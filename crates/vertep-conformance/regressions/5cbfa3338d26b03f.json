@@ -1,0 +1,96 @@
+{
+  "reason": "vertep-oracle did not finish within 10 s (a macrostep that never ends?). Rust: the macrostep exhausts the microstep budget of 200 (two error.execution queued per round by the failing guard of the parallel's transition, evaluated once per active atomic state); the Lean oracle does not terminate",
+  "scxml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<scxml xmlns=\"http://www.w3.org/2005/07/scxml\" version=\"1.0\">\n  <parallel id=\"p\">\n    <transition cond=\"x\"/>\n    <state id=\"a\"/>\n    <state id=\"b\"/>\n  </parallel>\n</scxml>\n",
+  "case": {
+    "chart": {
+      "name": null,
+      "datamodel": "null",
+      "datamodel_explicit": false,
+      "binding": "Early",
+      "binding_explicit": false,
+      "initial": [],
+      "data": [],
+      "script": null,
+      "states": [
+        {
+          "id": "p",
+          "id_generated": false,
+          "element": "Parallel",
+          "initial": [],
+          "initial_element": null,
+          "children": [
+            {
+              "id": "a",
+              "id_generated": false,
+              "element": "State",
+              "initial": [],
+              "initial_element": null,
+              "children": [],
+              "transitions": [],
+              "onentry": [],
+              "onexit": [],
+              "data": [],
+              "invokes": [],
+              "donedata": null,
+              "extensions": [],
+              "span": {
+                "line": 1,
+                "column": 101
+              }
+            },
+            {
+              "id": "b",
+              "id_generated": false,
+              "element": "State",
+              "initial": [],
+              "initial_element": null,
+              "children": [],
+              "transitions": [],
+              "onentry": [],
+              "onexit": [],
+              "data": [],
+              "invokes": [],
+              "donedata": null,
+              "extensions": [],
+              "span": {
+                "line": 1,
+                "column": 116
+              }
+            }
+          ],
+          "transitions": [
+            {
+              "events": [],
+              "cond": "x",
+              "targets": [],
+              "kind": "External",
+              "kind_explicit": false,
+              "body": [],
+              "extensions": [],
+              "span": {
+                "line": 1,
+                "column": 79
+              }
+            }
+          ],
+          "onentry": [],
+          "onexit": [],
+          "data": [],
+          "invokes": [],
+          "donedata": null,
+          "extensions": [],
+          "span": {
+            "line": 1,
+            "column": 62
+          }
+        }
+      ],
+      "extensions": [],
+      "span": {
+        "line": 1,
+        "column": 1
+      }
+    },
+    "inputs": []
+  }
+}

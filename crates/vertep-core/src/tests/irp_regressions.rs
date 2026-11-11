@@ -286,10 +286,41 @@ fn execution_error_carries_the_datamodel_message() {
     let Value::Object(fields) = &err.data else {
         panic!("error data is not an object: {:?}", err.data)
     };
-    assert_eq!(fields[0], ("kind".into(), Value::String("execution".into())));
+    assert_eq!(
+        fields[0],
+        ("kind".into(), Value::String("execution".into()))
+    );
     let Value::String(message) = &fields[1].1 else {
         panic!("message is not a string")
     };
     assert_eq!(fields[1].0, "message");
     assert!(!message.is_empty() && message != crate::session::EXECUTION_ERROR_MESSAGE);
+}
+
+/// Found by the Rust/Lean differential tests: an eventless transition whose guard fails queues
+/// `error.execution`, which enables nothing, after which the guard fails again. Every consumed
+/// event counts against the microstep budget, so the macrostep ends instead of looping forever.
+#[test]
+fn failing_eventless_guard_loop_hits_the_budget() {
+    use crate::session::{StartError, start};
+    let cc = compile(chart(vec![
+        atomic("s0").on(tr("", "s1").cond("not_an_in_predicate")),
+        atomic("s1"),
+    ]));
+    let mut input = start_input();
+    input.options.microstep_budget = 50;
+    match start(&cc, input, &mut crate::null::NullDatamodel) {
+        Err(StartError::BudgetExceeded { budget, partial }) => {
+            assert_eq!(budget, 50);
+            assert_eq!(partial.trace.microsteps.len(), 50);
+            assert!(
+                partial
+                    .trace
+                    .microsteps
+                    .iter()
+                    .all(|m| m.event.as_deref() == Some("error.execution"))
+            );
+        }
+        other => panic!("expected the budget to run out, got {other:?}"),
+    }
 }

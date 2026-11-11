@@ -9,13 +9,20 @@
 //!   now, the Lean oracle later), [`allow`] the expected-deviation allow-list and [`report`] the
 //!   run, the gate and the JSON report.
 //!
+//! - [`lean`] runs the Lean oracle on the Rust runs' recorded answer tapes and compares traces;
+//!   [`differential`] generates charts and inputs, compares Rust with Lean on them, shrinks
+//!   disagreements into the `regressions/` corpus, and compares the Rust validator with
+//!   `vt-certify`. [`corpus`] runs the SCXML and RDF round trips over the suite.
+//!
 //! The gate runs as `cargo test -p vertep-conformance --release -- --nocapture conformance`
 //! and writes `target/conformance-report.json`.
 
 pub mod allow;
 pub mod corpus;
+pub mod differential;
 pub mod engine;
 pub mod host;
+pub mod lean;
 pub mod manifest;
 pub mod report;
 pub mod verdict;
@@ -23,8 +30,9 @@ pub mod verdict;
 pub use allow::{AllowList, AllowListError, Deviation};
 pub use engine::{CaseRun, DocumentRun, EngineUnderTest, RustCore};
 pub use host::{Budget, ChartLoader, DirLoader, Host, Stop};
+pub use lean::{LeanOracle, LeanTools};
 pub use manifest::{Classification, Datamodel, Suite, TestCase};
-pub use report::{Record, Report, Status, Totals, run_suite};
+pub use report::{Record, Report, Status, Totals, run_differential, run_suite};
 pub use verdict::{FailReason, Verdict};
 
 use std::path::PathBuf;

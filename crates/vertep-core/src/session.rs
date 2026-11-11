@@ -40,7 +40,8 @@ pub const SCXML_INVOKE_TYPE: &str = "http://www.w3.org/TR/scxml/";
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Options {
-    /// The maximum number of microsteps per macrostep.
+    /// The maximum number of microsteps per macrostep: selections that fire transitions and
+    /// internal events consumed without enabling any (every [`MicrostepTrace`] record).
     pub microstep_budget: u32,
     /// `send` types the host can deliver; any other type raises `error.execution`.
     pub send_types: Vec<String>,
@@ -661,7 +662,10 @@ impl<'c, 'd> Driver<'c, 'd> {
         Driver {
             chart,
             s,
-            dm: Capture { inner: dm, last: None },
+            dm: Capture {
+                inner: dm,
+                last: None,
+            },
             effects: Vec::new(),
             to_invoke: chart.empty_set(),
             running: true,
@@ -1012,9 +1016,11 @@ impl<'c, 'd> Driver<'c, 'd> {
             && let Some(id) = t.strip_prefix("#_scxml_")
             && !known.iter().any(|k| k == id)
         {
-            self.s
-                .internal_queue
-                .push_back(platform_error("error.communication", COMMUNICATION_ERROR_MESSAGE, err_id));
+            self.s.internal_queue.push_back(platform_error(
+                "error.communication",
+                COMMUNICATION_ERROR_MESSAGE,
+                err_id,
+            ));
             return Ok(());
         }
         let exposed = if visible { Some(sendid.clone()) } else { None };
@@ -1092,11 +1098,20 @@ impl<'c, 'd> Driver<'c, 'd> {
         self.microsteps.push(MicrostepTrace { event, transitions });
     }
 
-    fn microstep(&mut self, event: Option<String>, ts: &[TransIdx]) -> Result<(), Budget> {
+    /// Charge one microstep record (a selection that fired transitions, or an event consumed
+    /// without enabling any) against the budget. Counting the latter too bounds a macrostep in
+    /// which every consumed event queues another one, such as a failing eventless guard
+    /// re-raising `error.execution` forever.
+    fn charge(&mut self) -> Result<(), Budget> {
         if self.used >= self.s.options.microstep_budget {
             return Err(Budget);
         }
         self.used += 1;
+        Ok(())
+    }
+
+    fn microstep(&mut self, event: Option<String>, ts: &[TransIdx]) -> Result<(), Budget> {
+        self.charge()?;
         self.record(event, ts);
         self.exit_states(ts);
         let chart = self.chart;
@@ -1223,6 +1238,7 @@ impl<'c, 'd> Driver<'c, 'd> {
                             self.dm.set_event(&ev);
                             enabled = self.select(Some(&ev.name));
                             if enabled.is_empty() {
+                                self.charge()?;
                                 self.record(Some(ev.name), &[]);
                                 continue;
                             }

@@ -26,6 +26,9 @@ pub enum FailReason {
     /// The document could not be read, compiled or started, a macrostep did not stabilize, or
     /// the interpreter panicked.
     InterpreterError(String),
+    /// A second engine (the Lean oracle) could not replay the Rust run or produced a different
+    /// trace.
+    Divergence(String),
 }
 
 impl fmt::Display for FailReason {
@@ -36,6 +39,7 @@ impl fmt::Display for FailReason {
             FailReason::BudgetExceeded(m) => write!(f, "budget exceeded: {m}"),
             FailReason::Stalled => f.write_str("stalled: no event pending and none scheduled"),
             FailReason::InterpreterError(m) => write!(f, "interpreter error: {m}"),
+            FailReason::Divergence(m) => write!(f, "differs from the Rust core: {m}"),
         }
     }
 }

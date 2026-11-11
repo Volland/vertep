@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::allow::AllowList;
 use crate::engine::{CaseRun, EngineUnderTest};
 use crate::manifest::{Classification, Datamodel, TestCase};
-use crate::verdict::Verdict;
+use crate::verdict::{FailReason, Verdict};
 
 /// What a variant's result means for the run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
@@ -64,8 +64,11 @@ pub struct Record {
     pub classification: Classification,
     /// The verdict on the Rust core; absent when not run.
     pub rust: Option<EngineVerdict>,
-    /// The verdict on the Lean oracle; absent until the oracle runs (task 8.6).
+    /// The verdict on the Lean oracle; absent when the oracle did not run.
     pub lean: Option<EngineVerdict>,
+    /// How the Lean oracle's verdict or trace differs from the Rust core's, if it does.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub divergence: Option<String>,
     /// What the result means for the run.
     pub status: Status,
     /// The failure reason (the Rust core's, or why an unexpected pass is a failure).
@@ -140,6 +143,7 @@ pub fn record(case: &TestCase, run: Option<&CaseRun>, allow: &AllowList) -> Reco
             classification: case.classification,
             rust: None,
             lean: None,
+            divergence: None,
             status: Status::NotRun,
             reason: None,
             allow_reason,
@@ -169,6 +173,7 @@ pub fn record(case: &TestCase, run: Option<&CaseRun>, allow: &AllowList) -> Reco
         classification: case.classification,
         rust: Some(EngineVerdict::of(&run.verdict)),
         lean: None,
+        divergence: None,
         status,
         reason,
         allow_reason,
@@ -179,36 +184,110 @@ pub fn record(case: &TestCase, run: Option<&CaseRun>, allow: &AllowList) -> Reco
 /// Run every variant on `engine` (manual tests are listed, not run), in parallel, and build
 /// the report.
 pub fn run_suite(cases: &[TestCase], allow: &AllowList, engine: &dyn EngineUnderTest) -> Report {
-    let runs = run_parallel(cases, engine);
-    let mut report = Report {
-        engines: vec![engine.name().to_string()],
-        ..Report::default()
-    };
-    for (case, run) in cases.iter().zip(runs) {
-        let r = record(case, run.as_ref(), allow);
-        report
-            .totals
-            .entry(r.classification)
-            .or_default()
-            .add(r.status);
-        report
-            .totals_by_datamodel
-            .entry(format!("{}/{}", r.classification, r.datamodel))
-            .or_default()
-            .add(r.status);
-        report.records.push(r);
-    }
-    report
+    let runs = run_parallel(cases, |case| engine.run(case, None));
+    let records = cases
+        .iter()
+        .zip(runs)
+        .map(|(case, run)| record(case, run.as_ref(), allow))
+        .collect();
+    Report::from_records(vec![engine.name().to_string()], records)
 }
 
-/// Run the non-manual cases on worker threads; results come back in case order.
-pub fn run_parallel(cases: &[TestCase], engine: &dyn EngineUnderTest) -> Vec<Option<CaseRun>> {
+/// Run every variant on the Rust core with the answer tape recorded, replay each run on the
+/// second engine (the Lean oracle), and report both verdicts
+/// ([[openspec:scxml-conformance#Lean Model Conformance]]). A variant whose second verdict or
+/// trace differs from the Rust run breaks the build, whatever its classification; the
+/// allow-list applies to the Rust verdict as in [`run_suite`].
+// @tg: implements:: [[openspec:scxml-conformance#Lean Model Conformance]]
+pub fn run_differential(
+    cases: &[TestCase],
+    allow: &AllowList,
+    rust: &dyn EngineUnderTest,
+    lean: &dyn EngineUnderTest,
+) -> Report {
+    let runs = run_parallel(cases, |case| {
+        let r = rust.run(case, None);
+        let l = lean.run(case, Some(&r));
+        (r, l)
+    });
+    let records = cases
+        .iter()
+        .zip(runs)
+        .map(|(case, run)| {
+            let Some((r, l)) = run else {
+                return record(case, None, allow);
+            };
+            let mut rec = record(case, Some(&r), allow);
+            rec.lean = Some(EngineVerdict::of(&l.verdict));
+            // Runs Rust could not record (an unreadable document) have nothing to replay.
+            let replayable = r.documents.iter().all(|d| !d.records.is_empty());
+            let divergence = match (&r.verdict, &l.verdict) {
+                _ if !replayable => None,
+                (_, Verdict::Fail(FailReason::Divergence(m))) => Some(m.clone()),
+                (a, b) if a == b => None,
+                (a, b) => Some(format!(
+                    "verdicts differ: rust {}, lean {}",
+                    EngineVerdict::of(a).verdict,
+                    b.reason().map_or("pass".to_string(), ToString::to_string)
+                )),
+            };
+            if divergence.is_some() {
+                rec.breaks_build = true;
+            }
+            rec.divergence = divergence;
+            rec
+        })
+        .collect();
+    Report::from_records(
+        vec![rust.name().to_string(), lean.name().to_string()],
+        records,
+    )
+}
+
+impl Report {
+    /// A report over `records`, with totals.
+    pub fn from_records(engines: Vec<String>, records: Vec<Record>) -> Self {
+        let mut report = Report {
+            engines,
+            ..Report::default()
+        };
+        for r in records {
+            report
+                .totals
+                .entry(r.classification)
+                .or_default()
+                .add(r.status);
+            report
+                .totals_by_datamodel
+                .entry(format!("{}/{}", r.classification, r.datamodel))
+                .or_default()
+                .add(r.status);
+            report.records.push(r);
+        }
+        report
+    }
+
+    /// The records where the Lean oracle disagrees with the Rust core.
+    pub fn divergences(&self) -> Vec<&Record> {
+        self.records
+            .iter()
+            .filter(|r| r.divergence.is_some())
+            .collect()
+    }
+}
+
+/// Run `work` on the non-manual cases on worker threads; results come back in case order.
+pub fn run_parallel<T, F>(cases: &[TestCase], work: F) -> Vec<Option<T>>
+where
+    T: Send,
+    F: Fn(&TestCase) -> T + Sync,
+{
     let workers = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
         .min(16);
     let next = std::sync::atomic::AtomicUsize::new(0);
-    let mut results: Vec<Option<CaseRun>> = vec![None; cases.len()];
+    let mut results: Vec<Option<T>> = (0..cases.len()).map(|_| None).collect();
     let collected = std::sync::Mutex::new(Vec::new());
     std::thread::scope(|scope| {
         for _ in 0..workers {
@@ -223,7 +302,7 @@ pub fn run_parallel(cases: &[TestCase], engine: &dyn EngineUnderTest) -> Vec<Opt
                         if case.classification == Classification::Manual {
                             continue;
                         }
-                        let run = engine.run(case, None);
+                        let run = work(case);
                         if let Ok(mut c) = collected.lock() {
                             c.push((i, run));
                         }
