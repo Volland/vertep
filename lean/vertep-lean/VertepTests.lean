@@ -4,3 +4,4 @@ import VertepTests.Axioms
 import VertepTests.WellFormed
 import VertepTests.Step
 import VertepTests.Theorems
+import VertepTests.Rdf

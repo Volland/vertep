@@ -83,7 +83,8 @@ theorem select_spec (cc : CChart) (ev : Option String) (core core' : Core)
   simp only [bind, pure, Except.pure, Except.bind] at h
   generalize hc : (Select.choices cc.candidates
     (fun _ _ t => if Interp.matchP cc ev t then (Interp.guard cc t).run
-      { config := core.config, sessionid := core.sessionid, options := core.options }
+      { config := core.config, sessionid := core.sessionid, options := core.options,
+        sessions := core.sessions }
       else pure false) (core.config.filter cc.isAtomic) 0).run ex = r at h
   cases r with
   | error e => cases h
@@ -94,7 +95,8 @@ theorem select_spec (cc : CChart) (ev : Option String) (core core' : Core)
     refine ⟨rfl, ?_⟩
     obtain ⟨g, hg⟩ := Select.choices_run cc.candidates (Interp.matchP cc ev)
       (fun _ _ t => (Interp.guard cc t).run
-        { config := core.config, sessionid := core.sessionid, options := core.options })
+        { config := core.config, sessionid := core.sessionid, options := core.options,
+          sessions := core.sessions })
       _ 0 ex _ chs hc
     exact ⟨g, by rw [hg]; rfl⟩
 

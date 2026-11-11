@@ -29,3 +29,18 @@ Lean) fails the build. -/
 VertepTests`. `VertepTests.Axioms` pins the axioms of every main theorem. -/
 @[default_target] lean_lib VertepTests where
   globs := #[.andSubmodules `VertepTests]
+
+/-- The differential oracle (formal-model, *Differential Oracle*):
+`lake exe vertep-oracle --chart CHART.nq --records RECORDS.jsonl [--out TRACES.jsonl] [--compare]`. -/
+lean_exe «vertep-oracle» where
+  root := `VertepOracleMain
+
+/-- The chart certifier behind `vt certify` (formal-model, *Chart Certificates*):
+`lake exe vt-certify --chart CHART.nq [--out CERT.nt] [--time DATETIME]`. -/
+lean_exe «vt-certify» where
+  root := `VertepCertifyMain
+
+/-- Empirical agreement of the chart shapes (LeanRDF SHACL Core) with `WellFormed`:
+`lake exe vertep-shapes FILE.nq…`. -/
+lean_exe «vertep-shapes» where
+  root := `VertepShapesMain

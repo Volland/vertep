@@ -204,6 +204,8 @@ structure ExecSt (cc : CChart) where
   internal : List Event
   sendCounter : Nat
   invokeCounter : Nat
+  /-- The error message of the most recent datamodel call, if it failed (Rust `Capture`). -/
+  lastError : Option String := none
 
 /-- State owned by the interpreter (the rest of Rust's `Session` and `Driver`). -/
 structure Core where
@@ -221,6 +223,8 @@ structure Core where
   running : Bool
   /-- Microsteps taken in this macrostep. -/
   used : Nat
+  /-- The reachable session identifiers of the current input, if the host listed them. -/
+  sessions : Option (List String)
   micros : Array MicrostepTrace
   terminatedNow : Bool
   deriving Inhabited
@@ -230,6 +234,7 @@ structure Env where
   config : List Nat
   sessionid : String
   options : Options
+  sessions : Option (List String) := none
 
 /-- The datamodel and effect state monad. -/
 abbrev SM (cc : CChart) := StateT (ExecSt cc) (Except StepError)
@@ -298,16 +303,35 @@ def nullAnswer (config : List Nat) : Request → Answer
     | none => .error "the null datamodel does not support conditions other than In()"
   | .evalContent c => .value (.str c)
   | .isLocation _ => .bool false
+  | .declare _ => .error "the null datamodel does not support data"
+  | .evalValue _ => .error "the null datamodel does not support value expressions"
+  | .assignExpr .. => .error "the null datamodel does not support assign"
+  | .assignValue .. => .error "the null datamodel does not support assign"
+  | .bindVar .. => .error "the null datamodel does not support variables"
+  | .execScript _ => .error "the null datamodel does not support script"
+  | .foreachItems _ => .error "the null datamodel does not support foreach"
   | .restore .undefined => .unit
-  | _ => .error "the null datamodel does not support this operation"
+  | .restore _ => .error "a null datamodel snapshot is undefined"
+
+/-- Rust `Capture`: the error remembered after a call (`set_environment` and `set_event` keep
+it, `is_location` clears it, every other call records its own result). -/
+def noteError (r : Request) (a : Answer) (last : Option String) : Option String :=
+  match r with
+  | .setEnvironment _ => last
+  | .setEvent _ => last
+  | .isLocation _ => none
+  | _ => match a with
+    | .error m => some m
+    | _ => none
 
 /-- Issue one datamodel request: answered natively for the `null` datamodel, otherwise taken
 from the tape, which must record exactly this request next with an answer of the right shape. -/
 def request (r : Request) (h : LocOk cc r) : EM cc Answer := do
   let env ← read
   if cc.datamodel == "null" then
-    modify fun st => { st with log := st.log.push ⟨r, h⟩ }
-    pure (nullAnswer cc env.config r)
+    let a := nullAnswer cc env.config r
+    modify fun st => { st with log := st.log.push ⟨r, h⟩, lastError := noteError r a st.lastError }
+    pure a
   else
     let st ← get
     match st.tape with
@@ -315,7 +339,8 @@ def request (r : Request) (h : LocOk cc r) : EM cc Answer := do
     | e :: rest =>
       if e.request == r then
         if Answer.wellShaped r e.answer then
-          set { st with tape := rest, log := st.log.push ⟨r, h⟩ }
+          set { st with tape := rest, log := st.log.push ⟨r, h⟩,
+                        lastError := noteError r e.answer st.lastError }
           pure e.answer
         else throw (.badAnswer r e.answer)
       else throw (.tapeMismatch r e.request)
@@ -324,10 +349,25 @@ def request (r : Request) (h : LocOk cc r) : EM cc Answer := do
 def ask (r : Request) (h : r.writes = none) : EM cc Answer :=
   request cc r (fun l hl => by rw [h] at hl; cases hl)
 
-/-- Queue `error.execution` (Rust `queue_error`). -/
+/-- The message of an `error.execution` the core raises itself. -/
+def executionErrorMessage : String := "execution error"
+/-- The message of an `error.communication` for a session the host says does not exist. -/
+def communicationErrorMessage : String := "target session does not exist"
+
+/-- Rust `platform_error`: a platform event with data `{kind, message}`, `kind` being the name
+after `error.`. -/
+def platformError (name message : String) (sendid : Option String) : Event :=
+  let kind := if name.startsWith "error." then String.ofList (name.toList.drop 6) else name
+  { name, type := .platform, sendid,
+    data := .object [("kind", .str kind), ("message", .str message)] }
+
+/-- Queue `error.execution` (Rust `queue_error`): its message is the error of the most recent
+datamodel call if that call failed (and is then forgotten), else `execution error`. -/
 def queueError (sendid : Option String := none) : EM cc Unit :=
-  modify fun st => { st with internal := st.internal ++
-    [{ name := "error.execution", type := .platform, sendid }] }
+  modify fun st => { st with
+    internal := st.internal ++
+      [platformError "error.execution" (st.lastError.getD executionErrorMessage) sendid],
+    lastError := none }
 
 /-- Queue an event. -/
 def enqueue (e : Event) : EM cc Unit :=
@@ -354,10 +394,11 @@ def evalString (e : Expr) : EM cc (Option String) := do
   pure ((← evalValue cc e).bind Value.toStr)
 
 /-- `eval_cond`. -/
-def evalCond (e : Expr) : EM cc (Option Bool) := do
+def evalCond (e : Expr) : EM cc (Except String Bool) := do
   match ← ask cc (.evalCond e) rfl with
-  | .bool b => pure (some b)
-  | _ => pure none
+  | .bool b => pure (.ok b)
+  | .error m => pure (.error m)
+  | _ => pure (.error executionErrorMessage)
 
 /-- `assign_value`; `false` on an error. -/
 def assignValue (loc : String) (v : Value) (h : loc ∈ cc.locations) : EM cc Bool := do
@@ -497,6 +538,16 @@ def execSend (s : Send) (hid : ∀ l, s.idlocation = some l → l ∈ cc.locatio
     match target with
     | some t => if !(t.startsWith "#_" || t.toList.contains ':') then return (← fail)
     | none => pure ()
+  -- a session the host says does not exist: error.communication at once, the block continues
+  if scxml && delayMs == 0 then
+    match target, env.sessions with
+    | some t, some known =>
+      if t.startsWith "#_scxml_" then
+        let id := String.ofList (t.toList.drop "#_scxml_".length)
+        if !known.contains id then
+          enqueue cc (platformError "error.communication" communicationErrorMessage (some sendid))
+          return true
+    | _, _ => pure ()
   let exposed := if visible then some sendid else none
   if target == some "#_internal" && delayMs == 0 then
     enqueue cc { name := name.getD "", type := .internal, sendid := exposed, data }
@@ -590,7 +641,7 @@ def execBranches : (bs : List (Option Expr × List Exec)) →
   | (c, b) :: bs, h => do
     let take ← match c with
       | none => pure (some true)
-      | some e => evalCond cc e
+      | some e => do pure (← evalCond cc e).toOption
     match take with
     | none => queueError cc; pure false
     | some true => execBlock b (fun l hl => h l (by simp [branchLocs, hl]))
@@ -650,7 +701,7 @@ def startInvoke (s index : Nat) (v : Invoke)
 def liftE {α : Type} (x : EM cc α) : M cc α := do
   let core ← get
   StateT.lift (x.run { config := core.config, sessionid := core.sessionid,
-                       options := core.options })
+                       options := core.options, sessions := core.sessions })
 
 /-- Run a list of top-level blocks. -/
 def runBlocks (bs : List Block) (h : ∀ b ∈ bs, ∀ l ∈ blockLocs b, l ∈ cc.locations) :
@@ -676,8 +727,8 @@ def guard (t : Nat) : EM cc Bool :=
   | none => pure true
   | some e => do
     match ← evalCond cc e with
-    | some b => pure b
-    | none => queueError cc; pure false
+    | .ok b => pure b
+    | .error m => enqueue cc (platformError "error.execution" m none); pure false
 
 /-- Appendix D `selectEventlessTransitions` (`ev = none`) and `selectTransitions` (`ev = some
 name`), including `removeConflictingTransitions` (Rust `kernel::select_transitions`). The loops
@@ -685,7 +736,8 @@ are `Select.choices` and `Select.removeConflicting`, the definitions the selecti
 about. -/
 def select (ev : Option String) : M cc (List Nat) := do
   let core ← get
-  let env : Env := { config := core.config, sessionid := core.sessionid, options := core.options }
+  let env : Env := { config := core.config, sessionid := core.sessionid, options := core.options,
+                     sessions := core.sessions }
   let chs ← StateT.lift (Select.choices cc.candidates
     (fun _ _ t => if matchP cc ev t then (guard cc t).run env else pure false)
     (core.config.filter cc.isAtomic) 0)
@@ -848,12 +900,7 @@ def runMacrostep : M cc Unit := do
 
 /-- Rust `run_external`. -/
 def runExternal (ev : Event) : M cc Unit := do
-  let core ← get
-  -- events from an invocation that is no longer active are discarded (W3C SCXML 6.4)
-  if let some id := ev.invokeid then
-    if !core.invocations.any (fun i => i.invokeid == id) then
-      record cc (some ev.name) []
-      return
+  -- every delivered event is processed; only active invocations run finalize or forward
   if ev.name.startsWith "done.invoke." then
     let rest := String.ofList (ev.name.toList.drop "done.invoke.".length)
     modify fun core => { core with invocations := core.invocations.map (fun i =>
@@ -925,13 +972,13 @@ def finish (input : TraceInput) (core : Core) (ex : ExecSt cc) : Out cc :=
     tape := ex.tape }
 
 /-- Run an interpreter body from a session and a tape. -/
-def run (input : TraceInput) (body : M cc Unit) (s : Session) (tape : Tape) :
-    Except StepError (Out cc) :=
+def run (input : TraceInput) (body : M cc Unit) (s : Session) (tape : Tape)
+    (sessions : Option (List String)) : Except StepError (Out cc) :=
   let core : Core :=
     { sessionid := s.sessionid, terminated := s.terminated, config := s.config,
       history := s.history, invocations := s.invocations, initialized := s.initialized,
       macrosteps := s.macrosteps, options := s.options, toInvoke := [], running := true,
-      used := 0, micros := #[], terminatedNow := false }
+      used := 0, sessions := sessions, micros := #[], terminatedNow := false }
   let ex : ExecSt cc :=
     { tape, log := #[], effects := #[], internal := s.internal, sendCounter := s.sendCounter,
       invokeCounter := s.invokeCounter }
@@ -969,7 +1016,7 @@ external event). -/
 -- @tg: implements:: [[openspec:formal-model#Executable Step Semantics]]
 def start (cc : CChart) (si : StartInput) (tape : Tape) : Except StepError (Out cc) :=
   Interp.run cc (.start si.info.sessionid) (Interp.startBody cc si)
-    (Session.fresh si.info.sessionid si.options) tape
+    (Session.fresh si.info.sessionid si.options) tape si.sessions
 
 /-- Process one input (Rust `session::step`): one macrostep for an external event, or
 termination for a cancel. Same inputs and outputs as the Rust step, with the datamodel replaced
@@ -980,6 +1027,6 @@ def step (cc : CChart) (s : Session) (i : Input) (tape : Tape) : Except StepErro
   if s.terminated then .error .terminated
   else Interp.run cc (match i.kind with
       | .event e => .event e
-      | .cancel => .cancel) (Interp.stepBody cc i) s tape
+      | .cancel => .cancel) (Interp.stepBody cc i) s tape i.sessions
 
 end Vertep

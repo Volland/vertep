@@ -8,25 +8,14 @@ and `VertepTests`). This file only *states* the theorem, as a `Prop`; nothing he
 and nothing here is assumed by the library. Check that it elaborates with
 `lake env lean Pending/ConfigWF.lean`.
 
-## Status: false under the current well-formedness rules
+## Status: not proven
 
-The statement below does not hold for every chart that `WellFormed` (and the Rust validator,
-which it mirrors) accepts. Two counterexamples, both run by the executable `step`:
-
-1. *A history target next to a sibling target.* `check_target_set` skips history targets, so
-   `<transition target="h a2">` with `h` a history child of compound `a` and `a2` a child of `a`
-   is accepted. Entering it enters the history default (`a1`) and `a2`: compound `a` ends with two
-   active children (`["a", "a1", "a2"]`).
-2. *An `initial` attribute naming a history state without a default transition.* The
-   synthesized default of such a history state is its parent's initial target, i.e. itself, so
-   `addDescendantStatesToEnter` never terminates (Rust recurses without bound; Lean runs out of
-   fuel and fails with `illFormed`).
-
-Both are fixed by extending the target-set rule to history targets (a history target counts as
-a target at its parent's position, so it conflicts with any other target under that parent that
-is not in a different region of a parallel state) and by rejecting `initial` targets (attribute
-or `<initial>`) that are history states with no default transition. With those two rules added
-to `WellFormed` (and to `validate.rs`), the statement is expected to hold.
+The two counterexamples found earlier (a history target next to a sibling target; an `initial`
+naming a history state without a default transition, whose default entry never ends) are now
+rejected by `WellFormed`, mirroring `validate.rs` (history targets stand for their parent in the
+target-set rule; `HistoryDefaultCycle`). They are kept as tests in `VertepTests/WellFormed.lean`.
+No counterexample is known under the current rules, and the IRP corpus run by the oracle stays
+legal, but the proof below has not been done.
 
 ## Missing lemmas for the proof
 

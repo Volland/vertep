@@ -13,8 +13,11 @@ checks them, one conjunct per Rust violation kind:
   and the root `initial` names a state;
 * `IllegalInitialTarget` — `initial` attribute and `<initial>` targets are proper descendants of
   the owning state;
-* `IllegalTargetSet` — the targets of one transition (history targets aside) are pairwise
-  distinct, unrelated by descent, and their lowest common proper ancestor is a parallel state;
+* `IllegalTargetSet` — the targets of one transition (a history target at its parent's position)
+  are pairwise distinct, unrelated by descent, and their lowest common proper ancestor is a
+  parallel state;
+* `HistoryDefaultCycle` — following history default entries never leads back to the history
+  state it started from;
 * `InitialOnNonCompound`, `InitialAttributeAndElement`, `IllegalInitialTransition`;
 * `HistoryAtRoot`, `HistoryTransitionCount`, `IllegalHistoryTransition`,
   `IllegalHistoryTarget`, `HistoryContent`;
@@ -213,9 +216,18 @@ instance (c : Chart) (x y : State) : Decidable (LcaParallel c x y) := by
 def PairOk (c : Chart) (x y : State) : Prop :=
   x.id ≠ y.id ∧ x.id ∉ y.descIds ∧ y.id ∉ x.descIds ∧ LcaParallel c x y
 
-/-- `IllegalTargetSet`: the existing non-history targets are pairwise compatible. -/
+/-- The position a target takes in the target-set rule: the state itself, or for a history
+state its parent, whose content it stands for (a history state at the root is reported on its
+own and skipped here). -/
+def targetPosition (c : Chart) (t : String) : Option State :=
+  match c.find t with
+  | some s => if s.isHistory then c.parentOf s else some s
+  | none => none
+
+/-- `IllegalTargetSet`: the existing targets, history targets at their parent's position, are
+pairwise compatible. -/
 def TargetSetOk (c : Chart) (ts : List String) : Prop :=
-  (ts.filterMap (fun t => (c.find t).filter (!·.isHistory))).Pairwise (PairOk c)
+  (ts.filterMap (targetPosition c)).Pairwise (PairOk c)
 
 instance (c : Chart) (ts : List String) : Decidable (TargetSetOk c ts) := by
   unfold TargetSetOk PairOk; infer_instance
@@ -269,6 +281,42 @@ def StateOk (c : Chart) (p : Option State) (s : State) : Prop :=
   (∀ b ∈ s.onentry ++ s.onexit, BlockOk b) ∧
   (∀ v ∈ s.invokes, InvokeOk v)
 
+/-- Rust `resolve_initial` targets of a state: for a compound state its `initial` attribute,
+else its `<initial>` transition's targets, else its first non-history child; nothing otherwise. -/
+def initialTargets (s : State) : List String :=
+  if s.kind != .compound then []
+  else if !s.initial.isEmpty then s.initial
+  else match s.initialElement with
+    | some i => i.transition.targets
+    | none => match s.children.find? (fun c => !c.isHistory) with
+      | some c => [c.id]
+      | none => []
+
+/-- The history states the default entry of history state `h` targets (Rust
+`history_default_edges`): through its default transition, or without one through its parent's
+initial targets. -/
+def historyDefaultEdges (c : Chart) (h : State) : List State :=
+  let targets := match h.transitions.head?, c.parentOf h with
+    | some t, _ => t.targets
+    | none, some p => initialTargets p
+    | none, none => []
+  (targets.filterMap c.find).filter (·.isHistory)
+
+/-- The states reachable from `frontier` along `historyDefaultEdges`, in at most `n` rounds. -/
+def historyReach (c : Chart) : Nat → List State → List State
+  | 0, _ => []
+  | n + 1, frontier =>
+    frontier ++ historyReach c n (frontier.flatMap (historyDefaultEdges c))
+
+/-- `HistoryDefaultCycle`: default history entry never leads back to the history state it
+started from (paths of every length up to the number of states are followed). -/
+def HistoryDefaultsAcyclic (c : Chart) : Prop :=
+  ∀ h ∈ c.allStates, h.isHistory = true →
+    h.id ∉ (historyReach c c.allStates.length (historyDefaultEdges c h)).map State.id
+
+instance (c : Chart) : Decidable (HistoryDefaultsAcyclic c) := by
+  unfold HistoryDefaultsAcyclic; infer_instance
+
 /-- `<data>`: not both `expr` and a source (`src`, inline content, or both: a resolved `src`
 keeps the reference and the content it resolved to). -/
 def DataOk (d : Data) : Prop := ([d.src.isSome || d.content.isSome, d.expr.isSome].count true) ≤ 1
@@ -282,7 +330,8 @@ def WellFormed (c : Chart) : Prop :=
   (∀ x ∈ c.initial, x ∈ c.ids) ∧ TargetSetOk c c.initial ∧
   (∀ s ∈ c.states, s.isHistory = false) ∧
   (c.allData.map (·.id)).Nodup ∧ (∀ d ∈ c.allData, DataOk d) ∧
-  (∀ p ∈ c.parented, StateOk c p.1 p.2)
+  (∀ p ∈ c.parented, StateOk c p.1 p.2) ∧
+  HistoryDefaultsAcyclic c
 
 /-! ## The decision procedure -/
 
@@ -313,5 +362,38 @@ def checkWF (c : Chart) : Bool := decide (WellFormed c)
 theorem checkWF_iff (c : Chart) : checkWF c = true ↔ WellFormed c := by
   unfold checkWF
   exact decide_eq_true_iff
+
+end Vertep
+
+namespace Vertep
+
+/-! ## Named violations (for `vt certify`) -/
+
+/-- Every rule group of `WellFormed`, its verdict, and the states it names when it fails. -/
+def ruleChecks (c : Chart) : List (String × Bool) :=
+  let bad := fun (p : State → Prop) [DecidablePred p] =>
+    String.intercalate ", " ((c.allStates.filter (fun s => !decide (p s))).map State.id)
+  [ ("EmptyChart", decide (c.states ≠ [])),
+    ("MissingId", decide (∀ s ∈ c.allStates, s.id ≠ "")),
+    ("DuplicateStateId", decide c.ids.Nodup),
+    ("UnknownTarget (root initial)", decide (∀ x ∈ c.initial, x ∈ c.ids)),
+    ("IllegalTargetSet (root initial)", decide (TargetSetOk c c.initial)),
+    ("HistoryAtRoot", decide (∀ s ∈ c.states, s.isHistory = false)),
+    ("DuplicateDataId", decide (c.allData.map (·.id)).Nodup),
+    ("ConflictingAttributes (data)", decide (∀ d ∈ c.allData, DataOk d)),
+    ("state rules (" ++ bad (fun s => StateOk c (c.parentOf s) s) ++ ")",
+      decide (∀ p ∈ c.parented, StateOk c p.1 p.2)),
+    ("HistoryDefaultCycle", decide (HistoryDefaultsAcyclic c)) ]
+
+/-- The violated rule groups, by name. -/
+def violations (c : Chart) : List String := ((ruleChecks c).filter (fun r => !r.2)).map (·.1)
+
+/-- No violation is reported exactly when the chart is well-formed. -/
+-- @tg: implements:: [[openspec:formal-model#Chart Certificates]]
+theorem violations_eq_nil_iff (c : Chart) : violations c = [] ↔ WellFormed c := by
+  unfold violations ruleChecks WellFormed
+  simp only [List.map_eq_nil_iff, List.filter_eq_nil_iff, List.mem_cons, List.not_mem_nil,
+    or_false, forall_eq_or_imp, forall_eq, Bool.not_eq_true', decide_eq_false_iff_not,
+    Decidable.not_not]
 
 end Vertep

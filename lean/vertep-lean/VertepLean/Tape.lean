@@ -235,6 +235,9 @@ inductive InputKind where
 structure Input where
   env : Environment := {}
   kind : InputKind
+  /-- The session identifiers the SCXML Event I/O Processor can deliver to, when the host
+  knows them (Rust `Input::sessions`). -/
+  sessions : Option (List String) := none
   deriving Repr, BEq
 
 /-- Interpreter options fixed at session start (Rust `Options`). -/
@@ -252,6 +255,8 @@ structure StartInput where
   options : Options := {}
   /-- Values for top-level data items supplied by the invoking session (W3C SCXML 6.4.4). -/
   data : List (String × Value) := []
+  /-- The session identifiers the SCXML Event I/O Processor can deliver to, when known. -/
+  sessions : Option (List String) := none
   deriving Repr, BEq
 
 end Vertep

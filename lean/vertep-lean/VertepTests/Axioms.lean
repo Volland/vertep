@@ -27,7 +27,9 @@ def mainTheorems : List Name :=
     ``Vertep.Select.selected_conflictFree, ``Vertep.Select.selected_optimal,
     ``Vertep.Select.selected_nodup, ``Vertep.select_spec, ``Vertep.transition_selection,
     ``Vertep.step_requests_declared, ``Vertep.start_requests_declared,
-    ``Vertep.dynamic_typed_soundness ]
+    ``Vertep.dynamic_typed_soundness, ``Vertep.violations_eq_nil_iff,
+    ``Vertep.Rdf.fromRDF_sound, ``Vertep.Rdf.canonical_determined,
+    ``Vertep.Rdf.version_determined, ``Vertep.Certify.check_certified_wellFormed ]
 
 /-- The axioms of `n` outside the allowed set. -/
 def disallowed (n : Name) : CoreM (Array Name) := do

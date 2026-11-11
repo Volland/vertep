@@ -6,3 +6,13 @@ import VertepLean.Select
 import VertepLean.Step
 import VertepLean.Theorems
 import VertepLean.Vocab
+import VertepLean.Sha256
+import VertepLean.Rdf.Project
+import VertepLean.Rdf.Canon
+import VertepLean.Rdf.Reconstruct
+import VertepLean.Json
+import VertepLean.Oracle
+import VertepLean.Certify
+import VertepLean.Rdf.Shapes
+import VertepLean.ShapesCheck
+import VertepLean.Rdf.Theorems
