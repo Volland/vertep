@@ -57,7 +57,10 @@ const RUNTIME_JS: &str = include_str!("runtime.js");
 struct HostState {
     /// SplitMix64 state behind `Math.random`.
     rng: Cell<u64>,
-    /// Answers to `In(id)` for the evaluation in progress.
+    /// The active states of the evaluation in progress, when the caller listed them.
+    active: RefCell<Option<BTreeSet<String>>>,
+    /// Answers to `In(id)` for prefetched candidate ids, used when the caller cannot list the
+    /// active states.
     in_answers: RefCell<BTreeMap<String, bool>>,
 }
 
@@ -125,12 +128,16 @@ fn in_predicate(_this: &JsValue, args: &[JsValue], ctx: &mut Context) -> JsResul
         .unwrap_or_default()
         .to_string(ctx)?
         .to_std_string_escaped();
-    let answer = host_state(ctx)?.in_answers.borrow().get(&id).copied();
+    let host = host_state(ctx)?;
+    let answer = match host.active.borrow().as_ref() {
+        Some(active) => Some(active.contains(&id)),
+        None => host.in_answers.borrow().get(&id).copied(),
+    };
     match answer {
         Some(active) => Ok(JsValue::new(active)),
         None => Err(JsNativeError::typ()
             .with_message(format!(
-                "In('{id}'): the state id must appear as a string literal in a chart expression or script"
+                "In('{id}'): the caller cannot list its active states, so the state id must appear as a string literal in a chart expression or script"
             ))
             .into()),
     }
@@ -376,20 +383,29 @@ impl Session {
     }
 
     /// Answers `In()` for every candidate state id against `states`.
+    /// Copies what `In()` needs out of `states`: the whole active configuration when the
+    /// caller can list it, otherwise answers for every candidate id seen as a literal.
     fn prepare_in(&mut self, text: &str, states: &dyn StateQuery) {
         self.note_candidates(text);
-        let answers = self
-            .in_candidates
-            .iter()
-            .map(|id| (id.clone(), states.in_state(id)))
-            .collect();
+        let active: Option<BTreeSet<String>> =
+            states.active_states().map(|ids| ids.into_iter().collect());
+        let answers = if active.is_some() {
+            BTreeMap::new()
+        } else {
+            self.in_candidates
+                .iter()
+                .map(|id| (id.clone(), states.in_state(id)))
+                .collect()
+        };
         if let Some(host) = self.ctx.get_data::<HostState>() {
+            *host.active.borrow_mut() = active;
             *host.in_answers.borrow_mut() = answers;
         }
     }
 
     fn clear_in(&mut self) {
         if let Some(host) = self.ctx.get_data::<HostState>() {
+            host.active.borrow_mut().take();
             host.in_answers.borrow_mut().clear();
         }
     }

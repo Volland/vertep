@@ -9,10 +9,11 @@
 //!
 //! - Inline content that `JSON.parse` accepts becomes that value; anything else becomes a
 //!   string whose runs of XML whitespace are collapsed to single spaces and trimmed.
-//! - `In(id)` answers for state ids that appear as string literals in chart expressions or
-//!   scripts that mention `In`; a computed id never seen as a literal is an evaluation error,
-//!   because the trait's [`StateQuery`](vertep_core::datamodel::StateQuery) cannot be kept
-//!   past the call that supplies it.
+//! - `In(id)` answers from a copy of
+//!   [`StateQuery::active_states`](vertep_core::datamodel::StateQuery::active_states) taken
+//!   before each evaluation, so computed ids work. When the caller cannot list its states, it
+//!   answers only ids that appear as string literals in chart expressions or scripts that
+//!   mention `In`, and any other id is an evaluation error.
 //! - Values leave the engine as `JSON.stringify` would shape them, except that `undefined` is
 //!   kept; functions become `undefined`, cycles and symbols are evaluation errors.
 //!

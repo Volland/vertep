@@ -73,6 +73,10 @@ SCXML 1.0 XML reader and writer to and from the IR, with `vt:` extension attribu
 - uses:: [[components#vertep-core]] {kind: required}
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
+Implemented 2026-11-11 on quick-xml: reader with spans, recoverable errors, `vt:` and foreign extensions, a caller-supplied `SourceResolver` and a `DatamodelSet` of registered names; writer; strict mode over a loss report that separates content losses from formatting losses. Every IRP chart and generated charts round-trip.
+
+IR gaps it reports as losses, to close before the IR is frozen for M1: no extension slot on `<datamodel>`, executable-content blocks, `donedata`, `param`, `content`, `elseif`/`else` and the top-level script; inline content cannot tell text from XML; `<content src>` must be inlined; the xpath `<assign type attr>` form (optional IRP tests 474–480, 483) is not representable.
+
 ## vertep-dm-ecma
 
 The `ecmascript` datamodel on the boa engine, behind a cargo feature, used for SCXML conformance and imported real-world charts.

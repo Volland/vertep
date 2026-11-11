@@ -13,6 +13,19 @@ impl StateQuery for Active {
 
 const NONE: Active = Active(&[]);
 
+/// A configuration that can also list its active states, as the interpreter's does.
+struct Listed(&'static [&'static str]);
+
+impl StateQuery for Listed {
+    fn in_state(&self, id: &str) -> bool {
+        self.0.contains(&id)
+    }
+
+    fn active_states(&self) -> Option<Vec<String>> {
+        Some(self.0.iter().map(|s| (*s).to_string()).collect())
+    }
+}
+
 fn session() -> EcmaDatamodel {
     let mut dm = EcmaDatamodel::new();
     dm.init_session(&SessionInfo {
@@ -185,6 +198,25 @@ fn in_predicate_answers_from_the_configuration() {
     assert_eq!(dm.eval_cond("inB()", &Active(&["b"])), Ok(true));
     assert_eq!(dm.eval_cond("inB()", &Active(&["a"])), Ok(false));
     assert!(dm.eval_cond("In('zz' + 'z')", &NONE).is_err());
+}
+
+#[test]
+fn in_predicate_answers_computed_ids_from_listed_states() {
+    let mut dm = session();
+    assert_eq!(dm.eval_cond("In('s' + 1)", &Listed(&["s1"])), Ok(true));
+    assert_eq!(dm.eval_cond("In('s' + 2)", &Listed(&["s1"])), Ok(false));
+    dm.exec_script("var target = ['s', 2].join('');", &NONE)
+        .unwrap();
+    assert_eq!(dm.eval_cond("In(target)", &Listed(&["s1", "s2"])), Ok(true));
+    assert_eq!(
+        dm.eval_value("[In(target), In('s1')]", &Listed(&["s2"])),
+        Ok(Value::Array(vec![Value::Bool(true), Value::Bool(false)]))
+    );
+    dm.exec_script("var seen = In(target);", &Listed(&["s2"]))
+        .unwrap();
+    assert_eq!(value(&mut dm, "seen"), Value::Bool(true));
+    // Answers do not outlive the evaluation that supplied them.
+    assert!(dm.eval_cond("In(target)", &NONE).is_err());
 }
 
 // ---- System Variables -----------------------------------------------------------------------
