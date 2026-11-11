@@ -163,6 +163,8 @@ The `rust` datamodel: typed context structs and named guard and action functions
 - realizes:: [[decisions#Pluggable datamodel]] {confidence: partial}
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
 
+Implemented 2026-11-11 per [[decisions#Rust actions lower to a foreach over the action IRI]] and [[decisions#Default function IRIs are vt:guard and vt:action paths]]: `RustDatamodel`, a function `Registry`, `Emit` for raises and sends, typed `Machine` sessions, and exact `Decimal` to 38 digits. It re-exports both macros so users depend on this crate alone.
+
 ## vertep-dm-cel
 
 The CEL datamodel: side-effect-free, terminating expressions type-checked against the chart's type environment.
@@ -186,6 +188,8 @@ The `statechart!` and `include_chart!` procedural macros: they build the IR at c
 - uses:: [[components#vertep-dm-rust]] {kind: required}
 - realizes:: [[decisions#One IR type language]]
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
+
+Implemented 2026-11-11: `statechart!` and `include_chart!`, lowering to the IR with spans, compile-time validation and typing per [[decisions#Macro findings are compile errors or deprecation lints]], and generated `Ctx`, `Event`, `State` and `Machine` types. It uses `vertep-core`, `vertep-scxml` and `vertep-yaml` only. `<donedata>`, `<assign>`, `<if>`, `<foreach>` and `<script>` have no macro syntax; that logic lives in Rust actions.
 
 ## vertep-store
 

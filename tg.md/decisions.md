@@ -437,3 +437,41 @@ The SCXML reader rewrites every `vt:type` annotation and `vt:types` block into c
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
 
 The Lean projection mirrors untyped charts only, so typed charts cannot be certified until the Lean type language (M1 group 9) mirrors `vt-types` projection.
+
+## Rust actions lower to a foreach over the action IRI
+
+A `rust`-datamodel action is one `<foreach array="<action IRI>" item="_vt_emit">` around one `<send>`: evaluating the array runs the action and yields its emitted events, so raises and sends stay visible in the IR without changing the interpreter.
+
+- motivated_by:: [[decisions#IR is the hub]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: secondary}
+
+The datamodel trait cannot enqueue events; a core hook would allow one node per action, but nothing needs it yet.
+
+## Default function IRIs are vt:guard and vt:action paths
+
+Guards and actions are named `vt:guard/<chart>/<name>` and `vt:action/<chart>/<name>`; the registry treats `vt:` and the expanded namespace as one IRI, and `include_chart!` binds by the IRI's last segment.
+
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#IR is the hub]] {weight: secondary}
+
+## Generated chart versions are computed at first use
+
+`statechart!` emits `CHART` and `VERSION` as lazily built statics, and `VERSION` is the chart hash from `vertep-rdf` computed at run time, because the macro never goes through RDF.
+
+- motivated_by:: [[constraints#Proc macros run at compile time]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Content-addressed chart versions]] {weight: secondary}
+
+## Macro findings are compile errors or deprecation lints
+
+Structural and type errors are `compile_error!` at the offending tokens; unreachable states and unhandled events are `deprecated` lints at the token, raised with `#[deny(...)]` and silenced with `#[allow(...)]` in the chart.
+
+- motivated_by:: [[constraints#Proc macros run at compile time]] {weight: primary, since: "2026-11-11"}
+
+Stable proc macros have no other way to emit warnings, so the lint text starts with "use of deprecated function".
+
+## The rust datamodel evaluates only literals, paths and function IRIs
+
+Guard and action logic is Rust; the `rust` datamodel evaluates JSON literals, context, system and loop-variable paths, `In()` and function IRIs, and its typer leaves the functions to the Rust compiler.
+
+- motivated_by:: [[decisions#Datamodel typers plug into one core checker]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: secondary}
