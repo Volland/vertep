@@ -472,12 +472,110 @@ impl StateQuery for Active<'_> {
     }
 }
 
-fn platform_error(name: &str, sendid: Option<String>) -> Event {
+/// Message of an `error.execution` the core raises itself, not from a datamodel failure.
+pub const EXECUTION_ERROR_MESSAGE: &str = "execution error";
+/// Message of an `error.communication` for a target the core knows is unreachable.
+pub const COMMUNICATION_ERROR_MESSAGE: &str = "target session does not exist";
+
+/// A platform error event whose data is `{kind, message}`, matching the predefined `error.*`
+/// payload type. `kind` is the part of the name after `error.`.
+fn platform_error(name: &str, message: &str, sendid: Option<String>) -> Event {
+    let kind = name.strip_prefix("error.").unwrap_or(name);
     Event {
         name: name.to_string(),
         type_: EventType::Platform,
         sendid,
+        data: Value::Object(Vec::from([
+            (String::from("kind"), Value::String(kind.to_string())),
+            (String::from("message"), Value::String(message.to_string())),
+        ])),
         ..Event::default()
+    }
+}
+
+/// The datamodel as the driver calls it: forwards every operation and remembers the error of
+/// the most recent call, so the `error.execution` it causes can carry its message.
+struct Capture<'d> {
+    inner: &'d mut dyn Datamodel,
+    last: Option<EvalError>,
+}
+
+impl Capture<'_> {
+    fn note<T>(&mut self, r: Result<T, EvalError>) -> Result<T, EvalError> {
+        self.last = r.as_ref().err().cloned();
+        r
+    }
+}
+
+impl Datamodel for Capture<'_> {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+    fn init_session(&mut self, info: &SessionInfo) -> Result<(), EvalError> {
+        let r = self.inner.init_session(info);
+        self.note(r)
+    }
+    fn set_environment(&mut self, env: &Environment) {
+        self.inner.set_environment(env)
+    }
+    fn declare(&mut self, id: &str) -> Result<(), EvalError> {
+        let r = self.inner.declare(id);
+        self.note(r)
+    }
+    fn set_event(&mut self, event: &Event) {
+        self.inner.set_event(event)
+    }
+    fn eval_cond(&mut self, expr: &str, states: &dyn StateQuery) -> Result<bool, EvalError> {
+        let r = self.inner.eval_cond(expr, states);
+        self.note(r)
+    }
+    fn eval_value(&mut self, expr: &str, states: &dyn StateQuery) -> Result<Value, EvalError> {
+        let r = self.inner.eval_value(expr, states);
+        self.note(r)
+    }
+    fn eval_content(&mut self, content: &str) -> Result<Value, EvalError> {
+        let r = self.inner.eval_content(content);
+        self.note(r)
+    }
+    fn assign_expr(
+        &mut self,
+        location: &str,
+        expr: &str,
+        states: &dyn StateQuery,
+    ) -> Result<(), EvalError> {
+        let r = self.inner.assign_expr(location, expr, states);
+        self.note(r)
+    }
+    fn assign_value(&mut self, location: &str, value: Value) -> Result<(), EvalError> {
+        let r = self.inner.assign_value(location, value);
+        self.note(r)
+    }
+    fn bind_var(&mut self, name: &str, value: Value) -> Result<(), EvalError> {
+        let r = self.inner.bind_var(name, value);
+        self.note(r)
+    }
+    fn is_location(&mut self, location: &str) -> bool {
+        self.last = None;
+        self.inner.is_location(location)
+    }
+    fn exec_script(&mut self, script: &str, states: &dyn StateQuery) -> Result<(), EvalError> {
+        let r = self.inner.exec_script(script, states);
+        self.note(r)
+    }
+    fn foreach_items(
+        &mut self,
+        array: &str,
+        states: &dyn StateQuery,
+    ) -> Result<Vec<Value>, EvalError> {
+        let r = self.inner.foreach_items(array, states);
+        self.note(r)
+    }
+    fn snapshot(&self) -> Value {
+        self.inner.snapshot()
+    }
+    fn restore(&mut self, snapshot: &Value) -> Result<(), EvalError> {
+        let r = self.inner.restore(snapshot);
+        self.note(r)
     }
 }
 
@@ -541,7 +639,7 @@ fn value_to_string(v: Value) -> Result<String, EvalError> {
 struct Driver<'c, 'd> {
     chart: &'c CompiledChart,
     s: Session,
-    dm: &'d mut dyn Datamodel,
+    dm: Capture<'d>,
     effects: Vec<Effect>,
     to_invoke: StateSet,
     running: bool,
@@ -563,7 +661,7 @@ impl<'c, 'd> Driver<'c, 'd> {
         Driver {
             chart,
             s,
-            dm,
+            dm: Capture { inner: dm, last: None },
             effects: Vec::new(),
             to_invoke: chart.empty_set(),
             running: true,
@@ -594,10 +692,16 @@ impl<'c, 'd> Driver<'c, 'd> {
 
     // ----- datamodel helpers -------------------------------------------------------------
 
+    /// Queue `error.execution`; its message is the datamodel error of the most recent
+    /// datamodel call when that call failed, otherwise [`EXECUTION_ERROR_MESSAGE`].
     fn queue_error(&mut self, sendid: Option<String>) {
+        let last = self.dm.last.take();
+        let message = last
+            .as_ref()
+            .map_or(EXECUTION_ERROR_MESSAGE, |e| e.message.as_str());
         self.s
             .internal_queue
-            .push_back(platform_error("error.execution", sendid));
+            .push_back(platform_error("error.execution", message, sendid));
     }
 
     fn eval_value(&mut self, expr: &str) -> Result<Value, EvalError> {
@@ -910,7 +1014,7 @@ impl<'c, 'd> Driver<'c, 'd> {
         {
             self.s
                 .internal_queue
-                .push_back(platform_error("error.communication", err_id));
+                .push_back(platform_error("error.communication", COMMUNICATION_ERROR_MESSAGE, err_id));
             return Ok(());
         }
         let exposed = if visible { Some(sendid.clone()) } else { None };
@@ -958,7 +1062,7 @@ impl<'c, 'd> Driver<'c, 'd> {
         let config = &self.s.configuration;
         let history = &self.s.history;
         let queue = &mut self.s.internal_queue;
-        let dm = &mut *self.dm;
+        let dm = &mut self.dm;
         kernel::select_transitions(chart, config, history, event, |t| {
             let Some(cond) = chart.transition(t).cond.as_deref() else {
                 return true;
@@ -966,8 +1070,8 @@ impl<'c, 'd> Driver<'c, 'd> {
             let q = Active { chart, config };
             match dm.eval_cond(cond, &q) {
                 Ok(b) => b,
-                Err(_) => {
-                    queue.push_back(platform_error("error.execution", None));
+                Err(e) => {
+                    queue.push_back(platform_error("error.execution", &e.message, None));
                     false
                 }
             }

@@ -222,7 +222,7 @@ Where the SCXML Recommendation leaves room, `vertep-core` reads it as follows; t
 
 - An unsupported send type or an illegal target raises `error.execution` (W3C 6.2.4, IRP test 199). When the input lists the running sessions, an immediate send to `#_scxml_<id>` of an unlisted session queues `error.communication` with its `sendid` at once and the block continues (IRP 496); every other undeliverable target is reported by the host as an `error.communication` input.
 - A failing `<if>` condition queues `error.execution` and stops the enclosing block; later branches are not tried.
-- `done.state.*` and error events are platform events with undefined data; errors from a failed send carry its `sendid`.
+- `done.state.*` events are platform events with undefined data. Error events are platform events whose data is `{kind, message}`: `kind` is the name after `error.`, and `message` is the failing datamodel call's error, or the fixed `execution error` / `target session does not exist` when the core raises it itself. Errors from a failed send carry its `sendid`.
 - Generated send ids are `<sessionid>.send.<n>`, invoke ids `<stateid>.<n>`; `idlocation` is assigned before anything else in the send is evaluated.
 - A delayed `#_internal` send becomes a `Send` effect that the host delivers back.
 - The core processes every delivered event; only active invocations run `finalize` or get autoforwarded events, and the host stops delivering a cancelled invocation's events from the `CancelInvoke` on (W3C 6.4, IRP 236). `done.invoke.<id>` completes the invocation, so leaving the state emits no `CancelInvoke`.

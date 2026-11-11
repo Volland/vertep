@@ -257,3 +257,39 @@ fn unknown_scxml_session_is_error_communication() {
     assert!(o.effects.iter().any(|e| matches!(e, Effect::Send(_))));
     assert_eq!(events(&o), ids(&["foo"]));
 }
+
+/// `error.execution` carries `{kind, message}` with the datamodel's error message, so the
+/// cause of a failure is visible in `_event.data` (cel-datamodel, type-system `error.*`).
+#[test]
+fn execution_error_carries_the_datamodel_message() {
+    use crate::datamodel::{Event, Value};
+    use crate::null::NullDatamodel;
+    use crate::session::start;
+    use crate::tape::{Request, TapeDatamodel};
+
+    let mut s = atomic("s");
+    s.onentry.push(vec![log_expr("1 + 1")]);
+    s.transitions.push(tr("error.execution", "pass"));
+    let cc = compile(chart(vec![s, final_("pass")]));
+    let mut null = NullDatamodel;
+    let mut tape = TapeDatamodel::new(&mut null);
+    let o = start(&cc, start_input(), &mut tape).expect("start");
+    assert_eq!(events(&o), ids(&["error.execution"]));
+    let err: &Event = tape
+        .entries()
+        .iter()
+        .find_map(|e| match &e.request {
+            Request::SetEvent(ev) if ev.name == "error.execution" => Some(ev),
+            _ => None,
+        })
+        .expect("error.execution was delivered");
+    let Value::Object(fields) = &err.data else {
+        panic!("error data is not an object: {:?}", err.data)
+    };
+    assert_eq!(fields[0], ("kind".into(), Value::String("execution".into())));
+    let Value::String(message) = &fields[1].1 else {
+        panic!("message is not a string")
+    };
+    assert_eq!(fields[1].0, "message");
+    assert!(!message.is_empty() && message != crate::session::EXECUTION_ERROR_MESSAGE);
+}
