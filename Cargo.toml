@@ -12,6 +12,8 @@ members = [
     "crates/vertep-store",
     "crates/vertep-tiramemsu",
     "crates/vertep-oxigraph",
+    "crates/vertep-runtime",
+    "crates/vertep",
 ]
 
 [workspace.package]
@@ -33,6 +35,7 @@ vertep-dm-cel = { path = "crates/vertep-dm-cel", version = "0.1.0" }
 vertep-store = { path = "crates/vertep-store", version = "0.1.0" }
 vertep-tiramemsu = { path = "crates/vertep-tiramemsu", version = "0.1.0" }
 vertep-oxigraph = { path = "crates/vertep-oxigraph", version = "0.1.0" }
+vertep-runtime = { path = "crates/vertep-runtime", version = "0.1.0" }
 # Storage layer (vertep-store, vertep-tiramemsu, vertep-oxigraph). The oxrdf family is the one
 # vertep-rdf uses (RDF 1.2); spargebra/spareval/sparesults match the versions oxigraph pins.
 oxrdf = { version = "0.3.5", features = ["rdf-12", "rdfc-10"] }
