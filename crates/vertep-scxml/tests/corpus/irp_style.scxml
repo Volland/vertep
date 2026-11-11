@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Shaped like a W3C IRP test: eventless pass/fail with a delayed timeout. -->
+<scxml initial="s0" version="1.0" datamodel="ecmascript" xmlns="http://www.w3.org/2005/07/scxml">
+<datamodel>
+  <data id="Var1" expr="0"/>
+</datamodel>
+<state id="s0">
+  <onentry>
+    <send event="timeout" delay="1s"/>
+    <raise event="foo"/>
+  </onentry>
+  <transition event="foo" cond="Var1 == 0" target="s1">
+    <assign location="Var1" expr="Var1 + 1"/>
+  </transition>
+  <transition event="*" target="fail"/>
+</state>
+<state id="s1">
+  <transition cond="Var1 === 1" target="pass"/>
+  <transition target="fail"/>
+</state>
+<final id="pass"><onentry><log label="Outcome" expr="'pass'"/></onentry></final>
+<final id="fail"><onentry><log label="Outcome" expr="'fail'"/></onentry></final>
+</scxml>

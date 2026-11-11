@@ -10,6 +10,11 @@ authors.workspace = true
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
+quick-xml = "0.42"
+
+[dev-dependencies]
+vertep-testkit = { workspace = true }
+proptest = "1.12"
 
 [lints]
 workspace = true

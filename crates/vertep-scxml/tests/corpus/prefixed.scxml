@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- SCXML under a prefix, with a different default namespace in scope. -->
+<s:scxml xmlns:s="http://www.w3.org/2005/07/scxml" xmlns="urn:example:default"
+         xmlns:vt="https://w3id.org/vertep/vt#" version="1.0" initial="a">
+  <s:state id="a" vt:mode="fast">
+    <s:onentry>
+      <note level="1">default-namespace foreign element</note>
+      <s:log expr="1"/>
+    </s:onentry>
+    <s:transition event="e" target="b">
+      <s:send event="x">
+        <s:content><payload xmlns:q="urn:q" q:a="1"><q:inner/>text</payload></s:content>
+      </s:send>
+    </s:transition>
+  </s:state>
+  <s:final id="b"/>
+</s:scxml>

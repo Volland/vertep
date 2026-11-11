@@ -1,0 +1,13 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="_vt.s.1">
+  <state>
+    <state/>
+    <state id="_vt.s.0.0"/>
+  </state>
+  <state id="_vt.s.1">
+    <transition event="back" target="_vt.s.1"/>
+  </state>
+  <parallel>
+    <state/>
+    <state/>
+  </parallel>
+</scxml>

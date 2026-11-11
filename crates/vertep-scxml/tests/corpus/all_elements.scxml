@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Every SCXML 1.0 element, plus vt: and foreign extensions. -->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       xmlns:ex="urn:example:ext" version="1.0" name="all" datamodel="ecmascript"
+       binding="late" initial="main" vt:profile="m0">
+  <datamodel>
+    <data id="counter" expr="0"/>
+    <data id="json">{"a": [1, 2, 3]}</data>
+    <data id="xml"><ex:item key="k">text &amp; more</ex:item></data>
+  </datamodel>
+  <script>var helper = function (a, b) { return a &lt; b &amp;&amp; b > 0; };</script>
+  <state id="main" initial="p">
+    <onentry>
+      <raise event="started"/>
+      <log label="enter" expr="counter"/>
+      <ex:audit level="info"/>
+      <assign location="counter" expr="counter + 1"/>
+      <assign location="json"><![CDATA[{"b": "<x>"}]]></assign>
+      <if cond="counter &gt; 1">
+        <log expr="'big'"/>
+      <elseif cond="counter == 1"/>
+        <log expr="'one'"/>
+      <else/>
+        <log expr="'small'"/>
+      </if>
+      <foreach array="json.a" item="v" index="i">
+        <log expr="v"/>
+      </foreach>
+      <send event="tick" target="#_internal" delay="1s" id="t1" namelist="counter json">
+        <param name="p1" expr="1"/>
+        <param name="p2" location="counter"/>
+      </send>
+      <send eventexpr="'e'" targetexpr="'#_parent'" typeexpr="'http://www.w3.org/TR/scxml/#SCXMLEventProcessor'" idlocation="sid" delayexpr="'2s'">
+        <content>payload</content>
+      </send>
+      <cancel sendid="t1"/>
+      <cancel sendidexpr="sid"/>
+      <script>counter = counter * 2;</script>
+    </onentry>
+    <onexit>
+      <log label="exit"/>
+    </onexit>
+    <parallel id="p" vt:defer="request.*">
+      <state id="r1">
+        <initial>
+          <transition target="r1a"/>
+        </initial>
+        <state id="r1a">
+          <transition event="go next.*" cond="In('r2')" target="r1b" type="internal">
+            <log expr="'moving'"/>
+          </transition>
+        </state>
+        <state id="r1b"/>
+        <history id="h1" type="deep">
+          <transition target="r1a"/>
+        </history>
+      </state>
+      <state id="r2">
+        <datamodel>
+          <data id="local" expr="'x'"/>
+        </datamodel>
+        <invoke type="scxml" id="child" autoforward="true" namelist="counter">
+          <param name="a" expr="1"/>
+          <content><scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"><final id="f"/></scxml></content>
+          <finalize>
+            <assign location="counter" expr="_event.data.a"/>
+          </finalize>
+        </invoke>
+        <invoke typeexpr="'scxml'" srcexpr="'child.scxml'" idlocation="iid"/>
+        <state/>
+        <history/>
+      </state>
+    </parallel>
+    <transition event="done.state.p" target="done"/>
+    <transition event="error.*"/>
+    <transition cond="false"/>
+  </state>
+  <final id="done">
+    <donedata>
+      <param name="result" expr="counter"/>
+    </donedata>
+  </final>
+  <final id="done2">
+    <donedata>
+      <content expr="counter"/>
+    </donedata>
+  </final>
+  <ex:note>trailing foreign element</ex:note>
+</scxml>

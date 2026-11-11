@@ -11,6 +11,7 @@ publish = false
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
+proptest = "1.12"
 
 [lints]
 workspace = true
