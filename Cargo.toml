@@ -17,6 +17,8 @@ members = [
     "crates/vertep-macros",
     "crates/vertep-dm-rust",
     "crates/vertep-cli",
+    "crates/vertep-cluster",
+    "crates/vertep-federation",
 ]
 
 [workspace.package]
