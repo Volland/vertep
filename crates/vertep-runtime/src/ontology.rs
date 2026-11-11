@@ -16,7 +16,7 @@ use vertep_rdf::shacl::{Shapes, ValidationReport};
 use vertep_store::Entry;
 
 /// The runtime module of the `vt:` ontology, in Turtle.
-pub const RUNTIME_ONTOLOGY_TTL: &str = include_str!("../../vertep-rdf/ontology/vt-runtime.ttl");
+pub use vertep_rdf::RUNTIME_ONTOLOGY_TTL;
 
 /// The SHACL shapes of the runtime module, in Turtle.
 pub const RUNTIME_SHAPES_TTL: &str = include_str!("../shapes/vt-runtime-shapes.ttl");

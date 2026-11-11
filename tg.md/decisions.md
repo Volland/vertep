@@ -496,3 +496,76 @@ The RDF, SHACL, JSON Schema and CEL projections of a type are tested to give the
 
 - motivated_by:: [[decisions#IR is the hub]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[constraints#Proc macros run at compile time]] {weight: secondary}
+
+## A node runs its actors on one thread
+
+A node owns its activations and schedules turns synchronously and deterministically; only function, stream and worker turns run as `Send` futures, and outside callers use a `Send` handle.
+
+- motivated_by:: [[decisions#No-std core and tokio shell]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: secondary, note: "datamodels such as boa are not Send"}
+
+Run a node in a `LocalSet` or on a dedicated thread; tests drive `run_until_idle` on a virtual clock.
+
+## Entry one carries the start macrostep
+
+The first input entry of an actor also records the session start, so replay begins with `start` under that entry's chart version, time and seed.
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11"}
+
+## Deduplication reads the whole journal on activation
+
+An activation collects every accepted message id from its journal, snapshot or not, and a turn acknowledges without running any message whose id is already there.
+
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary}
+
+The cost grows with the journal; an index of message ids in the current-state graph is the planned fix.
+
+## Outbox progress lives in an outbox graph
+
+Each actor has a graph `<A>/outbox` holding `vt:dispatchedThrough n` and `vt:dispatched` marks on fired timers; restart and activation dispatch every send after the mark again, and receivers deduplicate.
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary}
+
+## Pending timers live in the current-state graph
+
+Scheduled timers are statements of the actor's current-state graph committed with their entry through the state delta, and a restarted node re-arms them with one `vt:` query.
+
+- motivated_by:: [[decisions#State changes travel in the append]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#No-std core and tokio shell]] {weight: secondary}
+
+## Transition annotations go to the graph store
+
+Entries record `vt:tookTransition` as plain triples; the annotated statement with `vt:causedBy <entry>` goes to graph `<entry>/annotations` with a blank-node reifier.
+
+- motivated_by:: [[constraints#Tiramemsu cannot hold unasserted triple terms or reifier IRIs]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Modular vt ontology on RDF 1.2]] {weight: secondary}
+
+## Only journal entries carry vt:actor and vt:position
+
+Snapshots name their actor with `vt:snapshotOf` and timers carry no position, and the tiramemsu journal read selects entries inside their own graph by `rdf:type vt:JournalEntry`.
+
+- motivated_by:: [[decisions#Journal entries are stamped by the store]] {weight: primary, since: "2026-11-11"}
+
+The tiramemsu read once matched any subject with both properties in any graph; it is scoped to entry graphs since 2026-11-11, with a regression test.
+
+## Replies inherit the request's correlation id
+
+The runtime assigns `vt:request` correlation ids `<A>/request/<position>.<k>` and copies the input's correlation id onto every `vt:reply` sent in that turn, so charts need no datamodel to correlate.
+
+- motivated_by:: [[decisions#Non-blocking request and deferred events]] {weight: primary, since: "2026-11-11"}
+
+The lowering of `vt:request`, `vt:reminder` and `vt:migrate` lives in `vertep-runtime` until `vertep-core` takes it.
+
+## Virtual actor addresses append the key to the type
+
+A virtual actor of chart type `T` and key `K` is `<T>/<percent-encoded K>`, and its records are named under that address (`/entry/n`, `/snapshot/n`, `/invoke/id`).
+
+- motivated_by:: [[decisions#IRI identity and lifecycle classes]] {weight: primary, since: "2026-11-11"}
+
+## Randomness is seeded from the entry IRI
+
+Each macrostep's random seed is derived from its entry IRI, so random values are not journaled one by one; the entry's configuration digest covers the datamodel they produced.
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11"}

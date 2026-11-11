@@ -511,3 +511,34 @@ fn single_node_uses_a_configurable_shard_count() {
             .all(|a| again.head(a).unwrap() == Position::new(1))
     );
 }
+
+/// Regression: records outside the journal that carry `vt:actor` and `vt:position` (for
+/// example a snapshot description in its own graph) are never read back as journal entries.
+#[test]
+fn journal_read_ignores_non_entries_with_actor_and_position() {
+    let t = TempShard::new();
+    let shard = &t.shard;
+    let actor = iri("read/actor");
+    shard
+        .append(
+            &actor,
+            Position::ZERO,
+            &[sample_entry(&actor, "1")],
+            &AppendMeta::none(),
+        )
+        .unwrap();
+    let other = iri("read/actor/snapshot/1");
+    let quads = [
+        Quad::new(other.clone(), vt("actor"), actor.clone(), other.clone()),
+        Quad::new(
+            other.clone(),
+            vt("position"),
+            Literal::new_typed_literal("1", xsd::INTEGER),
+            other.clone(),
+        ),
+    ];
+    shard.insert_quads(&quads).unwrap();
+    let records = shard.read(&actor, Position::ZERO).unwrap();
+    assert_eq!(records.len(), 1, "only the journal entry is read");
+    assert_eq!(records[0].entry.name(), &entry_iri(&actor, "1"));
+}

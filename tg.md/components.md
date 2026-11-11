@@ -245,6 +245,8 @@ The tokio shell: actors and lifecycle classes, mailboxes, transports, the direct
 - realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the shell half"}
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
+Implemented 2026-11-11: a `Node` per [[decisions#A node runs its actors on one thread]] with virtual, invoked and stateless actors, an RDF journal with message dedup, a transactional outbox, snapshots and deterministic replay that detects divergence; pluggable mailboxes (memory, store) and transports (local SCXML processor); `vt:request`, `vt:defer` and unhandled-event policies; durable timers and reminders; checked migrations and forks; the runtime ontology module with SHACL shapes. 128 tests run on a virtual clock. Known limits: dedup scans the whole journal, nested invokes inside invoked children are not supported, and the store mailbox acknowledges in a separate write.
+
 ## vertep-agent
 
 Agents on charts: `vt:decide` and the `Decider` trait, LLM and tool actors, capability grants and LLM-written plan charts.
@@ -313,3 +315,5 @@ The facade crate an application depends on, re-exporting the other crates behind
 - uses:: [[components#vertep-cluster]] {kind: optional}
 - uses:: [[components#vertep-federation]] {kind: optional}
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
+
+Implemented 2026-11-11: re-exports core, store and RDF, plus runtime, tiramemsu and SCXML behind default features and ECMAScript on request; `examples/quickstart.rs` runs one virtual actor with a delayed send and a time-travel query.

@@ -516,8 +516,12 @@ impl JournalStore for TiramemsuShard {
 
     fn read(&self, actor: &NamedNode, from: Position) -> Result<Vec<JournalRecord>, StoreError> {
         let q = format!(
-            "SELECT ?e ?n ?s ?p ?o WHERE {{ ?e <{a}> {actor} ; <{pos}> ?n . FILTER(?n >= {from}) \
-             GRAPH ?e {{ ?s ?p ?o }} }}",
+            // Only journal entries: the stamps live inside the entry's own graph, so other
+            // records that happen to carry vt:actor and vt:position are never read as entries.
+            "SELECT ?e ?n ?s ?p ?o WHERE {{ GRAPH ?e {{ ?e <{ty}> <{entry}> ; <{a}> {actor} ; \
+             <{pos}> ?n . ?s ?p ?o }} FILTER(?n >= {from}) }}",
+            ty = vocab::RDF_TYPE,
+            entry = vocab::JOURNAL_ENTRY,
             a = vocab::ACTOR,
             pos = vocab::POSITION,
             from = from.get(),

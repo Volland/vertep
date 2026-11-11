@@ -32,7 +32,7 @@ Every actor SHALL have exactly one address that is an absolute IRI, and the same
 
 #### Scenario: Relative or malformed address rejected
 - **WHEN** a `<send>` target or an actor registration supplies a relative reference or a string that is not a valid IRI
-- **THEN** the send fails with `error.communication` (or the registration is rejected) and nothing is enqueued
+- **THEN** the send fails with `error.execution` when the target is not syntactically a legal target (W3C SCXML 6.2.4), or with `error.communication` when it is an IRI the runtime cannot resolve, or the registration is rejected; in every case nothing is enqueued
 
 ### Requirement: Virtual Actor Identity
 A virtual actor SHALL be identified by the pair of a chart type IRI and a key, from which its address IRI is derived deterministically, and SHALL logically exist for every such pair without being created or destroyed.

@@ -35,3 +35,7 @@ pub use vocab::NodeKind;
 
 /// The verification module of the `vt:` ontology: certificates issued by `vt certify`.
 pub const VERIFICATION_ONTOLOGY_TTL: &str = include_str!("../ontology/vt-verification.ttl");
+
+/// The runtime module of the `vt:` ontology: actors, journal entries, snapshots, timers,
+/// mailboxes and migrations.
+pub const RUNTIME_ONTOLOGY_TTL: &str = include_str!("../ontology/vt-runtime.ttl");
