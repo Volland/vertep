@@ -126,11 +126,12 @@ A dev-only harness that runs the W3C SCXML IRP suite on the Rust core and on the
 - uses:: [[components#vertep-dm-ecma]] {kind: dev}
 - uses:: [[components#vertep-lean]] {kind: dev, note: "the oracle binary"}
 - uses:: [[components#vertep-testkit]] {kind: dev}
+- uses:: [[components#vertep-rdf]] {kind: required, note: "corpus round-trip and shape checks"}
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
 The suite under `suite/` comes from [[decisions#IRP suite from a pinned mirror]]: 236 ECMAScript charts and one `null` chart, checked by `scripts/check-suite-hash.sh`.
 
-Results 2026-11-11 on the Rust core: mandatory 158/158 ECMAScript and 1/1 `null` pass with no allow-list entries; optional 18 pass and 45 are allow-listed with reasons (Basic HTTP processor, xpath datamodel, XML DOM in ECMAScript, and test 444 whose guard mutates data, refused by [[decisions#Pluggable datamodel]]). Nine manual tests are listed, not run. The in-memory host runs many sessions on a virtual clock in about 0.4 s. Lean comparison, differential testing and RDF corpus checks plug in through `EngineUnderTest`.
+Results 2026-11-11 on the Rust core: mandatory 158/158 ECMAScript and 1/1 `null` pass with no allow-list entries; optional 18 pass and 45 are allow-listed with reasons (Basic HTTP processor, xpath datamodel, XML DOM in ECMAScript, and test 444 whose guard mutates data, refused by [[decisions#Pluggable datamodel]]). Nine manual tests are listed, not run. The in-memory host runs many sessions on a virtual clock in about 0.4 s. `corpus::check_corpus` checks every IRP chart's SCXML and RDF round trips and its conformance to the chart shapes. Lean comparison and differential testing plug in through `EngineUnderTest`.
 
 ## vertep-testkit
 
