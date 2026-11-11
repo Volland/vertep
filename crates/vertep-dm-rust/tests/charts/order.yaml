@@ -1,0 +1,61 @@
+vertep: 1
+name: order
+datamodel: rust
+types:
+  Pay:
+    amount: decimal
+  Approval:
+    by: iri
+events:
+  start: null
+  pay: Pay
+  authorized: null
+  approve: Approval
+  cancel: null
+context:
+  total:
+    type: decimal
+    init: "0"
+  limit:
+    type: decimal
+    init: "100"
+initial: idle
+states:
+  idle:
+    on:
+      start: checkout
+  checkout:
+    initial: cart
+    on:
+      cancel: cancelled
+    states:
+      cart:
+        on:
+          pay:
+            cond: "vt:guard/order/positive"
+            target: payment
+            actions:
+              - foreach:
+                  array: "vt:action/order/record_total"
+                  item: _vt_emit
+                  do:
+                    - send:
+                        eventexpr: _vt_emit.event
+                        targetexpr: _vt_emit.target
+                        typeexpr: _vt_emit.type
+                        delayexpr: _vt_emit.delay
+                        content:
+                          expr: _vt_emit.data
+      payment:
+        on:
+          authorized:
+            - cond: "vt:guard/order/over_limit"
+              target: review
+            - target: paid
+      review:
+        on:
+          approve: paid
+  paid:
+    type: final
+  cancelled:
+    type: final

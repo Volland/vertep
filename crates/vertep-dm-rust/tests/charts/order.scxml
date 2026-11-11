@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#" version="1.0" name="order" datamodel="rust" initial="idle">
+  <vt:types xmlns:vt="https://w3id.org/vertep/vt#">type Pay = { amount: decimal };
+type Approval = { by: iri };
+event start;
+event pay: Pay;
+event authorized;
+event approve: Approval;
+event cancel;
+</vt:types>
+  <datamodel>
+    <data id="total" expr="0" vt:type="decimal"/>
+    <data id="limit" expr="100" vt:type="decimal"/>
+  </datamodel>
+  <state id="idle">
+    <transition event="start" target="checkout"/>
+  </state>
+  <state id="checkout" initial="cart">
+    <transition event="cancel" target="cancelled"/>
+    <state id="cart">
+      <transition event="pay" cond="vt:guard/order/positive" target="payment">
+        <foreach array="vt:action/order/record_total" item="_vt_emit">
+          <send eventexpr="_vt_emit.event" targetexpr="_vt_emit.target" typeexpr="_vt_emit.type" delayexpr="_vt_emit.delay">
+            <content expr="_vt_emit.data"/>
+          </send>
+        </foreach>
+      </transition>
+    </state>
+    <state id="payment">
+      <transition event="authorized" cond="vt:guard/order/over_limit" target="review"/>
+      <transition event="authorized" target="paid"/>
+    </state>
+    <state id="review">
+      <transition event="approve" target="paid"/>
+    </state>
+  </state>
+  <final id="paid"/>
+  <final id="cancelled"/>
+</scxml>

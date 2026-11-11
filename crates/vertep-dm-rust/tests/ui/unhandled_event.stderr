@@ -1,0 +1,5 @@
+error: event `refund` is declared but no transition handles it
+ --> tests/ui/unhandled_event.rs:6:19
+  |
+6 |     events { pay, refund }
+  |                   ^^^^^^

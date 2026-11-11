@@ -1,0 +1,5 @@
+error: unknown target state `paymnt`; did you mean `payment`?
+ --> tests/ui/unknown_target.rs:7:28
+  |
+7 |     state cart { on pay => paymnt; }
+  |                            ^^^^^^

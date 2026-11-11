@@ -10,6 +10,12 @@ authors.workspace = true
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
+# include_chart! reads SCXML and YAML files with the surfaces' own readers (no RDF, no store).
+vertep-scxml = { workspace = true }
+vertep-yaml = { workspace = true }
+syn = { workspace = true }
+quote = { workspace = true }
+proc-macro2 = { workspace = true }
 
 [lints]
 workspace = true

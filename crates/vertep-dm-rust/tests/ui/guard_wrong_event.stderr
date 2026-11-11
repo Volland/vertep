@@ -1,0 +1,24 @@
+error[E0631]: type mismatch in function arguments
+  --> tests/ui/guard_wrong_event.rs:8:28
+   |
+ 8 |     state open { on pay if is_large => review; on cancel => closed; }
+   |                            ^^^^^^^^ expected due to this
+...
+13 | fn is_large(_: &Ctx, ev: &Cancel) -> bool {
+   | ----------------------------------------- found signature defined here
+   |
+   = note: expected function signature `for<'a, 'b> fn(&'a Ctx, &'b Pay) -> _`
+              found function signature `fn(&Ctx, &Cancel) -> _`
+   = note: required for `for<'a, 'b> fn(&'a Ctx, &'b Cancel) -> bool {is_large}` to implement `GuardFn<Ctx, Pay>`
+note: required by a bound in `Registry::<C>::guard`
+  --> src/registry.rs
+   |
+   |     pub fn guard<P, F>(&mut self, iri: &str, f: F) -> Result<&mut Self, RegistryError>
+   |            ----- required by a bound in this associated function
+...
+   |         F: GuardFn<C, P>,
+   |            ^^^^^^^^^^^^^ required by this bound in `Registry::<C>::guard`
+help: consider wrapping the function in a closure
+   |
+ 8 |     state open { on pay if |arg0: &Ctx, arg1: &Pay| is_large(arg0, /* &Cancel */) => review; on cancel => closed; }
+   |                            ++++++++++++++++++++++++         +++++++++++++++++++++

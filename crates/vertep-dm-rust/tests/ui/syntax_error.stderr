@@ -1,0 +1,5 @@
+error: malformed transition: expected a target state after `=>`
+ --> tests/ui/syntax_error.rs:8:19
+  |
+8 |         on pay => ;
+  |                   ^

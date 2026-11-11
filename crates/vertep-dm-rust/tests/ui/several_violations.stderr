@@ -1,0 +1,17 @@
+error: state id `done` is declared more than once
+ --> tests/ui/several_violations.rs:9:11
+  |
+9 |     final done;
+  |           ^^^^
+
+error: state id `done` is declared more than once
+  --> tests/ui/several_violations.rs:10:11
+   |
+10 |     final done;
+   |           ^^^^
+
+error: unknown target state `paymnt`; did you mean `payment`?
+ --> tests/ui/several_violations.rs:7:28
+  |
+7 |     state cart { on pay => paymnt; on finish => done; }
+  |                            ^^^^^^

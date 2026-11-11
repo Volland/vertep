@@ -1,0 +1,11 @@
+error: use of deprecated function `__vertep_chart_warnings::vertep_warning_0`: vertep: state `archived` is unreachable from the initial configuration (`#[allow(unreachable_states)]` silences this)
+  --> tests/ui/unreachable_state.rs:12:11
+   |
+12 |     state archived;
+   |           ^^^^^^^^
+   |
+note: the lint level is defined here
+  --> tests/ui/unreachable_state.rs:2:9
+   |
+ 2 | #![deny(deprecated)]
+   |         ^^^^^^^^^^

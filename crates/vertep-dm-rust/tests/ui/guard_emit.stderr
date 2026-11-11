@@ -1,0 +1,18 @@
+error[E0593]: function is expected to take 2 arguments, but it takes 3 arguments
+  --> tests/ui/guard_emit.rs:8:28
+   |
+ 8 |     state open { on pay if announce => paid; }
+   |                            ^^^^^^^^ expected function that takes 2 arguments
+...
+12 | fn announce(_: &Ctx, _: &(), emit: &mut Emit) -> bool {
+   | ----------------------------------------------------- takes 3 arguments
+   |
+   = note: required for `for<'a, 'b, 'c> fn(&'a Ctx, &'b (), &'c mut vertep_dm_rust::Emit<Event>) -> bool {announce}` to implement `GuardFn<Ctx, ()>`
+note: required by a bound in `Registry::<C>::guard`
+  --> src/registry.rs
+   |
+   |     pub fn guard<P, F>(&mut self, iri: &str, f: F) -> Result<&mut Self, RegistryError>
+   |            ----- required by a bound in this associated function
+...
+   |         F: GuardFn<C, P>,
+   |            ^^^^^^^^^^^^^ required by this bound in `Registry::<C>::guard`

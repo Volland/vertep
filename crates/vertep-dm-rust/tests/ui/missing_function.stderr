@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `notify` in this scope
+ --> tests/ui/missing_function.rs:7:35
+  |
+7 |     state open { on pay => paid / notify; }
+  |                                   ^^^^^^ not found in this scope

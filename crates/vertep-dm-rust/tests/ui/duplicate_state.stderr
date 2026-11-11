@@ -1,0 +1,11 @@
+error: state id `done` is declared more than once
+ --> tests/ui/duplicate_state.rs:8:11
+  |
+8 |     final done;
+  |           ^^^^
+
+error: state id `done` is declared more than once
+ --> tests/ui/duplicate_state.rs:9:11
+  |
+9 |     final done;
+  |           ^^^^

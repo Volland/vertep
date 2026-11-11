@@ -1,0 +1,24 @@
+error[E0631]: type mismatch in function arguments
+  --> tests/ui/guard_mut_ctx.rs:8:28
+   |
+ 8 |     state open { on pay if counted => paid; }
+   |                            ^^^^^^^ expected due to this
+...
+12 | fn counted(ctx: &mut Ctx, _: &()) -> bool {
+   | ----------------------------------------- found signature defined here
+   |
+   = note: expected function signature `for<'a, 'b> fn(&'a Ctx, &'b ()) -> _`
+              found function signature `fn(&mut Ctx, &()) -> _`
+   = note: required for `for<'a, 'b> fn(&'a mut Ctx, &'b ()) -> bool {counted}` to implement `GuardFn<Ctx, ()>`
+note: required by a bound in `Registry::<C>::guard`
+  --> src/registry.rs
+   |
+   |     pub fn guard<P, F>(&mut self, iri: &str, f: F) -> Result<&mut Self, RegistryError>
+   |            ----- required by a bound in this associated function
+...
+   |         F: GuardFn<C, P>,
+   |            ^^^^^^^^^^^^^ required by this bound in `Registry::<C>::guard`
+help: consider wrapping the function in a closure
+   |
+ 8 |     state open { on pay if |arg0: &Ctx, arg1: &()| counted(&mut *arg0, arg1) => paid; }
+   |                            +++++++++++++++++++++++        ++++++++++++++++++

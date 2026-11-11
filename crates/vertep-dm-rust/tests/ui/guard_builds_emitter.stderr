@@ -1,0 +1,10 @@
+error[E0624]: associated function `new` is private
+  --> tests/ui/guard_builds_emitter.rs:13:51
+   |
+13 |     let mut emit = vertep_dm_rust::Emit::<Event>::new(Default::default());
+   |                                                   ^^^ private associated function
+   |
+  ::: src/emit.rs
+   |
+   |     pub(crate) fn new(sys: Sys) -> Self {
+   |     ----------------------------------- private associated function defined here

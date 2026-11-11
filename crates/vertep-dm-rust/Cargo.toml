@@ -10,6 +10,14 @@ authors.workspace = true
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
+vertep-macros = { workspace = true }
+# The chart version IRI of generated charts (`VERSION`), the same function `vt hash` uses.
+vertep-rdf = { workspace = true }
+
+[dev-dependencies]
+vertep-scxml = { workspace = true }
+vertep-yaml = { workspace = true }
+trybuild = { workspace = true }
 
 [lints]
 workspace = true
