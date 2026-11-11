@@ -6,3 +6,4 @@ mod builder;
 mod chart_model;
 mod datamodel;
 mod interpretation;
+mod irp_regressions;

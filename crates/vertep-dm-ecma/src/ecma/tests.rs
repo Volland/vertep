@@ -615,3 +615,42 @@ fn builtins_referenced_by_data_survive_a_snapshot() {
         Ok(true)
     );
 }
+
+/// IRP 326: a data item initialized from an object (`<data id="Var1" expr="_ioprocessors"/>`,
+/// which the interpreter runs as `eval_value` then `assign_value`) holds that very object, so a
+/// later reference comparison with the same object is true.
+#[test]
+fn data_initialized_from_an_object_keeps_its_identity() {
+    let mut dm = session();
+    dm.declare("Var1").unwrap();
+    dm.declare("Var2").unwrap();
+    let v = dm.eval_value("_ioprocessors", &NONE).unwrap();
+    dm.assign_value("Var1", v).unwrap();
+    dm.assign_expr("Var2", "_ioprocessors", &NONE).unwrap();
+    assert!(dm.eval_cond("Var1 === Var2", &NONE).unwrap());
+    // Only the value just evaluated is bound by identity; an equal value assigned later is a
+    // copy.
+    dm.declare("Var3").unwrap();
+    let v = dm.eval_value("Var1", &NONE).unwrap();
+    dm.assign_value("Var3", v).unwrap();
+    assert!(dm.eval_cond("Var3 === Var1", &NONE).unwrap());
+    let copy = dm.eval_value("Var1", &NONE).unwrap();
+    dm.eval_content("1").unwrap();
+    dm.assign_value("Var3", copy).unwrap();
+    assert!(!dm.eval_cond("Var3 === Var1", &NONE).unwrap());
+}
+
+/// IRP 452: a value expression may end with a statement terminator.
+#[test]
+fn trailing_semicolon_is_accepted_in_expressions() {
+    let mut dm = session();
+    dm.exec_script("function T() { this.bar = 0; }", &NONE)
+        .unwrap();
+    dm.declare("foo").unwrap();
+    dm.assign_expr("foo", "new T();", &NONE).unwrap();
+    dm.assign_expr("foo.bar", "1 ;\n", &NONE).unwrap();
+    assert!(dm.eval_cond("foo.bar == 1;", &NONE).unwrap());
+    assert_eq!(dm.eval_value("2;", &NONE).unwrap(), Value::Number(2.0));
+    // Only terminators are removed: two statements are still not one expression.
+    assert!(dm.eval_value("1; 2", &NONE).is_err());
+}

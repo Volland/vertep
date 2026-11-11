@@ -820,7 +820,8 @@ fn exiting_the_state_cancels_the_invocation() {
         }]
     );
     assert!(o.session.invocations.is_empty());
-    // Events from the cancelled invocation are ignored afterwards.
+    // The host stops delivering the cancelled invocation's events; one it had already queued
+    // is processed, but it no longer runs finalize or is forwarded.
     let late = Event {
         invokeid: Some(id),
         ..Event::named("e", EventType::External)

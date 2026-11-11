@@ -46,6 +46,14 @@ fn parse_expression(text: &str) -> Result<(Expression, Interner), EvalError> {
     )))
 }
 
+/// `text` without trailing whitespace and statement terminators: `new f();` is accepted as the
+/// expression `new f()`, as charts written for statement-evaluating engines expect (IRP test
+/// 452). Removing a final `;` never changes what a valid expression means, and the result is
+/// still checked with [`check_expression`].
+pub(crate) fn strip_terminator(text: &str) -> &str {
+    text.trim_end().trim_end_matches(';').trim_end()
+}
+
 /// Checks that `text` is exactly one expression.
 pub(crate) fn check_expression(text: &str) -> Result<(), EvalError> {
     parse_expression(text).map(|_| ())

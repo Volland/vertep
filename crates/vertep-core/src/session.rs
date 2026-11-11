@@ -150,6 +150,20 @@ pub struct StartInput {
     pub env: Environment,
     /// Interpreter options.
     pub options: Options,
+    /// Values for top-level data items supplied by the invoking session (the evaluated
+    /// `namelist` and `<param>` of `<invoke>`, W3C SCXML 6.4.4): a top-level data item whose
+    /// identifier is listed here is initialized to the value instead of its `expr`, content or
+    /// `src`. Names that match no top-level data item are ignored.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub data: Vec<(String, Value)>,
+    /// The session identifiers the SCXML Event I/O Processor can deliver to while this input
+    /// is processed, when the host knows them. With a list, an immediate `<send>` to
+    /// `#_scxml_<id>` naming no listed session queues `error.communication` (with the send id)
+    /// on the internal queue at once, as W3C SCXML 6.2.4 requires (IRP test 496); with `None`
+    /// every such target goes to the host, which reports delivery failures back as an
+    /// `error.communication` input.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub sessions: Option<Vec<String>>,
 }
 
 /// What an input asks the session to do.
@@ -170,6 +184,14 @@ pub struct Input {
     pub env: Environment,
     /// The request.
     pub kind: InputKind,
+    /// The session identifiers the SCXML Event I/O Processor can deliver to while this input
+    /// is processed, when the host knows them. With a list, an immediate `<send>` to
+    /// `#_scxml_<id>` naming no listed session queues `error.communication` (with the send id)
+    /// on the internal queue at once, as W3C SCXML 6.2.4 requires (IRP test 496); with `None`
+    /// every such target goes to the host, which reports delivery failures back as an
+    /// `error.communication` input.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub sessions: Option<Vec<String>>,
 }
 
 impl Input {
@@ -178,6 +200,7 @@ impl Input {
         Input {
             env,
             kind: InputKind::Event(event),
+            sessions: None,
         }
     }
 
@@ -186,6 +209,7 @@ impl Input {
         Input {
             env,
             kind: InputKind::Cancel,
+            sessions: None,
         }
     }
 }
@@ -241,7 +265,8 @@ pub enum Effect {
     },
     /// Start an invocation.
     Invoke(InvokeRequest),
-    /// Cancel an invocation whose state was exited.
+    /// Cancel an invocation whose state was exited. From then on the host must not deliver
+    /// events from that invocation; events it already queued are still delivered.
     CancelInvoke {
         /// The invoke identifier.
         invokeid: String,
@@ -358,6 +383,7 @@ pub fn start(
         .map_err(StartError::Datamodel)?;
     dm.set_environment(&input.env);
     let session = new_session(chart, input.info.sessionid.clone(), input.options);
+    let invoker_data = input.data;
     let mut d = Driver::new(
         chart,
         session,
@@ -366,8 +392,9 @@ pub fn start(
             sessionid: input.info.sessionid,
         },
     );
+    d.sessions = input.sessions;
     let budget = d.s.options.microstep_budget;
-    match d.run_start() {
+    match d.run_start(&invoker_data) {
         Ok(()) => Ok(d.finish()),
         Err(Budget) => Err(StartError::BudgetExceeded {
             budget,
@@ -396,6 +423,7 @@ pub fn step(
     };
     let budget = session.options.microstep_budget;
     let mut d = Driver::new(chart, session, dm, trace_input);
+    d.sessions = input.sessions;
     let r = match input.kind {
         InputKind::Cancel => {
             d.exit_interpreter(true);
@@ -521,6 +549,8 @@ struct Driver<'c, 'd> {
     microsteps: Vec<MicrostepTrace>,
     used: u32,
     input: TraceInput,
+    /// The reachable session identifiers of the input, if the host listed them.
+    sessions: Option<Vec<String>>,
 }
 
 impl<'c, 'd> Driver<'c, 'd> {
@@ -541,6 +571,7 @@ impl<'c, 'd> Driver<'c, 'd> {
             microsteps: Vec::new(),
             used: 0,
             input,
+            sessions: None,
         }
     }
 
@@ -622,8 +653,15 @@ impl<'c, 'd> Driver<'c, 'd> {
     }
 
     fn init_data(&mut self, items: &'c [Data]) {
+        self.init_data_with(items, &[]);
+    }
+
+    /// Initialize data items; an item named in `given` takes that value (invoke parameters).
+    fn init_data_with(&mut self, items: &'c [Data], given: &[(String, Value)]) {
         for d in items {
-            let r = if let Some(e) = &d.expr {
+            let r = if let Some((_, v)) = given.iter().find(|(n, _)| *n == d.id) {
+                self.dm.assign_value(&d.id, v.clone())
+            } else if let Some(e) = &d.expr {
                 self.eval_value(e)
                     .and_then(|v| self.dm.assign_value(&d.id, v))
             } else if let Some(c) = &d.content {
@@ -862,6 +900,19 @@ impl<'c, 'd> Driver<'c, 'd> {
         {
             return self.fail(err_id);
         }
+        // A session the host says does not exist cannot be dispatched to: error.communication
+        // goes on the internal queue at once and the block continues (W3C SCXML 6.2.4).
+        if scxml
+            && delay_ms == 0
+            && let (Some(t), Some(known)) = (&target, &self.sessions)
+            && let Some(id) = t.strip_prefix("#_scxml_")
+            && !known.iter().any(|k| k == id)
+        {
+            self.s
+                .internal_queue
+                .push_back(platform_error("error.communication", err_id));
+            return Ok(());
+        }
         let exposed = if visible { Some(sendid.clone()) } else { None };
         if target.as_deref() == Some("#_internal") && delay_ms == 0 {
             self.s.internal_queue.push_back(Event {
@@ -1088,7 +1139,7 @@ impl<'c, 'd> Driver<'c, 'd> {
         }
     }
 
-    fn run_start(&mut self) -> Result<(), Budget> {
+    fn run_start(&mut self, invoker_data: &[(String, Value)]) -> Result<(), Budget> {
         let chart = self.chart;
         // Create every data item, then initialize them per the binding mode.
         for s in 0..chart.len() {
@@ -1101,12 +1152,13 @@ impl<'c, 'd> Driver<'c, 'd> {
         match chart.binding() {
             Binding::Early => {
                 for s in 0..chart.len() {
-                    self.init_data(&chart.state(s).data);
+                    let given = if s == ROOT { invoker_data } else { &[] };
+                    self.init_data_with(&chart.state(s).data, given);
                     self.s.data_initialized.insert(s);
                 }
             }
             Binding::Late => {
-                self.init_data(&chart.state(ROOT).data);
+                self.init_data_with(&chart.state(ROOT).data, invoker_data);
                 self.s.data_initialized.insert(ROOT);
             }
         }
@@ -1133,13 +1185,12 @@ impl<'c, 'd> Driver<'c, 'd> {
 
     // @tg: implements:: [[openspec:scxml-interpretation#Invoke Lifecycle]]
     fn run_external(&mut self, ev: Event) -> Result<(), Budget> {
-        // Events from an invocation that is no longer active are discarded (W3C SCXML 6.4).
-        if let Some(id) = &ev.invokeid
-            && !self.s.invocations.iter().any(|i| &i.invokeid == id)
-        {
-            self.record(Some(ev.name), &[]);
-            return Ok(());
-        }
+        // Every event the host delivers is processed. Ignoring events from a cancelled
+        // invocation is the host's job when it receives them (W3C SCXML 6.4: once cancelled,
+        // the processor MUST NOT insert the invoked session's events into the external queue);
+        // events queued before the cancellation, such as the `done.invoke.<id>` of a child that
+        // finished first, are still processed (IRP test 236). Only active invocations run
+        // `finalize` or get the event forwarded.
         if let Some(rest) = ev.name.strip_prefix("done.invoke.") {
             for inv in self.s.invocations.iter_mut() {
                 if inv.invokeid == rest || ev.invokeid.as_deref() == Some(inv.invokeid.as_str()) {

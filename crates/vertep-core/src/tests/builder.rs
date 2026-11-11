@@ -205,6 +205,8 @@ pub fn start_input() -> StartInput {
         },
         env: Environment::default(),
         options: Options::default(),
+        data: Vec::new(),
+        sessions: None,
     }
 }
 

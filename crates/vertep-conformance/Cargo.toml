@@ -9,8 +9,20 @@ repository.workspace = true
 authors.workspace = true
 publish = false
 
+[features]
+# Rust-versus-Lean differential tests (tasks 8.6, 8.9); run in CI with
+# `cargo test -p vertep-conformance --features differential -- --ignored differential`.
+differential = []
+
 [dependencies]
-vertep-core = { workspace = true, features = ["std"] }
+vertep-core = { workspace = true, features = ["std", "serde"] }
+vertep-scxml = { workspace = true }
+vertep-dm-ecma = { workspace = true }
+quick-xml = "0.42"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+toml = "0.9"
 
 [lints]
 workspace = true

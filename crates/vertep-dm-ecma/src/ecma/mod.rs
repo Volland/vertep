@@ -204,6 +204,10 @@ struct Session {
     assign_fns: HashMap<String, JsObject>,
     read_fns: HashMap<String, JsObject>,
     pending: Vec<PendingItems>,
+    /// The object the last `eval_value` produced, so that an `assign_value` of that same value
+    /// right after it (data initialization: `<data id expr>`) binds the object itself instead
+    /// of a copy rebuilt from its [`Value`], as an ECMAScript assignment would (IRP test 326).
+    last_value: Option<(Value, JsValue)>,
     clock: Rc<InputClock>,
     info: SessionInfo,
     event: Option<Event>,
@@ -233,6 +237,7 @@ impl Session {
             assign_fns: HashMap::new(),
             read_fns: HashMap::new(),
             pending: Vec::new(),
+            last_value: None,
             clock,
             info: SessionInfo::default(),
             event: None,
@@ -509,6 +514,7 @@ impl Session {
     }
 
     fn eval_cond(&mut self, expr: &str, states: &dyn StateQuery) -> Result<bool, EvalError> {
+        let expr = syntax::strip_terminator(expr);
         syntax::check_expression(expr)?;
         self.prepare_in(expr, states);
         let rng = self.rng();
@@ -536,6 +542,7 @@ impl Session {
 
     /// Evaluates a checked expression to an engine value.
     fn eval_js(&mut self, expr: &str, states: &dyn StateQuery) -> Result<JsValue, EvalError> {
+        let expr = syntax::strip_terminator(expr);
         syntax::check_expression(expr)?;
         self.prepare_in(expr, states);
         let result = (|| {
@@ -549,8 +556,13 @@ impl Session {
     }
 
     fn eval_value(&mut self, expr: &str, states: &dyn StateQuery) -> Result<Value, EvalError> {
-        let value = self.eval_js(expr, states)?;
-        self.value_of(&value).map_err(|e| self.err(&e))
+        self.last_value = None;
+        let js = self.eval_js(expr, states)?;
+        let value = self.value_of(&js).map_err(|e| self.err(&e))?;
+        if js.is_object() {
+            self.last_value = Some((value.clone(), js));
+        }
+        Ok(value)
     }
 
     fn eval_content(&mut self, content: &str) -> Result<Value, EvalError> {
@@ -597,8 +609,11 @@ impl Session {
     }
 
     fn assign_value(&mut self, location: &str, value: &Value) -> Result<(), EvalError> {
-        let value = to_js(value, &mut self.ctx).map_err(|e| self.err(&e))?;
-        self.assign_js(location, value)
+        let js = match self.last_value.take() {
+            Some((last, js)) if same_value(&last, value) => js,
+            _ => to_js(value, &mut self.ctx).map_err(|e| self.err(&e))?,
+        };
+        self.assign_js(location, js)
     }
 
     /// The engine value for `value`: the original array item when `value` came from
@@ -1080,6 +1095,12 @@ impl EcmaDatamodel {
         self.session.get_mut()
     }
 
+    /// Any operation other than `assign_value` ends the window in which the last evaluated
+    /// object may be bound by identity.
+    fn forget_last_value(&mut self) {
+        self.session().last_value = None;
+    }
+
     /// Debug-build backstop for guard purity: the datamodel after a condition must equal the
     /// datamodel before it; if not, the state is rolled back and the condition fails.
     #[cfg(debug_assertions)]
@@ -1120,18 +1141,21 @@ impl Datamodel for EcmaDatamodel {
     }
 
     fn declare(&mut self, id: &str) -> Result<(), EvalError> {
+        self.forget_last_value();
         self.session().declare(id)
     }
 
     fn set_event(&mut self, event: &Event) {
         // Building `_event` fails only if the engine is out of resources; the previous event
         // then stays visible, which the next operation's error will surface.
+        self.forget_last_value();
         let _ = self.session().set_event(event);
     }
 
     // @tg: implements:: [[openspec:datamodel#Guard Purity]]
     fn eval_cond(&mut self, expr: &str, states: &dyn StateQuery) -> Result<bool, EvalError> {
         self.session().pending.clear();
+        self.forget_last_value();
         #[cfg(debug_assertions)]
         {
             self.checked_cond(expr, states)
@@ -1147,6 +1171,7 @@ impl Datamodel for EcmaDatamodel {
     }
 
     fn eval_content(&mut self, content: &str) -> Result<Value, EvalError> {
+        self.forget_last_value();
         self.session().eval_content(content)
     }
 
@@ -1156,6 +1181,7 @@ impl Datamodel for EcmaDatamodel {
         expr: &str,
         states: &dyn StateQuery,
     ) -> Result<(), EvalError> {
+        self.forget_last_value();
         self.session().assign_expr(location, expr, states)
     }
 
@@ -1164,14 +1190,17 @@ impl Datamodel for EcmaDatamodel {
     }
 
     fn bind_var(&mut self, name: &str, value: Value) -> Result<(), EvalError> {
+        self.forget_last_value();
         self.session().bind_var(name, &value)
     }
 
     fn is_location(&mut self, location: &str) -> bool {
+        self.forget_last_value();
         self.session().is_location(location)
     }
 
     fn exec_script(&mut self, script: &str, states: &dyn StateQuery) -> Result<(), EvalError> {
+        self.forget_last_value();
         self.session().exec_script(script, states)
     }
 
@@ -1180,6 +1209,7 @@ impl Datamodel for EcmaDatamodel {
         array: &str,
         states: &dyn StateQuery,
     ) -> Result<Vec<Value>, EvalError> {
+        self.forget_last_value();
         self.session().foreach_items(array, states)
     }
 

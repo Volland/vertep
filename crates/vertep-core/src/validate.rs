@@ -193,6 +193,14 @@ pub enum ViolationKind {
         /// The second target of the conflicting pair.
         second: String,
     },
+    /// Default history entry never reaches a real state: following the default transitions of
+    /// history states (a history state without one defaults to its parent's `initial`) leads
+    /// back to this history state, for example `<state initial="h">` whose history child `h`
+    /// has no default transition.
+    HistoryDefaultCycle {
+        /// The history state on the cycle.
+        history: String,
+    },
     /// Two data items share an identifier.
     DuplicateDataId {
         /// The repeated identifier.
@@ -325,6 +333,8 @@ pub fn validate(chart: &Chart) -> Result<(), Vec<Violation>> {
         }
     }
 
+    check_history_defaults(&flat, &mut push);
+
     // Data identifiers.
     let mut data_seen: BTreeMap<&str, usize> = BTreeMap::new();
     let all_data = chart
@@ -341,7 +351,9 @@ pub fn validate(chart: &Chart) -> Result<(), Vec<Violation>> {
                 d.span,
             );
         }
-        let given = [d.src.is_some(), d.expr.is_some(), d.content.is_some()]
+        // A resolved `src` keeps both the reference and the content it resolved to (the
+        // reader's convention), so `src` with `content` is one source, not two.
+        let given = [d.src.is_some() || d.content.is_some(), d.expr.is_some()]
             .iter()
             .filter(|b| **b)
             .count();
@@ -556,8 +568,13 @@ pub fn validate(chart: &Chart) -> Result<(), Vec<Violation>> {
                     inv.id.is_some() && inv.idlocation.is_some(),
                     "id, idlocation",
                 ),
+                // A resolved `src` keeps the reference and the document it resolved to as an
+                // inline `<content>` body, so only `srcexpr`, or `src` with a `<content expr>`,
+                // conflicts with content.
                 (
-                    inv.content.is_some() && (inv.src.is_some() || inv.srcexpr.is_some()),
+                    inv.content.as_ref().is_some_and(|c| {
+                        inv.srcexpr.is_some() || (inv.src.is_some() && c.expr.is_some())
+                    }),
                     "content, src",
                 ),
                 (
@@ -585,8 +602,60 @@ fn conflict(element: &str, attributes: &str) -> ViolationKind {
     }
 }
 
+/// The history states the default entry of history state `h` targets: its default transition's
+/// history targets, or, without one, the history targets of its parent's `initial` attribute or
+/// `<initial>` transition (which is what compilation synthesizes as the default).
+fn history_default_edges(flat: &Flat<'_>, h: usize) -> Vec<usize> {
+    let st = flat.states[h];
+    let targets: Vec<&str> = match (st.transitions.first(), flat.parent[h]) {
+        (Some(t), _) => t.targets.iter().map(String::as_str).collect(),
+        (None, Some(p)) => resolve_initial(flat.states[p]).targets,
+        (None, None) => Vec::new(),
+    };
+    targets
+        .iter()
+        .filter_map(|t| flat.by_id.get(t).copied())
+        .filter(|&i| matches!(flat.states[i].element, StateElement::History(_)))
+        .collect()
+}
+
+/// Default history entry must terminate: no history state may reach itself through
+/// [`history_default_edges`]. Without this rule entering such a history state would recurse
+/// forever.
+fn check_history_defaults(flat: &Flat<'_>, push: &mut impl FnMut(ViolationKind, NodeRef, Span)) {
+    let histories: Vec<usize> = (0..flat.states.len())
+        .filter(|&i| matches!(flat.states[i].element, StateElement::History(_)))
+        .collect();
+    for &h in &histories {
+        let mut seen = alloc::vec![false; flat.states.len()];
+        let mut stack = history_default_edges(flat, h);
+        let mut cyclic = false;
+        while let Some(x) = stack.pop() {
+            if x == h {
+                cyclic = true;
+                break;
+            }
+            if !core::mem::replace(&mut seen[x], true) {
+                stack.extend(history_default_edges(flat, x));
+            }
+        }
+        if cyclic {
+            let id = flat.states[h].id.clone();
+            push(
+                ViolationKind::HistoryDefaultCycle {
+                    history: id.clone(),
+                },
+                NodeRef::State { id },
+                flat.states[h].span,
+            );
+        }
+    }
+}
+
 /// Targets of one transition must be able to be active together: no target may be an ancestor of
-/// another, and every pair must meet below a parallel state.
+/// another, and every pair must meet below a parallel state. A history target stands for the
+/// whole content of its parent, so it takes its parent's position: it excludes its siblings,
+/// their descendants and other history states of the same parent.
 fn check_target_set(
     flat: &Flat<'_>,
     targets: &[String],
@@ -597,7 +666,14 @@ fn check_target_set(
     let idx: Vec<(usize, &String)> = targets
         .iter()
         .filter_map(|t| flat.by_id.get(t.as_str()).map(|i| (*i, t)))
-        .filter(|(i, _)| !matches!(flat.states[*i].element, StateElement::History(_)))
+        .filter_map(|(i, t)| {
+            if matches!(flat.states[i].element, StateElement::History(_)) {
+                // A history state at the root is reported on its own.
+                flat.parent[i].map(|p| (p, t))
+            } else {
+                Some((i, t))
+            }
+        })
         .collect();
     for a in 0..idx.len() {
         for b in (a + 1)..idx.len() {

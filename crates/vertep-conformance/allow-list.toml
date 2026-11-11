@@ -1,0 +1,239 @@
+# Expected deviations from the W3C SCXML IRP suite on the Rust core.
+#
+# Every entry names the test, the datamodel of the variant and why the failure is outside
+# Vertep's control. An allow-listed test that passes fails the run, so remove its entry; an
+# entry without a reason, or naming a test the suite does not have, is rejected.
+#
+
+# Basic HTTP Event I/O Processor (W3C SCXML Appendix C.2)
+
+[[deviation]]
+test = "201"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "509"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "510"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "518"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "519"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "520"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "522"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "531"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "532"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "534"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "567"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+[[deviation]]
+test = "577"
+datamodel = "ecmascript"
+reason = "needs the Basic HTTP Event I/O Processor (http://www.w3.org/TR/scxml/#BasicHTTPEventProcessor); the in-memory test host offers only the SCXML Event I/O Processor and has no network"
+
+# XML DOM values in the ecmascript datamodel (W3C SCXML B.2.2)
+
+[[deviation]]
+test = "557"
+datamodel = "ecmascript"
+reason = "needs XML content turned into an ECMAScript DOM object (getElementsByTagName); the boa engine has no DOM, so vertep-dm-ecma keeps XML content as a string"
+
+[[deviation]]
+test = "561"
+datamodel = "ecmascript"
+reason = "needs XML content turned into an ECMAScript DOM object (getElementsByTagName); the boa engine has no DOM, so vertep-dm-ecma keeps XML content as a string"
+
+# Guard purity
+
+[[deviation]]
+test = "444"
+datamodel = "ecmascript"
+reason = "the condition `++var1==2` modifies the datamodel; Vertep evaluates conditions against a read-only scope (design decision D4, openspec datamodel#Guard Purity), so the guard is an evaluation error by design"
+
+# xpath datamodel (W3C SCXML B.3)
+
+[[deviation]]
+test = "463"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "464"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "465"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "466"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "467"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "468"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "469"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "470"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "473"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "474"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "475"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "476"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "477"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "478"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "479"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "480"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "481"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "482"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "483"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "537"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "539"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "540"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "542"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "543"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "544"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "545"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "546"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "547"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "555"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"
+
+[[deviation]]
+test = "568"
+datamodel = "ecmascript"
+reason = "the chart uses datamodel=\"xpath\", which Vertep does not implement (the IRP import places xpath charts with the ecmascript variants); xpath also needs the `<assign type>` and `attr` forms the IR does not represent"

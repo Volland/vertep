@@ -120,6 +120,18 @@ fn push_unique(v: &mut Vec<StateIdx>, s: StateIdx) {
 /// `getEffectiveTargetStates`: the targets of `t` with history states replaced by their recorded
 /// states, or by the effective targets of their default transition when nothing is recorded.
 pub fn effective_targets(chart: &CompiledChart, history: &History, t: TransIdx) -> Vec<StateIdx> {
+    effective_targets_within(chart, history, t, chart.len())
+}
+
+/// [`effective_targets`] following at most `fuel` history default transitions. Validation
+/// rejects cyclic history defaults, so the bound never cuts a well-formed chart short; it only
+/// guarantees termination.
+fn effective_targets_within(
+    chart: &CompiledChart,
+    history: &History,
+    t: TransIdx,
+    fuel: usize,
+) -> Vec<StateIdx> {
     let mut out = Vec::new();
     for &s in &chart.transition(t).targets {
         if matches!(chart.state(s).kind, StateKind::History(_)) {
@@ -130,8 +142,10 @@ pub fn effective_targets(chart: &CompiledChart, history: &History, t: TransIdx) 
                     }
                 }
                 None => {
-                    if let Some(&dt) = chart.state(s).transitions.first() {
-                        for x in effective_targets(chart, history, dt) {
+                    if let Some(&dt) = chart.state(s).transitions.first()
+                        && fuel > 0
+                    {
+                        for x in effective_targets_within(chart, history, dt, fuel - 1) {
                             push_unique(&mut out, x);
                         }
                     }
@@ -335,17 +349,25 @@ pub fn compute_entry_set(chart: &CompiledChart, history: &History, ts: &[TransId
     };
     for &t in ts {
         for &s in &chart.transition(t).targets {
-            add_descendants(chart, history, s, &mut p);
+            add_descendants(chart, history, s, &mut p, chart.len());
         }
         let ancestor = transition_domain(chart, history, t);
         for s in effective_targets(chart, history, t) {
-            add_ancestors(chart, history, s, ancestor, &mut p);
+            add_ancestors(chart, history, s, ancestor, &mut p, chart.len());
         }
     }
     p
 }
 
-fn add_descendants(chart: &CompiledChart, history: &History, state: StateIdx, p: &mut EntryPlan) {
+/// `addDescendantStatesToEnter`. `fuel` bounds the history default transitions followed (see
+/// [`effective_targets_within`]); every other recursion goes strictly deeper in the tree.
+fn add_descendants(
+    chart: &CompiledChart,
+    history: &History,
+    state: StateIdx,
+    p: &mut EntryPlan,
+    fuel: usize,
+) {
     let st = chart.state(state);
     if matches!(st.kind, StateKind::History(_)) {
         let parent = st.parent.unwrap_or(ROOT);
@@ -353,21 +375,23 @@ fn add_descendants(chart: &CompiledChart, history: &History, state: StateIdx, p:
             Some(v) => {
                 let v = v.to_vec();
                 for &s in &v {
-                    add_descendants(chart, history, s, p);
+                    add_descendants(chart, history, s, p, fuel);
                 }
                 for &s in &v {
-                    add_ancestors(chart, history, s, Some(parent), p);
+                    add_ancestors(chart, history, s, Some(parent), p, fuel);
                 }
             }
             None => {
-                if let Some(&dt) = st.transitions.first() {
+                if let Some(&dt) = st.transitions.first()
+                    && fuel > 0
+                {
                     p.default_history_content.retain(|(par, _)| *par != parent);
                     p.default_history_content.push((parent, dt));
                     for &s in &chart.transition(dt).targets {
-                        add_descendants(chart, history, s, p);
+                        add_descendants(chart, history, s, p, fuel - 1);
                     }
                     for &s in &chart.transition(dt).targets {
-                        add_ancestors(chart, history, s, Some(parent), p);
+                        add_ancestors(chart, history, s, Some(parent), p, fuel - 1);
                     }
                 }
             }
@@ -380,17 +404,17 @@ fn add_descendants(chart: &CompiledChart, history: &History, state: StateIdx, p:
             p.default_entry.insert(state);
             if let Some(it) = st.initial {
                 for &s in &chart.transition(it).targets {
-                    add_descendants(chart, history, s, p);
+                    add_descendants(chart, history, s, p, fuel);
                 }
                 for &s in &chart.transition(it).targets {
-                    add_ancestors(chart, history, s, Some(state), p);
+                    add_ancestors(chart, history, s, Some(state), p, fuel);
                 }
             }
         }
         StateKind::Parallel => {
             for &child in &st.children {
                 if !p.states.any_in_range(child + 1, chart.state(child).last) {
-                    add_descendants(chart, history, child, p);
+                    add_descendants(chart, history, child, p, fuel);
                 }
             }
         }
@@ -404,6 +428,7 @@ fn add_ancestors(
     state: StateIdx,
     ancestor: Option<StateIdx>,
     p: &mut EntryPlan,
+    fuel: usize,
 ) {
     for anc in proper_ancestors(chart, state, ancestor) {
         if anc == ROOT {
@@ -413,7 +438,7 @@ fn add_ancestors(
         if chart.state(anc).kind == StateKind::Parallel {
             for &child in &chart.state(anc).children {
                 if !p.states.any_in_range(child + 1, chart.state(child).last) {
-                    add_descendants(chart, history, child, p);
+                    add_descendants(chart, history, child, p, fuel);
                 }
             }
         }
