@@ -772,7 +772,6 @@ impl<'c, 'd> Driver<'c, 'd> {
         }
     }
 
-    // @tg: -contradicts:: [[openspec:scxml-interpretation#Execution Errors]] {reason: "W3C SCXML 6.2.4 and IRP test 199 require error.execution, not error.communication, for an unsupported send type"}
     fn exec_send(&mut self, send: &'c Send) -> Result<(), Stop> {
         // 1. Identifier, stored at `idlocation` before anything else is evaluated, so error
         //    events raised below can carry it.

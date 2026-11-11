@@ -143,7 +143,7 @@ The interpreter SHALL keep an internal queue fed by `raise`, by `send` with targ
 - **THEN** the event is placed on the internal queue, not emitted as an effect
 
 ### Requirement: Execution Errors
-The interpreter SHALL place `error.execution` on the internal queue when an expression fails to evaluate or an assignment target is invalid and SHALL stop the enclosing executable content block at that element, SHALL place `error.communication` when a send target or type cannot be handled, and SHALL continue processing (W3C SCXML 5.10 and 6.2).
+The interpreter SHALL place `error.execution` on the internal queue when an expression fails to evaluate or an assignment target is invalid and SHALL stop the enclosing executable content block at that element, SHALL place `error.execution` when a send names an unsupported type or a syntactically illegal target, SHALL place `error.communication` when the host reports that a send could not be delivered, and SHALL continue processing (W3C SCXML 5.10, 6.2.4; IRP test 199).
 
 #### Scenario: Failed expression stops the block
 - **WHEN** the second of three elements of an `onentry` block fails to evaluate
@@ -151,7 +151,7 @@ The interpreter SHALL place `error.execution` on the internal queue when an expr
 
 #### Scenario: Invalid send type
 - **WHEN** a `send` names a type that no Event I/O Processor supports
-- **THEN** `error.communication` is queued and the session continues
+- **THEN** `error.execution` is queued and the session continues
 
 ### Requirement: Send And Cancel Effects
 The interpreter SHALL turn every `send` whose target is not `#_internal` into a send effect carrying the evaluated event name, data, target, type, delay and a send identifier, SHALL generate send identifiers deterministically from the session identifier and a per-session counter when none is given, and SHALL turn `cancel` into a cancel effect for that send identifier.

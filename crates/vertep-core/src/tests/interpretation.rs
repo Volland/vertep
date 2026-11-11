@@ -617,9 +617,7 @@ fn failed_expression_stops_the_block() {
     assert_eq!(active(&cc, &o), ids(&["pass"]));
 }
 
-/// The spec scenario says `error.communication`; W3C SCXML 6.2.4 and IRP test 199 require
-/// `error.execution` for a type no Event I/O Processor supports, and the Recommendation is
-/// normative, so this test checks the W3C behavior (see the `-contradicts` edge on `exec_send`).
+/// W3C SCXML 6.2.4 and IRP test 199: an unsupported send type raises `error.execution`.
 // @tg: verifies:: [[openspec:scxml-interpretation#Execution Errors#Invalid send type]] {level: unit}
 #[test]
 fn invalid_send_type() {
