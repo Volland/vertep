@@ -80,8 +80,8 @@
 - [ ] 7.7 Define the projection and reconstruction in Lean on LeanRDF's RDF 1.2 model and prove the round trip and canonical-form theorem (RDF Round Trip Theorem)
 - [ ] 7.8 Transcribe the chart shapes into LeanRDF and prove `validate shapes (toRDF c) = conforms ↔ WellFormed c` (Shapes Equivalence Theorem)
 - [x] 7.9 State the dynamic type-soundness theorem and the named M1 extension point (Type Soundness Statement)
-- [ ] 7.10 Build the oracle executable reading N-Quads, inputs and a tape and writing JSON Lines traces (Differential Oracle)
-- [ ] 7.11 Build `vt certify`, emitting `vt:certifiedBy` certificates with theorem names, toolchain, LeanRDF revision and checker hash (Chart Certificates)
+- [x] 7.10 Build the oracle executable reading N-Quads, inputs and a tape and writing JSON Lines traces (Differential Oracle)
+- [x] 7.11 Build `vt certify`, emitting `vt:certifiedBy` certificates with theorem names, toolchain, LeanRDF revision and checker hash (Chart Certificates)
 - [ ] 7.12 Link each Lean declaration to its requirement with a `-- @tg: implements:: [[openspec:formal-model#<Requirement>]]` comment for every formal-model requirement, and annotate the Lean tests with `-- @tg: verifies:: [[openspec:formal-model#<Requirement>#<Scenario>]]`
 
 ## 8. vertep-conformance: conformance harness

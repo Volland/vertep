@@ -248,7 +248,7 @@ The theorem that `step` preserves legal configurations is stated only in `lean/v
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: secondary}
 
-The counterexamples: a transition targeting a history state and its sibling, which leaves two active children; and an `initial` naming a history state without a default transition, which recursed without bound in Rust. Both are now validator rules in Rust (2026-11-11), to be mirrored in `WellFormed`; the proof then needs lemmas for compile correctness, exit and entry legality, a history invariant and fuel adequacy. No theorem is stated with `sorry` meanwhile.
+The counterexamples: a transition targeting a history state and its sibling, which leaves two active children; and an `initial` naming a history state without a default transition, which recursed without bound in Rust. Both are now validator rules in Rust (2026-11-11), to be mirrored in `WellFormed`; the proof then needs lemmas for compile correctness, exit and entry legality, a history invariant and fuel adequacy. No theorem is stated with `sorry` meanwhile. With both rules in place no counterexample is known (2026-11-11), and the RDF round-trip and shapes-equivalence theorems are pending in the same way.
 
 ## Journal entries are stamped by the store
 
