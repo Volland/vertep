@@ -220,14 +220,16 @@ Where the SCXML Recommendation leaves room, `vertep-core` reads it as follows; t
 - motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[decisions#SCXML semantics are normative]] {weight: secondary}
 
-- An unsupported send type or an illegal target raises `error.execution` (W3C 6.2.4, IRP test 199); `error.communication` is reserved for delivery failures the host reports back as input.
+- An unsupported send type or an illegal target raises `error.execution` (W3C 6.2.4, IRP test 199). When the input lists the running sessions, an immediate send to `#_scxml_<id>` of an unlisted session queues `error.communication` with its `sendid` at once and the block continues (IRP 496); every other undeliverable target is reported by the host as an `error.communication` input.
 - A failing `<if>` condition queues `error.execution` and stops the enclosing block; later branches are not tried.
 - `done.state.*` and error events are platform events with undefined data; errors from a failed send carry its `sendid`.
 - Generated send ids are `<sessionid>.send.<n>`, invoke ids `<stateid>.<n>`; `idlocation` is assigned before anything else in the send is evaluated.
 - A delayed `#_internal` send becomes a `Send` effect that the host delivers back.
-- Events whose `invokeid` matches no active invocation are discarded; `done.invoke.<id>` completes the invocation, so leaving the state emits no `CancelInvoke`.
+- The core processes every delivered event; only active invocations run `finalize` or get autoforwarded events, and the host stops delivering a cancelled invocation's events from the `CancelInvoke` on (W3C 6.4, IRP 236). `done.invoke.<id>` completes the invocation, so leaving the state emits no `CancelInvoke`.
+- Invoker `param` and `namelist` values arrive as start data and override the initialization of top-level data items with those names (W3C 6.4.4).
 - A history state without a default transition gets one to its parent's default entry; the root's initial transition is internal with the root as domain.
 - `SessionDone` is emitted exactly once, also on cancel; a `<state>` whose only children are history states is rejected by validation.
+- A history target stands for its parent's position in the target-set rule, and cycles through history default transitions are rejected (found by the Lean model).
 
 ## IRP suite from a pinned mirror
 
@@ -246,7 +248,7 @@ The theorem that `step` preserves legal configurations is stated only in `lean/v
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: secondary}
 
-The counterexamples: a transition targeting a history state and its sibling, which leaves two active children; and an `initial` naming a history state without a default transition, which recursed without bound in Rust. Both become validator rules, mirrored in `WellFormed`; the proof then needs lemmas for compile correctness, exit and entry legality, a history invariant and fuel adequacy. No theorem is stated with `sorry` meanwhile.
+The counterexamples: a transition targeting a history state and its sibling, which leaves two active children; and an `initial` naming a history state without a default transition, which recursed without bound in Rust. Both are now validator rules in Rust (2026-11-11), to be mirrored in `WellFormed`; the proof then needs lemmas for compile correctness, exit and entry legality, a history invariant and fuel adequacy. No theorem is stated with `sorry` meanwhile.
 
 ## Journal entries are stamped by the store
 
