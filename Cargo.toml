@@ -1,0 +1,30 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/vertep-core",
+    "crates/vertep-scxml",
+    "crates/vertep-dm-ecma",
+    "crates/vertep-rdf",
+    "crates/vertep-conformance",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Volland/vertep"
+authors = ["Volodymyr Pavlyshyn"]
+
+[workspace.dependencies]
+vertep-core = { path = "crates/vertep-core", version = "0.1.0", default-features = false }
+vertep-scxml = { path = "crates/vertep-scxml", version = "0.1.0" }
+vertep-dm-ecma = { path = "crates/vertep-dm-ecma", version = "0.1.0" }
+vertep-rdf = { path = "crates/vertep-rdf", version = "0.1.0" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

@@ -1,0 +1,16 @@
+[package]
+name = "vertep-conformance"
+description = "W3C SCXML IRP conformance harness and differential tests for Vertep"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+vertep-core = { workspace = true, features = ["std"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "vertep-rdf"
+description = "RDF 1.2 projection, vt ontology, SHACL shapes and canonical hashing for Vertep charts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+vertep-core = { workspace = true, features = ["std"] }
+
+[lints]
+workspace = true

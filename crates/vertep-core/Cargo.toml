@@ -1,0 +1,20 @@
+[package]
+name = "vertep-core"
+description = "Chart IR, validation and the pure SCXML step kernel for Vertep (no_std)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+default = ["std"]
+std = []
+serde = ["dep:serde"]
+
+[dependencies]
+serde = { version = "1", default-features = false, features = ["derive", "alloc"], optional = true }
+
+[lints]
+workspace = true
