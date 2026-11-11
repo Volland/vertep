@@ -63,6 +63,8 @@ The `no_std` heart: the chart IR, the type language, the `Datamodel` trait and t
 - realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the core half"}
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
+Implemented 2026-11-11: `validate`, `order`, `compile` (states numbered in document order, root 0, an in-crate bitset), the pure Appendix D `kernel`, `session::{start, step}` with effects, the `null` datamodel and registry, and the `tape`/`trace` exchange format for the Lean oracle, following [[decisions#Appendix D readings in the Rust core]].
+
 ## vertep-scxml
 
 SCXML 1.0 XML reader and writer to and from the IR, with `vt:` extension attributes and a loss report for unsupported constructs.
@@ -109,6 +111,16 @@ A dev-only harness that runs the W3C SCXML IRP suite on the Rust core and on the
 - uses:: [[components#vertep-scxml]] {kind: dev}
 - uses:: [[components#vertep-dm-ecma]] {kind: dev}
 - uses:: [[components#vertep-lean]] {kind: dev, note: "the oracle binary"}
+- uses:: [[components#vertep-testkit]] {kind: dev}
+- scheduled_in:: [[roadmap#M0 SCXML core]]
+
+The suite under `suite/` comes from [[decisions#IRP suite from a pinned mirror]]: 236 ECMAScript charts and one `null` chart, checked by `scripts/check-suite-hash.sh`.
+
+## vertep-testkit
+
+Test-only proptest generators for charts, shared by the SCXML, YAML and RDF round-trip tests and the differential conformance tests.
+
+- uses:: [[components#vertep-core]]
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
 ## vertep-yaml

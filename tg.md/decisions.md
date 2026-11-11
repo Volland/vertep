@@ -212,3 +212,29 @@ In M3 an LLM call is an invoked actor of the deciding chart; pooled stateless LL
 LLM-authored plan charts run in a sandbox with either the CEL or the `null` datamodel; ECMAScript and Rust datamodels are never available to a plan. Ratified 2026-11-11 from the M3 spec.
 
 - motivated_by:: [[decisions#Pluggable datamodel]] {weight: primary, since: "2026-11-11"}
+
+## Appendix D readings in the Rust core
+
+Where the SCXML Recommendation leaves room, `vertep-core` reads it as follows; the Lean model must make the same choices, and a change here is a semantic change.
+
+- motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#SCXML semantics are normative]] {weight: secondary}
+
+- An unsupported send type or an illegal target raises `error.execution` (W3C 6.2.4, IRP test 199); `error.communication` is reserved for delivery failures the host reports back as input.
+- A failing `<if>` condition queues `error.execution` and stops the enclosing block; later branches are not tried.
+- `done.state.*` and error events are platform events with undefined data; errors from a failed send carry its `sendid`.
+- Generated send ids are `<sessionid>.send.<n>`, invoke ids `<stateid>.<n>`; `idlocation` is assigned before anything else in the send is evaluated.
+- A delayed `#_internal` send becomes a `Send` effect that the host delivers back.
+- Events whose `invokeid` matches no active invocation are discarded; `done.invoke.<id>` completes the invocation, so leaving the state emits no `CancelInvoke`.
+- A history state without a default transition gets one to its parent's default entry; the root's initial transition is internal with the root as domain.
+- `SessionDone` is emitted exactly once, also on cancel; a `<state>` whose only children are history states is rejected by validation.
+
+## IRP suite from a pinned mirror
+
+The W3C IRP files are imported from the verbatim copy in the uscxml repository pinned by commit, transformed with `confEcma.xsl` on SaxonJS, and committed with a SHA-256 manifest that CI checks.
+
+- motivated_by:: [[constraints#W3C serves a bot challenge to scripted clients]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#The IRP stylesheet is XSLT 2.0]] {weight: primary}
+- motivated_by:: [[decisions#Full SCXML first]] {weight: secondary}
+
+The mirror's `update-txml.sh` copies the W3C files unchanged; the only local edit it carries is commented out. `crates/vertep-conformance/scripts/import-irp.sh` re-imports, `check-suite-hash.sh` verifies.

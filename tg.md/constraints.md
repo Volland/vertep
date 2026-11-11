@@ -63,3 +63,15 @@ Aeneas translates only a restricted subset of safe Rust to Lean, with limited tr
 
 - constrains:: [[decisions#Lean verification bridge]] {strength: should, source: "Aeneas"}
 - constrains:: [[decisions#No-std core and tokio shell]] {strength: should, source: "Aeneas"}
+
+## W3C serves a bot challenge to scripted clients
+
+The W3C web server answers bursts of scripted requests with HTTP 429 and a Cloudflare challenge, so the IRP files cannot be fetched reliably by a script or in CI.
+
+- constrains:: [[decisions#IRP suite from a pinned mirror]] {strength: must, source: "observed 2026-11-11 on www.w3.org/Voice/2013/scxml-irp"}
+
+## The IRP stylesheet is XSLT 2.0
+
+`confEcma.xsl`, which turns IRP `.txml` templates into ECMAScript charts, uses XSLT 2.0 features such as `xsl:analyze-string`, so libxslt's `xsltproc` cannot run it.
+
+- constrains:: [[decisions#IRP suite from a pinned mirror]] {strength: must, source: "confEcma.xsl version=\"2.0\""}
