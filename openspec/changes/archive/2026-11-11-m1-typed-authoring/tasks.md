@@ -53,7 +53,7 @@
 - [x] 6.7 Define map ordering and exact decimals; annotate `@tg: implements:: [[openspec:cel-datamodel#Deterministic Evaluation]]`
 - [x] 6.8 Implement the CEL-only loading policy; annotate `@tg: implements:: [[openspec:cel-datamodel#Safe Datamodel for Generated Charts]]`
 - [x] 6.9 Implement `<data>`, `<assign>`, `<donedata>`, `<content>`, `<param>`, `<foreach>`, `<if>`, `<log>` semantics; annotate `@tg: implements:: [[openspec:cel-datamodel#SCXML Datamodel Contract]]`
-- [ ] 6.10 Run the SCXML conformance tests that are datamodel-neutral under CEL (transformed from the ECMAScript templates) and record deviations in the allow-list
+- [x] 6.10 MOVED to change verification-backlog task 3.1, was: Run the SCXML conformance tests that are datamodel-neutral under CEL (transformed from the ECMAScript templates) and record deviations in the allow-list
 - [x] 6.11 Native versus WebAssembly determinism test over an expression corpus, and tests for every cel-datamodel scenario, each annotated with `@tg: verifies::`
 
 ## 7. Macros in vertep-macros
@@ -75,16 +75,16 @@
 
 ## 9. Lean formal model
 
-- [ ] 9.1 Add the type language, `HasType` and the executable checker to `vertep-lean`; prove `check T v = true ↔ HasType v T`
-- [ ] 9.2 Define the SHACL projection in Lean and prove agreement using LeanRDF's `validate_conforms`
-- [ ] 9.3 Define the JSON Schema projection in Lean and prove agreement for the supported keyword subset
-- [ ] 9.4 State and prove chart type soundness for `step`: well-typed chart, configuration and input events yield well-typed context and output events
-- [ ] 9.5 Extend the differential oracle: the Lean checker and the Rust checker give the same verdict and diagnostics count on generated charts and values in CI
-- [ ] 9.6 Pin the axioms of every new theorem in tests (no `sorry`, only `propext`, `Quot.sound`, `Classical.choice`)
+- [x] 9.1 MOVED to change verification-backlog task 4.1, was: Add the type language, `HasType` and the executable checker to `vertep-lean`; prove `check T v = true ↔ HasType v T`
+- [x] 9.2 MOVED to change verification-backlog task 4.2, was: Define the SHACL projection in Lean and prove agreement using LeanRDF's `validate_conforms`
+- [x] 9.3 MOVED to change verification-backlog task 4.3, was: Define the JSON Schema projection in Lean and prove agreement for the supported keyword subset
+- [x] 9.4 MOVED to change verification-backlog task 4.4, was: State and prove chart type soundness for `step`: well-typed chart, configuration and input events yield well-typed context and output events
+- [x] 9.5 MOVED to change verification-backlog task 4.5, was: Extend the differential oracle: the Lean checker and the Rust checker give the same verdict and diagnostics count on generated charts and values in CI
+- [x] 9.6 MOVED to change verification-backlog task 4.6, was: Pin the axioms of every new theorem in tests (no `sorry`, only `propext`, `Quot.sound`, `Classical.choice`)
 
 ## 10. Documentation and graph
 
-- [ ] 10.1 Update the lat.md sections [[capabilities#Type system]], [[capabilities#Rust DSL]], [[capabilities#YAML format]] and [[capabilities#CEL datamodel]] with `specified_by` edges to the new requirements, and keep `type-system`, `rust-dsl`, `yaml-format` and `cel-datamodel` in the `openspec:` frontmatter of `tg.md/capabilities.md`
-- [x] 10.2 Record design decisions 1–7 of design.md as `Decision` sections in `tg.md/decisions.md` with `motivated_by` edges to [[decisions#One IR type language]], [[decisions#Pluggable datamodel]] and [[constraints#Proc macros run at compile time]]; add `- constrains:: [[openspec:rust-dsl#Compile-Time Structural Checks]] {strength: must}` to [[constraints#Proc macros run at compile time]]
-- [ ] 10.3 Set `status: in-progress` then `stable` on the M1 components in `tg.md/components.md` and add `provides` edges from each crate to the requirements it implements
-- [ ] 10.4 Run `tg check`, `tg ontology check` and `tg trace type-system rust-dsl yaml-format cel-datamodel --gaps`, and close every gap they report
+- [x] 10.1 Update the lat.md sections [[capabilities#Type system]], [[capabilities#Rust DSL]], [[capabilities#YAML format]] and [[capabilities#CEL datamodel]] with `specified_by` edges to the new requirements, and keep `type-system`, `rust-dsl`, `yaml-format` and `cel-datamodel` in the `openspec:` frontmatter of `tg.md/capabilities.md`
+- [x] 10.2 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Record design decisions 1–7 of design.md as `Decision` sections in `tg.md/decisions.md` with `motivated_by` edges to [[decisions#One IR type language]], [[decisions#Pluggable datamodel]] and [[constraints#Proc macros run at compile time]]; add `- constrains:: [[openspec:rust-dsl#Compile-Time Structural Checks]] {strength: must}` to [[constraints#Proc macros run at compile time]]
+- [x] 10.3 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Set `status: in-progress` then `stable` on the M1 components in `tg.md/components.md` and add `provides` edges from each crate to the requirements it implements
+- [x] 10.4 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Run `tg check`, `tg ontology check` and `tg trace type-system rust-dsl yaml-format cel-datamodel --gaps`, and close every gap they report

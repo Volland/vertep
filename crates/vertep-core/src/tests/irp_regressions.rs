@@ -300,6 +300,7 @@ fn execution_error_carries_the_datamodel_message() {
 /// Found by the Rust/Lean differential tests: an eventless transition whose guard fails queues
 /// `error.execution`, which enables nothing, after which the guard fails again. Every consumed
 /// event counts against the microstep budget, so the macrostep ends instead of looping forever.
+// @tg: verifies:: [[openspec:scxml-interpretation#Macrostep Execution#Error loop without transitions is cut by the budget]] {level: unit}
 #[test]
 fn failing_eventless_guard_loop_hits_the_budget() {
     use crate::session::{StartError, start};

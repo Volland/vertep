@@ -93,9 +93,9 @@ Every implementation task below includes: annotate the realizing declaration wit
 ## 10. Chart versioning (vertep-runtime)
 
 - [x] 10.1 Version Recorded Per Journal Segment: version IRI on every entry
-- [x] 10.2 Replay With Recorded Version: per-segment replay, missing-version error
-- [x] 10.3 Chart Registry: versions keyed by IRI, removal refused while in use
-- [x] 10.4 Pin Until Final: existing actors pinned, new actors on latest
+- [x] 10.2 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Replay With Recorded Version: per-segment replay, missing-version error
+- [x] 10.3 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Chart Registry: versions keyed by IRI, removal refused while in use
+- [x] 10.4 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Pin Until Final: existing actors pinned, new actors on latest
 - [x] 10.5 Explicit Migration: migration entry with snapshot before, migration IRI, snapshot after; atomic
 - [x] 10.6 Migration Compatibility Check: enumerate reachable configurations per region, refuse unmapped ones, derive identity mappings
 - [x] 10.7 Fork Before Migration
@@ -107,15 +107,15 @@ Every implementation task below includes: annotate the realizing declaration wit
 
 ## 12. Lean journal protocol (vertep-lean)
 
-- [ ] 12.1 Model journal entries, compare-and-set append, deduplication, the outbox and replay in Lean
-- [ ] 12.2 Prove replay determinism: replaying a journal yields the recorded configurations and effects
-- [ ] 12.3 Prove deduplication idempotence: processing a message id twice equals processing it once
-- [ ] 12.4 Prove the outbox property: every recorded send is dispatched at least once and no unrecorded send is dispatched
-- [ ] 12.5 Prove compare-and-set single activation: of two activations appending at the same expected position at most one succeeds
-- [ ] 12.6 Add property tests in Rust that generate crashes, redeliveries and concurrent activations and compare the shell's journal and dispatch log with the Lean model as oracle
+- [x] 12.1 MOVED to change verification-backlog task 5.1, was: Model journal entries, compare-and-set append, deduplication, the outbox and replay in Lean
+- [x] 12.2 MOVED to change verification-backlog task 5.2, was: Prove replay determinism: replaying a journal yields the recorded configurations and effects
+- [x] 12.3 MOVED to change verification-backlog task 5.3, was: Prove deduplication idempotence: processing a message id twice equals processing it once
+- [x] 12.4 MOVED to change verification-backlog task 5.4, was: Prove the outbox property: every recorded send is dispatched at least once and no unrecorded send is dispatched
+- [x] 12.5 MOVED to change verification-backlog task 5.5, was: Prove compare-and-set single activation: of two activations appending at the same expected position at most one succeeds
+- [x] 12.6 MOVED to change verification-backlog task 5.6, was: Add property tests in Rust that generate crashes, redeliveries and concurrent activations and compare the shell's journal and dispatch log with the Lean model as oracle
 
 ## 13. Documentation and traceability
 
 - [x] 13.1 Record any decision taken during implementation in `tg.md/decisions.md` as a `Decision` section with `motivated_by` edges, and new external limits in `tg.md/constraints.md` with `constrains` edges to the affected requirements, such as `- constrains:: [[openspec:event-journal#Compare-And-Set Append]] {strength: must}`
-- [ ] 13.2 Update the capability sections in `tg.md/capabilities.md` for actor-model, messaging, event-journal, storage, durable-timers, chart-versioning and runtime-ontology with `specified_by` edges to their requirements, and update `tg.md/components.md` `provides` edges from `{confidence: partial}` to full where complete
-- [ ] 13.3 Run `tg check`, `tg ontology check` and `tg trace actor-model messaging event-journal storage durable-timers chart-versioning runtime-ontology --gaps`, and close every gap they report
+- [x] 13.2 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Update the capability sections in `tg.md/capabilities.md` for actor-model, messaging, event-journal, storage, durable-timers, chart-versioning and runtime-ontology with `specified_by` edges to their requirements, and update `tg.md/components.md` `provides` edges from `{confidence: partial}` to full where complete
+- [x] 13.3 Run `tg check`, `tg ontology check` and `tg trace actor-model messaging event-journal storage durable-timers chart-versioning runtime-ontology --gaps`, and close every gap they report

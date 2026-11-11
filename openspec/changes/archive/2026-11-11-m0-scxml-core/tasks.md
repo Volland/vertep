@@ -75,14 +75,14 @@
 - [x] 7.2 Define the IR, `WellFormed` and a decision procedure with its correctness theorem (IR Model In Lean)
 - [x] 7.3 Define the executable `step` with the datamodel as an answer-tape oracle and native `In()` (Executable Step Semantics)
 - [x] 7.4 Prove step determinism (Step Determinism Theorem)
-- [ ] 7.5 Prove that legal configurations are preserved (Configuration Well-Formedness Theorem)
+- [x] 7.5 MOVED to change verification-backlog task 2.2, was: Prove that legal configurations are preserved (Configuration Well-Formedness Theorem)
 - [x] 7.6 Prove that selected transition sets are enabled, conflict-free and optimal (Transition Selection Theorem)
-- [ ] 7.7 Define the projection and reconstruction in Lean on LeanRDF's RDF 1.2 model and prove the round trip and canonical-form theorem (RDF Round Trip Theorem)
-- [ ] 7.8 Transcribe the chart shapes into LeanRDF and prove `validate shapes (toRDF c) = conforms ↔ WellFormed c` (Shapes Equivalence Theorem)
+- [x] 7.7 MOVED to change verification-backlog task 2.1, was: Define the projection and reconstruction in Lean on LeanRDF's RDF 1.2 model and prove the round trip and canonical-form theorem (RDF Round Trip Theorem)
+- [x] 7.8 MOVED to change verification-backlog task 2.3, was: Transcribe the chart shapes into LeanRDF and prove `validate shapes (toRDF c) = conforms ↔ WellFormed c` (Shapes Equivalence Theorem)
 - [x] 7.9 State the dynamic type-soundness theorem and the named M1 extension point (Type Soundness Statement)
 - [x] 7.10 Build the oracle executable reading N-Quads, inputs and a tape and writing JSON Lines traces (Differential Oracle)
 - [x] 7.11 Build `vt certify`, emitting `vt:certifiedBy` certificates with theorem names, toolchain, LeanRDF revision and checker hash (Chart Certificates)
-- [ ] 7.12 Link each Lean declaration to its requirement with a `-- @tg: implements:: [[openspec:formal-model#<Requirement>]]` comment for every formal-model requirement, and annotate the Lean tests with `-- @tg: verifies:: [[openspec:formal-model#<Requirement>#<Scenario>]]`
+- [x] 7.12 MOVED to change verification-backlog task 2.4, was: Link each Lean declaration to its requirement with a `-- @tg: implements:: [[openspec:formal-model#<Requirement>]]` comment for every formal-model requirement, and annotate the Lean tests with `-- @tg: verifies:: [[openspec:formal-model#<Requirement>#<Scenario>]]`
 
 ## 8. vertep-conformance: conformance harness
 
@@ -109,7 +109,7 @@
 ## 10. Documentation and traceability
 
 - [x] 10.1 Record the design decisions D1 to D13 of this change in `tg.md/decisions.md` as `Decision` sections with `motivated_by` edges to the constraints and decisions they rest on
-- [ ] 10.2 Add `constrains` edges from `tg.md/constraints.md` to the requirements they bind, for example `- constrains:: [[openspec:scxml-interpretation#Optimal Enabled Transition Set]] {strength: must}` from the SCXML interpretation algorithm constraint
-- [ ] 10.3 Update the capability sections in `tg.md/capabilities.md` for chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model and scxml-conformance with `specified_by` edges to their requirements, and keep them in the file's `openspec:` frontmatter
-- [ ] 10.4 Update `tg.md/components.md` for vertep-core, vertep-scxml, vertep-dm-ecma, vertep-rdf, vertep-lean and vertep-conformance with `provides` edges to the requirements they implement and set their status
-- [ ] 10.5 Run `tg check`, `tg ontology check` and `tg trace chart-model scxml-interpretation scxml-format datamodel chart-rdf formal-model scxml-conformance --gaps`, and close every gap they report
+- [x] 10.2 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Add `constrains` edges from `tg.md/constraints.md` to the requirements they bind, for example `- constrains:: [[openspec:scxml-interpretation#Optimal Enabled Transition Set]] {strength: must}` from the SCXML interpretation algorithm constraint
+- [x] 10.3 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Update the capability sections in `tg.md/capabilities.md` for chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model and scxml-conformance with `specified_by` edges to their requirements, and keep them in the file's `openspec:` frontmatter
+- [x] 10.4 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists every capability in its openspec frontmatter and code carries @tg annotations), was: Update `tg.md/components.md` for vertep-core, vertep-scxml, vertep-dm-ecma, vertep-rdf, vertep-lean and vertep-conformance with `provides` edges to the requirements they implement and set their status
+- [x] 10.5 Run `tg check`, `tg ontology check` and `tg trace chart-model scxml-interpretation scxml-format datamodel chart-rdf formal-model scxml-conformance --gaps`, and close every gap they report

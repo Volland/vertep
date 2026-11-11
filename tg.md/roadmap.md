@@ -25,6 +25,8 @@ The complete SCXML core: chart IR, interpretation algorithm, SCXML format, datam
 
 Delivered by the OpenSpec change `m0-scxml-core`. A throwaway spike of a journaled actor with an LLM decider runs alongside it, see [[decisions#Full SCXML first]]; its code is deleted when M2 starts.
 
+Archived 2026-11-11 as `openspec/changes/archive/2026-11-11-m0-scxml-core` with 78 requirements in `openspec/specs/`. The three unproven Lean theorems and the Lean oracle hang moved to the `verification-backlog` change.
+
 ## M1 Typed authoring
 
 One IR type language with its projections, the `statechart!` and `include_chart!` macros with the Rust datamodel, the YAML format and the CEL datamodel.
@@ -32,6 +34,8 @@ One IR type language with its projections, the `statechart!` and `include_chart!
 - precedes:: [[roadmap#M2 Actor runtime]]
 
 Delivered by the OpenSpec change `m1-typed-authoring`.
+
+Archived 2026-11-11 with 44 requirements. The CEL variant of the IRP suite and the Lean type language moved to `verification-backlog`.
 
 ## M2 Actor runtime
 
@@ -42,6 +46,8 @@ Single-node actor runtime: the three lifecycle classes, mailboxes and transports
 - precedes:: [[roadmap#M6 WASM and JS]]
 
 Delivered by the OpenSpec change `m2-actor-runtime`.
+
+Archived 2026-11-11 with 68 requirements. The Lean journal-protocol proofs moved to `verification-backlog`.
 
 ## M3 Agents
 

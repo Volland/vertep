@@ -77,4 +77,4 @@ Each type earns its place through a query the project asks.
 - What a milestone delivers: `MATCH (x)-[:scheduled_in]->(m:Milestone {title: "M0 SCXML core"}) RETURN labels(x), x.title`.
 - Which decisions a crate realizes, and why: `MATCH (c:Component)-[:realizes]->(d:Decision)-[:motivated_by]->(w) RETURN c.title, d.title, w.title`.
 - Which views explain a component: `MATCH (v:View)-[:describes]->(c:Component) RETURN v.title, c.title`.
-- What a capability is specified by: `MATCH (k:Capability)-[:specified_by]->(r:Requirement) RETURN k.title, r.title`. Doc edges to requirements resolve only once a change is archived into `openspec/specs/`; while a change is open, use `tg trace <capability>`, `openspec:` frontmatter with requirement ids, and code annotations, which do resolve pending deltas.
+- What a capability is specified by: `MATCH (k:Capability)-[:specified_by]->(r:Requirement) RETURN k.title, r.title`. In tg 0.22, wiki links from `tg.md/` sections to `openspec:` targets do not resolve, open or archived, so `specified_by` stays unused for now; link docs to requirements with `openspec:` frontmatter and link code with `@tg:` annotations, which `tg trace` reads.
