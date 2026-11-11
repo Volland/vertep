@@ -11,6 +11,11 @@ use vertep_core::ir::{
     Transition, TransitionType, VT_NS,
 };
 
+use std::borrow::Cow;
+
+use vertep_core::types::Type;
+use vertep_core::types::chart::{PARAM_TYPES_ATTR, param_types};
+
 use crate::ids::referenced_ids;
 use crate::text::{escape_attr, escape_text, is_ncname, is_xml_char, looks_like_xml};
 
@@ -85,8 +90,10 @@ enum Item<'c> {
     Transition(&'c Transition),
     Initial(&'c Initial),
     Invoke(&'c Invoke),
-    DoneData(&'c DoneData),
-    Param(&'c Param),
+    /// A `<donedata>` and the `vt:type` of each of its params.
+    DoneData(&'c DoneData, Vec<Option<String>>),
+    /// A `<param>` and its `vt:type`.
+    Param(&'c Param, Option<String>),
     Content(&'c Content),
     Finalize(&'c [Exec]),
     Ext(&'c Extension),
@@ -319,15 +326,15 @@ impl Writer {
                 vec![Item::Transition(&i.transition)],
             ),
             Item::Invoke(i) => self.invoke(i),
-            Item::DoneData(d) => {
+            Item::DoneData(d, types) => {
                 let mut items: Vec<Item<'_>> = Vec::new();
                 if let Some(c) = &d.content {
                     items.push(Item::Content(c));
                 }
-                items.extend(d.params.iter().map(Item::Param));
+                items.extend(params(&d.params, &types));
                 self.element("donedata", &[], &[], items);
             }
-            Item::Param(p) => {
+            Item::Param(p, ty) => {
                 self.open(
                     "param",
                     &[
@@ -337,6 +344,10 @@ impl Writer {
                     ],
                     &[],
                 );
+                if let Some(t) = ty {
+                    let prefix = self.prefix_of(VT_NS).unwrap_or("vt").to_owned();
+                    self.attr(&format!("{prefix}:type"), &t, "param");
+                }
                 self.close_empty();
             }
             Item::Content(c) => {
@@ -439,8 +450,11 @@ impl Writer {
         items.extend(s.transitions.iter().map(Item::Transition));
         items.extend(s.children.iter().map(Item::State));
         items.extend(s.invokes.iter().map(Item::Invoke));
+        let no_params: &[Param] = &[];
+        let dd_params = s.donedata.as_ref().map_or(no_params, |d| &d.params);
+        let (exts, types) = split_param_types(&s.extensions, dd_params);
         if let Some(d) = &s.donedata {
-            items.push(Item::DoneData(d));
+            items.push(Item::DoneData(d, types));
         }
         self.element(
             name,
@@ -449,7 +463,7 @@ impl Writer {
                 ("initial", initial.as_deref()),
                 ("type", ty),
             ],
-            &s.extensions,
+            &exts,
             items,
         );
     }
@@ -524,7 +538,8 @@ impl Writer {
 
     fn invoke(&mut self, i: &Invoke) {
         let namelist = join(&i.namelist);
-        let mut items: Vec<Item<'_>> = i.params.iter().map(Item::Param).collect();
+        let (exts, types) = split_param_types(&i.extensions, &i.params);
+        let mut items: Vec<Item<'_>> = params(&i.params, &types);
         if i.src.is_none()
             && let Some(c) = &i.content
         {
@@ -545,7 +560,7 @@ impl Writer {
                 ("namelist", namelist.as_deref()),
                 ("autoforward", i.autoforward.then_some("true")),
             ],
-            &i.extensions,
+            &exts,
             items,
         );
     }
@@ -589,7 +604,8 @@ impl Writer {
             }
             ExecKind::Send(s) => {
                 let namelist = join(&s.namelist);
-                let mut items: Vec<Item<'_>> = s.params.iter().map(Item::Param).collect();
+                let (exts, types) = split_param_types(exts, &s.params);
+                let mut items: Vec<Item<'_>> = params(&s.params, &types);
                 if let Some(c) = &s.content {
                     items.push(Item::Content(c));
                 }
@@ -608,7 +624,7 @@ impl Writer {
                         ("delayexpr", s.delayexpr.as_deref()),
                         ("namelist", namelist.as_deref()),
                     ],
-                    exts,
+                    &exts,
                     items,
                 );
             }
@@ -747,6 +763,66 @@ fn merge<'c>(items: Vec<Item<'c>>, exts: &'c [Extension]) -> Vec<Item<'c>> {
         }
     }
     out
+}
+
+/// The `<param>` items of `ps`, with their `vt:type`s.
+fn params<'c>(ps: &'c [Param], types: &[Option<String>]) -> Vec<Item<'c>> {
+    ps.iter()
+        .enumerate()
+        .map(|(i, p)| Item::Param(p, types.get(i).cloned().flatten()))
+        .collect()
+}
+
+/// Move an owner's `vt:paramTypes` record onto its `<param>`s as `vt:type` attributes, when
+/// reading them back gives the same record: the record is in canonical form, and its fields
+/// are exactly the typed parameter names in order of their first `<param>`. Otherwise the
+/// record stays an attribute of the owner. Returns the owner's extensions to write and the
+/// `vt:type` of each parameter.
+// @tg: implements:: [[openspec:type-system#Typed SCXML Attributes]]
+fn split_param_types<'e>(
+    exts: &'e [Extension],
+    ps: &[Param],
+) -> (Cow<'e, [Extension]>, Vec<Option<String>>) {
+    let none = vec![None; ps.len()];
+    let Some(Ok(fields)) = param_types(exts) else {
+        return (Cow::Borrowed(exts), none);
+    };
+    let canonical = Type::Record(fields.clone()).to_string();
+    let text_is_canonical = exts.iter().any(|x| {
+        x.ns == VT_NS
+            && x.local == PARAM_TYPES_ATTR
+            && matches!(&x.value, ExtensionValue::Attribute(v) if *v == canonical)
+    });
+    let mut first_order: Vec<&str> = Vec::new();
+    for p in ps {
+        if fields.iter().any(|f| f.name == p.name) && !first_order.contains(&p.name.as_str()) {
+            first_order.push(&p.name);
+        }
+    }
+    let same_order = first_order.len() == fields.len()
+        && first_order.iter().zip(&fields).all(|(n, f)| *n == f.name);
+    if !text_is_canonical || !same_order {
+        return (Cow::Borrowed(exts), none);
+    }
+    let types = ps
+        .iter()
+        .map(|p| {
+            fields
+                .iter()
+                .find(|f| f.name == p.name)
+                .map(|f| f.ty.to_string())
+        })
+        .collect();
+    let rest = exts
+        .iter()
+        .filter(|x| {
+            !(x.ns == VT_NS
+                && x.local == PARAM_TYPES_ATTR
+                && matches!(x.value, ExtensionValue::Attribute(_)))
+        })
+        .cloned()
+        .collect();
+    (Cow::Owned(rest), types)
 }
 
 fn join(v: &[String]) -> Option<String> {

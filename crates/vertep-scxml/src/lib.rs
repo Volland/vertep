@@ -33,6 +33,13 @@
 //!   [`vertep_core::identity::assign_generated_ids`]. A declared identifier that is exactly
 //!   the generated identifier of its own position is read as generated, so that a written
 //!   generated identifier reads back as generated.
+//! - Types ride on `vt:` extensions ([[decisions#Types ride on vt extension nodes]]):
+//!   `vt:type` on `<data>` and `<send>` stays on the node, `vt:type` on `<param>` goes to the
+//!   owner's `vt:paramTypes` record (and the writer puts it back on each `<param>`), and the
+//!   `vt:types` element stays on the chart. Annotations and the block are read in canonical
+//!   form; one that does not parse or names an undeclared type is an [`ErrorKind::Type`] error
+//!   suggesting the closest declared name. A processor that ignores the `vt:` namespace runs
+//!   the same document untyped.
 //!
 //! @tg: implements:: [[decisions#IR is the hub]]
 //! @tg: implements:: [[decisions#Full SCXML first]]
@@ -44,6 +51,7 @@ pub mod loss;
 mod reader;
 pub mod resolve;
 mod text;
+mod typing;
 mod writer;
 
 use vertep_core::identity::assign_generated_ids;
@@ -153,7 +161,11 @@ pub fn read(input: &str, options: &ReadOptions<'_>) -> Result<Parsed, ReadError>
     };
     assign_generated_ids(&mut chart);
     ids::recognize_generated(&mut chart);
-    if options.check_references && !errors.iter().any(|e| e.kind == ErrorKind::Xml) {
+    let xml_ok = !errors.iter().any(|e| e.kind == ErrorKind::Xml);
+    if xml_ok {
+        errors.extend(typing::normalize(&mut chart));
+    }
+    if options.check_references && xml_ok {
         errors.extend(ids::check_references(&chart));
     }
     errors.sort_by_key(|e| (e.span.line, e.span.column));

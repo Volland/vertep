@@ -1,0 +1,555 @@
+@prefix vt:   <https://w3id.org/vertep/vt#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# The runtime module of the vt: ontology (RDF 1.2, Turtle).
+#
+# Actors, addresses, mailboxes, activations, journal entries, macrosteps, snapshots, timers,
+# migrations and dead letters, as written by vertep-store and vertep-runtime. The module is
+# separate from the chart module (vt-chart.ttl): a chart projected without running it uses only
+# the chart module. A few datatype properties without a domain (vt:eventName, vt:sendId,
+# vt:invokeId, vt:sendTarget, vt:order, vt:position) are declared by the chart module and reused
+# here with the same range; vt:position is restated below because the storage layer stamps it on
+# every journal entry.
+#
+# PROV-O alignment is by rdfs:subClassOf and rdfs:subPropertyOf only. The runtime never needs a
+# reasoner: every query it runs names vt: terms. A store with RDFS inference additionally answers
+# PROV-O queries over the same data.
+#
+# Stable IRIs (runtime-ontology#Stable Runtime IRIs), for an actor address A:
+#   journal entry  A/entry/<position>        (also the name of the entry's graph)
+#   input event    A/entry/<position>/input
+#   outgoing send  A/entry/<position>/send/<k>
+#   timer          A/entry/<position>/timer/<percent-encoded send id>
+#   reminder       A/reminder/<percent-encoded name>
+#   snapshot       A/snapshot/<position>     (also the name of the snapshot's graph)
+#   dead letter    A/dead-letter/<hex digest of the message id>, in graph A/dead-letters
+#   mailbox row    A/mailbox/<sequence>, in graph A/mailbox
+#   outbox marks   in graph A/outbox
+#   current state  in graph A
+
+<https://w3id.org/vertep/vt/runtime>
+    a owl:Ontology ;
+    rdfs:label "Vertep runtime ontology module"@en ;
+    rdfs:comment "Classes and properties for running Vertep actors: addresses, lifecycle classes, mailboxes, event journals, snapshots, durable timers, chart version migrations and dead letters."@en ;
+    dcterms:license <https://opensource.org/licenses/MIT> , <https://www.apache.org/licenses/LICENSE-2.0> ;
+    rdfs:seeAlso <http://www.w3.org/ns/prov#> ;
+    owl:versionInfo "0.1.0" .
+
+# ---------------------------------------------------------------------------------------------
+# Actors and addresses
+
+vt:Address
+    a owl:Class ;
+    rdfs:label "address"@en ;
+    rdfs:comment "An absolute IRI naming exactly one actor. The actor's state, journal and relationships use it as subject or as graph name."@en .
+
+vt:Actor
+    a owl:Class ;
+    rdfs:subClassOf vt:Address ;
+    rdfs:label "actor"@en ;
+    rdfs:comment "Anything that can be the target of an SCXML send or invoke; identified by its address."@en .
+
+vt:VirtualActor
+    a owl:Class ;
+    rdfs:subClassOf vt:Actor ;
+    rdfs:label "virtual actor"@en ;
+    rdfs:comment "An actor identified by a chart type and a key, which always exists logically, is activated on message and keeps an event journal."@en .
+
+vt:InvokedActor
+    a owl:Class ;
+    rdfs:subClassOf vt:Actor ;
+    rdfs:label "invoked actor"@en ;
+    rdfs:comment "A child actor started by `<invoke>`, addressed by its parent's address and the invoke id, living while the invoking state is active."@en .
+
+vt:StatelessWorker
+    a owl:Class ;
+    rdfs:subClassOf vt:Actor ;
+    rdfs:label "stateless worker"@en ;
+    rdfs:comment "A pooled actor kind with several activations per address and no journal."@en .
+
+vt:chartType
+    a owl:ObjectProperty ;
+    rdfs:domain vt:VirtualActor ;
+    rdfs:label "chart type"@en ;
+    rdfs:comment "The chart type IRI a virtual actor's address was derived from."@en .
+
+vt:key
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:VirtualActor ;
+    rdfs:range xsd:string ;
+    rdfs:label "key"@en ;
+    rdfs:comment "The key a virtual actor's address was derived from."@en .
+
+vt:parent
+    a owl:ObjectProperty ;
+    rdfs:domain vt:InvokedActor ;
+    rdfs:range vt:Actor ;
+    rdfs:label "parent"@en ;
+    rdfs:comment "The actor whose state invoked this one."@en .
+
+vt:status
+    a owl:ObjectProperty ;
+    rdfs:range vt:ActorStatus ;
+    rdfs:label "status"@en ;
+    rdfs:comment "Whether the actor's session is running or terminated (reached a top-level final state)."@en .
+
+vt:ActorStatus
+    a owl:Class ;
+    rdfs:label "actor status"@en ;
+    owl:oneOf ( vt:Running vt:Terminated ) .
+
+vt:Running a vt:ActorStatus ; rdfs:label "running"@en .
+vt:Terminated a vt:ActorStatus ; rdfs:label "terminated"@en .
+
+vt:inState
+    a owl:ObjectProperty ;
+    rdfs:range vt:StateNode ;
+    rdfs:label "in state"@en ;
+    rdfs:comment "An active state of the actor's configuration, named by the state node IRI of the chart version the actor runs."@en .
+
+vt:datamodelState
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "datamodel state"@en ;
+    rdfs:comment "The datamodel snapshot, as JSON text in the Vertep value encoding."@en .
+
+vt:tookTransition
+    a owl:ObjectProperty ;
+    rdfs:range vt:Transition ;
+    rdfs:label "took transition"@en ;
+    rdfs:comment "A transition the actor took in a macrostep; annotated through a reifier with the entry that caused it."@en .
+
+vt:causedBy
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:wasGeneratedBy ;
+    rdfs:range vt:Macrostep ;
+    rdfs:label "caused by"@en ;
+    rdfs:comment "On a reifier of a runtime statement (a state fact or a transition taken): the journal entry whose macrostep produced it."@en .
+
+# ---------------------------------------------------------------------------------------------
+# Mailboxes and messages
+
+vt:Mailbox
+    a owl:Class ;
+    rdfs:label "mailbox"@en ;
+    rdfs:comment "A durable inbox of one actor that outlives its activations; a store-backed mailbox keeps its messages in graph A/mailbox."@en .
+
+vt:Message
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "message"@en ;
+    rdfs:comment "A message waiting in a store-backed mailbox."@en .
+
+vt:recipient
+    a owl:ObjectProperty ;
+    rdfs:range vt:Address ;
+    rdfs:label "recipient"@en ;
+    rdfs:comment "The address a message or a send is delivered to."@en .
+
+vt:sequence
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:Message ;
+    rdfs:range xsd:integer ;
+    rdfs:label "sequence"@en ;
+    rdfs:comment "Arrival order of a message in its mailbox."@en .
+
+vt:envelope
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "envelope"@en ;
+    rdfs:comment "A complete message, outgoing send or timer as JSON text, from which it is redelivered, re-dispatched or re-armed exactly."@en .
+
+# ---------------------------------------------------------------------------------------------
+# Activations
+
+vt:Activation
+    a owl:Class ;
+    rdfs:subClassOf prov:Activity ;
+    rdfs:label "activation"@en ;
+    rdfs:comment "One in-memory incarnation of an actor on a node, from activation to deactivation."@en .
+
+vt:activationOf
+    a owl:ObjectProperty ;
+    rdfs:domain vt:Activation ;
+    rdfs:range vt:Actor ;
+    rdfs:label "activation of"@en .
+
+# ---------------------------------------------------------------------------------------------
+# Journal (terms written by vertep-store and vertep-runtime)
+
+vt:JournalEntry
+    a owl:Class ;
+    rdfs:label "journal entry"@en ;
+    rdfs:comment "One entry of an actor's append-only journal, stored as the named graph named by the entry IRI. The store stamps its type, actor and position on append."@en .
+
+vt:InputEntry
+    a owl:Class ;
+    rdfs:subClassOf vt:JournalEntry , vt:Macrostep ;
+    rdfs:label "input entry"@en ;
+    rdfs:comment "A journal entry recording one accepted external input and the macrostep it started."@en .
+
+vt:MigrationEntry
+    a owl:Class ;
+    rdfs:subClassOf vt:JournalEntry ;
+    rdfs:label "migration entry"@en ;
+    rdfs:comment "A journal entry recording a migration: the snapshot before, the migration and the snapshot after."@en .
+
+vt:ForkEntry
+    a owl:Class ;
+    rdfs:subClassOf vt:JournalEntry ;
+    rdfs:label "fork entry"@en ;
+    rdfs:comment "The first entry of a forked actor: a reference to the source actor and position and the state there."@en .
+
+vt:Macrostep
+    a owl:Class ;
+    rdfs:subClassOf prov:Activity ;
+    rdfs:label "macrostep"@en ;
+    rdfs:comment "One SCXML macrostep, which is one actor turn."@en .
+
+vt:InputEvent
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "input event"@en ;
+    rdfs:comment "The external event that started a macrostep, with its full content."@en .
+
+vt:OutgoingSend
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "outgoing send"@en ;
+    rdfs:comment "An event a macrostep sent, dispatched through the transactional outbox after its entry was appended."@en .
+
+vt:actor
+    a owl:ObjectProperty ;
+    rdfs:range vt:Actor ;
+    rdfs:label "actor"@en ;
+    rdfs:comment "The actor whose journal an entry is in, or which a snapshot, timer or dead letter belongs to."@en .
+
+vt:position
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:integer ;
+    rdfs:label "position"@en ;
+    rdfs:comment "Shared with the chart module. For a journal entry or snapshot: the journal position, a per-actor sequence number from 1 without gaps."@en .
+
+vt:head
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:integer ;
+    rdfs:label "head"@en ;
+    rdfs:comment "The position of the last entry of an actor's journal (cardinality one, kept by the store)."@en .
+
+vt:fencingEpoch
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:integer ;
+    rdfs:label "fencing epoch"@en ;
+    rdfs:comment "The highest fencing epoch a journal store accepted for a scope (cardinality one)."@en .
+
+vt:projectedPosition
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:integer ;
+    rdfs:label "projected position"@en ;
+    rdfs:comment "The last journal position of an actor a projector wrote to a graph store."@en .
+
+vt:projection
+    a rdfs:Resource ;
+    rdfs:label "projection graph"@en ;
+    rdfs:comment "The named graph in which a projector records its projected positions."@en .
+
+vt:chartVersion
+    a owl:ObjectProperty ;
+    rdfs:range vt:Chart ;
+    rdfs:label "chart version"@en ;
+    rdfs:comment "The content-addressed chart version IRI (urn:vertep:chart:sha256:...) an entry's macrostep ran under, or a snapshot was taken under."@en .
+
+vt:messageId
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "message id"@en ;
+    rdfs:comment "The deduplication key of the input an entry accepted; accepted at most once per actor."@en .
+
+vt:timestamp
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:integer ;
+    rdfs:label "timestamp"@en ;
+    rdfs:comment "Milliseconds since the Unix epoch, stamped by the runtime's clock when the input was dequeued; the only time a macrostep sees."@en .
+
+vt:configurationDigest
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "configuration digest"@en ;
+    rdfs:comment "SHA-256 (hex) of the active state ids and the datamodel snapshot after the macrostep; compared on replay."@en .
+
+vt:terminatedHere
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "terminated here"@en ;
+    rdfs:comment "True when the macrostep reached a top-level final state."@en .
+
+vt:unhandled
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "unhandled"@en ;
+    rdfs:comment "The unhandled-event policy applied when the input enabled no transition: discard, dead-letter or error."@en .
+
+vt:input
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:used ;
+    rdfs:domain vt:Macrostep ;
+    rdfs:range vt:InputEvent ;
+    rdfs:label "input"@en ;
+    rdfs:comment "The input event a macrostep consumed."@en .
+
+vt:send
+    a owl:ObjectProperty ;
+    rdfs:domain vt:JournalEntry ;
+    rdfs:range vt:OutgoingSend ;
+    rdfs:label "send"@en ;
+    rdfs:comment "An outgoing send recorded by the entry."@en .
+
+vt:schedules
+    a owl:ObjectProperty ;
+    rdfs:domain vt:JournalEntry ;
+    rdfs:range vt:Timer ;
+    rdfs:label "schedules"@en ;
+    rdfs:comment "A timer (delayed send, request timeout or reminder) the entry's macrostep scheduled."@en .
+
+vt:cancels
+    a owl:ObjectProperty ;
+    rdfs:domain vt:JournalEntry ;
+    rdfs:range vt:Timer ;
+    rdfs:label "cancels"@en ;
+    rdfs:comment "A pending timer the entry's macrostep cancelled."@en .
+
+vt:firedTimer
+    a owl:ObjectProperty ;
+    rdfs:domain vt:JournalEntry ;
+    rdfs:range vt:Timer ;
+    rdfs:label "fired timer"@en ;
+    rdfs:comment "The timer whose firing is the entry's input; the entry's timestamp is the time it fired."@en .
+
+vt:invokes
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:JournalEntry ;
+    rdfs:range xsd:string ;
+    rdfs:label "invokes"@en ;
+    rdfs:comment "An invocation the macrostep started, as JSON text."@en .
+
+vt:eventType
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "event type"@en ;
+    rdfs:comment "The SCXML `_event.type`: external, internal or platform."@en .
+
+vt:origin
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "origin"@en ;
+    rdfs:comment "The SCXML `_event.origin`: the sender's address IRI."@en .
+
+vt:originType
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "origin type"@en ;
+    rdfs:comment "The SCXML `_event.origintype`: the type IRI of the transport that delivered the event."@en .
+
+vt:payload
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "payload"@en ;
+    rdfs:comment "Event data as JSON text in the Vertep value encoding (undefined and non-finite numbers are tagged objects)."@en .
+
+vt:sendType
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "send type"@en ;
+    rdfs:comment "The Event I/O Processor type of an outgoing send."@en .
+
+vt:correlationId
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:string ;
+    rdfs:label "correlation id"@en ;
+    rdfs:comment "The correlation id of a vt:request, derived from the requester's address, the journal position of the issuing macrostep and the request's index in it."@en .
+
+vt:answers
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:JournalEntry ;
+    rdfs:range xsd:string ;
+    rdfs:label "answers"@en ;
+    rdfs:comment "The correlation id of the request whose reply is the entry's input."@en .
+
+vt:requests
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:JournalEntry ;
+    rdfs:range xsd:string ;
+    rdfs:label "requests"@en ;
+    rdfs:comment "The correlation id of a request the entry's macrostep issued."@en .
+
+# ---------------------------------------------------------------------------------------------
+# Snapshots
+
+vt:Snapshot
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "snapshot"@en ;
+    rdfs:comment "The configuration, datamodel, pending requests and active timers of an actor at a journal position, under one chart version."@en .
+
+vt:sessionState
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:Snapshot ;
+    rdfs:range xsd:string ;
+    rdfs:label "session state"@en ;
+    rdfs:comment "The interpreter session value as JSON text."@en .
+
+vt:runtimeState
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:Snapshot ;
+    rdfs:range xsd:string ;
+    rdfs:label "runtime state"@en ;
+    rdfs:comment "The runtime's per-actor state (timers, reminders, requests) as JSON text."@en .
+
+# ---------------------------------------------------------------------------------------------
+# Timers
+
+vt:Timer
+    a owl:Class ;
+    rdfs:label "timer"@en ;
+    rdfs:comment "A durable delayed send recorded in the journal entry that scheduled it, fired as an input event."@en .
+
+vt:Reminder
+    a owl:Class ;
+    rdfs:subClassOf vt:Timer ;
+    rdfs:label "reminder"@en ;
+    rdfs:comment "A recurring timer registered with vt:reminder, fired every period until cancelled or final."@en .
+
+vt:dueAt
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:Timer ;
+    rdfs:range xsd:integer ;
+    rdfs:label "due at"@en ;
+    rdfs:comment "Due time in milliseconds since the Unix epoch: the scheduling entry's timestamp plus the delay."@en .
+
+vt:period
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:Reminder ;
+    rdfs:range xsd:integer ;
+    rdfs:label "period"@en ;
+    rdfs:comment "Reminder period in milliseconds."@en .
+
+vt:reminderName
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:Reminder ;
+    rdfs:range xsd:string ;
+    rdfs:label "reminder name"@en .
+
+vt:scheduledBy
+    a owl:ObjectProperty ;
+    owl:inverseOf vt:schedules ;
+    rdfs:domain vt:Timer ;
+    rdfs:range vt:JournalEntry ;
+    rdfs:label "scheduled by"@en .
+
+vt:dispatched
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "dispatched"@en ;
+    rdfs:comment "Outbox mark: the send or timer was accepted by its transport."@en .
+
+vt:dispatchedThrough
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:integer ;
+    rdfs:label "dispatched through"@en ;
+    rdfs:comment "Outbox mark: every send of entries up to this position was dispatched."@en .
+
+# ---------------------------------------------------------------------------------------------
+# Versions and migrations
+
+vt:Migration
+    a owl:Class ;
+    rdfs:subClassOf prov:Plan ;
+    rdfs:label "migration"@en ;
+    rdfs:comment "A declared move from one chart version to another: a total configuration mapping and a datamodel transform."@en .
+
+vt:migration
+    a owl:ObjectProperty ;
+    rdfs:domain vt:MigrationEntry ;
+    rdfs:range vt:Migration ;
+    rdfs:label "migration"@en .
+
+vt:fromVersion
+    a owl:ObjectProperty ;
+    rdfs:range vt:Chart ;
+    rdfs:label "from version"@en .
+
+vt:toVersion
+    a owl:ObjectProperty ;
+    rdfs:range vt:Chart ;
+    rdfs:label "to version"@en .
+
+vt:snapshotBefore
+    a owl:ObjectProperty ;
+    rdfs:domain vt:MigrationEntry ;
+    rdfs:range vt:Snapshot ;
+    rdfs:label "snapshot before"@en .
+
+vt:snapshotAfter
+    a owl:ObjectProperty ;
+    rdfs:domain vt:MigrationEntry ;
+    rdfs:range vt:Snapshot ;
+    rdfs:label "snapshot after"@en .
+
+vt:snapshot
+    a owl:ObjectProperty ;
+    rdfs:range vt:Snapshot ;
+    rdfs:label "snapshot"@en ;
+    rdfs:comment "The state a fork entry starts from."@en .
+
+vt:forkOf
+    a owl:ObjectProperty ;
+    rdfs:domain vt:ForkEntry ;
+    rdfs:range vt:Actor ;
+    rdfs:label "fork of"@en .
+
+vt:forkPosition
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:ForkEntry ;
+    rdfs:range xsd:integer ;
+    rdfs:label "fork position"@en .
+
+# ---------------------------------------------------------------------------------------------
+# Dead letters
+
+vt:DeadLetter
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "dead letter"@en ;
+    rdfs:comment "An event that no state handled or that could not be delivered, kept in the graph A/dead-letters of its intended receiver A."@en .
+
+vt:receiver
+    a owl:ObjectProperty ;
+    rdfs:domain vt:DeadLetter ;
+    rdfs:label "receiver"@en ;
+    rdfs:comment "The intended receiver of a dead letter."@en .
+
+vt:sender
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:DeadLetter ;
+    rdfs:range xsd:string ;
+    rdfs:label "sender"@en ;
+    rdfs:comment "The sender's address, when known."@en .
+
+vt:reason
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:DeadLetter ;
+    rdfs:range xsd:string ;
+    rdfs:label "reason"@en ;
+    rdfs:comment "Why the event is a dead letter: unhandled, unresolvable, late-reply."@en .
+
+vt:recordedAt
+    a owl:DatatypeProperty ;
+    rdfs:domain vt:DeadLetter ;
+    rdfs:range xsd:integer ;
+    rdfs:label "recorded at"@en ;
+    rdfs:comment "Milliseconds since the Unix epoch when the dead letter was recorded."@en .

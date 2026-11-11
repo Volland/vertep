@@ -408,3 +408,81 @@ pub fn expr_datatype(datamodel: &str) -> String {
     iri.push_str("Expr");
     iri
 }
+
+vt_terms! {
+    // The type module (`ontology/vt-types.ttl`): named types and their definitions.
+    /// `vt:NamedType`: a named type, identified by its content-addressed type IRI.
+    NAMED_TYPE = "NamedType";
+    /// `vt:RecordType`: a closed record type.
+    RECORD_TYPE = "RecordType";
+    /// `vt:UnionType`: a tagged union type.
+    UNION_TYPE = "UnionType";
+    /// `vt:ListType`: a homogeneous list type.
+    LIST_TYPE = "ListType";
+    /// `vt:OptionalType`: an optional type.
+    OPTIONAL_TYPE = "OptionalType";
+    /// `vt:TypeField`: one field of a record type.
+    TYPE_FIELD_NODE = "TypeField";
+    /// `vt:TypeVariant`: one variant of a tagged union type.
+    TYPE_VARIANT_NODE = "TypeVariant";
+    /// `vt:PrimitiveType`: the class of the primitive types and of `value`.
+    PRIMITIVE_TYPE = "PrimitiveType";
+    /// `vt:BoolType`: the primitive `bool`.
+    BOOL_TYPE = "BoolType";
+    /// `vt:IntType`: the primitive `int`.
+    INT_TYPE = "IntType";
+    /// `vt:DecimalType`: the primitive `decimal`.
+    DECIMAL_TYPE = "DecimalType";
+    /// `vt:StringType`: the primitive `string`.
+    STRING_TYPE = "StringType";
+    /// `vt:DatetimeType`: the primitive `datetime`.
+    DATETIME_TYPE = "DatetimeType";
+    /// `vt:IriType`: the primitive `iri`.
+    IRI_TYPE = "IriType";
+    /// `vt:ValueType`: the dynamic type `value`.
+    VALUE_TYPE = "ValueType";
+    /// `vt:declaresType`: from a chart to each named type it declares.
+    DECLARES_TYPE = "declaresType";
+    /// `vt:typeName`: the name of a named type.
+    TYPE_NAME = "typeName";
+    /// `vt:definition`: the type expression a named type stands for.
+    DEFINITION = "definition";
+    /// `vt:typeField`: a field of a record type.
+    TYPE_FIELD = "typeField";
+    /// `vt:fieldName`: the name of a record field.
+    FIELD_NAME = "fieldName";
+    /// `vt:fieldType`: the type of a record field.
+    FIELD_TYPE = "fieldType";
+    /// `vt:typeVariant`: a variant of a union type.
+    TYPE_VARIANT = "typeVariant";
+    /// `vt:variantTag`: the tag of a union variant.
+    VARIANT_TAG = "variantTag";
+    /// `vt:payloadType`: the payload type of a union variant.
+    PAYLOAD_TYPE = "payloadType";
+    /// `vt:itemType`: the item type of a list type.
+    ITEM_TYPE = "itemType";
+    /// `vt:someType`: the type of the present value of an optional type.
+    SOME_TYPE = "someType";
+    /// `vt:Null`: the RDF encoding of an absent (`null`) value.
+    NULL = "Null";
+}
+
+/// The namespace of record field predicates in the RDF encoding of values: field `name` is
+/// `<https://w3id.org/vertep/field#name>`, percent-encoded.
+pub const FIELD_NS: &str = "https://w3id.org/vertep/field#";
+/// `xsd:long`, the datatype of `int` values.
+pub const XSD_LONG: &str = "http://www.w3.org/2001/XMLSchema#long";
+/// `xsd:decimal`, the datatype of non-integral and out-of-range numbers.
+pub const XSD_DECIMAL: &str = "http://www.w3.org/2001/XMLSchema#decimal";
+/// `xsd:double`, the datatype of non-finite numbers.
+pub const XSD_DOUBLE: &str = "http://www.w3.org/2001/XMLSchema#double";
+/// `rdf:value`.
+pub const RDF_VALUE: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#value";
+/// `rdf:first`.
+pub const RDF_FIRST: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#first";
+/// `rdf:rest`.
+pub const RDF_REST: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#rest";
+/// `rdf:nil`.
+pub const RDF_NIL: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil";
+/// The SHACL namespace.
+pub const SH: &str = "http://www.w3.org/ns/shacl#";

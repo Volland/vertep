@@ -1,0 +1,166 @@
+@prefix vt:   <https://w3id.org/vertep/vt#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# The type module of the vt: ontology (RDF 1.2, Turtle).
+#
+# A chart's named types are projected into the chart graph: the chart links each one with
+# vt:declaresType, and each named type is a node whose IRI is content-addressed,
+# urn:vertep:type:sha256:<hex>, the SHA-256 of the RDFC-1.0 canonical N-Quads of its
+# definition (see vertep_rdf::types). The same node is the SHACL node shape that a value of the
+# type conforms to, so a shape is found by its type IRI.
+#
+# Values are encoded in RDF for SHACL validation as follows: booleans as xsd:boolean, integral
+# numbers in the signed 64-bit range as xsd:long, other finite numbers as xsd:decimal, strings
+# as xsd:string, null as vt:Null, arrays as RDF collections and objects as blank nodes with one
+# triple per entry whose predicate is <https://w3id.org/vertep/field#name>.
+
+<https://w3id.org/vertep/vt/types>
+    a owl:Ontology ;
+    rdfs:label "Vertep type module"@en ;
+    rdfs:comment "Classes and properties for the Vertep chart type language: named types, records, tagged unions, lists, optional values and primitives."@en ;
+    dcterms:license <https://opensource.org/licenses/MIT> , <https://www.apache.org/licenses/LICENSE-2.0> ;
+    owl:versionInfo "0.1.0" .
+
+# Classes
+
+vt:NamedType
+    a owl:Class ;
+    rdfs:subClassOf sh:NodeShape ;
+    rdfs:label "named type"@en ;
+    rdfs:comment "A named type of a chart. Its IRI is the hash of its canonical definition, and it is also the SHACL node shape of its values."@en .
+
+vt:RecordType
+    a owl:Class ;
+    rdfs:label "record type"@en ;
+    rdfs:comment "A closed record: exactly the fields listed with vt:typeField."@en .
+
+vt:UnionType
+    a owl:Class ;
+    rdfs:label "union type"@en ;
+    rdfs:comment "A tagged union: one of the variants listed with vt:typeVariant."@en .
+
+vt:ListType
+    a owl:Class ;
+    rdfs:label "list type"@en ;
+    rdfs:comment "A homogeneous list of vt:itemType."@en .
+
+vt:OptionalType
+    a owl:Class ;
+    rdfs:label "optional type"@en ;
+    rdfs:comment "A value of vt:someType, or absent."@en .
+
+vt:TypeField
+    a owl:Class ;
+    rdfs:label "record field"@en ;
+    rdfs:comment "One field of a record type: a name and a type."@en .
+
+vt:TypeVariant
+    a owl:Class ;
+    rdfs:label "union variant"@en ;
+    rdfs:comment "One variant of a tagged union: a tag and an optional payload type."@en .
+
+vt:PrimitiveType
+    a owl:Class ;
+    rdfs:label "primitive type"@en ;
+    rdfs:comment "The class of the primitive types and of the dynamic type value."@en .
+
+# Primitive types
+
+vt:BoolType a vt:PrimitiveType ; rdfs:label "bool"@en ;
+    rdfs:comment "The primitive bool."@en .
+vt:IntType a vt:PrimitiveType ; rdfs:label "int"@en ;
+    rdfs:comment "The primitive int: a signed 64-bit integer, encoded as xsd:long."@en .
+vt:DecimalType a vt:PrimitiveType ; rdfs:label "decimal"@en ;
+    rdfs:comment "The primitive decimal: an arbitrary-precision decimal, a number or a decimal string."@en .
+vt:StringType a vt:PrimitiveType ; rdfs:label "string"@en ;
+    rdfs:comment "The primitive string."@en .
+vt:DatetimeType a vt:PrimitiveType ; rdfs:label "datetime"@en ;
+    rdfs:comment "The primitive datetime: an RFC 3339 instant with an explicit offset."@en .
+vt:IriType a vt:PrimitiveType ; rdfs:label "iri"@en ;
+    rdfs:comment "The primitive iri: an IRI with a scheme (RFC 3987)."@en .
+vt:ValueType a vt:PrimitiveType ; rdfs:label "value"@en ;
+    rdfs:comment "The dynamic type value: any JSON-compatible or RDF-literal value."@en .
+
+vt:Null
+    a owl:NamedIndividual ;
+    rdfs:label "null"@en ;
+    rdfs:comment "The RDF encoding of an absent (null) value."@en .
+
+# Properties
+
+vt:declaresType
+    a owl:ObjectProperty ;
+    rdfs:label "declares type"@en ;
+    rdfs:comment "From a chart to each named type of its vt:types block."@en ;
+    rdfs:domain vt:Chart ;
+    rdfs:range vt:NamedType .
+
+vt:typeName
+    a owl:DatatypeProperty ;
+    rdfs:label "type name"@en ;
+    rdfs:comment "The name of a named type; part of its identity."@en ;
+    rdfs:domain vt:NamedType ;
+    rdfs:range xsd:string .
+
+vt:definition
+    a owl:ObjectProperty ;
+    rdfs:label "definition"@en ;
+    rdfs:comment "The type expression a named type stands for: a primitive, another named type, or a record, union, list or optional type node."@en ;
+    rdfs:domain vt:NamedType .
+
+vt:typeField
+    a owl:ObjectProperty ;
+    rdfs:label "field"@en ;
+    rdfs:comment "A field of a record type. Fields are a set: their source order is not part of the type."@en ;
+    rdfs:domain vt:RecordType ;
+    rdfs:range vt:TypeField .
+
+vt:fieldName
+    a owl:DatatypeProperty ;
+    rdfs:label "field name"@en ;
+    rdfs:comment "The name of a record field."@en ;
+    rdfs:domain vt:TypeField ;
+    rdfs:range xsd:string .
+
+vt:fieldType
+    a owl:ObjectProperty ;
+    rdfs:label "field type"@en ;
+    rdfs:comment "The type of a record field."@en ;
+    rdfs:domain vt:TypeField .
+
+vt:typeVariant
+    a owl:ObjectProperty ;
+    rdfs:label "variant"@en ;
+    rdfs:comment "A variant of a tagged union. Variants are a set selected by tag."@en ;
+    rdfs:domain vt:UnionType ;
+    rdfs:range vt:TypeVariant .
+
+vt:variantTag
+    a owl:DatatypeProperty ;
+    rdfs:label "variant tag"@en ;
+    rdfs:comment "The tag of a union variant."@en ;
+    rdfs:domain vt:TypeVariant ;
+    rdfs:range xsd:string .
+
+vt:payloadType
+    a owl:ObjectProperty ;
+    rdfs:label "payload type"@en ;
+    rdfs:comment "The payload type of a union variant; absent for a variant without payload."@en ;
+    rdfs:domain vt:TypeVariant .
+
+vt:itemType
+    a owl:ObjectProperty ;
+    rdfs:label "item type"@en ;
+    rdfs:comment "The type of the items of a list type."@en ;
+    rdfs:domain vt:ListType .
+
+vt:someType
+    a owl:ObjectProperty ;
+    rdfs:label "present type"@en ;
+    rdfs:comment "The type of the value of an optional type when it is present."@en ;
+    rdfs:domain vt:OptionalType .

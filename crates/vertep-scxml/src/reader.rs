@@ -8,8 +8,11 @@ use quick_xml::{NsReader, XmlVersion};
 use vertep_core::ir::{
     Binding, Chart, Content, Data, DoneData, Exec, ExecKind, Extension, ExtensionValue,
     HistoryType, IfBranch, Initial, Invoke, Param, SCXML_NS, Script, Send, Span, State,
-    StateElement, Transition, TransitionType,
+    StateElement, Transition, TransitionType, VT_NS,
 };
+use vertep_core::types::Type;
+use vertep_core::types::chart::{PARAM_TYPES_ATTR, TYPE_ATTR, set_param_type};
+use vertep_core::types::syntax::parse_type;
 
 use crate::ReadOptions;
 use crate::error::{ErrorKind, ParseError};
@@ -1049,7 +1052,9 @@ impl<'i, 'o> Parser<'i, 'o> {
                 }
                 "donedata" if s.donedata.is_some() => self.duplicate(c, &el.local),
                 "donedata" => {
-                    s.donedata = Some(self.donedata(c));
+                    let (d, typed) = self.donedata(c);
+                    Self::param_types(&mut s.extensions, typed);
+                    s.donedata = Some(d);
                     idx += 1;
                 }
                 _ => self.unexpected(c, &el.local),
@@ -1323,6 +1328,7 @@ impl<'i, 'o> Parser<'i, 'o> {
             params: Vec::new(),
             content: None,
         };
+        let mut typed = Vec::new();
         let mut idx = 0u32;
         while let Some(c) = self.child(&el) {
             if !c.is_scxml() {
@@ -1333,7 +1339,10 @@ impl<'i, 'o> Parser<'i, 'o> {
             }
             match c.local.as_str() {
                 "param" => {
-                    let p = self.param(c);
+                    let (p, t) = self.param(c);
+                    if let Some(t) = t {
+                        typed.push((p.name.clone(), t, p.span));
+                    }
                     send.params.push(p);
                     idx += 1;
                 }
@@ -1350,6 +1359,7 @@ impl<'i, 'o> Parser<'i, 'o> {
             "<content> and `namelist` or <param>",
             &el,
         );
+        Self::param_types(&mut exts, typed);
         Exec {
             kind: ExecKind::Send(Box::new(send)),
             extensions: exts,
@@ -1522,6 +1532,7 @@ impl<'i, 'o> Parser<'i, 'o> {
                 self.error(ErrorKind::InvalidValue, el.span, msg);
             }
         }
+        let mut typed = Vec::new();
         let mut idx = 0u32;
         let mut seen_finalize = false;
         while let Some(c) = self.child(&el) {
@@ -1533,7 +1544,10 @@ impl<'i, 'o> Parser<'i, 'o> {
             }
             match c.local.as_str() {
                 "param" => {
-                    let p = self.param(c);
+                    let (p, t) = self.param(c);
+                    if let Some(t) = t {
+                        typed.push((p.name.clone(), t, p.span));
+                    }
                     inv.params.push(p);
                     idx += 1;
                 }
@@ -1572,19 +1586,60 @@ impl<'i, 'o> Parser<'i, 'o> {
                 span: el.span,
             });
         }
+        Self::param_types(&mut inv.extensions, typed);
         inv
     }
 
-    fn param(&mut self, el: Elem) -> Param {
+    /// Read a `<param>` and its `vt:type`, if any. `<param>` has no extension slot in the IR:
+    /// the type goes to its owner's `vt:paramTypes` record ([`Parser::param_types`]), and every
+    /// other extension attribute is dropped.
+    // @tg: implements:: [[openspec:type-system#Typed SCXML Attributes]]
+    fn param(&mut self, mut el: Elem) -> (Param, Option<Type>) {
+        let mut ty = None;
+        if let Some(i) = el
+            .attrs
+            .iter()
+            .position(|a| a.ns.as_deref() == Some(VT_NS) && a.local == TYPE_ATTR)
+        {
+            let text = el.attrs.remove(i).value;
+            match parse_type(&text) {
+                Ok(t) => ty = Some(t),
+                Err(e) => self.error(
+                    ErrorKind::Type,
+                    el.span,
+                    format!(
+                        "vt:type=\"{text}\" on <param> does not parse: {}",
+                        e.message
+                    ),
+                ),
+            }
+        }
         let a = self.attrs(&el, &["name", "expr", "location"], None);
         let name = self.required(&a, "name", &el).unwrap_or_default();
         self.exclusive(&a, "expr", "location", &el);
         self.leaf_children(&el, None);
-        Param {
+        let p = Param {
             name,
             expr: a.owned("expr"),
             location: a.owned("location"),
             span: el.span,
+        };
+        (p, ty)
+    }
+
+    /// Record the `vt:type`s of an owner's `<param>`s in its `vt:paramTypes` attribute, with
+    /// the location of the first typed `<param>`.
+    fn param_types(owner: &mut Vec<Extension>, typed: Vec<(String, Type, Span)>) {
+        let Some(span) = typed.first().map(|(_, _, s)| *s) else {
+            return;
+        };
+        for (name, t, _) in &typed {
+            set_param_type(owner, name, Some(t));
+        }
+        for x in owner.iter_mut() {
+            if x.ns == VT_NS && x.local == PARAM_TYPES_ATTR && !x.span.is_known() {
+                x.span = span;
+            }
         }
     }
 
@@ -1618,7 +1673,10 @@ impl<'i, 'o> Parser<'i, 'o> {
         }
     }
 
-    fn donedata(&mut self, el: Elem) -> DoneData {
+    /// Read a `<donedata>`, with the `vt:type`s of its `<param>`s, which go to the owning
+    /// final state's `vt:paramTypes`.
+    fn donedata(&mut self, el: Elem) -> (DoneData, Vec<(String, Type, Span)>) {
+        let mut typed = Vec::new();
         self.attrs(&el, &[], None);
         let mut d = DoneData {
             content: None,
@@ -1632,7 +1690,10 @@ impl<'i, 'o> Parser<'i, 'o> {
             }
             match c.local.as_str() {
                 "param" => {
-                    let p = self.param(c);
+                    let (p, t) = self.param(c);
+                    if let Some(t) = t {
+                        typed.push((p.name.clone(), t, p.span));
+                    }
                     d.params.push(p);
                 }
                 "content" if d.content.is_some() => self.duplicate(c, "donedata"),
@@ -1645,7 +1706,7 @@ impl<'i, 'o> Parser<'i, 'o> {
             "<content> and <param>",
             &el,
         );
-        d
+        (d, typed)
     }
 }
 

@@ -8,7 +8,8 @@
 //! `sh:maxLength`, `sh:in`, `sh:hasValue`, `sh:equals`, `sh:disjoint`, `sh:lessThan`,
 //! `sh:lessThanOrEquals` (on integers), `sh:not`, `sh:and`, `sh:or`, `sh:xone`, `sh:node`,
 //! `sh:property`, `sh:qualifiedValueShape` with `sh:qualifiedMinCount` and
-//! `sh:qualifiedMaxCount`, and `sh:deactivated`. SHACL-SPARQL is not supported: the chart shapes
+//! `sh:qualifiedMaxCount`, `sh:pattern` with `sh:flags` (`i`, `m`, `s`, `x`), `sh:closed` with
+//! `sh:ignoredProperties`, and `sh:deactivated`. SHACL-SPARQL is not supported: the chart shapes
 //! are SHACL Core only (design D9), which the Lean validator also models.
 //!
 //! An unsupported constraint parameter in a shapes graph is an error at load time, so a shape
@@ -112,6 +113,10 @@ enum Constraint {
     Xone(Vec<usize>),
     Node(usize),
     Property(usize),
+    /// `sh:pattern`: the regular expression (flags applied) and its source text.
+    Pattern(regex::Regex, String),
+    /// `sh:closed true`: the predicates a value node may have.
+    Closed(BTreeSet<NamedNode>),
     Qualified {
         shape: usize,
         min: Option<usize>,
@@ -145,6 +150,8 @@ impl Constraint {
             Constraint::Xone(_) => "XoneConstraintComponent",
             Constraint::Node(_) => "NodeConstraintComponent",
             Constraint::Property(_) => "PropertyConstraintComponent",
+            Constraint::Pattern(..) => "PatternConstraintComponent",
+            Constraint::Closed(_) => "ClosedConstraintComponent",
             Constraint::Qualified { min: Some(_), .. } => "QualifiedMinCountConstraintComponent",
             Constraint::Qualified { .. } => "QualifiedMaxCountConstraintComponent",
         }
@@ -322,8 +329,21 @@ impl<'g> Loader<'g> {
     }
 
     fn path(&self, t: &Term) -> Result<Path, ShapesError> {
+        // An IRI is a predicate path unless the shapes graph describes it as a complex path
+        // (an IRI-named list or path node, as the type projection mints them).
         if let Term::NamedNode(n) = t {
-            return Ok(Path::Predicate(n.clone()));
+            let complex = ["first", "inversePath", "alternativePath"]
+                .iter()
+                .map(|l| if *l == "first" { rdf(l) } else { sh(l) })
+                .chain(
+                    ["zeroOrMorePath", "oneOrMorePath", "zeroOrOnePath"]
+                        .iter()
+                        .map(|l| sh(l)),
+                )
+                .any(|p| self.g.object_for_subject_predicate(n, &p).is_some());
+            if !complex {
+                return Ok(Path::Predicate(n.clone()));
+            }
         }
         if self.object(t, &rdf("first"))?.is_some() {
             let items = self.list(t)?;
@@ -445,6 +465,53 @@ impl<'g> Loader<'g> {
                     }
                     "not" => Constraint::Not(self.shape(&v)?),
                     "node" => Constraint::Node(self.shape(&v)?),
+                    "pattern" => {
+                        let Term::Literal(l) = &v else {
+                            return Err(ShapesError("sh:pattern must be a literal".into()));
+                        };
+                        let flags = match self.object(id, &sh("flags"))? {
+                            Some(Term::Literal(f)) => f.value().to_owned(),
+                            Some(_) => {
+                                return Err(ShapesError("sh:flags must be a literal".into()));
+                            }
+                            None => String::new(),
+                        };
+                        let mut b = regex::RegexBuilder::new(l.value());
+                        for c in flags.chars() {
+                            match c {
+                                'i' => b.case_insensitive(true),
+                                'm' => b.multi_line(true),
+                                's' => b.dot_matches_new_line(true),
+                                'x' => b.ignore_whitespace(true),
+                                other => {
+                                    return Err(ShapesError(format!(
+                                        "unsupported sh:flags {other}"
+                                    )));
+                                }
+                            };
+                        }
+                        let re = b
+                            .build()
+                            .map_err(|e| ShapesError(format!("bad sh:pattern: {e}")))?;
+                        Constraint::Pattern(re, l.value().to_owned())
+                    }
+                    "closed" => {
+                        if !matches!(&v, Term::Literal(l) if l.value() == "true") {
+                            continue;
+                        }
+                        let mut allowed = BTreeSet::new();
+                        for p in self.objects(id, &sh("property"))? {
+                            if let Some(Term::NamedNode(n)) = self.object(&p, &sh("path"))? {
+                                allowed.insert(n);
+                            }
+                        }
+                        if let Some(l) = self.object(id, &sh("ignoredProperties"))? {
+                            for i in self.list(&l)? {
+                                allowed.insert(Self::iri(i, "sh:ignoredProperties")?);
+                            }
+                        }
+                        Constraint::Closed(allowed)
+                    }
                     "property" => Constraint::Property(self.shape(&v)?),
                     "and" | "or" | "xone" => {
                         let members = self
@@ -485,7 +552,9 @@ impl<'g> Loader<'g> {
                     | "group"
                     | "qualifiedMinCount"
                     | "qualifiedMaxCount"
-                    | "qualifiedValueShapesDisjoint" => continue,
+                    | "qualifiedValueShapesDisjoint"
+                    | "flags"
+                    | "ignoredProperties" => continue,
                     other => {
                         return Err(ShapesError(format!("unsupported parameter sh:{other}")));
                     }
@@ -1038,6 +1107,28 @@ impl Validator<'_> {
                 self.validate_shape(*s, v, results, depth + 1);
                 None
             }
+            Constraint::Pattern(re, src) => {
+                let text = match v {
+                    Term::Literal(l) => Some(l.value()),
+                    Term::NamedNode(n) => Some(n.as_str()),
+                    _ => None,
+                };
+                fail(!text.is_some_and(|t| re.is_match(t)), &|| {
+                    format!("does not match the pattern {src}")
+                })
+            }
+            Constraint::Closed(allowed) => {
+                let extra = as_subject(v).and_then(|s| {
+                    self.data
+                        .triples_for_subject(s)
+                        .map(|t| t.predicate.into_owned())
+                        .find(|p| !allowed.contains(p))
+                });
+                fail(extra.is_some(), &|| match &extra {
+                    Some(p) => format!("closed shape does not allow the property {p}"),
+                    None => String::new(),
+                })
+            }
             // Handled over the whole value set.
             Constraint::MinCount(_)
             | Constraint::MaxCount(_)
@@ -1071,6 +1162,24 @@ fn well_formed(value: &str, datatype: &str) -> bool {
             !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())
         }
         crate::vocab::XSD_BOOLEAN => matches!(value, "true" | "false" | "1" | "0"),
+        crate::vocab::XSD_LONG => {
+            let digits = value.strip_prefix(['+', '-']).unwrap_or(value);
+            !digits.is_empty()
+                && digits.bytes().all(|b| b.is_ascii_digit())
+                && value.parse::<i64>().is_ok()
+        }
+        crate::vocab::XSD_DECIMAL => {
+            // (\+|-)?([0-9]+(\.[0-9]*)?|\.[0-9]+)
+            let unsigned = value.strip_prefix(['+', '-']).unwrap_or(value);
+            let (int, frac) = match unsigned.split_once('.') {
+                Some((i, f)) => (i, Some(f)),
+                None => (unsigned, None),
+            };
+            let digits = |t: &str| t.bytes().all(|b| b.is_ascii_digit());
+            digits(int)
+                && frac.is_none_or(digits)
+                && (!int.is_empty() || frac.is_some_and(|f| !f.is_empty()))
+        }
         _ => true,
     }
 }

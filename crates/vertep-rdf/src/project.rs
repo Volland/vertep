@@ -41,6 +41,13 @@
 //! target set rule, which is pairwise and otherwise needs SPARQL). And from every history
 //! state it materializes `vt:historyDefault` to the history states its default entry targets,
 //! so that the shapes can reject default-entry cycles.
+//!
+//! # Types
+//!
+//! A typed chart's named types are projected too ([`crate::types::project_chart_types`]):
+//! `vt:declaresType` from the chart node to each type IRI, and under each type IRI its
+//! definition and SHACL node shape. Type IRIs are content-addressed on their own, not minted
+//! under the chart's base, so the hashed and the published projection share them.
 
 use std::collections::HashMap;
 
@@ -89,7 +96,9 @@ pub fn project_with_base(chart: &Chart, base: &str) -> Graph {
     }
     p.chart(chart);
     p.history_defaults(&chart.states, None);
-    p.graph
+    let mut graph = p.graph;
+    crate::types::project_chart_types(&mut graph, chart, base);
+    graph
 }
 
 /// Project a chart under [`PLACEHOLDER_BASE`]: the graph whose canonical form is hashed.

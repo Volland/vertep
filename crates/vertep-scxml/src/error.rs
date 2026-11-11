@@ -43,6 +43,9 @@ pub enum ErrorKind {
     DuplicateStateId,
     /// A transition target or `initial` identifier names no state.
     UnknownTarget,
+    /// A `vt:type` annotation or the `vt:types` block does not parse, or names a type that is
+    /// not declared ([[openspec:type-system#Typed SCXML Attributes]]).
+    Type,
 }
 
 /// One problem found while reading an SCXML document, with the location of the element (or,

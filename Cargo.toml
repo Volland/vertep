@@ -41,6 +41,13 @@ vertep-oxigraph = { path = "crates/vertep-oxigraph", version = "0.1.0" }
 vertep-runtime = { path = "crates/vertep-runtime", version = "0.1.0" }
 vertep-macros = { path = "crates/vertep-macros", version = "0.1.0" }
 vertep-dm-rust = { path = "crates/vertep-dm-rust", version = "0.1.0" }
+# vertep-macros: token parsing and code generation for statechart! and include_chart!.
+# `span-locations` gives the line and column of macro input tokens for IR spans.
+syn = { version = "2.0.119", features = ["full", "extra-traits"] }
+quote = "1.0.47"
+proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
+# vertep-dm-rust: compile-fail tests of the generated API and the macros.
+trybuild = "1.0.122"
 # Storage layer (vertep-store, vertep-tiramemsu, vertep-oxigraph). The oxrdf family is the one
 # vertep-rdf uses (RDF 1.2); spargebra/spareval/sparesults match the versions oxigraph pins.
 oxrdf = { version = "0.3.5", features = ["rdf-12", "rdfc-10"] }
@@ -52,6 +59,9 @@ tiramemsu = { version = "0.12.0", default-features = false, features = ["sparql"
 # vertep-dm-cel: linear-time regular expressions for CEL `matches`, without std.
 regex-automata = { version = "0.4.18", default-features = false, features = ["alloc", "syntax", "nfa-pikevm", "unicode"] }
 boa_engine = { version = "0.22.0", default-features = false, features = ["annex-b"] }
+# vertep-runtime: the tokio shell and its future combinators.
+tokio = { version = "1.54", default-features = false }
+futures = { version = "0.3.31", default-features = false, features = ["std", "async-await"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
