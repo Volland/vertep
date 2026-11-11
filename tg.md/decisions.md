@@ -475,3 +475,24 @@ Guard and action logic is Rust; the `rust` datamodel evaluates JSON literals, co
 
 - motivated_by:: [[decisions#Datamodel typers plug into one core checker]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[decisions#Pluggable datamodel]] {weight: secondary}
+
+## Types are IR values checked in the core
+
+Types are ordinary IR values in `vertep-core`, checked by one `no_std` checker that every surface and the runtime call, so a chart is typed the same way however it was written (M1 design 1).
+
+- motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#IR is the hub]] {weight: secondary}
+
+## Type projections must agree with the checker
+
+The RDF, SHACL, JSON Schema and CEL projections of a type are tested to give the same verdict as the core checker on generated valid and near-miss values, and the Lean model is to prove the SHACL agreement (M1 design 3).
+
+- motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary}
+
+## One macro pipeline for inline and included charts
+
+`statechart!` and `include_chart!` share one pipeline: tokens or a `.scxml`/`.yaml` file become IR, which is validated, type-checked and turned into the same generated types (M1 design 4).
+
+- motivated_by:: [[decisions#IR is the hub]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Proc macros run at compile time]] {weight: secondary}
