@@ -110,6 +110,8 @@ The Lean 4 package on LeanRDF: the IR, types, `step`, journal protocol and decid
 - realizes:: [[decisions#Lean verification bridge]]
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
+First phase landed 2026-11-11 on Lean v4.35.0 and LeanRDF `b407b97`: the IR, `WellFormed` with a proven decision procedure, compile and the Appendix D kernel mirroring Rust, the executable `step` over an answer tape, and proofs of step determinism, transition selection and dynamic type soundness. `scripts/check.sh` gates `sorry` and axioms. See [[decisions#Configuration well-formedness proof is pending]].
+
 ## vertep-conformance
 
 A dev-only harness that runs the W3C SCXML IRP suite on the Rust core and on the Lean model, and the property-based differential tests between them.

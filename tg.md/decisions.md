@@ -238,3 +238,12 @@ The W3C IRP files are imported from the verbatim copy in the uscxml repository p
 - motivated_by:: [[decisions#Full SCXML first]] {weight: secondary}
 
 The mirror's `update-txml.sh` copies the W3C files unchanged; the only local edit it carries is commented out. `crates/vertep-conformance/scripts/import-irp.sh` re-imports, `check-suite-hash.sh` verifies.
+
+## Configuration well-formedness proof is pending
+
+The theorem that `step` preserves legal configurations is stated only in `lean/vertep-lean/Pending/`, outside the build, because the Lean model found two charts that pass validation and break it.
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: secondary}
+
+The counterexamples: a transition targeting a history state and its sibling, which leaves two active children; and an `initial` naming a history state without a default transition, which recursed without bound in Rust. Both become validator rules, mirrored in `WellFormed`; the proof then needs lemmas for compile correctness, exit and entry legality, a history invariant and fuel adequacy. No theorem is stated with `sorry` meanwhile.
