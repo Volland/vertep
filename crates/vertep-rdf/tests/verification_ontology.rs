@@ -5,8 +5,11 @@ use vertep_rdf::io::{RdfFormat, read_graph};
 
 #[test]
 fn verification_module_declares_certificate_terms() {
-    let g = read_graph(vertep_rdf::VERIFICATION_ONTOLOGY_TTL.as_bytes(), RdfFormat::Turtle)
-        .expect("module parses");
+    let g = read_graph(
+        vertep_rdf::VERIFICATION_ONTOLOGY_TTL.as_bytes(),
+        RdfFormat::Turtle,
+    )
+    .expect("module parses");
     let owl = |t: &str| format!("http://www.w3.org/2002/07/owl#{t}");
     let class = owl("Class");
     let obj = owl("ObjectProperty");
