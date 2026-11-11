@@ -227,7 +227,7 @@ vt:actor
     a owl:ObjectProperty ;
     rdfs:range vt:Actor ;
     rdfs:label "actor"@en ;
-    rdfs:comment "The actor whose journal an entry is in, or which a snapshot, timer or dead letter belongs to."@en .
+    rdfs:comment "The actor whose journal an entry is in, or which scheduled a timer."@en .
 
 vt:position
     a owl:DatatypeProperty ;
@@ -395,6 +395,13 @@ vt:Snapshot
     rdfs:subClassOf prov:Entity ;
     rdfs:label "snapshot"@en ;
     rdfs:comment "The configuration, datamodel, pending requests and active timers of an actor at a journal position, under one chart version."@en .
+
+vt:snapshotOf
+    a owl:ObjectProperty ;
+    rdfs:domain vt:Snapshot ;
+    rdfs:range vt:Actor ;
+    rdfs:label "snapshot of"@en ;
+    rdfs:comment "The actor a snapshot belongs to. Snapshots do not use vt:actor, so that only journal entries carry both vt:actor and vt:position."@en .
 
 vt:sessionState
     a owl:DatatypeProperty ;

@@ -9,8 +9,32 @@ repository.workspace = true
 authors.workspace = true
 readme = "../../README.md"
 
+[features]
+default = ["runtime", "tiramemsu", "scxml"]
+# The actor runtime (vertep-runtime) on tokio.
+runtime = ["dep:vertep-runtime"]
+# The tiramemsu storage backend, with `Storage` for it.
+tiramemsu = ["runtime", "dep:vertep-tiramemsu", "vertep-runtime/tiramemsu"]
+# The SCXML reader and writer.
+scxml = ["dep:vertep-scxml"]
+# The ECMAScript datamodel.
+ecmascript = ["dep:vertep-dm-ecma"]
+
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
+vertep-store = { workspace = true }
+vertep-rdf = { workspace = true }
+vertep-runtime = { workspace = true, optional = true }
+vertep-tiramemsu = { workspace = true, optional = true }
+vertep-scxml = { workspace = true, optional = true }
+vertep-dm-ecma = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros", "time"] }
+
+[[example]]
+name = "quickstart"
+required-features = ["runtime", "tiramemsu", "scxml"]
 
 [lints]
 workspace = true

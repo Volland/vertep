@@ -8,8 +8,33 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+default = []
+# `Storage` for the tiramemsu backend.
+tiramemsu = ["dep:vertep-tiramemsu"]
+
 [dependencies]
 vertep-core = { workspace = true, features = ["std", "serde"] }
+vertep-store = { workspace = true }
+vertep-rdf = { workspace = true }
+vertep-scxml = { workspace = true }
+vertep-tiramemsu = { workspace = true, optional = true }
+oxrdf = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { workspace = true, features = ["sync", "time", "rt"] }
+futures = { workspace = true }
+
+[dev-dependencies]
+vertep-runtime = { path = ".", features = ["tiramemsu"] }
+vertep-dm-ecma = { workspace = true }
+vertep-yaml = { workspace = true }
+vertep-tiramemsu = { workspace = true }
+vertep-store = { workspace = true, features = ["testkit"] }
+tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
+tempfile = "3"
+futures = { workspace = true }
 
 [lints]
 workspace = true

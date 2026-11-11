@@ -1,0 +1,195 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix vt:   <https://w3id.org/vertep/vt#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL Core shapes for the vt: runtime module (vertep-rdf/ontology/vt-runtime.ttl), one per
+# class. Every record vertep-runtime writes conforms: journal entries as read back from any
+# journal store (with the store's stamps), snapshots, timers, dead letters, mailbox rows and the
+# actor resource of a current-state graph. Only SHACL Core is used.
+
+
+vt:AddressRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Address ;
+    rdfs:comment "An actor address is an IRI." ;
+    sh:nodeKind sh:IRI .
+
+vt:ActorRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Actor ;
+    rdfs:comment "An actor resource in its current-state graph." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:chartVersion ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:status ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:datamodelState ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:VirtualActorRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:VirtualActor ;
+    rdfs:comment "A virtual actor names at most one chart type and key." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:chartType ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:key ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:InvokedActorRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:InvokedActor ;
+    rdfs:comment "An invoked actor has at most one parent." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:parent ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] .
+
+vt:StatelessWorkerRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:StatelessWorker ;
+    rdfs:comment "A stateless worker is addressed by an IRI." ;
+    sh:nodeKind sh:IRI .
+
+vt:MailboxRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Mailbox ;
+    rdfs:comment "A mailbox is named by an IRI." ;
+    sh:nodeKind sh:IRI .
+
+vt:MessageRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Message ;
+    rdfs:comment "A stored mailbox message." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:recipient ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:sequence ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] ;
+    sh:property [ sh:path vt:messageId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:envelope ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:ActivationRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Activation ;
+    rdfs:comment "An activation belongs to at most one actor." ;
+    sh:property [ sh:path vt:activationOf ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] .
+
+vt:JournalEntryRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:JournalEntry ;
+    rdfs:comment "A journal entry as read back from a journal store." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:actor ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:position ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] ;
+    sh:property [ sh:path vt:messageId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:chartVersion ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:timestamp ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] ;
+    sh:property [ sh:path vt:configurationDigest ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:InputEntryRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:InputEntry ;
+    rdfs:comment "An input entry records exactly one input event." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:input ; sh:minCount 1 ; sh:maxCount 1 ; sh:class vt:InputEvent ] ;
+    sh:property [ sh:path vt:send ; sh:nodeKind sh:IRI ; sh:class vt:OutgoingSend ] ;
+    sh:property [ sh:path vt:schedules ; sh:nodeKind sh:IRI ; sh:class vt:Timer ] ;
+    sh:property [ sh:path vt:cancels ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:unhandled ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:MigrationEntryRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:MigrationEntry ;
+    rdfs:comment "A migration entry: from and to versions, the migration and both snapshots." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:migration ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:fromVersion ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:toVersion ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:snapshotBefore ; sh:minCount 1 ; sh:maxCount 1 ; sh:class vt:Snapshot ] ;
+    sh:property [ sh:path vt:snapshotAfter ; sh:minCount 1 ; sh:maxCount 1 ; sh:class vt:Snapshot ] .
+
+vt:ForkEntryRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:ForkEntry ;
+    rdfs:comment "A fork entry: the source actor and position and the state there." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:forkOf ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:forkPosition ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] ;
+    sh:property [ sh:path vt:snapshot ; sh:minCount 1 ; sh:maxCount 1 ; sh:class vt:Snapshot ] .
+
+vt:MacrostepRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Macrostep ;
+    rdfs:comment "A macrostep consumes at most one input event." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:input ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] .
+
+vt:InputEventRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:InputEvent ;
+    rdfs:comment "An input event with its full content." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:eventName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:payload ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:messageId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:eventType ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:origin ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:originType ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:OutgoingSendRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:OutgoingSend ;
+    rdfs:comment "A recorded send." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:order ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] ;
+    sh:property [ sh:path vt:messageId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:eventName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:sendType ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:envelope ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:recipient ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] .
+
+vt:SnapshotRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Snapshot ;
+    rdfs:comment "A snapshot of an actor at a journal position." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:snapshotOf ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:position ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] ;
+    sh:property [ sh:path vt:chartVersion ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:configurationDigest ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:sessionState ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:datamodelState ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:runtimeState ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:TimerRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Timer ;
+    rdfs:comment "A durable timer." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:actor ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:sendId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:dueAt ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] ;
+    sh:property [ sh:path vt:recipient ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:messageId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:envelope ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:ReminderRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Reminder ;
+    rdfs:comment "A recurring reminder." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:reminderName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:period ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] .
+
+vt:MigrationRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Migration ;
+    rdfs:comment "A migration is named by an IRI." ;
+    sh:nodeKind sh:IRI .
+
+vt:DeadLetterRuntimeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:DeadLetter ;
+    rdfs:comment "A dead letter in its receiver's dead-letter graph." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt:receiver ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt:eventName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:payload ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:reason ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:recordedAt ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ] ;
+    sh:property [ sh:path vt:messageId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:sender ; sh:maxCount 1 ; sh:datatype xsd:string ] .

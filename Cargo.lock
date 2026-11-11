@@ -2640,7 +2640,14 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "vertep"
 version = "0.1.0"
 dependencies = [
+ "tokio",
  "vertep-core",
+ "vertep-dm-ecma",
+ "vertep-rdf",
+ "vertep-runtime",
+ "vertep-scxml",
+ "vertep-store",
+ "vertep-tiramemsu",
 ]
 
 [[package]]
@@ -2656,6 +2663,13 @@ dependencies = [
  "vertep-rdf",
  "vertep-scxml",
  "vertep-yaml",
+]
+
+[[package]]
+name = "vertep-cluster"
+version = "0.1.0"
+dependencies = [
+ "vertep-core",
 ]
 
 [[package]]
@@ -2708,6 +2722,13 @@ dependencies = [
  "vertep-rdf",
  "vertep-scxml",
  "vertep-yaml",
+]
+
+[[package]]
+name = "vertep-federation"
+version = "0.1.0"
+dependencies = [
+ "vertep-core",
 ]
 
 [[package]]
@@ -2764,6 +2785,7 @@ dependencies = [
  "vertep-core",
  "vertep-dm-ecma",
  "vertep-rdf",
+ "vertep-runtime",
  "vertep-scxml",
  "vertep-store",
  "vertep-tiramemsu",
