@@ -379,7 +379,7 @@ vt:TransitionShape a sh:NodeShape ;
     ] .
 ```
 
-Rules that need the whole chart (a target must be a state of the same chart, a parallel state's regions) are SPARQL-based constraints. A rule that SHACL cannot express is a gap the `Shapes Equivalence Theorem` would expose, so the equivalence theorem doubles as a completeness check of the shapes.
+Rules that need the whole chart (a target must be a state of the same chart, legal target sets, history default cycles) stay in SHACL Core over derived triples the projection materializes: `vt:ancestor`, `vt:source`, `vt:scope`, `vt:historyDefault` and selection nodes with `vt:choice`. Four checks SHACL Core cannot state are done by reconstruction: `vt:order` is exactly 0..n-1, expression datatypes match the datamodel, one chart per graph, and derived triples agree with a re-projection. A rule that SHACL cannot express is a gap the `Shapes Equivalence Theorem` would expose, so the equivalence theorem doubles as a completeness check of the shapes.
 
 ## Content addressing
 

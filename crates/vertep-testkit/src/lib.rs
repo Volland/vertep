@@ -97,6 +97,30 @@ pub const EXTENSION_NAMESPACES: [&str; 3] = [VT_NS, "urn:example:ext", "http://e
 /// Prefix used to mark a target that the post-processing pass replaces with a real state id.
 const PLACEHOLDER: char = '?';
 
+/// Data ids are global to a chart (W3C SCXML 5.2), so rename later duplicates.
+fn unique_data_ids(chart: &mut Chart) {
+    fn fix(data: &mut [Data], seen: &mut BTreeSet<String>) {
+        for d in data {
+            let mut id = d.id.clone();
+            let mut n = 0usize;
+            while !seen.insert(id.clone()) {
+                n += 1;
+                id = format!("{}_{n}", d.id);
+            }
+            d.id = id;
+        }
+    }
+    fn walk(states: &mut [State], seen: &mut BTreeSet<String>) {
+        for st in states {
+            fix(&mut st.data, seen);
+            walk(&mut st.children, seen);
+        }
+    }
+    let mut seen = BTreeSet::new();
+    fix(&mut chart.data, &mut seen);
+    walk(&mut chart.states, &mut seen);
+}
+
 // ==================================================================== public entry points
 
 /// Well-formed charts with the default [`ChartConfig`].
@@ -196,6 +220,7 @@ pub fn canonicalize_extensions(chart: &mut Chart) {
 fn finish_well_formed(mut chart: Chart) -> Chart {
     let mut counter = 0usize;
     name_states(&mut chart.states, &mut counter);
+    unique_data_ids(&mut chart);
     assign_generated_ids(&mut chart);
     let all = state_ids(&chart);
     let mut top_desc = Vec::new();
@@ -1282,6 +1307,17 @@ mod tests {
         let unique: BTreeSet<&String> = ids.iter().collect();
         if unique.len() != ids.len() {
             return Err(format!("duplicate ids {ids:?}"));
+        }
+        fn data_ids(states: &[State], out: &mut Vec<String>) {
+            for s in states {
+                out.extend(s.data.iter().map(|d| d.id.clone()));
+                data_ids(&s.children, out);
+            }
+        }
+        let mut dids: Vec<String> = c.data.iter().map(|d| d.id.clone()).collect();
+        data_ids(&c.states, &mut dids);
+        if dids.iter().collect::<BTreeSet<_>>().len() != dids.len() {
+            return Err(format!("duplicate data ids {dids:?}"));
         }
         fn walk(states: &[State], ids: &[String], top: bool) -> Result<(), String> {
             for s in states {
