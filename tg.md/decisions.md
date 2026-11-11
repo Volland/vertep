@@ -230,6 +230,7 @@ Where the SCXML Recommendation leaves room, `vertep-core` reads it as follows; t
 - A history state without a default transition gets one to its parent's default entry; the root's initial transition is internal with the root as domain.
 - `SessionDone` is emitted exactly once, also on cancel; a `<state>` whose only children are history states is rejected by validation.
 - A history target stands for its parent's position in the target-set rule, and cycles through history default transitions are rejected (found by the Lean model).
+- The microstep budget charges every microstep record: selections that fire transitions and internal events consumed without enabling any, so a failing eventless guard that keeps raising `error.execution` ends in `BudgetExceeded` (found by differential testing).
 
 ## IRP suite from a pinned mirror
 

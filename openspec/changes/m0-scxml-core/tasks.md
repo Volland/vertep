@@ -91,13 +91,13 @@
 - [x] 8.3 Implement pass/fail detection with step and virtual-time budgets (Pass Fail Protocol)
 - [x] 8.4 Implement the allow-list with reasons, unexpected-pass failures and unknown-entry failures (Expected Deviation Allow List)
 - [x] 8.5 Run all mandatory tests on the Rust core as a CI gate (Rust Core Conformance)
-- [ ] 8.6 Run the same tests on the Lean oracle with recorded tapes and compare traces (Lean Model Conformance)
+- [x] 8.6 Run the same tests on the Lean oracle with recorded tapes and compare traces (Lean Model Conformance)
 - [x] 8.7 Run optional tests separately and list manual tests (Optional Test Reporting)
 - [x] 8.8 Write the machine-readable report and the CI summary (Conformance Report)
-- [ ] 8.9 Implement chart and input generators with shrinking and a stored regression corpus; compare Rust and Lean traces (Randomized Differential Testing)
+- [x] 8.9 Implement chart and input generators with shrinking and a stored regression corpus; compare Rust and Lean traces (Randomized Differential Testing)
 - [x] 8.10 Run the SCXML and RDF round-trip and shape checks over the corpus (Round Trip Corpus Checks)
-- [ ] 8.11 Annotate the implementing items with `// @tg: implements:: [[openspec:scxml-conformance#<Requirement>]]` for each of: IRP Suite Import, Pass Fail Protocol, Test Host, Rust Core Conformance, Lean Model Conformance, Expected Deviation Allow List, Optional Test Reporting, Conformance Report, Randomized Differential Testing, Round Trip Corpus Checks
-- [ ] 8.12 Write one test per scxml-conformance scenario and annotate each with `// @tg: verifies:: [[openspec:scxml-conformance#<Requirement>#<Scenario>]]`
+- [x] 8.11 Annotate the implementing items with `// @tg: implements:: [[openspec:scxml-conformance#<Requirement>]]` for each of: IRP Suite Import, Pass Fail Protocol, Test Host, Rust Core Conformance, Lean Model Conformance, Expected Deviation Allow List, Optional Test Reporting, Conformance Report, Randomized Differential Testing, Round Trip Corpus Checks
+- [x] 8.12 Write one test per scxml-conformance scenario and annotate each with `// @tg: verifies:: [[openspec:scxml-conformance#<Requirement>#<Scenario>]]`
 
 ## 9. Throwaway integration spike (deleted when M2 starts)
 
