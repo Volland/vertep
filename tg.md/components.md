@@ -167,6 +167,8 @@ The CEL datamodel: side-effect-free, terminating expressions type-checked agains
 - realizes:: [[decisions#Pluggable datamodel]] {confidence: partial}
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
 
+Implemented 2026-11-11 per [[decisions#Own CEL interpreter in vertep-dm-cel]]: data items are fields of `ctx`, `<script>` is refused, `foreach` walks lists by index and maps by key, and every expression has step, size, depth and length limits. A 130-expression golden corpus gives identical results natively and on wasm32. The IRP suite under CEL is still open.
+
 ## vertep-macros
 
 The `statechart!` and `include_chart!` procedural macros: they build the IR at compile time, run its checks and emit typed Rust state, event and context APIs.

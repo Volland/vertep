@@ -310,3 +310,13 @@ The declaration text is `type X = T; event e: T;`. Untyped charts carry none of 
 - motivated_by:: [[decisions#IR is the hub]] {weight: primary, since: "2026-11-11"}
 
 Rejected: serde-based YAML crates, which lose positions or key order or resolve scalars the YAML 1.1 way, turning the `on:` transition key into `true`.
+
+## Own CEL interpreter in vertep-dm-cel
+
+Vertep evaluates CEL with its own `no_std` interpreter: a bounded-depth parser, a gradual static checker, a step-budgeted evaluator, exact decimals, key-ordered maps, integer time and linear-time regex.
+
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#No-std core and tokio shell]] {weight: secondary}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary, note: "deterministic replay"}
+
+A probe on 2026-11-11 rejected `cel` 0.15 (hash-ordered maps gave five key orders in five runs, no decimal, no step limit, needs std), `cel-core` 0.5 (no decimal, no limits, stack overflow on deep nesting, needs std), `rscel` 1.0.8 (nightly only, non-deterministic `now()`) and `cel-cxx` (C++ FFI, no wasm, no decimal). Decimals hold 34 significant digits; more is an overflow error.
