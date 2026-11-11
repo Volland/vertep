@@ -6,6 +6,7 @@
 //! compare equal to every other span so that derived equality is structural
 //! ([[openspec:chart-model#Chart Equality]]).
 
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -332,7 +333,7 @@ pub enum ExecKind {
         event: String,
     },
     /// `<send>`.
-    Send(Send),
+    Send(Box<Send>),
     /// `<cancel>`.
     Cancel {
         /// `sendid`.
