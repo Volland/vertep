@@ -1,0 +1,706 @@
+@prefix vt:   <https://w3id.org/vertep/vt#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# The chart module of the vt: ontology (RDF 1.2, Turtle).
+#
+# One class per IR node kind (vt:irNodeKind names it) and one property per IR attribute or
+# containment (vt:irField names it). Document order is explicit: every ordered member carries
+# vt:order. Expression, location and script text are literals typed vt:<datamodel>Expr, for
+# example vt:ecmascriptExpr. Properties marked "Derived" are materialized by the projection for
+# the SHACL Core shapes and are ignored by reconstruction.
+#
+# This module imports nothing. Alignment with other vocabularies (PROV-O, DID Core) is by
+# annotation only (rdfs:seeAlso); no Vertep query or shape depends on it.
+
+<https://w3id.org/vertep/vt/chart>
+    a owl:Ontology ;
+    rdfs:label "Vertep chart ontology module"@en ;
+    rdfs:comment "Classes and properties for statecharts (W3C SCXML) projected losslessly from the Vertep chart IR."@en ;
+    dcterms:license <https://opensource.org/licenses/MIT> , <https://www.apache.org/licenses/LICENSE-2.0> ;
+    owl:versionInfo "0.1.0" .
+
+vt:irNodeKind
+    a owl:AnnotationProperty ;
+    rdfs:label "IR node kind"@en ;
+    rdfs:comment "The node kind of the Vertep chart IR that a class corresponds to."@en .
+
+vt:irField
+    a owl:AnnotationProperty ;
+    rdfs:label "IR field"@en ;
+    rdfs:comment "The fields of the Vertep chart IR that a property projects."@en .
+
+vt:Expr
+    a rdfs:Datatype ;
+    rdfs:label "expression"@en ;
+    rdfs:comment "Documentation only: expression literals use one datatype per datamodel, vt:<datamodel>Expr with the datamodel name percent-encoded, such as vt:ecmascriptExpr and vt:nullExpr. The lexical form is the uninterpreted expression text."@en .
+
+vt:ecmascriptExpr
+    a rdfs:Datatype ;
+    rdfs:label "ECMAScript expression"@en ;
+    rdfs:comment "Expression, location or script text of a chart whose datamodel is ecmascript."@en .
+
+vt:nullExpr
+    a rdfs:Datatype ;
+    rdfs:label "null datamodel expression"@en ;
+    rdfs:comment "Expression text of a chart whose datamodel is null (only In() conditions are meaningful)."@en .
+
+# Classes
+vt:Chart
+    a owl:Class ;
+    rdfs:seeAlso <http://www.w3.org/ns/prov#Plan> ;
+    rdfs:label "chart"@en ;
+    rdfs:comment "The root of a chart: the `<scxml>` element, with its datamodel, binding, initial targets, top-level data, script and child states."@en ;
+    vt:irNodeKind "ir::Chart" .
+
+vt:StateNode
+    a owl:Class ;
+    rdfs:label "state node"@en ;
+    rdfs:comment "Any state of a chart, whatever element it was written as. Every state node is also an instance of exactly one of vt:State, vt:Parallel, vt:Final and vt:History."@en ;
+    vt:irNodeKind "ir::State" .
+
+vt:State
+    a owl:Class ;
+    rdfs:subClassOf vt:StateNode ;
+    rdfs:label "state element"@en ;
+    rdfs:comment "A state written as `<state>`: atomic when it has no child states, compound otherwise."@en ;
+    vt:irNodeKind "ir::StateElement::State" .
+
+vt:Parallel
+    a owl:Class ;
+    rdfs:subClassOf vt:StateNode ;
+    rdfs:label "parallel state"@en ;
+    rdfs:comment "A state written as `<parallel>`, whose child states are active together."@en ;
+    vt:irNodeKind "ir::StateElement::Parallel" .
+
+vt:Final
+    a owl:Class ;
+    rdfs:subClassOf vt:StateNode ;
+    rdfs:label "final state"@en ;
+    rdfs:comment "A state written as `<final>`."@en ;
+    vt:irNodeKind "ir::StateElement::Final" .
+
+vt:History
+    a owl:Class ;
+    rdfs:subClassOf vt:StateNode ;
+    rdfs:label "history state"@en ;
+    rdfs:comment "A history pseudo-state written as `<history>`, shallow or deep (vt:historyType)."@en ;
+    vt:irNodeKind "ir::StateElement::History" .
+
+vt:Initial
+    a owl:Class ;
+    rdfs:label "initial element"@en ;
+    rdfs:comment "The `<initial>` pseudo-state of a compound state, holding its single default transition."@en ;
+    vt:irNodeKind "ir::Initial" .
+
+vt:Transition
+    a owl:Class ;
+    rdfs:label "transition"@en ;
+    rdfs:comment "A transition, with its source state, event descriptors, condition, ordered targets, type and executable content."@en ;
+    vt:irNodeKind "ir::Transition" .
+
+vt:OnEntry
+    a owl:Class ;
+    rdfs:label "onentry handler"@en ;
+    rdfs:comment "One `<onentry>` handler: an ordered block of executable content run when its state is entered."@en ;
+    vt:irNodeKind "ir::State::onentry[]" .
+
+vt:OnExit
+    a owl:Class ;
+    rdfs:label "onexit handler"@en ;
+    rdfs:comment "One `<onexit>` handler: an ordered block of executable content run when its state is exited."@en ;
+    vt:irNodeKind "ir::State::onexit[]" .
+
+vt:ExecutableContent
+    a owl:Class ;
+    rdfs:label "executable content"@en ;
+    rdfs:comment "Any executable content element. Every instance is also an instance of exactly one of its subclasses."@en ;
+    vt:irNodeKind "ir::Exec" .
+
+vt:Raise
+    a owl:Class ;
+    rdfs:subClassOf vt:ExecutableContent ;
+    rdfs:label "raise"@en ;
+    rdfs:comment "The `<raise>` element: raises an internal event."@en ;
+    vt:irNodeKind "ir::ExecKind::Raise" .
+
+vt:Send
+    a owl:Class ;
+    rdfs:subClassOf vt:ExecutableContent ;
+    rdfs:label "send"@en ;
+    rdfs:comment "The `<send>` element: sends an event, possibly delayed, to a target."@en ;
+    vt:irNodeKind "ir::ExecKind::Send" .
+
+vt:Cancel
+    a owl:Class ;
+    rdfs:subClassOf vt:ExecutableContent ;
+    rdfs:label "cancel"@en ;
+    rdfs:comment "The `<cancel>` element: cancels a delayed send by its identifier."@en ;
+    vt:irNodeKind "ir::ExecKind::Cancel" .
+
+vt:Log
+    a owl:Class ;
+    rdfs:subClassOf vt:ExecutableContent ;
+    rdfs:label "log"@en ;
+    rdfs:comment "The `<log>` element."@en ;
+    vt:irNodeKind "ir::ExecKind::Log" .
+
+vt:Assign
+    a owl:Class ;
+    rdfs:subClassOf vt:ExecutableContent ;
+    rdfs:label "assign"@en ;
+    rdfs:comment "The `<assign>` element: assigns a value to a datamodel location."@en ;
+    vt:irNodeKind "ir::ExecKind::Assign" .
+
+vt:Script
+    a owl:Class ;
+    rdfs:label "script"@en ;
+    rdfs:comment "A `<script>`: the top-level script of a chart, or, when also typed vt:ExecutableContent, a script executable content element. Not a subclass of vt:ExecutableContent because the top-level script is not executable content."@en ;
+    vt:irNodeKind "ir::Script" .
+
+vt:If
+    a owl:Class ;
+    rdfs:subClassOf vt:ExecutableContent ;
+    rdfs:label "if"@en ;
+    rdfs:comment "The `<if>` element with its `<elseif>` and `<else>` branches."@en ;
+    vt:irNodeKind "ir::ExecKind::If" .
+
+vt:IfBranch
+    a owl:Class ;
+    rdfs:label "if branch"@en ;
+    rdfs:comment "One branch of an `<if>`: the `<if>` itself, an `<elseif>` or the final `<else>` (the only branch without a condition)."@en ;
+    vt:irNodeKind "ir::IfBranch" .
+
+vt:Foreach
+    a owl:Class ;
+    rdfs:subClassOf vt:ExecutableContent ;
+    rdfs:label "foreach"@en ;
+    rdfs:comment "The `<foreach>` element: runs its block once per item of an array."@en ;
+    vt:irNodeKind "ir::ExecKind::Foreach" .
+
+vt:ExtensionContent
+    a owl:Class ;
+    rdfs:subClassOf vt:ExecutableContent ;
+    rdfs:label "extension content"@en ;
+    rdfs:comment "An executable content element from the `vt:` namespace or a foreign namespace, kept opaque."@en ;
+    vt:irNodeKind "ir::ExecKind::Extension" .
+
+vt:Param
+    a owl:Class ;
+    rdfs:label "param"@en ;
+    rdfs:comment "A `<param>` of a send, an invoke or a donedata."@en ;
+    vt:irNodeKind "ir::Param" .
+
+vt:Content
+    a owl:Class ;
+    rdfs:label "content"@en ;
+    rdfs:comment "A `<content>` of a send, an invoke or a donedata: an expression or inline content."@en ;
+    vt:irNodeKind "ir::Content" .
+
+vt:DataItem
+    a owl:Class ;
+    rdfs:label "data item"@en ;
+    rdfs:comment "A `<data>` element: a datamodel variable declared by the chart or by a state."@en ;
+    vt:irNodeKind "ir::Data" .
+
+vt:DoneData
+    a owl:Class ;
+    rdfs:label "donedata"@en ;
+    rdfs:comment "The `<donedata>` of a final state."@en ;
+    vt:irNodeKind "ir::DoneData" .
+
+vt:Invoke
+    a owl:Class ;
+    rdfs:label "invoke"@en ;
+    rdfs:comment "An `<invoke>` element: starts an external service while its state is active."@en ;
+    vt:irNodeKind "ir::Invoke" .
+
+vt:ExtensionNode
+    a owl:Class ;
+    rdfs:label "extension node"@en ;
+    rdfs:comment "An attribute or element from the `vt:` namespace or a foreign namespace, kept on its owning node with its document position."@en ;
+    vt:irNodeKind "ir::Extension" .
+
+vt:TargetRef
+    a owl:Class ;
+    rdfs:label "target reference"@en ;
+    rdfs:comment "One member of an ordered list of state identifiers (a transition's targets, an `initial` attribute), pointing at the named state and carrying its list position in vt:order."@en ;
+    vt:irNodeKind "ir::Transition::targets[], ir::Chart::initial[], ir::State::initial[]" .
+
+vt:Token
+    a owl:Class ;
+    rdfs:label "token"@en ;
+    rdfs:comment "One member of an ordered list of names (a transition's event descriptors, a namelist), carrying its text in vt:value and its list position in vt:order."@en ;
+    vt:irNodeKind "ir::Transition::events[], ir::Send::namelist[], ir::Invoke::namelist[]" .
+
+# Properties
+vt:child
+    a owl:ObjectProperty ;
+    rdfs:label "child"@en ;
+    rdfs:comment "A child state. Orders: vt:order of the child."@en ;
+    rdfs:range vt:StateNode ;
+    vt:irField "Chart.states, State.children" .
+
+vt:initial
+    a owl:ObjectProperty ;
+    rdfs:label "initial target"@en ;
+    rdfs:comment "A member of the `initial` attribute."@en ;
+    rdfs:range vt:TargetRef ;
+    vt:irField "Chart.initial, State.initial" .
+
+vt:initialElement
+    a owl:ObjectProperty ;
+    rdfs:label "initial element"@en ;
+    rdfs:comment "The `<initial>` element of a compound state."@en ;
+    rdfs:range vt:Initial ;
+    vt:irField "State.initial_element" .
+
+vt:initialTransition
+    a owl:ObjectProperty ;
+    rdfs:label "initial transition"@en ;
+    rdfs:comment "The single transition of an `<initial>` element."@en ;
+    rdfs:range vt:Transition ;
+    vt:irField "Initial.transition" .
+
+vt:transition
+    a owl:ObjectProperty ;
+    rdfs:label "transition"@en ;
+    rdfs:comment "An outgoing transition of a state, ordered by vt:order (document order, which is transition priority)."@en ;
+    rdfs:range vt:Transition ;
+    vt:irField "State.transitions" .
+
+vt:onentry
+    a owl:ObjectProperty ;
+    rdfs:label "onentry"@en ;
+    rdfs:comment "An `<onentry>` handler of a state."@en ;
+    rdfs:range vt:OnEntry ;
+    vt:irField "State.onentry" .
+
+vt:onexit
+    a owl:ObjectProperty ;
+    rdfs:label "onexit"@en ;
+    rdfs:comment "An `<onexit>` handler of a state."@en ;
+    rdfs:range vt:OnExit ;
+    vt:irField "State.onexit" .
+
+vt:action
+    a owl:ObjectProperty ;
+    rdfs:label "action"@en ;
+    rdfs:comment "A member of a block of executable content, ordered by vt:order."@en ;
+    rdfs:range vt:ExecutableContent ;
+    vt:irField "Transition.body, State.onentry[], State.onexit[], IfBranch.body, ExecKind::Foreach.body" .
+
+vt:finalize
+    a owl:ObjectProperty ;
+    rdfs:label "finalize"@en ;
+    rdfs:comment "A member of the `<finalize>` block of an invoke, ordered by vt:order."@en ;
+    rdfs:range vt:ExecutableContent ;
+    vt:irField "Invoke.finalize" .
+
+vt:branch
+    a owl:ObjectProperty ;
+    rdfs:label "branch"@en ;
+    rdfs:comment "A branch of an `<if>`, ordered by vt:order."@en ;
+    rdfs:range vt:IfBranch ;
+    vt:irField "ExecKind::If.branches" .
+
+vt:data
+    a owl:ObjectProperty ;
+    rdfs:label "data"@en ;
+    rdfs:comment "A data item declared by the chart or a state."@en ;
+    rdfs:range vt:DataItem ;
+    vt:irField "Chart.data, State.data" .
+
+vt:script
+    a owl:ObjectProperty ;
+    rdfs:label "script"@en ;
+    rdfs:comment "The top-level script of a chart."@en ;
+    rdfs:range vt:Script ;
+    vt:irField "Chart.script" .
+
+vt:invoke
+    a owl:ObjectProperty ;
+    rdfs:label "invoke"@en ;
+    rdfs:comment "An invoke of a state."@en ;
+    rdfs:range vt:Invoke ;
+    vt:irField "State.invokes" .
+
+vt:donedata
+    a owl:ObjectProperty ;
+    rdfs:label "donedata"@en ;
+    rdfs:comment "The donedata of a final state."@en ;
+    rdfs:range vt:DoneData ;
+    vt:irField "State.donedata" .
+
+vt:param
+    a owl:ObjectProperty ;
+    rdfs:label "param"@en ;
+    rdfs:comment "A param, ordered by vt:order."@en ;
+    rdfs:range vt:Param ;
+    vt:irField "Send.params, Invoke.params, DoneData.params" .
+
+vt:content
+    a owl:ObjectProperty ;
+    rdfs:label "content"@en ;
+    rdfs:comment "The content child."@en ;
+    rdfs:range vt:Content ;
+    vt:irField "Send.content, Invoke.content, DoneData.content" .
+
+vt:extension
+    a owl:ObjectProperty ;
+    rdfs:label "extension"@en ;
+    rdfs:comment "An extension attribute or element of a node, ordered by vt:order."@en ;
+    rdfs:range vt:ExtensionNode ;
+    vt:irField "*.extensions" .
+
+vt:target
+    a owl:ObjectProperty ;
+    rdfs:label "target"@en ;
+    rdfs:comment "A target of a transition."@en ;
+    rdfs:range vt:TargetRef ;
+    vt:irField "Transition.targets" .
+
+vt:event
+    a owl:ObjectProperty ;
+    rdfs:label "event descriptor"@en ;
+    rdfs:comment "An event descriptor of a transition."@en ;
+    rdfs:range vt:Token ;
+    vt:irField "Transition.events" .
+
+vt:namelist
+    a owl:ObjectProperty ;
+    rdfs:label "namelist name"@en ;
+    rdfs:comment "A name of a `namelist` attribute."@en ;
+    rdfs:range vt:Token ;
+    vt:irField "Send.namelist, Invoke.namelist" .
+
+vt:state
+    a owl:ObjectProperty ;
+    rdfs:label "state"@en ;
+    rdfs:comment "The state a target reference names; minted from the identifier, so a dangling reference points at an IRI with no state."@en ;
+    rdfs:range vt:StateNode ;
+    vt:irField "TargetRef" .
+
+vt:scope
+    a owl:ObjectProperty ;
+    rdfs:label "scope"@en ;
+    rdfs:comment "Derived: the node whose proper descendants a target reference may name: the owning state for `initial` attributes and `<initial>` transitions, the parent of a history state for its default transition, and the chart otherwise."@en ;
+    vt:irField "(derived)" .
+
+vt:source
+    a owl:ObjectProperty ;
+    rdfs:label "source"@en ;
+    rdfs:comment "Derived: the source state of a transition, the state that owns it (for an `<initial>` transition, the state that owns the `<initial>`)."@en ;
+    rdfs:range vt:StateNode ;
+    vt:irField "(derived)" .
+
+vt:ancestor
+    a owl:ObjectProperty ;
+    rdfs:label "ancestor"@en ;
+    rdfs:comment "Derived: a proper ancestor of a state, the chart node included."@en ;
+    vt:irField "(derived)" .
+
+vt:choice
+    a owl:ObjectProperty ;
+    rdfs:label "choice"@en ;
+    rdfs:comment "Derived: on a selection node minted per target list and ancestor, the branch each target of the list takes at that ancestor. A legal target set has at most one choice per selection node."@en ;
+    vt:irField "(derived)" .
+
+vt:historyDefault
+    a owl:ObjectProperty ;
+    rdfs:label "history default"@en ;
+    rdfs:comment "Derived: from a history state to each history state its default entry targets, through its default transition or, without one, its parent's initial targets. Default entry must not loop back to the same history state."@en ;
+    rdfs:range vt:History ;
+    vt:irField "(derived)" .
+
+vt:order
+    a owl:DatatypeProperty ;
+    rdfs:label "order"@en ;
+    rdfs:comment "The 0-based position of a member in its ordered collection. Document order is recorded only here, never by triple order or RDF collections."@en ;
+    rdfs:range xsd:integer ;
+    vt:irField "(list position)" .
+
+vt:name
+    a owl:DatatypeProperty ;
+    rdfs:label "name"@en ;
+    rdfs:comment "The `name` attribute of a chart."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Chart.name" .
+
+vt:datamodel
+    a owl:DatatypeProperty ;
+    rdfs:label "datamodel"@en ;
+    rdfs:comment "The datamodel name; `null` when the document names none. Expression literals of the chart are typed `vt:<datamodel>Expr`."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Chart.datamodel" .
+
+vt:datamodelExplicit
+    a owl:DatatypeProperty ;
+    rdfs:label "datamodel explicit"@en ;
+    rdfs:comment "Whether the document stated the `datamodel` attribute."@en ;
+    rdfs:range xsd:boolean ;
+    vt:irField "Chart.datamodel_explicit" .
+
+vt:binding
+    a owl:DatatypeProperty ;
+    rdfs:label "binding"@en ;
+    rdfs:comment "The binding mode, `early` or `late`."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Chart.binding" .
+
+vt:bindingExplicit
+    a owl:DatatypeProperty ;
+    rdfs:label "binding explicit"@en ;
+    rdfs:comment "Whether the document stated the `binding` attribute."@en ;
+    rdfs:range xsd:boolean ;
+    vt:irField "Chart.binding_explicit" .
+
+vt:id
+    a owl:DatatypeProperty ;
+    rdfs:label "state identifier"@en ;
+    rdfs:comment "The identifier of a state, declared or generated."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "State.id" .
+
+vt:idGenerated
+    a owl:DatatypeProperty ;
+    rdfs:label "identifier generated"@en ;
+    rdfs:comment "Whether the state identifier was generated because the document declared none."@en ;
+    rdfs:range xsd:boolean ;
+    vt:irField "State.id_generated" .
+
+vt:historyType
+    a owl:DatatypeProperty ;
+    rdfs:label "history type"@en ;
+    rdfs:comment "The depth of a history state, `shallow` or `deep`."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "StateElement::History" .
+
+vt:cond
+    a owl:DatatypeProperty ;
+    rdfs:label "condition"@en ;
+    rdfs:comment "A condition, as an expression literal."@en ;
+    vt:irField "Transition.cond, IfBranch.cond" .
+
+vt:transitionType
+    a owl:DatatypeProperty ;
+    rdfs:label "transition type"@en ;
+    rdfs:comment "The transition type, `external` or `internal`."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Transition.kind" .
+
+vt:transitionTypeExplicit
+    a owl:DatatypeProperty ;
+    rdfs:label "transition type explicit"@en ;
+    rdfs:comment "Whether the document stated the `type` attribute of a transition."@en ;
+    rdfs:range xsd:boolean ;
+    vt:irField "Transition.kind_explicit" .
+
+vt:value
+    a owl:DatatypeProperty ;
+    rdfs:label "value"@en ;
+    rdfs:comment "The text of a token."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "(token text)" .
+
+vt:eventName
+    a owl:DatatypeProperty ;
+    rdfs:label "event name"@en ;
+    rdfs:comment "The `event` attribute of a raise or send."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "ExecKind::Raise.event, Send.event" .
+
+vt:eventexpr
+    a owl:DatatypeProperty ;
+    rdfs:label "event expression"@en ;
+    rdfs:comment "The `eventexpr` attribute of a send."@en ;
+    vt:irField "Send.eventexpr" .
+
+vt:sendTarget
+    a owl:DatatypeProperty ;
+    rdfs:label "send target"@en ;
+    rdfs:comment "The `target` attribute of a send."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Send.target" .
+
+vt:targetexpr
+    a owl:DatatypeProperty ;
+    rdfs:label "target expression"@en ;
+    rdfs:comment "The `targetexpr` attribute of a send."@en ;
+    vt:irField "Send.targetexpr" .
+
+vt:type
+    a owl:DatatypeProperty ;
+    rdfs:label "type"@en ;
+    rdfs:comment "The `type` attribute of a send or invoke."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Send.type_, Invoke.type_" .
+
+vt:typeexpr
+    a owl:DatatypeProperty ;
+    rdfs:label "type expression"@en ;
+    rdfs:comment "The `typeexpr` attribute of a send or invoke."@en ;
+    vt:irField "Send.typeexpr, Invoke.typeexpr" .
+
+vt:sendId
+    a owl:DatatypeProperty ;
+    rdfs:label "send identifier"@en ;
+    rdfs:comment "The `id` of a send, or the `sendid` of a cancel."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Send.id, ExecKind::Cancel.sendid" .
+
+vt:sendidexpr
+    a owl:DatatypeProperty ;
+    rdfs:label "send identifier expression"@en ;
+    rdfs:comment "The `sendidexpr` attribute of a cancel."@en ;
+    vt:irField "ExecKind::Cancel.sendidexpr" .
+
+vt:idlocation
+    a owl:DatatypeProperty ;
+    rdfs:label "identifier location"@en ;
+    rdfs:comment "The `idlocation` attribute of a send or invoke."@en ;
+    vt:irField "Send.idlocation, Invoke.idlocation" .
+
+vt:delay
+    a owl:DatatypeProperty ;
+    rdfs:label "delay"@en ;
+    rdfs:comment "The `delay` attribute of a send."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Send.delay" .
+
+vt:delayexpr
+    a owl:DatatypeProperty ;
+    rdfs:label "delay expression"@en ;
+    rdfs:comment "The `delayexpr` attribute of a send."@en ;
+    vt:irField "Send.delayexpr" .
+
+vt:label
+    a owl:DatatypeProperty ;
+    rdfs:label "label"@en ;
+    rdfs:comment "The `label` attribute of a log."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "ExecKind::Log.label" .
+
+vt:expr
+    a owl:DatatypeProperty ;
+    rdfs:label "expression"@en ;
+    rdfs:comment "An `expr` attribute, as an expression literal."@en ;
+    vt:irField "ExecKind::Log.expr, ExecKind::Assign.expr, Param.expr, Content.expr, Data.expr" .
+
+vt:location
+    a owl:DatatypeProperty ;
+    rdfs:label "location"@en ;
+    rdfs:comment "A `location` attribute, as an expression literal."@en ;
+    vt:irField "ExecKind::Assign.location, Param.location" .
+
+vt:inlineContent
+    a owl:DatatypeProperty ;
+    rdfs:label "inline content"@en ;
+    rdfs:comment "Inline children as raw text or XML, exactly as written."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "ExecKind::Assign.content, Content.body, Data.content" .
+
+vt:src
+    a owl:DatatypeProperty ;
+    rdfs:label "source URI"@en ;
+    rdfs:comment "A `src` attribute."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Script.src, Data.src, Invoke.src" .
+
+vt:srcexpr
+    a owl:DatatypeProperty ;
+    rdfs:label "source expression"@en ;
+    rdfs:comment "The `srcexpr` attribute of an invoke."@en ;
+    vt:irField "Invoke.srcexpr" .
+
+vt:scriptBody
+    a owl:DatatypeProperty ;
+    rdfs:label "script body"@en ;
+    rdfs:comment "The inline text of a script, as an expression literal."@en ;
+    vt:irField "Script.body" .
+
+vt:array
+    a owl:DatatypeProperty ;
+    rdfs:label "array"@en ;
+    rdfs:comment "The `array` attribute of a foreach."@en ;
+    vt:irField "ExecKind::Foreach.array" .
+
+vt:item
+    a owl:DatatypeProperty ;
+    rdfs:label "item"@en ;
+    rdfs:comment "The `item` attribute of a foreach."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "ExecKind::Foreach.item" .
+
+vt:index
+    a owl:DatatypeProperty ;
+    rdfs:label "index"@en ;
+    rdfs:comment "The `index` attribute of a foreach."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "ExecKind::Foreach.index" .
+
+vt:paramName
+    a owl:DatatypeProperty ;
+    rdfs:label "param name"@en ;
+    rdfs:comment "The `name` attribute of a param."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Param.name" .
+
+vt:dataId
+    a owl:DatatypeProperty ;
+    rdfs:label "data identifier"@en ;
+    rdfs:comment "The `id` attribute of a data item."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Data.id" .
+
+vt:invokeId
+    a owl:DatatypeProperty ;
+    rdfs:label "invoke identifier"@en ;
+    rdfs:comment "The `id` attribute of an invoke."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Invoke.id" .
+
+vt:autoforward
+    a owl:DatatypeProperty ;
+    rdfs:label "autoforward"@en ;
+    rdfs:comment "The `autoforward` flag of an invoke."@en ;
+    rdfs:range xsd:boolean ;
+    vt:irField "Invoke.autoforward" .
+
+vt:namespace
+    a owl:DatatypeProperty ;
+    rdfs:label "namespace"@en ;
+    rdfs:comment "The namespace IRI of an extension attribute or element."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Extension.ns" .
+
+vt:localName
+    a owl:DatatypeProperty ;
+    rdfs:label "local name"@en ;
+    rdfs:comment "The local name of an extension attribute or element."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "Extension.local" .
+
+vt:attributeValue
+    a owl:DatatypeProperty ;
+    rdfs:label "attribute value"@en ;
+    rdfs:comment "The value of an extension attribute."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "ExtensionValue::Attribute" .
+
+vt:elementXml
+    a owl:DatatypeProperty ;
+    rdfs:label "element XML"@en ;
+    rdfs:comment "An extension element, serialized as XML including its own start and end tags."@en ;
+    rdfs:range xsd:string ;
+    vt:irField "ExtensionValue::Element" .
+
+vt:position
+    a owl:DatatypeProperty ;
+    rdfs:label "position"@en ;
+    rdfs:comment "For an extension element, its index among the owner's element children; 0 for attributes."@en ;
+    rdfs:range xsd:integer ;
+    vt:irField "Extension.position" .

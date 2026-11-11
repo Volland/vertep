@@ -1,0 +1,634 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix vt:   <https://w3id.org/vertep/vt#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL Core shapes for the vt: chart module.
+#
+# A graph conforms to these shapes when it is the projection of a well-formed chart. They state
+# the structure of the projection (one shape per class, cardinalities, datatypes, containment)
+# and every well-formedness rule of the chart model, using only SHACL Core: rules over the
+# whole chart are stated over the derived triples the projection materializes (vt:ancestor,
+# vt:source, vt:scope, vt:historyDefault and the vt:choice selection nodes), never with
+# SHACL-SPARQL (design D9).
+#
+# Not stated here, and checked by reconstruction instead: that vt:order values of one collection
+# are exactly 0..n-1, that expression literals carry the datatype of the chart's datamodel, that
+# the graph holds a single vt:Chart, and that the selection nodes and vt:historyDefault match
+# the chart (the
+# reconstruction re-projects the chart and requires every projected triple to be present).
+
+# ---------------------------------------------------------------------------------------------
+# Reusable node shapes (no targets)
+
+vt:OrderedShape
+    a sh:NodeShape ;
+    rdfs:comment "A member of an ordered collection: exactly one non-negative integer vt:order." ;
+    sh:property [
+        sh:path vt:order ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 0 ;
+    ] .
+
+vt:TargetRefShape
+    a sh:NodeShape ;
+    rdfs:comment "A member of a target list: it names a state of the chart that is a proper descendant of its scope." ;
+    sh:class vt:TargetRef ;
+    sh:node vt:OrderedShape ;
+    sh:property [
+        sh:path vt:state ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class vt:StateNode ;
+        sh:message "target names no state of the chart" ;
+    ] ;
+    sh:property [
+        sh:path vt:scope ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+    ] ;
+    sh:not [
+        sh:path ( vt:state vt:ancestor ) ;
+        sh:disjoint vt:scope ;
+    ] ;
+    sh:message "target is not a state inside its scope (unknown, or not a descendant of the owning state or history parent)" .
+
+vt:ExtensionFieldsShape
+    a sh:NodeShape ;
+    rdfs:comment "The fields of an extension attribute or element." ;
+    sh:property [ sh:path vt:namespace ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:localName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:attributeValue ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:elementXml ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [
+        sh:path vt:position ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 0 ;
+    ] ;
+    sh:xone (
+        [ sh:path vt:attributeValue ; sh:minCount 1 ]
+        [ sh:path vt:elementXml ; sh:minCount 1 ]
+    ) .
+
+vt:EventlessTargetedShape
+    a sh:NodeShape ;
+    rdfs:comment "A transition with no event and no condition and at least one target (initial and history transitions)." ;
+    sh:property [ sh:path vt:event ; sh:maxCount 0 ] ;
+    sh:property [ sh:path vt:cond ; sh:maxCount 0 ] ;
+    sh:property [ sh:path vt:target ; sh:minCount 1 ] .
+
+# ---------------------------------------------------------------------------------------------
+# Containment: every node other than the chart has exactly one container and the chart above it.
+
+vt:ContainedShape
+    a sh:NodeShape ;
+    sh:targetClass vt:StateNode , vt:Initial , vt:Transition , vt:OnEntry , vt:OnExit ,
+        vt:ExecutableContent , vt:Raise , vt:Send , vt:Cancel , vt:Log , vt:Assign ,
+        vt:Script , vt:If , vt:IfBranch , vt:Foreach , vt:ExtensionContent , vt:Param ,
+        vt:Content , vt:DataItem , vt:DoneData , vt:Invoke , vt:ExtensionNode ,
+        vt:TargetRef , vt:Token , vt:State , vt:Parallel , vt:Final , vt:History ;
+    sh:property [
+        sh:path [ sh:alternativePath (
+            [ sh:inversePath vt:child ] [ sh:inversePath vt:initial ]
+            [ sh:inversePath vt:initialElement ] [ sh:inversePath vt:initialTransition ]
+            [ sh:inversePath vt:transition ] [ sh:inversePath vt:onentry ]
+            [ sh:inversePath vt:onexit ] [ sh:inversePath vt:action ]
+            [ sh:inversePath vt:finalize ] [ sh:inversePath vt:branch ]
+            [ sh:inversePath vt:data ] [ sh:inversePath vt:script ]
+            [ sh:inversePath vt:invoke ] [ sh:inversePath vt:donedata ]
+            [ sh:inversePath vt:param ] [ sh:inversePath vt:content ]
+            [ sh:inversePath vt:extension ] [ sh:inversePath vt:target ]
+            [ sh:inversePath vt:event ] [ sh:inversePath vt:namelist ]
+        ) ] ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "node must have exactly one container" ;
+    ] ;
+    sh:property [
+        sh:path [ sh:oneOrMorePath [ sh:alternativePath (
+            [ sh:inversePath vt:child ] [ sh:inversePath vt:initial ]
+            [ sh:inversePath vt:initialElement ] [ sh:inversePath vt:initialTransition ]
+            [ sh:inversePath vt:transition ] [ sh:inversePath vt:onentry ]
+            [ sh:inversePath vt:onexit ] [ sh:inversePath vt:action ]
+            [ sh:inversePath vt:finalize ] [ sh:inversePath vt:branch ]
+            [ sh:inversePath vt:data ] [ sh:inversePath vt:script ]
+            [ sh:inversePath vt:invoke ] [ sh:inversePath vt:donedata ]
+            [ sh:inversePath vt:param ] [ sh:inversePath vt:content ]
+            [ sh:inversePath vt:extension ] [ sh:inversePath vt:target ]
+            [ sh:inversePath vt:event ] [ sh:inversePath vt:namelist ]
+        ) ] ] ;
+        sh:qualifiedValueShape [ sh:class vt:Chart ] ;
+        sh:qualifiedMinCount 1 ;
+        sh:message "node must be contained in the chart" ;
+    ] .
+
+# ---------------------------------------------------------------------------------------------
+# Chart
+
+vt:ChartShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Chart ;
+    sh:property [
+        sh:path [ sh:alternativePath (
+            [ sh:inversePath vt:child ] [ sh:inversePath vt:action ] [ sh:inversePath vt:extension ]
+        ) ] ;
+        sh:maxCount 0 ;
+    ] ;
+    sh:property [ sh:path vt:name ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:datamodel ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:datamodelExplicit ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:property [ sh:path vt:binding ; sh:minCount 1 ; sh:maxCount 1 ; sh:in ( "early" "late" ) ] ;
+    sh:property [ sh:path vt:bindingExplicit ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:property [
+        sh:path vt:child ;
+        sh:minCount 1 ;
+        sh:class vt:StateNode ;
+        sh:message "a chart has at least one child state" ;
+    ] ;
+    sh:property [ sh:path vt:initial ; sh:node vt:TargetRefShape ] ;
+    sh:property [ sh:path vt:data ; sh:class vt:DataItem ] ;
+    sh:property [ sh:path vt:script ; sh:maxCount 1 ; sh:class vt:Script ] ;
+    sh:property [ sh:path vt:extension ; sh:class vt:ExtensionNode ] ;
+    sh:property [
+        sh:path vt:child ;
+        sh:qualifiedValueShape [ sh:class vt:History ] ;
+        sh:qualifiedMaxCount 0 ;
+        sh:message "a history state cannot be a child of the chart" ;
+    ] .
+
+# ---------------------------------------------------------------------------------------------
+# States
+
+vt:StateNodeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:StateNode ;
+    sh:node vt:OrderedShape ;
+    sh:property [
+        sh:path vt:id ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:minLength 1 ;
+        sh:message "a state has exactly one non-empty identifier" ;
+    ] ;
+    sh:property [ sh:path vt:idGenerated ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:xone (
+        [ sh:class vt:State ]
+        [ sh:class vt:Parallel ]
+        [ sh:class vt:Final ]
+        [ sh:class vt:History ]
+    ) ;
+    sh:property [
+        sh:path [ sh:oneOrMorePath [ sh:inversePath vt:child ] ] ;
+        sh:equals vt:ancestor ;
+        sh:message "vt:ancestor must list exactly the proper ancestors" ;
+    ] ;
+    sh:property [ sh:path [ sh:inversePath vt:child ] ; sh:maxCount 1 ] ;
+    sh:property [ sh:path vt:child ; sh:class vt:StateNode ] ;
+    sh:property [ sh:path vt:transition ; sh:class vt:Transition ] ;
+    sh:property [ sh:path vt:initial ; sh:node vt:TargetRefShape ] ;
+    sh:property [ sh:path vt:initialElement ; sh:maxCount 1 ; sh:class vt:Initial ] ;
+    sh:property [ sh:path vt:onentry ; sh:class vt:OnEntry ] ;
+    sh:property [ sh:path vt:onexit ; sh:class vt:OnExit ] ;
+    sh:property [ sh:path vt:data ; sh:class vt:DataItem ] ;
+    sh:property [ sh:path vt:invoke ; sh:class vt:Invoke ] ;
+    sh:property [ sh:path vt:donedata ; sh:maxCount 1 ; sh:class vt:DoneData ] ;
+    sh:property [ sh:path vt:extension ; sh:class vt:ExtensionNode ] ;
+    sh:or (
+        [ sh:path vt:initial ; sh:maxCount 0 ]
+        [ sh:path vt:initialElement ; sh:maxCount 0 ]
+    ) ;
+    sh:message "a state has exactly one parent, a known element, and not both an initial attribute and an <initial> element" .
+
+vt:UniqueStateIdShape
+    a sh:NodeShape ;
+    sh:targetObjectsOf vt:id ;
+    sh:property [
+        sh:path [ sh:inversePath vt:id ] ;
+        sh:maxCount 1 ;
+        sh:message "two states share an identifier" ;
+    ] .
+
+vt:StateShape
+    a sh:NodeShape ;
+    sh:targetClass vt:State ;
+    sh:property [ sh:path vt:historyType ; sh:maxCount 0 ] ;
+    sh:property [
+        sh:path vt:donedata ;
+        sh:maxCount 0 ;
+        sh:message "donedata belongs to final states" ;
+    ] ;
+    sh:property [
+        sh:path ( vt:transition vt:target vt:scope ) ;
+        sh:class vt:Chart ;
+    ] ;
+    sh:or (
+        [ sh:path vt:child ; sh:maxCount 0 ]
+        [
+            sh:path vt:child ;
+            sh:qualifiedValueShape [ sh:not [ sh:class vt:History ] ] ;
+            sh:qualifiedMinCount 1 ;
+        ]
+    ) ;
+    sh:message "a state's children cannot all be history states" .
+
+vt:ParallelShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Parallel ;
+    sh:property [ sh:path vt:historyType ; sh:maxCount 0 ] ;
+    sh:property [
+        sh:path [ sh:alternativePath ( vt:initial vt:initialElement ) ] ;
+        sh:maxCount 0 ;
+        sh:message "initial belongs to compound states" ;
+    ] ;
+    sh:property [
+        sh:path vt:donedata ;
+        sh:maxCount 0 ;
+        sh:message "donedata belongs to final states" ;
+    ] ;
+    sh:or (
+        [ sh:path vt:child ; sh:maxCount 0 ]
+        [
+            sh:path vt:child ;
+            sh:qualifiedValueShape [ sh:not [ sh:class vt:History ] ] ;
+            sh:qualifiedMinCount 1 ;
+        ]
+    ) ;
+    sh:property [
+        sh:path ( vt:transition vt:target vt:scope ) ;
+        sh:class vt:Chart ;
+    ] ;
+    sh:message "a parallel state's children cannot all be history states" .
+
+vt:FinalShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Final ;
+    sh:property [ sh:path vt:historyType ; sh:maxCount 0 ] ;
+    sh:property [
+        sh:path [ sh:alternativePath (
+            vt:child vt:transition vt:invoke vt:data vt:initial vt:initialElement
+        ) ] ;
+        sh:maxCount 0 ;
+        sh:message "a final state has only onentry, onexit and donedata" ;
+    ] .
+
+vt:HistoryShape
+    a sh:NodeShape ;
+    sh:targetClass vt:History ;
+    sh:property [
+        sh:path vt:historyType ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in ( "shallow" "deep" ) ;
+    ] ;
+    sh:property [
+        sh:path vt:transition ;
+        sh:maxCount 1 ;
+        sh:node vt:EventlessTargetedShape ;
+        sh:message "a history state has at most one transition, with no event or condition and at least one target" ;
+    ] ;
+    sh:property [
+        sh:path [ sh:alternativePath (
+            vt:child vt:onentry vt:onexit vt:invoke vt:data vt:initial vt:initialElement
+            vt:donedata
+        ) ] ;
+        sh:maxCount 0 ;
+        sh:message "a history state has only its default transition" ;
+    ] ;
+    sh:property [
+        sh:path [ sh:inversePath vt:child ] ;
+        sh:class vt:StateNode ;
+        sh:message "a history state cannot be a child of the chart" ;
+    ] ;
+    sh:property [
+        sh:path ( [ sh:oneOrMorePath vt:historyDefault ] vt:id ) ;
+        sh:disjoint vt:id ;
+        sh:message "default history entry loops back to this history state" ;
+    ] ;
+    sh:property [
+        sh:path ( vt:transition vt:target ) ;
+        sh:property [
+            sh:path ( [ sh:inversePath vt:target ] [ sh:inversePath vt:transition ]
+                      [ sh:inversePath vt:child ] ) ;
+            sh:equals vt:scope ;
+        ] ;
+    ] .
+
+# ---------------------------------------------------------------------------------------------
+# Initial, transitions and target sets
+
+vt:InitialRefScopeShape
+    a sh:NodeShape ;
+    sh:targetObjectsOf vt:initial ;
+    sh:property [
+        sh:path [ sh:inversePath vt:initial ] ;
+        sh:equals vt:scope ;
+    ] .
+
+vt:InitialShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Initial ;
+    sh:property [
+        sh:path vt:initialTransition ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class vt:Transition ;
+        sh:node vt:EventlessTargetedShape ;
+        sh:message "an <initial> has one transition, with no event or condition and at least one target" ;
+    ] ;
+    sh:property [
+        sh:path ( vt:initialTransition vt:target ) ;
+        sh:property [
+            sh:path ( [ sh:inversePath vt:target ] [ sh:inversePath vt:initialTransition ]
+                      [ sh:inversePath vt:initialElement ] ) ;
+            sh:equals vt:scope ;
+        ] ;
+    ] ;
+    sh:property [ sh:path vt:extension ; sh:class vt:ExtensionNode ] .
+
+vt:TransitionShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Transition ;
+    sh:node vt:OrderedShape ;
+    sh:property [
+        sh:path vt:source ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class vt:StateNode ;
+        sh:message "a transition has exactly one source state" ;
+    ] ;
+    sh:property [
+        sh:path [ sh:alternativePath (
+            [ sh:inversePath vt:transition ]
+            ( [ sh:inversePath vt:initialTransition ] [ sh:inversePath vt:initialElement ] )
+        ) ] ;
+        sh:equals vt:source ;
+    ] ;
+    sh:property [ sh:path vt:event ; sh:class vt:Token ] ;
+    sh:property [ sh:path vt:cond ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:target ; sh:node vt:TargetRefShape ] ;
+    sh:property [
+        sh:path vt:transitionType ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in ( "external" "internal" ) ;
+    ] ;
+    sh:property [
+        sh:path vt:transitionTypeExplicit ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:boolean ;
+    ] ;
+    sh:property [ sh:path vt:action ; sh:class vt:ExecutableContent ] ;
+    sh:property [ sh:path vt:extension ; sh:class vt:ExtensionNode ] .
+
+vt:SelectionShape
+    a sh:NodeShape ;
+    rdfs:comment "Selection nodes: the targets of one list take one branch at every non-parallel ancestor, are distinct, and none is an ancestor of another." ;
+    sh:targetSubjectsOf vt:choice ;
+    sh:property [
+        sh:path vt:choice ;
+        sh:maxCount 1 ;
+        sh:message "the targets cannot be active together" ;
+    ] .
+
+vt:TokenShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Token ;
+    sh:node vt:OrderedShape ;
+    sh:property [ sh:path vt:value ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:HandlerShape
+    a sh:NodeShape ;
+    sh:targetClass vt:OnEntry , vt:OnExit ;
+    sh:node vt:OrderedShape ;
+    sh:property [ sh:path vt:action ; sh:class vt:ExecutableContent ] .
+
+# ---------------------------------------------------------------------------------------------
+# Executable content
+
+vt:ExecutableContentShape
+    a sh:NodeShape ;
+    sh:targetClass vt:ExecutableContent ;
+    sh:node vt:OrderedShape ;
+    sh:property [ sh:path vt:extension ; sh:class vt:ExtensionNode ] ;
+    sh:xone (
+        [ sh:class vt:Raise ] [ sh:class vt:Send ] [ sh:class vt:Cancel ] [ sh:class vt:Log ]
+        [ sh:class vt:Assign ] [ sh:class vt:Script ] [ sh:class vt:If ] [ sh:class vt:Foreach ]
+        [ sh:class vt:ExtensionContent ]
+    ) .
+
+vt:RaiseShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Raise ;
+    sh:property [ sh:path vt:eventName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:SendShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Send ;
+    sh:property [ sh:path vt:eventName ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:eventexpr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:sendTarget ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:targetexpr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:type ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:typeexpr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:sendId ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:idlocation ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:delay ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:delayexpr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:namelist ; sh:class vt:Token ] ;
+    sh:property [ sh:path vt:param ; sh:class vt:Param ] ;
+    sh:property [ sh:path vt:content ; sh:maxCount 1 ; sh:class vt:Content ] ;
+    sh:and (
+        [ sh:or ( [ sh:path vt:eventName ; sh:maxCount 0 ] [ sh:path vt:eventexpr ; sh:maxCount 0 ] ) ]
+        [ sh:or ( [ sh:path vt:sendTarget ; sh:maxCount 0 ] [ sh:path vt:targetexpr ; sh:maxCount 0 ] ) ]
+        [ sh:or ( [ sh:path vt:type ; sh:maxCount 0 ] [ sh:path vt:typeexpr ; sh:maxCount 0 ] ) ]
+        [ sh:or ( [ sh:path vt:sendId ; sh:maxCount 0 ] [ sh:path vt:idlocation ; sh:maxCount 0 ] ) ]
+        [ sh:or ( [ sh:path vt:delay ; sh:maxCount 0 ] [ sh:path vt:delayexpr ; sh:maxCount 0 ] ) ]
+        [ sh:or (
+            [ sh:path vt:content ; sh:maxCount 0 ]
+            [ sh:path [ sh:alternativePath ( vt:param vt:namelist ) ] ; sh:maxCount 0 ]
+        ) ]
+    ) ;
+    sh:message "send has conflicting attributes" .
+
+vt:CancelShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Cancel ;
+    sh:property [ sh:path vt:sendId ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:sendidexpr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:xone (
+        [ sh:path vt:sendId ; sh:minCount 1 ]
+        [ sh:path vt:sendidexpr ; sh:minCount 1 ]
+    ) ;
+    sh:message "cancel has exactly one of sendid and sendidexpr" .
+
+vt:LogShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Log ;
+    sh:property [ sh:path vt:label ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:expr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] .
+
+vt:AssignShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Assign ;
+    sh:property [ sh:path vt:location ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:expr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:inlineContent ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:or (
+        [ sh:path vt:expr ; sh:maxCount 0 ]
+        [ sh:path vt:inlineContent ; sh:maxCount 0 ]
+    ) ;
+    sh:message "assign has not both expr and content" .
+
+vt:ScriptShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Script ;
+    sh:property [ sh:path vt:src ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:scriptBody ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] .
+
+vt:IfShape
+    a sh:NodeShape ;
+    sh:targetClass vt:If ;
+    sh:property [ sh:path vt:branch ; sh:class vt:IfBranch ] .
+
+vt:IfBranchShape
+    a sh:NodeShape ;
+    sh:targetClass vt:IfBranch ;
+    sh:node vt:OrderedShape ;
+    sh:property [ sh:path vt:cond ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:action ; sh:class vt:ExecutableContent ] ;
+    sh:or (
+        [ sh:path vt:cond ; sh:minCount 1 ]
+        [
+            sh:and (
+                [ sh:path vt:order ; sh:minExclusive 0 ]
+                [
+                    sh:path ( [ sh:inversePath vt:branch ] vt:branch vt:order ) ;
+                    sh:lessThanOrEquals vt:order ;
+                ]
+            )
+        ]
+    ) ;
+    sh:message "only the last branch of an if, and not the first, may lack a condition" .
+
+vt:ForeachShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Foreach ;
+    sh:property [ sh:path vt:array ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [
+        sh:path vt:item ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:datatype xsd:string ;
+        sh:minLength 1 ;
+    ] ;
+    sh:property [ sh:path vt:index ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:action ; sh:class vt:ExecutableContent ] .
+
+vt:ExtensionContentShape
+    a sh:NodeShape ;
+    sh:targetClass vt:ExtensionContent ;
+    sh:node vt:ExtensionFieldsShape .
+
+# ---------------------------------------------------------------------------------------------
+# Data, params, content, invoke, extensions
+
+vt:ParamShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Param ;
+    sh:node vt:OrderedShape ;
+    sh:property [ sh:path vt:paramName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:expr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:location ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:xone (
+        [ sh:path vt:expr ; sh:minCount 1 ]
+        [ sh:path vt:location ; sh:minCount 1 ]
+    ) ;
+    sh:message "param has exactly one of expr and location" .
+
+vt:ContentShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Content ;
+    sh:property [ sh:path vt:expr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:inlineContent ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt:DataItemShape
+    a sh:NodeShape ;
+    sh:targetClass vt:DataItem ;
+    sh:node vt:OrderedShape ;
+    sh:property [ sh:path vt:dataId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:src ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:expr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:inlineContent ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:extension ; sh:class vt:ExtensionNode ] ;
+    sh:or (
+        [ sh:path vt:expr ; sh:maxCount 0 ]
+        [ sh:path [ sh:alternativePath ( vt:src vt:inlineContent ) ] ; sh:maxCount 0 ]
+    ) ;
+    sh:message "data has not both expr and a source (src, or the content it resolved to)" .
+
+vt:UniqueDataIdShape
+    a sh:NodeShape ;
+    sh:targetObjectsOf vt:dataId ;
+    sh:property [
+        sh:path [ sh:inversePath vt:dataId ] ;
+        sh:maxCount 1 ;
+        sh:message "two data items share an identifier" ;
+    ] .
+
+vt:DoneDataShape
+    a sh:NodeShape ;
+    sh:targetClass vt:DoneData ;
+    sh:property [ sh:path vt:content ; sh:maxCount 1 ; sh:class vt:Content ] ;
+    sh:property [ sh:path vt:param ; sh:class vt:Param ] ;
+    sh:or (
+        [ sh:path vt:content ; sh:maxCount 0 ]
+        [ sh:path vt:param ; sh:maxCount 0 ]
+    ) ;
+    sh:message "donedata has not both content and params" .
+
+vt:InvokeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Invoke ;
+    sh:node vt:OrderedShape ;
+    sh:property [ sh:path vt:type ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:typeexpr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:src ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:srcexpr ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:invokeId ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:idlocation ; sh:maxCount 1 ; sh:nodeKind sh:Literal ] ;
+    sh:property [ sh:path vt:namelist ; sh:class vt:Token ] ;
+    sh:property [ sh:path vt:autoforward ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:property [ sh:path vt:param ; sh:class vt:Param ] ;
+    sh:property [ sh:path vt:content ; sh:maxCount 1 ; sh:class vt:Content ] ;
+    sh:property [ sh:path vt:finalize ; sh:class vt:ExecutableContent ] ;
+    sh:property [ sh:path vt:extension ; sh:class vt:ExtensionNode ] ;
+    sh:and (
+        [ sh:or ( [ sh:path vt:type ; sh:maxCount 0 ] [ sh:path vt:typeexpr ; sh:maxCount 0 ] ) ]
+        [ sh:or ( [ sh:path vt:src ; sh:maxCount 0 ] [ sh:path vt:srcexpr ; sh:maxCount 0 ] ) ]
+        [ sh:or ( [ sh:path vt:invokeId ; sh:maxCount 0 ] [ sh:path vt:idlocation ; sh:maxCount 0 ] ) ]
+        [ sh:or (
+            [ sh:path vt:content ; sh:maxCount 0 ]
+            [ sh:and (
+                [ sh:path vt:srcexpr ; sh:maxCount 0 ]
+                [ sh:or (
+                    [ sh:path vt:src ; sh:maxCount 0 ]
+                    [ sh:path ( vt:content vt:expr ) ; sh:maxCount 0 ]
+                ) ]
+            ) ]
+        ) ]
+        [ sh:or ( [ sh:path vt:param ; sh:maxCount 0 ] [ sh:path vt:namelist ; sh:maxCount 0 ] ) ]
+    ) ;
+    sh:message "invoke has conflicting attributes" .
+
+vt:ExtensionNodeShape
+    a sh:NodeShape ;
+    sh:targetClass vt:ExtensionNode ;
+    sh:node vt:OrderedShape ;
+    sh:node vt:ExtensionFieldsShape .
