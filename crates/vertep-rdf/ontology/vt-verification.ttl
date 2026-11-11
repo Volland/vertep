@@ -1,0 +1,54 @@
+@prefix vt:   <https://w3id.org/vertep/vt#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# The verification module of the vt: ontology (RDF 1.2, Turtle).
+#
+# `vt certify` (the Lean-compiled checker in lean/vertep-lean) attaches a certificate to a chart
+# version IRI. The certificate IRI is urn:vertep:cert:sha256:<hex>, the SHA-256 of the
+# certificate body, so certifying the same chart with the same checker gives the same IRI.
+
+<https://w3id.org/vertep/vt/verification>
+    a owl:Ontology ;
+    rdfs:label "Vertep verification module"@en ;
+    rdfs:comment "Certificates issued by the Lean model for chart versions: which theorems back them and which checker, toolchain and library revision produced them."@en ;
+    dcterms:license <https://opensource.org/licenses/MIT> , <https://www.apache.org/licenses/LICENSE-2.0> ;
+    owl:versionInfo "0.1.0" .
+
+vt:Certificate a owl:Class ;
+    rdfs:label "certificate"@en ;
+    rdfs:comment "A statement by the Lean checker that a chart version is well-formed, naming the theorems that justify trusting the check."@en ;
+    rdfs:seeAlso prov:Entity .
+
+vt:certifiedBy a owl:ObjectProperty ;
+    rdfs:label "certified by"@en ;
+    rdfs:comment "Links a chart version IRI to a certificate issued for it."@en ;
+    rdfs:range vt:Certificate .
+
+vt:theorem a owl:DatatypeProperty ;
+    rdfs:label "theorem"@en ;
+    rdfs:comment "The fully qualified name of a proven Lean theorem the certificate relies on."@en ;
+    rdfs:domain vt:Certificate ;
+    rdfs:range xsd:string .
+
+vt:leanToolchain a owl:DatatypeProperty ;
+    rdfs:label "Lean toolchain"@en ;
+    rdfs:comment "The Lean toolchain that built the checker, as in lean-toolchain."@en ;
+    rdfs:domain vt:Certificate ;
+    rdfs:range xsd:string .
+
+vt:leanRdfRevision a owl:DatatypeProperty ;
+    rdfs:label "LeanRDF revision"@en ;
+    rdfs:comment "The git revision of LeanRDF the checker was built against."@en ;
+    rdfs:domain vt:Certificate ;
+    rdfs:range xsd:string .
+
+vt:checkerHash a owl:DatatypeProperty ;
+    rdfs:label "checker hash"@en ;
+    rdfs:comment "The SHA-256 of the checker executable, written sha256:<hex>."@en ;
+    rdfs:domain vt:Certificate ;
+    rdfs:range xsd:string .
