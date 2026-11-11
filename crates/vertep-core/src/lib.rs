@@ -29,6 +29,7 @@ pub mod order;
 pub mod session;
 pub mod tape;
 pub mod trace;
+pub mod types;
 pub mod validate;
 
 #[cfg(test)]

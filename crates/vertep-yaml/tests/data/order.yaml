@@ -1,0 +1,22 @@
+vertep: 1
+name: order
+types: { Pay: { amount: decimal } }
+events: { start: null, pay: Pay, authorized: null, cancel: null }
+context:
+  total: { type: decimal, init: "0" }
+states:
+  idle: { on: { start: checkout } }
+  checkout:
+    on: { cancel: cancelled }
+    states:
+      cart:
+        on:
+          pay: [ { cond: "ev.data.amount <= 0", target: cart }, { target: payment, actions: [ { assign: { location: ctx.total, expr: "ev.data.amount" } } ] } ]
+      payment:
+        on:
+          authorized:
+            - { cond: "ctx.total > 100", target: review }
+            - { target: paid }
+      review: { on: { approve: paid } }
+  paid: { type: final }
+  cancelled: { type: final }
