@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust build, test and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+          targets: thumbv7em-none-eabihf
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - name: vertep-core builds without std
+        run: cargo build -p vertep-core --no-default-features --target thumbv7em-none-eabihf
+
+  lean:
+    name: Lean model
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: lean/vertep-lean
+          build: true
+          test: false
+      - name: No sorry and axiom hygiene
+        working-directory: lean/vertep-lean
+        run: ./scripts/check.sh
+
+  conformance:
+    name: W3C SCXML conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Suite hash
+        run: ./crates/vertep-conformance/scripts/check-suite-hash.sh
+      - name: Mandatory tests on the Rust core
+        run: cargo test -p vertep-conformance --release -- --nocapture conformance
+
+  traceability:
+    name: tg graph and OpenSpec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g @fission-ai/openspec@1.9.0
+      - run: openspec validate --all --strict
+
+  differential:
+    name: Nightly Rust vs Lean differential
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: lean/vertep-lean
+          build: true
+          test: false
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p vertep-conformance --release --features differential -- --ignored differential
