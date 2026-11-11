@@ -120,6 +120,14 @@ pub struct Environment {
 pub trait StateQuery {
     /// True exactly when the state with this identifier is active.
     fn in_state(&self, id: &str) -> bool;
+
+    /// The identifiers of every active state in document order, when the caller can list
+    /// them. Datamodels that must answer `In()` from a callback they cannot borrow (such as an
+    /// embedded engine's native function) copy this before evaluating; `None` means only
+    /// [`StateQuery::in_state`] is available.
+    fn active_states(&self) -> Option<Vec<String>> {
+        None
+    }
 }
 
 /// The contract every datamodel implements. No operation may panic on bad input: failures are

@@ -430,6 +430,18 @@ impl StateQuery for Active<'_> {
             .index_of(id)
             .is_some_and(|i| self.config.contains(i))
     }
+
+    fn active_states(&self) -> Option<Vec<String>> {
+        Some(
+            self.chart
+                .states()
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != 0 && self.config.contains(*i))
+                .map(|(_, s)| s.id.clone())
+                .collect(),
+        )
+    }
 }
 
 fn platform_error(name: &str, sendid: Option<String>) -> Event {

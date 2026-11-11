@@ -8,8 +8,13 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+default = ["ecmascript"]
+ecmascript = ["dep:boa_engine"]
+
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
+boa_engine = { workspace = true, optional = true }
 
 [lints]
 workspace = true
