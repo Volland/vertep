@@ -210,3 +210,11 @@ Greenfield: no existing deployments. The throwaway spike from M0 is deleted when
 
 - The default snapshot interval and the default shard count per node; to be set from the benchmarks in the task list, without affecting the specs.
 - Whether the store-backed mailbox should also be offered for invoked actors whose parents are virtual; deferred until M4 shows whether invoked charts need to survive node loss.
+
+## Measurements
+
+Tiramemsu backend, release build, default durability, one entry of 14 statements plus a state delta per append (task 4.6, measured 2026-11-11 with `cargo test --release -p vertep-tiramemsu --test throughput -- --ignored --nocapture`):
+
+- one shard: about 400 appends/s
+- four shards in parallel: about 970 appends/s
+- replay read: about 25,000 entries/s

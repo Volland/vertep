@@ -182,6 +182,8 @@ The storage traits `JournalStore` and `GraphStore`, their contracts and a shared
 - realizes:: [[decisions#Two storage traits with tiramemsu as default]] {confidence: partial}
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
+Implemented 2026-11-11: `JournalStore` (compare-and-set append with fencing tokens and state deltas), `GraphStore` (quads and SPARQL), an in-memory reference store, the RDF 1.1 reification fallback, a projector to an external graph store and a test kit that every backend runs. Message-id deduplication is the runtime's job.
+
 ## vertep-tiramemsu
 
 The default backend: one tiramemsu file per shard implements both `JournalStore` and `GraphStore`, with `now()` as the current-state graph and `as_of` as time travel.
@@ -192,6 +194,8 @@ The default backend: one tiramemsu file per shard implements both `JournalStore`
 - realizes:: [[decisions#Two storage traits with tiramemsu as default]] {confidence: partial}
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
+Implemented 2026-11-11 on tiramemsu 0.12: one append is one `Db::transact`; entries are named graphs, current state is `GRAPH <actor>` derived from entries, `view_as_of` gives time travel. Measured about 400 appends/s per shard and 25,000 replayed entries/s.
+
 ## vertep-oxigraph
 
 A `GraphStore` adapter for Oxigraph and for any SPARQL 1.1 endpoint, including the RDF 1.1 reification fallback.
@@ -199,6 +203,8 @@ A `GraphStore` adapter for Oxigraph and for any SPARQL 1.1 endpoint, including t
 - provides:: [[capabilities#Storage]] {confidence: partial, note: "second GraphStore backend"}
 - uses:: [[components#vertep-store]] {kind: required}
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
+
+Implemented 2026-11-11: an embedded in-memory Oxigraph `GraphStore` and a SPARQL 1.1 Protocol endpoint client over a pluggable HTTP client; neither is a journal store.
 
 ## vertep-runtime
 

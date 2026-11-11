@@ -247,3 +247,40 @@ The theorem that `step` preserves legal configurations is stated only in `lean/v
 - motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: secondary}
 
 The counterexamples: a transition targeting a history state and its sibling, which leaves two active children; and an `initial` naming a history state without a default transition, which recursed without bound in Rust. Both become validator rules, mirrored in `WellFormed`; the proof then needs lemmas for compile correctness, exit and entry legality, a history invariant and fuel adequacy. No theorem is stated with `sorry` meanwhile.
+
+## Journal entries are stamped by the store
+
+Every append adds `rdf:type vt:JournalEntry`, `vt:actor` and `vt:position` to each entry graph and rejects an entry that states another position or actor, so entries read back are self-describing.
+
+- motivated_by:: [[decisions#Two storage traits with tiramemsu as default]] {weight: primary, since: "2026-11-11"}
+
+## State changes travel in the append
+
+An append may carry a state delta for the actor's current-state graph; stores that declare `state_in_append` commit it in the same transaction, on tiramemsu as derived statements supported by the entry.
+
+- motivated_by:: [[decisions#Two storage traits with tiramemsu as default]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary}
+
+A state already active is not re-derived, so it keeps its first cause, and `state_causes` walks back from any state triple to the entries that produced it.
+
+## Stores without fencing refuse tokens
+
+A journal store that does not enforce fencing fails an append carrying a fencing token with `Unsupported` instead of ignoring it, and a failed append never records its epoch.
+
+- motivated_by:: [[decisions#Fencing epochs on journal appends]] {weight: primary, since: "2026-11-11"}
+
+## Single-node shards placed by FNV-1a of the address IRI
+
+On one node an actor lives in shard `fnv1a64(IRI) mod n`, one tiramemsu file `shard-i-of-n.db` each; reopening a directory with another `n` is refused.
+
+- motivated_by:: [[constraints#Tiramemsu has a single writer per file]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Shard-based placement]] {weight: secondary}
+
+Cross-shard queries go to the projected external graph store; one projector runs per shard.
+
+## Remote SPARQL endpoints default to RDF 1.1
+
+A remote endpoint's RDF version is declared by the application and defaults to RDF 1.1, so annotations use `rdf:Statement` reification that every endpoint understands.
+
+- motivated_by:: [[constraints#SPARQL Update has no compare-and-set]] {weight: secondary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Modular vt ontology on RDF 1.2]] {weight: primary}

@@ -75,3 +75,23 @@ The W3C web server answers bursts of scripted requests with HTTP 429 and a Cloud
 `confEcma.xsl`, which turns IRP `.txml` templates into ECMAScript charts, uses XSLT 2.0 features such as `xsl:analyze-string`, so libxslt's `xsltproc` cannot run it.
 
 - constrains:: [[decisions#IRP suite from a pinned mirror]] {strength: must, source: "confEcma.xsl version=\"2.0\""}
+
+## Tiramemsu cannot hold unasserted triple terms or reifier IRIs
+
+Every tiramemsu statement id is an asserted statement: a triple term in inserted data is asserted, reifiers resolve to statement ids and a reifier IRI is refused.
+
+- constrains:: [[decisions#Two storage traits with tiramemsu as default]] {strength: should, source: "tiramemsu lat.md/query.md SPARQL 1.2 deviation"}
+
+The backend rejects triple terms in entries and state deltas and writes reifiers as annotation syntax; reifier identity is not preserved.
+
+## Tiramemsu's default graph is the union of all graphs
+
+A tiramemsu query without `GRAPH` also sees entry graphs, state graphs and bookkeeping, so portable queries scope with `GRAPH`; the backend declares `union_default_graph`.
+
+- constrains:: [[decisions#Two storage traits with tiramemsu as default]] {strength: should, source: "tiramemsu D28"}
+
+## Tiramemsu canonicalises literals
+
+Tiramemsu stores literals in canonical form, for example `"08"^^xsd:integer` reads back as `"8"`, so entries with non-canonical lexical forms do not round-trip byte for byte.
+
+- constrains:: [[decisions#Journal entries are stamped by the store]] {strength: should, source: "tiramemsu"}
