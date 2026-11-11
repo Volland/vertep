@@ -2097,6 +2097,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "vertep-cli"
+version = "0.1.0"
+dependencies = [
+ "vertep-core",
+]
+
+[[package]]
 name = "vertep-conformance"
 version = "0.1.0"
 dependencies = [
@@ -2130,6 +2137,20 @@ name = "vertep-dm-ecma"
 version = "0.1.0"
 dependencies = [
  "boa_engine",
+ "vertep-core",
+]
+
+[[package]]
+name = "vertep-dm-rust"
+version = "0.1.0"
+dependencies = [
+ "vertep-core",
+]
+
+[[package]]
+name = "vertep-macros"
+version = "0.1.0"
+dependencies = [
  "vertep-core",
 ]
 

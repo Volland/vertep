@@ -1,0 +1,262 @@
+1 + 2 * 3
+  => ok 7 | Number(7.0) [steps 5]
+-9223372036854775808
+  => ok -9223372036854775808 | String("-9223372036854775808") [steps 1]
+9223372036854775807 + 1
+  => error cel: `9223372036854775807 + 1`: int overflow [steps 3]
+-9223372036854775808 / -1
+  => error cel: `-9223372036854775808 / -1`: int overflow [steps 3]
+18446744073709551615u + 1u
+  => error cel: `18446744073709551615u + 1u`: uint overflow [steps 3]
+7 / 2
+  => ok 3 | Number(3.0) [steps 3]
+-7 / 2
+  => ok -3 | Number(-3.0) [steps 3]
+-7 % 3
+  => ok -1 | Number(-1.0) [steps 3]
+7 / 0
+  => error cel: `7 / 0`: division by zero [steps 3]
+7 % 0
+  => error cel: `7 % 0`: modulus by zero [steps 3]
+5u - 6u
+  => error cel: `5u - 6u`: uint overflow [steps 3]
+0.1 + 0.2
+  => ok double(0.30000000000000004/3fd3333333333334) | Number(0.30000000000000004) [steps 3]
+0.1 + 0.2 == 0.3
+  => ok false | Bool(false) [steps 6]
+1.0 / 0.0
+  => ok double(inf/7ff0000000000000) | Number(inf) [steps 3]
+-1.0 / 0.0
+  => ok double(-inf/fff0000000000000) | Number(-inf) [steps 4]
+0.0 / 0.0 == 0.0 / 0.0
+  => ok false | Bool(false) [steps 8]
+2.0 * 3.5
+  => ok double(7.0/401c000000000000) | Number(7.0) [steps 3]
+1e308 * 10.0
+  => ok double(inf/7ff0000000000000) | Number(inf) [steps 3]
+double('1e-7')
+  => ok double(1e-7/3e7ad7f29abcaf48) | Number(1e-7) [steps 2]
+string(1.0 / 3.0)
+  => ok "0.3333333333333333" | String("0.3333333333333333") [steps 4]
+string(123456789.125)
+  => ok "123456789.125" | String("123456789.125") [steps 2]
+decimal('0.1') + decimal('0.2') == decimal('0.3')
+  => ok true | Bool(true) [steps 9]
+decimal('1') / decimal('3')
+  => ok decimal(0.3333333333333333333333333333333333) | String("0.3333333333333333333333333333333333") [steps 5]
+decimal('2') / decimal('3')
+  => ok decimal(0.6666666666666666666666666666666667) | String("0.6666666666666666666666666666666667") [steps 5]
+decimal('10') / decimal('4')
+  => ok decimal(2.5) | String("2.5") [steps 5]
+decimal('7.5') % decimal('2')
+  => ok decimal(1.5) | String("1.5") [steps 5]
+decimal('1.10') * decimal('3')
+  => ok decimal(3.3) | String("3.3") [steps 5]
+ctx.d * 3 - decimal('0.5')
+  => ok decimal(37) | String("37") [steps 7]
+ctx.d > 12 && ctx.d < 12.6
+  => ok true | Bool(true) [steps 9]
+decimal(0.1) == decimal('0.1')
+  => ok true | Bool(true) [steps 6]
+decimal('9999999999999999999999999999999999') + decimal('1')
+  => error cel: `decimal('9999999999999999999999999999999999') + decimal('1')`: decimal overflow [steps 5]
+decimal('1e-35')
+  => error cel: `decimal('1e-35')`: cannot convert string `1e-35` to decimal: decimal out of range: at most 34 significant and 34 fractional digits [steps 2]
+int(decimal('-7.9'))
+  => ok -7 | Number(-7.0) [steps 3]
+double(decimal('2.5'))
+  => ok double(2.5/4004000000000000) | Number(2.5) [steps 3]
+1 == 1.0
+  => ok true | Bool(true) [steps 4]
+1 == 1u
+  => ok true | Bool(true) [steps 4]
+1u < 2
+  => ok true | Bool(true) [steps 3]
+-1 < 0u
+  => ok true | Bool(true) [steps 3]
+2.5 > 2
+  => ok true | Bool(true) [steps 3]
+3 == decimal('3.0')
+  => ok true | Bool(true) [steps 5]
+'abc' < 'abd'
+  => ok true | Bool(true) [steps 4]
+b'\x00\xff' < b'\x01'
+  => ok true | Bool(true) [steps 4]
+'a' + 'b' + "c"
+  => ok "abc" | String("abc") [steps 7]
+size('héllo')
+  => ok 5 | Number(5.0) [steps 3]
+size(b'h\xc3\xa9')
+  => ok 3 | Number(3.0) [steps 2]
+'hello'.contains('ell')
+  => ok true | Bool(true) [steps 4]
+'hello'.startsWith('he') && 'hello'.endsWith('lo')
+  => ok true | Bool(true) [steps 9]
+'abc123'.matches('^[a-z]+[0-9]+$')
+  => ok true | Bool(true) [steps 10]
+matches('xyz', 'y')
+  => ok true | Bool(true) [steps 4]
+'x'.matches('(')
+  => error cel: `'x'.matches('(')`: invalid regular expression `(`: error parsing regex [steps 4]
+ctx.s + '!'
+  => ok "héllo!" | String("héllo!") [steps 5]
+size(ctx.s)
+  => ok 5 | Number(5.0) [steps 4]
+[1, 2, 3].map(x, x * x)
+  => ok [1, 4, 9] | Array([Number(1.0), Number(4.0), Number(9.0)]) [steps 17]
+[1, 2, 3, 4].filter(x, x % 2 == 0)
+  => ok [2, 4] | Array([Number(2.0), Number(4.0)]) [steps 34]
+[1, 2, 3].all(x, x > 0)
+  => ok true | Bool(true) [steps 17]
+[1, 2, 3].exists(x, x > 2)
+  => ok true | Bool(true) [steps 17]
+[1, 2, 3].exists_one(x, x > 1)
+  => ok false | Bool(false) [steps 17]
+[1, 2, 3].map(x, x > 1, x * 10)
+  => ok [20, 30] | Array([Number(20.0), Number(30.0)]) [steps 23]
+[0, 1].all(x, 1 / x > 0)
+  => error cel: `[0, 1].all(x, 1 / x > 0)`: division by zero [steps 15]
+[0, 1].exists(x, 1 / x > 0)
+  => ok true | Bool(true) [steps 15]
+{'b': 1, 'a': 2, 'c': 3}.map(k, k)
+  => ok ["a", "b", "c"] | Array([String("a"), String("b"), String("c")]) [steps 14]
+{'b': 1, 'a': 2}
+  => ok {"a": 2, "b": 1} | Object([("a", Number(2.0)), ("b", Number(1.0))]) [steps 5]
+{'x': 0, 2: 0, true: 0, 1u: 0, -1: 0}
+  => ok {true: 0, -1: 0, 2: 0, 1u: 0, "x": 0} | Object([("true", Number(0.0)), ("-1", Number(0.0)), ("2", Number(0.0)), ("1", Number(0.0)), ("x", Number(0.0))]) [steps 11]
+ctx.m.map(k, ctx.m[k] * 10)
+  => ok [10, 20] | Array([Number(10.0), Number(20.0)]) [steps 17]
+ctx.m
+  => ok {"a": 1, "b": 2} | Object([("a", Number(1.0)), ("b", Number(2.0))]) [steps 2]
+ctx.l
+  => ok [3, 1, 2] | Array([Number(3.0), Number(1.0), Number(2.0)]) [steps 2]
+ctx.l[1]
+  => ok 1 | Number(1.0) [steps 4]
+ctx.l[5]
+  => error cel: `ctx.l[5]`: index out of range: 5 [steps 4]
+ctx.m.c
+  => error cel: `ctx.m.c`: no such key: `c` [steps 3]
+has(ctx.m.a)
+  => ok true | Bool(true) [steps 3]
+has(ctx.m.c)
+  => ok false | Bool(false) [steps 3]
+'b' in ctx.m
+  => ok true | Bool(true) [steps 4]
+2 in ctx.l
+  => ok true | Bool(true) [steps 5]
+{'a': 1, 'a': 2}
+  => error cel: `{'a': 1, 'a': 2}`: duplicate key in map literal [steps 5]
+[1, 'a', 2.5, null, true]
+  => ok [1, "a", double(2.5/4004000000000000), null, true] | Array([Number(1.0), String("a"), Number(2.5), Null, Bool(true)]) [steps 6]
+[[1, 2], [3]] == [[1, 2], [3]]
+  => ok true | Bool(true) [steps 14]
+{'a': [1]} == {'a': [1.0]}
+  => ok true | Bool(true) [steps 10]
+ctx.n > 5 ? 'big' : 'small'
+  => ok "big" | String("big") [steps 6]
+true || 1 / 0 == 1
+  => ok true | Bool(true) [steps 2]
+1 / 0 == 1 || true
+  => ok true | Bool(true) [steps 6]
+false && 1 / 0 == 1
+  => ok false | Bool(false) [steps 2]
+1 / 0 == 1 && false
+  => ok false | Bool(false) [steps 6]
+type(1) == int
+  => ok true | Bool(true) [steps 5]
+type(ctx.d)
+  => ok type(decimal) | String("decimal") [steps 3]
+type(ctx.m) == map
+  => ok true | Bool(true) [steps 6]
+string(type(1u))
+  => ok "uint" | String("uint") [steps 3]
+dyn(1) + 1
+  => ok 2 | Number(2.0) [steps 4]
+int('42')
+  => ok 42 | Number(42.0) [steps 2]
+int('4x')
+  => error cel: `int('4x')`: cannot convert string `4x` to int [steps 2]
+uint(-1)
+  => error cel: `uint(-1)`: uint overflow [steps 2]
+int(1e19)
+  => error cel: `int(1e19)`: int overflow [steps 2]
+int(-3.9)
+  => ok -3 | Number(-3.0) [steps 3]
+uint(3.9)
+  => ok 3u | Number(3.0) [steps 2]
+string(b'\xff')
+  => error cel: `string(b'\xff')`: bytes are not valid UTF-8 [steps 2]
+bool('true')
+  => ok true | Bool(true) [steps 2]
+bool('maybe')
+  => error cel: `bool('maybe')`: cannot convert string `maybe` to bool [steps 2]
+bytes('hé')
+  => ok b[104, 195, 169] | String("aMOp") [steps 2]
+timestamp('2024-02-29T23:30:00.250+01:00')
+  => ok timestamp(2024-02-29T22:30:00.25Z) | String("2024-02-29T22:30:00.25Z") [steps 2]
+timestamp('2024-02-29T23:30:00Z') + duration('1h30m')
+  => ok timestamp(2024-03-01T01:00:00Z) | String("2024-03-01T01:00:00Z") [steps 5]
+timestamp('2024-03-01T00:00:00Z') - timestamp('2024-02-28T00:00:00Z')
+  => ok duration(172800s) | String("172800s") [steps 5]
+timestamp('2024-03-01T00:00:00Z').getDayOfWeek()
+  => ok 5 | Number(5.0) [steps 3]
+timestamp('2024-03-01T00:00:00Z').getDayOfYear()
+  => ok 60 | Number(60.0) [steps 3]
+timestamp('2024-03-01T00:30:00Z').getHours('-01:00')
+  => ok 23 | Number(23.0) [steps 4]
+timestamp('2024-03-01T00:30:00Z').getFullYear('Europe/Kyiv')
+  => error cel: `timestamp('2024-03-01T00:30:00Z').getFullYear('Europe/Kyiv')`: unsupported time zone `Europe/Kyiv`: use `UTC` or a fixed offset such as `+02:00` [steps 4]
+timestamp('2024-03-01T00:30:00Z').getMonth()
+  => ok 2 | Number(2.0) [steps 3]
+duration('1h30m').getMinutes()
+  => ok 90 | Number(90.0) [steps 3]
+duration('-1.5s')
+  => ok duration(-1.5s) | String("-1.5s") [steps 2]
+duration('100ms') + duration('1s')
+  => ok duration(1.1s) | String("1.1s") [steps 5]
+int(timestamp('1970-01-02T00:00:00Z'))
+  => ok 86400 | Number(86400.0) [steps 3]
+timestamp(0)
+  => ok timestamp(1970-01-01T00:00:00Z) | String("1970-01-01T00:00:00Z") [steps 2]
+timestamp('0000-01-01T00:00:00Z')
+  => error cel: `timestamp('0000-01-01T00:00:00Z')`: invalid RFC 3339 timestamp `0000-01-01T00:00:00Z` [steps 2]
+timestamp('9999-12-31T23:59:59Z') + duration('1s')
+  => error cel: `timestamp('9999-12-31T23:59:59Z') + duration('1s')`: timestamp overflow [steps 5]
+string(duration('3600s'))
+  => ok "3600s" | String("3600s") [steps 3]
+In('a')
+  => ok true | Bool(true) [steps 2]
+now()
+  => error cel: `now()`: undeclared reference to function `now` [steps 0]
+ctx.missing
+  => error cel: `ctx.missing`: no such key: `missing` [steps 2]
+nosuchvar
+  => error cel: `nosuchvar`: undeclared reference to `nosuchvar` [steps 0]
+size(1)
+  => error cel: `size(1)`: no matching overload for `size` applied to (int) [steps 0]
+1 + 'a'
+  => error cel: `1 + 'a'`: no matching overload for `_+_` applied to (int, string) [steps 0]
+[1, 2] + [3]
+  => ok [1, 2, 3] | Array([Number(1.0), Number(2.0), Number(3.0)]) [steps 7]
+'x' * 2
+  => error cel: `'x' * 2`: no matching overload for `_*_` applied to (string, int) [steps 0]
+{'a': 1}.a.b
+  => error cel: `{'a': 1}.a.b`: type int has no fields [steps 0]
+ctx.l.map(x, ctx.l.map(y, ctx.l.map(z, x + y + z)))
+  => ok [[[9, 7, 8], [7, 5, 6], [8, 6, 7]], [[7, 5, 6], [5, 3, 4], [6, 4, 5]], [[8, 6, 7], [6, 4, 5], [7, 5, 6]]] | Array([Array([Array([Number(9.0), Number(7.0), Number(8.0)]), Array([Number(7.0), Number(5.0), Number(6.0)]), Array([Number(8.0), Number(6.0), Number(7.0)])]), Array([Array([Number(7.0), Number(5.0), Number(6.0)]), Array([Number(5.0), Number(3.0), Number(4.0)]), Array([Number(6.0), Number(4.0), Number(5.0)])]), Array([Array([Number(8.0), Number(6.0), Number(7.0)]), Array([Number(6.0), Number(4.0), Number(5.0)]), Array([Number(7.0), Number(5.0), Number(6.0)])])]) [steps 213]
+[0,1,2,3,4,5,6,7,8,9].map(a, [0,1,2,3,4,5,6,7,8,9].map(b, [0,1,2,3,4,5,6,7,8,9].map(c, [0,1,2,3,4,5,6,7,8,9].map(d, [0,1,2,3,4,5,6,7,8,9].map(e, a + b + c + d + e))))).size()
+  => error cel: `[0,1,2,3,4,5,6,7,8,9].map(a, [0,1,2,3,4,5,6,7,8,9].map(b, [0,1,2,3,4,5,6,7,8,9].map(c, [0,1,2,3,4,5,6,7,8,9].map(d, [0,1,2,3,4,5,6,7,8,9].map(e, a + b + c + d + e))))).size()`: evaluation step limit exceeded: more than 100000 steps [steps 100001]
+r'\d+\n'
+  => ok "\\d+\\n" | String("\\d+\\n") [steps 1]
+'é\x41\101'
+  => ok "éAA" | String("éAA") [steps 1]
+'''tri\nple'''
+  => ok "tri\nple" | String("tri\nple") [steps 1]
+0x1F + 0xffu
+  => error cel: `0x1F + 0xffu`: no matching overload for `_+_` applied to (int, uint) [steps 0]
+1 +
+  => error cel: `1 +`: syntax error at offset 3: unexpected end of expression [steps 0]
+if
+  => error cel: `if`: syntax error at offset 0: reserved identifier `if` [steps 0]
+Msg{a: 1}
+  => error cel: `Msg{a: 1}`: syntax error at offset 0: message construction is not supported [steps 0]

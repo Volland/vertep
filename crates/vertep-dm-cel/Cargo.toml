@@ -8,8 +8,14 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+default = ["std"]
+# Only forwards `std` to vertep-core; the CEL datamodel itself is `no_std` with `alloc`.
+std = ["vertep-core/std"]
+
 [dependencies]
-vertep-core = { workspace = true, features = ["std"] }
+vertep-core = { workspace = true }
+regex-automata = { workspace = true }
 
 [lints]
 workspace = true

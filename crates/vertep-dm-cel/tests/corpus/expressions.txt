@@ -1,0 +1,134 @@
+# One CEL expression per line, evaluated with ctx = {"n": 7, "d": decimal("12.50"), "s": "héllo",
+# "l": [3, 1, 2], "m": {"b": 2, "a": 1}, "f": 0.1}. Lines starting with # are comments.
+1 + 2 * 3
+-9223372036854775808
+9223372036854775807 + 1
+-9223372036854775808 / -1
+18446744073709551615u + 1u
+7 / 2
+-7 / 2
+-7 % 3
+7 / 0
+7 % 0
+5u - 6u
+0.1 + 0.2
+0.1 + 0.2 == 0.3
+1.0 / 0.0
+-1.0 / 0.0
+0.0 / 0.0 == 0.0 / 0.0
+2.0 * 3.5
+1e308 * 10.0
+double('1e-7')
+string(1.0 / 3.0)
+string(123456789.125)
+decimal('0.1') + decimal('0.2') == decimal('0.3')
+decimal('1') / decimal('3')
+decimal('2') / decimal('3')
+decimal('10') / decimal('4')
+decimal('7.5') % decimal('2')
+decimal('1.10') * decimal('3')
+ctx.d * 3 - decimal('0.5')
+ctx.d > 12 && ctx.d < 12.6
+decimal(0.1) == decimal('0.1')
+decimal('9999999999999999999999999999999999') + decimal('1')
+decimal('1e-35')
+int(decimal('-7.9'))
+double(decimal('2.5'))
+1 == 1.0
+1 == 1u
+1u < 2
+-1 < 0u
+2.5 > 2
+3 == decimal('3.0')
+'abc' < 'abd'
+b'\x00\xff' < b'\x01'
+'a' + 'b' + "c"
+size('héllo')
+size(b'h\xc3\xa9')
+'hello'.contains('ell')
+'hello'.startsWith('he') && 'hello'.endsWith('lo')
+'abc123'.matches('^[a-z]+[0-9]+$')
+matches('xyz', 'y')
+'x'.matches('(')
+ctx.s + '!'
+size(ctx.s)
+[1, 2, 3].map(x, x * x)
+[1, 2, 3, 4].filter(x, x % 2 == 0)
+[1, 2, 3].all(x, x > 0)
+[1, 2, 3].exists(x, x > 2)
+[1, 2, 3].exists_one(x, x > 1)
+[1, 2, 3].map(x, x > 1, x * 10)
+[0, 1].all(x, 1 / x > 0)
+[0, 1].exists(x, 1 / x > 0)
+{'b': 1, 'a': 2, 'c': 3}.map(k, k)
+{'b': 1, 'a': 2}
+{'x': 0, 2: 0, true: 0, 1u: 0, -1: 0}
+ctx.m.map(k, ctx.m[k] * 10)
+ctx.m
+ctx.l
+ctx.l[1]
+ctx.l[5]
+ctx.m.c
+has(ctx.m.a)
+has(ctx.m.c)
+'b' in ctx.m
+2 in ctx.l
+{'a': 1, 'a': 2}
+[1, 'a', 2.5, null, true]
+[[1, 2], [3]] == [[1, 2], [3]]
+{'a': [1]} == {'a': [1.0]}
+ctx.n > 5 ? 'big' : 'small'
+true || 1 / 0 == 1
+1 / 0 == 1 || true
+false && 1 / 0 == 1
+1 / 0 == 1 && false
+type(1) == int
+type(ctx.d)
+type(ctx.m) == map
+string(type(1u))
+dyn(1) + 1
+int('42')
+int('4x')
+uint(-1)
+int(1e19)
+int(-3.9)
+uint(3.9)
+string(b'\xff')
+bool('true')
+bool('maybe')
+bytes('hé')
+timestamp('2024-02-29T23:30:00.250+01:00')
+timestamp('2024-02-29T23:30:00Z') + duration('1h30m')
+timestamp('2024-03-01T00:00:00Z') - timestamp('2024-02-28T00:00:00Z')
+timestamp('2024-03-01T00:00:00Z').getDayOfWeek()
+timestamp('2024-03-01T00:00:00Z').getDayOfYear()
+timestamp('2024-03-01T00:30:00Z').getHours('-01:00')
+timestamp('2024-03-01T00:30:00Z').getFullYear('Europe/Kyiv')
+timestamp('2024-03-01T00:30:00Z').getMonth()
+duration('1h30m').getMinutes()
+duration('-1.5s')
+duration('100ms') + duration('1s')
+int(timestamp('1970-01-02T00:00:00Z'))
+timestamp(0)
+timestamp('0000-01-01T00:00:00Z')
+timestamp('9999-12-31T23:59:59Z') + duration('1s')
+string(duration('3600s'))
+In('a')
+now()
+ctx.missing
+nosuchvar
+size(1)
+1 + 'a'
+[1, 2] + [3]
+'x' * 2
+{'a': 1}.a.b
+ctx.l.map(x, ctx.l.map(y, ctx.l.map(z, x + y + z)))
+[0,1,2,3,4,5,6,7,8,9].map(a, [0,1,2,3,4,5,6,7,8,9].map(b, [0,1,2,3,4,5,6,7,8,9].map(c, [0,1,2,3,4,5,6,7,8,9].map(d, [0,1,2,3,4,5,6,7,8,9].map(e, a + b + c + d + e))))).size()
+r'\d+\n'
+'é\x41\101'
+'''tri
+ple'''
+0x1F + 0xffu
+1 +
+if
+Msg{a: 1}
