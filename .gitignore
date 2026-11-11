@@ -1,0 +1,6 @@
+/target
+**/*.rs.bk
+.omc/
+.DS_Store
+lean/**/.lake/
+*.swp
