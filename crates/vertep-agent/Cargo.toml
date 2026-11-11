@@ -1,0 +1,15 @@
+[package]
+name = "vertep-agent"
+description = "Deciders, LLM actors, tools with grants and sandboxed plan charts for Vertep agents"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+vertep-core = { workspace = true, features = ["std"] }
+
+[lints]
+workspace = true

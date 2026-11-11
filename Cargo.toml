@@ -19,6 +19,7 @@ members = [
     "crates/vertep-cli",
     "crates/vertep-cluster",
     "crates/vertep-federation",
+    "crates/vertep-agent",
 ]
 
 [workspace.package]
@@ -64,6 +65,12 @@ boa_engine = { version = "0.22.0", default-features = false, features = ["annex-
 # vertep-runtime: the tokio shell and its future combinators.
 tokio = { version = "1.54", default-features = false }
 futures = { version = "0.3.31", default-features = false, features = ["std", "async-await"] }
+# vertep-cluster: QUIC cluster transport with mutual TLS (ring provider, no aws-lc build),
+# certificate parsing for peer identity, and cluster certificate issuance.
+quinn = { version = "0.11.9", default-features = false, features = ["runtime-tokio", "rustls-ring"] }
+rustls = { version = "0.23.31", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-webpki = { version = "0.103.4", default-features = false, features = ["ring", "std"] }
+rcgen = { version = "0.14.5", default-features = false, features = ["ring", "pem", "crypto"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
