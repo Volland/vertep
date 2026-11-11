@@ -8,8 +8,18 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+default = []
+# The shared backend test kit (`vertep_store::testkit`): every backend runs it from its tests.
+testkit = []
+
 [dependencies]
-vertep-core = { workspace = true, features = ["std"] }
+oxrdf = { workspace = true }
+spargebra = { workspace = true }
+spareval = { workspace = true }
+
+[dev-dependencies]
+vertep-store = { path = ".", features = ["testkit"] }
 
 [lints]
 workspace = true

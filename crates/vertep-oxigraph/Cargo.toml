@@ -9,7 +9,15 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-vertep-core = { workspace = true, features = ["std"] }
+vertep-store = { workspace = true }
+oxrdf = { workspace = true }
+oxigraph = { workspace = true }
+sparesults = { workspace = true }
+
+[dev-dependencies]
+vertep-store = { workspace = true, features = ["testkit"] }
+vertep-tiramemsu = { workspace = true }
+tempfile = "3"
 
 [lints]
 workspace = true

@@ -33,6 +33,16 @@ vertep-dm-cel = { path = "crates/vertep-dm-cel", version = "0.1.0" }
 vertep-store = { path = "crates/vertep-store", version = "0.1.0" }
 vertep-tiramemsu = { path = "crates/vertep-tiramemsu", version = "0.1.0" }
 vertep-oxigraph = { path = "crates/vertep-oxigraph", version = "0.1.0" }
+# Storage layer (vertep-store, vertep-tiramemsu, vertep-oxigraph). The oxrdf family is the one
+# vertep-rdf uses (RDF 1.2); spargebra/spareval/sparesults match the versions oxigraph pins.
+oxrdf = { version = "0.3.5", features = ["rdf-12", "rdfc-10"] }
+spargebra = { version = "0.4.8", features = ["sparql-12"] }
+spareval = { version = "0.2.9", features = ["sparql-12"] }
+sparesults = { version = "0.3.5", features = ["sparql-12"] }
+oxigraph = { version = "0.5.13", default-features = false, features = ["rdf-12"] }
+tiramemsu = { version = "0.12.0", default-features = false, features = ["sparql"] }
+# vertep-dm-cel: linear-time regular expressions for CEL `matches`, without std.
+regex-automata = { version = "0.4.18", default-features = false, features = ["alloc", "syntax", "nfa-pikevm", "unicode"] }
 boa_engine = { version = "0.22.0", default-features = false, features = ["annex-b"] }
 
 [workspace.lints.rust]
