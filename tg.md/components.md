@@ -82,6 +82,10 @@ The `ecmascript` datamodel on the boa engine, behind a cargo feature, used for S
 - realizes:: [[decisions#Pluggable datamodel]] {confidence: partial}
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
+Implemented 2026-11-11 on boa 0.22 with Intl and Temporal off and the time zone pinned to UTC. Guards run in a `with` over a proxy view whose write traps throw; debug builds also snapshot-compare every guard. `Math.random` is SplitMix64 seeded per input and `Date` reads the input time. Snapshots keep script-defined functions and classes as source; values that cannot be captured make restore fail loudly.
+
+Known limits: in release builds a script-defined function called from a guard can still mutate through its closure; boa compiles functions before later global `let` declarations are visible to them; there is no DOM, so XML `<data>` content is a string.
+
 ## vertep-rdf
 
 The `vt:` ontology modules, IR to RDF 1.2 and back, SHACL shapes, RDFC-1.0 canonical hashing and chart version IRIs.
