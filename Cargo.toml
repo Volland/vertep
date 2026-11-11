@@ -6,6 +6,7 @@ members = [
     "crates/vertep-dm-ecma",
     "crates/vertep-rdf",
     "crates/vertep-conformance",
+    "crates/vertep-testkit",
 ]
 
 [workspace.package]
@@ -21,6 +22,7 @@ vertep-core = { path = "crates/vertep-core", version = "0.1.0", default-features
 vertep-scxml = { path = "crates/vertep-scxml", version = "0.1.0" }
 vertep-dm-ecma = { path = "crates/vertep-dm-ecma", version = "0.1.0" }
 vertep-rdf = { path = "crates/vertep-rdf", version = "0.1.0" }
+vertep-testkit = { path = "crates/vertep-testkit" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -101,3 +101,10 @@ version = "0.1.0"
 dependencies = [
  "vertep-core",
 ]
+
+[[package]]
+name = "vertep-testkit"
+version = "0.1.0"
+dependencies = [
+ "vertep-core",
+]
