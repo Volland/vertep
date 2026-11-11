@@ -286,3 +286,27 @@ A remote endpoint's RDF version is declared by the application and defaults to R
 
 - motivated_by:: [[constraints#SPARQL Update has no compare-and-set]] {weight: secondary, since: "2026-11-11"}
 - motivated_by:: [[decisions#Modular vt ontology on RDF 1.2]] {weight: primary}
+
+## Types ride on vt extension nodes
+
+The IR has no typed fields: `vt:type` on data and send is an extension attribute, param types are one `vt:paramTypes` record on the owner, and declarations are a `vt:types` element on the chart.
+
+- motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#IR is the hub]] {weight: secondary}
+
+The declaration text is `type X = T; event e: T;`. Untyped charts carry none of these and run exactly as before, which every conformance chart confirms.
+
+## Datamodel typers plug into one core checker
+
+`check_chart` takes an `ExprTyper`; the core ships a basic typer for literals and `ctx`/`ev.data` paths, and the CEL and Rust datamodels supply full expression typing, so every surface calls one checker.
+
+- motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: secondary}
+
+## YAML on saphyr-parser with a self-verifying writer
+
+`vertep-yaml` reads with saphyr-parser's YAML 1.2 event API into an ordered, positioned node tree; the writer uses shorthands only when they lower back to the same IR node and reads its own output back before returning.
+
+- motivated_by:: [[decisions#IR is the hub]] {weight: primary, since: "2026-11-11"}
+
+Rejected: serde-based YAML crates, which lose positions or key order or resolve scalars the YAML 1.1 way, turning the `on:` transition key into `true`.

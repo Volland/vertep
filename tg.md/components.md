@@ -65,6 +65,8 @@ The `no_std` heart: the chart IR, the type language, the `Datamodel` trait and t
 
 Implemented 2026-11-11: `validate`, `order`, `compile` (states numbered in document order, root 0, an in-crate bitset), the pure Appendix D `kernel`, `session::{start, step}` with effects, the `null` datamodel and registry, and the `tape`/`trace` exchange format for the Lean oracle, following [[decisions#Appendix D readings in the Rust core]].
 
+M1 type language added 2026-11-11 in `types`: a value checker with path-located errors, declarations validated for unknown names and unguarded cycles, event payload tables, and `check_chart`/`compile_checked` per [[decisions#Types ride on vt extension nodes]] and [[decisions#Datamodel typers plug into one core checker]]. Projections to RDF, JSON Schema, SHACL and CEL and content-addressed type IRIs are still open.
+
 ## vertep-scxml
 
 SCXML 1.0 XML reader and writer to and from the IR, with `vt:` extension attributes and a loss report for unsupported constructs.
@@ -144,6 +146,8 @@ The YAML chart surface, mapped one to one onto the IR, with a `types:` block.
 - provides:: [[capabilities#YAML format]] {confidence: full}
 - uses:: [[components#vertep-core]] {kind: required}
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
+
+Implemented 2026-11-11 per [[decisions#YAML on saphyr-parser with a self-verifying writer]]: reader with spans and located diagnostics, canonical byte-stable writer, version check and `cel` as the default datamodel; every SCXML corpus chart converts to YAML and back unchanged. The `vt convert` command and a real CEL expression parser are still open.
 
 ## vertep-dm-rust
 
