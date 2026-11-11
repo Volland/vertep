@@ -106,6 +106,8 @@ The `vt:` ontology modules, IR to RDF 1.2 and back, SHACL shapes, RDFC-1.0 canon
 
 Implemented 2026-11-11 on oxrdf 0.3 with RDF 1.2 and built-in RDFC-1.0 (86/86 W3C RDFC tests): a chart module of 29 classes and 69 properties, node IRIs `<base>#<fragment>` with no blank nodes, the version hash computed under the fixed base `urn:vertep:chart:self` and rebased to `urn:vertep:chart:sha256:<hex>`, SHACL Core shapes with an in-crate validator, and reconstruction gated by the shapes. Its verdicts agree with `vertep-core` validation on generated charts and on 46 single-rule mutations.
 
+M1 types added 2026-11-11 in `types` and `ontology/vt-types.ttl`: [[decisions#Type IRIs hash the definition graph]], SHACL shapes per type, a value encoding for checking values against those shapes, and JSON Schema; the SHACL engine gained `sh:closed`, `sh:pattern` and datatype well-formedness.
+
 ## vertep-lean
 
 The Lean 4 package on LeanRDF: the IR, types, `step`, journal protocol and decider safety as definitions with proofs, an executable oracle and the `vt certify` checker.
@@ -293,6 +295,8 @@ The `vt` command: convert between SCXML, YAML and RDF, validate and hash charts,
 - uses:: [[components#vertep-rdf]] {kind: required}
 - uses:: [[components#vertep-lean]] {kind: optional, note: "vt certify"}
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
+
+Implemented 2026-11-11: the `vt` binary with `typecheck`, `schema` (JSON Schema, SHACL, CEL; Rust waits for the macro crate), `validate`, `hash`, `convert` between SCXML, YAML and RDF formats, and `certify` per [[decisions#vt certify runs the Lean checker as a process]]. Exit codes: 0 success, 1 the chart fails, 2 usage or I/O.
 
 ## vertep
 

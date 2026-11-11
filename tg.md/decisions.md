@@ -407,3 +407,33 @@ IRP templates become `ecmascript` and `null` charts once, by a script; the resul
 The planned M0 spike of a tiramemsu journal with an LLM decider was not built, because M2 was implemented directly on the finished core and storage, which answered the same integration questions with real code (replaces M0 design D13).
 
 - motivated_by:: [[decisions#Full SCXML first]] {weight: primary, since: "2026-11-11"}
+
+## Type IRIs hash the definition graph
+
+A named type's IRI is `urn:vertep:type:sha256:<hex>` over the RDFC-1.0 canonical N-Quads of its definition graph, with fields and variants keyed by name and references written as the referenced types' IRIs.
+
+- motivated_by:: [[decisions#Content-addressed chart versions]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#One IR type language]] {weight: secondary}
+
+Source order does not change a type's IRI, a type's IRI covers every type it uses, and mutually recursive types are hashed as a group. The name is part of the identity.
+
+## Type vocabulary is its own ontology module
+
+Type terms live in `vt-types.ttl` next to the chart module, so the chart module keeps exactly one class per IR node kind and a typed chart's projection adds type definitions and shapes under their type IRIs.
+
+- motivated_by:: [[decisions#Modular vt ontology on RDF 1.2]] {weight: primary, since: "2026-11-11"}
+
+## SCXML type annotations are canonicalized on read
+
+The SCXML reader rewrites every `vt:type` annotation and `vt:types` block into canonical type text, so the same typed chart hashes to the same version from any surface or spelling.
+
+- motivated_by:: [[decisions#Types ride on vt extension nodes]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Content-addressed chart versions]] {weight: secondary}
+
+## vt certify runs the Lean checker as a process
+
+`vt certify` writes the chart's published N-Quads to a file and runs the Lean-compiled `vt-certify --chart <file>`, found through `VT_CERTIFY` or on `PATH`; without it no certificate is produced.
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
+
+The Lean projection mirrors untyped charts only, so typed charts cannot be certified until the Lean type language (M1 group 9) mirrors `vt-types` projection.
