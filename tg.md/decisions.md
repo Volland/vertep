@@ -320,3 +320,90 @@ Vertep evaluates CEL with its own `no_std` interpreter: a bounded-depth parser, 
 - motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary, note: "deterministic replay"}
 
 A probe on 2026-11-11 rejected `cel` 0.15 (hash-ordered maps gave five key orders in five runs, no decimal, no step limit, needs std), `cel-core` 0.5 (no decimal, no limits, stack overflow on deep nesting, needs std), `rscel` 1.0.8 (nightly only, non-deterministic `now()`) and `cel-cxx` (C++ FFI, no wasm, no decimal). Decimals hold 34 significant digits; more is an overflow error.
+
+## Session state is a value and the datamodel a component
+
+`step` takes the compiled chart, a session value, one input and the datamodel, and returns a new session and its effects; the datamodel keeps its own mutable state behind the trait (M0 design D1).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: secondary}
+
+Rejected: an immutable datamodel value, which would copy the ECMAScript heap every microstep, and an async `step`, which would break purity and the Lean correspondence.
+
+## Compiled charts are derived and never serialized
+
+Validation turns a well-formed IR into a compiled chart with states numbered in document order, ancestor tables and precomputed domains; only the IR is ever serialized or hashed (M0 design D2).
+
+- motivated_by:: [[decisions#IR is the hub]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: secondary}
+
+## Every interaction is an effect
+
+The step emits `Send`, `Cancel`, `Invoke`, `CancelInvoke`, `Forward`, `Log` and `SessionDone` effects in document order, and delays are durations in effects, so one kernel runs under the test host, the runtime and the Lean oracle (M0 design D3).
+
+- motivated_by:: [[decisions#No-std core and tokio shell]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary}
+
+## Guard purity is enforced by the datamodel
+
+A datamodel evaluates guards against a read-only view whose writes fail, so an impure guard is an evaluation error and false; ECMAScript also seeds `Math.random` and reads `Date` from the input (M0 design D4).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11", note: "replay must be sound"}
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: secondary}
+
+Rejected: snapshot-compare after every guard as the main mechanism, which costs a heap walk; it remains a debug backstop.
+
+## The Lean model sees the datamodel as an answer tape
+
+The Rust run records every datamodel request and answer; the Lean `step` consumes the tape and must issue identical requests, and evaluates `In()` itself, so its theorems hold for every datamodel (M0 design D5).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
+
+## Charts cross to Lean as N-Quads
+
+The oracle and the certifier read a chart as the N-Quads of its RDF projection, decoded by the Lean reconstruction the round-trip theorem covers, and traces are JSON Lines with one record per macrostep (M0 design D6).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Modular vt ontology on RDF 1.2]] {weight: secondary}
+
+Rejected: a separate JSON chart format for Lean, a second, unproven codec.
+
+## Persistent vt namespace and blank-node-free charts
+
+The namespace is `https://w3id.org/vertep/vt#`, chart versions are `urn:vertep:chart:sha256:<hex>`, and node IRIs are minted under the version with no blank nodes, so canonicalization stays linear (M0 design D7).
+
+- motivated_by:: [[decisions#Content-addressed chart versions]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#RDF is open-world]] {weight: secondary}
+
+## Document order is explicit in RDF
+
+Every ordered member of a projected chart carries `vt:order`; `rdf:List` is not used, because transition priority is document order and lists are awkward in SPARQL and fragile under partial updates (M0 design D8).
+
+- motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: primary, since: "2026-11-11"}
+
+## Shapes are SHACL Core over derived triples
+
+Whole-chart rules are SHACL Core over triples the projection materializes, never SHACL-SPARQL, and their equivalence with `WellFormed` is a Lean theorem and an empirical test (M0 design D9).
+
+- motivated_by:: [[constraints#RDF is open-world]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary}
+
+## Conformance variants are generated once and pinned
+
+IRP templates become `ecmascript` and `null` charts once, by a script; the results and their hashes are committed, every expected deviation has a reason, and an unexpected pass fails (M0 design D10).
+
+- motivated_by:: [[decisions#SCXML semantics are normative]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#IRP suite from a pinned mirror]] {weight: secondary}
+
+## Minimal dependencies per M0 crate
+
+`vertep-core` uses only `alloc` (its bitset is in-crate), `vertep-scxml` quick-xml, `vertep-dm-ecma` boa, `vertep-rdf` oxrdf and oxttl with RDF 1.2 and RDFC-1.0, and `vertep-lean` a pinned LeanRDF (M0 design D11).
+
+- motivated_by:: [[decisions#No-std core and tokio shell]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Proc macros run at compile time]] {weight: secondary}
+
+## No throwaway journal spike
+
+The planned M0 spike of a tiramemsu journal with an LLM decider was not built, because M2 was implemented directly on the finished core and storage, which answered the same integration questions with real code (replaces M0 design D13).
+
+- motivated_by:: [[decisions#Full SCXML first]] {weight: primary, since: "2026-11-11"}

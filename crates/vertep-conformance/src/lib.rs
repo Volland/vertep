@@ -13,6 +13,7 @@
 //! and writes `target/conformance-report.json`.
 
 pub mod allow;
+pub mod corpus;
 pub mod engine;
 pub mod host;
 pub mod manifest;
