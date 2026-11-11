@@ -1,10 +1,14 @@
 //! The Lean oracle as an engine under test (decision D5).
 //!
-//! The Lean package builds three executables into `lean/vertep-lean/.lake/build/bin/`
-//! (`cd lean/vertep-lean && lake build`): `vertep-oracle` replays a Rust run's records (input,
-//! datamodel answer tape, trace per macrostep) against the chart's RDF projection and prints
-//! its own trace per macrostep, `vt-certify` checks a chart projection for well-formedness, and
-//! `vertep-shapes` checks the SHACL shapes. [`LeanTools::find`] locates them (or the directory
+//! The Lean package builds six executables into `lean/vertep-lean/.lake/build/bin/` (`cd
+//! lean/vertep-lean && lake build vertep-oracle vt-certify vertep-shapes vertep-journal
+//! vertep-lease vertep-decide`):
+//! `vertep-oracle` replays a Rust run's records (input, datamodel answer tape, trace per
+//! macrostep) against the chart's RDF projection and prints its own trace per macrostep,
+//! `vt-certify` checks a chart projection for well-formedness, `vertep-shapes` checks the SHACL
+//! shapes, `vertep-journal` judges an observed runtime run against the journal protocol model,
+//! `vertep-lease` replays a cluster fault-injection history through the lease and fencing
+//! model, and `vertep-decide` replays an agent run's decisions through the decider model. [`LeanTools::find`] locates them (or the directory
 //! in `VT_LEAN_BIN`).
 //!
 //! Charts cross as the N-Quads of their `vertep-rdf` projection; records as JSON Lines of
@@ -37,6 +41,12 @@ pub struct LeanTools {
     pub certify: PathBuf,
     /// `vertep-shapes`.
     pub shapes: PathBuf,
+    /// `vertep-journal`, the journal protocol model as a test oracle.
+    pub journal: PathBuf,
+    /// `vertep-lease`, the lease and fencing model as an oracle for fault-injection histories.
+    pub lease: PathBuf,
+    /// `vertep-decide`, decision validation of the agent model as an oracle for agent runs.
+    pub decide: PathBuf,
 }
 
 /// The directory the Lean executables are expected in: `$VT_LEAN_BIN`, or
@@ -61,6 +71,9 @@ impl LeanTools {
             oracle: dir.join("vertep-oracle"),
             certify: dir.join("vt-certify"),
             shapes: dir.join("vertep-shapes"),
+            journal: dir.join("vertep-journal"),
+            lease: dir.join("vertep-lease"),
+            decide: dir.join("vertep-decide"),
         };
         let missing: Vec<String> = [&tools.oracle, &tools.certify]
             .iter()
@@ -126,6 +139,24 @@ pub enum LeanLine {
     Trace(Json),
     /// The oracle failed on the macrostep (for example a request differing from the tape).
     Error(String),
+    /// The macrostep ran out of the microstep budget: the budget and the partial Lean trace
+    /// (Rust's `BudgetExceeded { budget, partial }`).
+    BudgetExceeded {
+        /// The microstep budget.
+        budget: u64,
+        /// The partial trace.
+        trace: Json,
+    },
+}
+
+impl LeanLine {
+    /// The trace of the line, partial or not; `None` for an error.
+    pub fn trace(&self) -> Option<&Json> {
+        match self {
+            LeanLine::Trace(t) | LeanLine::BudgetExceeded { trace: t, .. } => Some(t),
+            LeanLine::Error(_) => None,
+        }
+    }
 }
 
 /// Replay `records` on the oracle for `chart`. Fails when the oracle rejects its input.
@@ -191,15 +222,23 @@ pub fn replay(
         .filter(|l| !l.trim().is_empty())
         .map(|l| {
             let v: Json = serde_json::from_str(l).map_err(|e| format!("oracle output: {e}"))?;
-            Ok(match v.get("error") {
-                Some(err) if v.as_object().is_some_and(|o| o.len() == 1) => {
-                    LeanLine::Error(match err {
+            let keys = v.as_object().map_or(0, serde_json::Map::len);
+            Ok(
+                match (v.get("error"), v.get("budgetExceeded"), v.get("trace")) {
+                    (Some(err), _, _) if keys == 1 => LeanLine::Error(match err {
                         Json::String(s) => s.clone(),
                         other => other.to_string(),
-                    })
-                }
-                _ => LeanLine::Trace(v),
-            })
+                    }),
+                    (_, Some(b), Some(t)) if keys == 2 => LeanLine::BudgetExceeded {
+                        budget: b
+                            .as_f64()
+                            .map(|f| f as u64)
+                            .ok_or_else(|| format!("oracle output: budget {b}"))?,
+                        trace: t.clone(),
+                    },
+                    _ => LeanLine::Trace(v),
+                },
+            )
         })
         .collect()
 }
@@ -237,12 +276,41 @@ impl std::fmt::Display for Divergence {
     }
 }
 
-/// Compare the oracle's lines with the Rust records, macrostep by macrostep.
-// @tg: implements:: [[openspec:scxml-conformance#Lean Model Conformance]]
+/// Compare the oracle's lines with the Rust records, macrostep by macrostep, when no Rust
+/// macrostep ran out of the microstep budget (see [`compare_run`]).
 pub fn compare(records: &[OracleRecord], lean: &[LeanLine]) -> Result<(), Divergence> {
+    compare_run(records, Some(false), lean)
+}
+
+/// Compare the oracle's lines with the Rust records, macrostep by macrostep. `last_exceeded`
+/// says whether the last Rust macrostep ran out of the microstep budget (its trace partial);
+/// then the oracle must report the budget error on that macrostep, with the same partial trace,
+/// and on no other. `None` leaves the budget unchecked and compares traces only.
+// @tg: implements:: [[openspec:scxml-conformance#Lean Model Conformance]]
+pub fn compare_run(
+    records: &[OracleRecord],
+    last_exceeded: Option<bool>,
+    lean: &[LeanLine],
+) -> Result<(), Divergence> {
+    let n = records.len();
     for (i, r) in records.iter().enumerate() {
         let macrostep = r.trace.index;
         let rust = serde_json::to_value(&r.trace).unwrap_or(Json::Null);
+        if let (Some(e), Some(line)) = (last_exceeded, lean.get(i)) {
+            let rust_out = e && i + 1 == n;
+            let lean_out = matches!(line, LeanLine::BudgetExceeded { .. });
+            if !matches!(line, LeanLine::Error(_)) && rust_out != lean_out {
+                let said = |b: bool| if b { "ran out of" } else { "stayed within" };
+                return Err(Divergence {
+                    macrostep,
+                    detail: format!(
+                        "Rust {} the microstep budget, Lean {} it",
+                        said(rust_out),
+                        said(lean_out)
+                    ),
+                });
+            }
+        }
         match lean.get(i) {
             None => {
                 return Err(Divergence {
@@ -263,13 +331,15 @@ pub fn compare(records: &[OracleRecord], lean: &[LeanLine]) -> Result<(), Diverg
                     ),
                 });
             }
-            Some(LeanLine::Trace(t)) if !json_eq(&rust, t) => {
+            Some(LeanLine::Trace(t) | LeanLine::BudgetExceeded { trace: t, .. })
+                if !json_eq(&rust, t) =>
+            {
                 return Err(Divergence {
                     macrostep,
                     detail: format!("traces differ\n  rust: {rust}\n  lean: {t}"),
                 });
             }
-            Some(LeanLine::Trace(_)) => {}
+            Some(LeanLine::Trace(_) | LeanLine::BudgetExceeded { .. }) => {}
         }
     }
     if lean.len() > records.len() {
@@ -328,13 +398,16 @@ impl LeanOracle {
             Ok(l) => l,
             Err(e) => return diverged(e),
         };
-        if let Err(d) = compare(&rust.records, &lines) {
+        // The host stops the run when any session (the root or a child) overruns its
+        // microstep budget and records the root's macrosteps only, so whether the last root
+        // record is partial is not known here: traces are compared, the budget is not.
+        if let Err(d) = compare_run(&rust.records, None, &lines) {
             return diverged(d.to_string());
         }
-        let last: Option<MacrostepTrace> = match lines.last() {
-            Some(LeanLine::Trace(t)) => serde_json::from_value(normalize_numbers(t.clone())).ok(),
-            _ => None,
-        };
+        let last: Option<MacrostepTrace> = lines
+            .last()
+            .and_then(LeanLine::trace)
+            .and_then(|t| serde_json::from_value(normalize_numbers(t.clone())).ok());
         // A host-level stop (budget, stall) is not the oracle's to judge: Lean ran the same
         // macrosteps, so it inherits the reason; a terminated session is judged from Lean's
         // own trace.

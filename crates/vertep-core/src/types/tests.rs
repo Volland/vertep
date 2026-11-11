@@ -241,6 +241,55 @@ fn unguarded_self_reference() {
     assert!(errs[0].to_string().contains("A -> B -> A"));
 }
 
+/// Run `f` on its own thread; panic if it does not finish within a few seconds.
+fn within_seconds<T: core::marker::Send + 'static>(
+    f: impl FnOnce() -> T + core::marker::Send + 'static,
+) -> T {
+    extern crate std;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(f());
+    });
+    rx.recv_timeout(core::time::Duration::from_secs(5))
+        .expect("the check terminates")
+}
+
+/// Recursion only through optional (`type A = optional<A>`) is guarded by the spec's rule and
+/// accepted; its only value is `null`. Checking any other value against it terminates with a
+/// mismatch: the checker stops when it would expand the same named type again at the same
+/// value position without consuming any of the value (decision "Type checking stops on
+/// non-contractive recursion").
+// @tg: verifies:: [[openspec:type-system#Recursive and Cyclic Type Definitions#Recursive tree through a list]] {level: unit}
+#[test]
+fn recursion_through_optional_only_terminates() {
+    let src = "type A = optional<A>; type B = optional<C>; type C = optional<B>; \
+               type D = optional<optional<D>>; type R = { a: A, n: int };";
+    assert_eq!(decls(src).validate(), vec![]);
+    let results = within_seconds(move || {
+        let d = decls(src);
+        let mut out = Vec::new();
+        for n in ["A", "B", "D"] {
+            out.push(kinds(d.check(&Type::named(n), &Value::Null)));
+            out.push(kinds(d.check(&Type::named(n), &s("x"))));
+            out.push(kinds(d.encode(&Type::named(n), &obj(&[])).map(|_| ())));
+        }
+        let rec = obj(&[("a", Value::Bool(true)), ("n", Value::Number(1.0))]);
+        let errs = d.check(&Type::named("R"), &rec).unwrap_err();
+        (out, errs)
+    });
+    let (out, errs) = results;
+    for (i, k) in out.iter().enumerate() {
+        if i % 3 == 0 {
+            assert_eq!(k, &vec![], "null is a value of every optional");
+        } else {
+            assert_eq!(k.len(), 1, "{k:?}");
+            assert!(matches!(k[0], TypeErrorKind::Mismatch { .. }), "{k:?}");
+        }
+    }
+    assert_eq!(errs.len(), 1);
+    assert_eq!(errs[0].path.to_string(), "$.a");
+}
+
 #[test]
 fn declarations_report_unknown_names_duplicates_and_reserved_names() {
     let d = decls(

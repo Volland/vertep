@@ -20,6 +20,7 @@ members = [
     "crates/vertep-cluster",
     "crates/vertep-federation",
     "crates/vertep-agent",
+    "crates/vertep-wasm",
 ]
 
 [workspace.package]
@@ -44,6 +45,9 @@ vertep-oxigraph = { path = "crates/vertep-oxigraph", version = "0.1.0" }
 vertep-runtime = { path = "crates/vertep-runtime", version = "0.1.0" }
 vertep-macros = { path = "crates/vertep-macros", version = "0.1.0" }
 vertep-dm-rust = { path = "crates/vertep-dm-rust", version = "0.1.0" }
+vertep-agent = { path = "crates/vertep-agent", version = "0.1.0" }
+vertep-federation = { path = "crates/vertep-federation", version = "0.1.0" }
+vertep-cluster = { path = "crates/vertep-cluster", version = "0.1.0", default-features = false }
 # vertep-macros: token parsing and code generation for statechart! and include_chart!.
 # `span-locations` gives the line and column of macro input tokens for IR spans.
 syn = { version = "2.0.119", features = ["full", "extra-traits"] }
@@ -78,3 +82,18 @@ missing_docs = "warn"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+
+# boa runs ECMAScript guards in generated differential charts; unoptimized it is ~300x slower,
+# which turns the debug-mode smoke samples into multi-minute runs.
+[profile.dev.package.boa_engine]
+opt-level = 3
+[profile.dev.package.boa_gc]
+opt-level = 3
+[profile.dev.package.boa_parser]
+opt-level = 3
+[profile.dev.package.boa_ast]
+opt-level = 3
+[profile.dev.package.boa_interner]
+opt-level = 3
+[profile.dev.package.boa_string]
+opt-level = 3

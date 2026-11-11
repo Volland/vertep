@@ -7,6 +7,7 @@
 //! vt hash <chart>                                       print the chart version IRI
 //! vt convert <chart> --to scxml|yaml|turtle|trig|nquads [-o <file>]
 //! vt certify <chart>                                    run the Lean checker, print the certificate
+//! vt cluster reshard <dir> <out>                        double a stopped cluster's shard count
 //! ```
 //!
 //! A chart may be SCXML (`.scxml`), YAML (`.yaml`) or RDF (`.ttl`, `.trig`, `.nq`, `.nt`);

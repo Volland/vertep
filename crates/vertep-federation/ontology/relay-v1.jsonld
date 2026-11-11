@@ -1,0 +1,17 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+    "vt": "https://w3id.org/vertep/vt#",
+    "vt-id": "https://w3id.org/vertep/vt-id#",
+    "type": "@type",
+    "RelayEnvelope": "vt-id:RelayEnvelope",
+    "messageId": "vt-id:messageId",
+    "name": "vt:eventName",
+    "sendid": "vt:sendId",
+    "data": { "@id": "vt-id:payload", "@type": "@json" },
+    "dataType": { "@id": "vt-id:payloadType", "@type": "@id" },
+    "chartVersion": { "@id": "vt-id:senderChartVersion", "@type": "@id" },
+    "correlation": "vt-id:correlation"
+  }
+}

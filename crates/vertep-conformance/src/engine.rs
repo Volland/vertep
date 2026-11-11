@@ -6,11 +6,9 @@
 use std::path::{Path, PathBuf};
 
 use vertep_core::datamodel::DatamodelRegistry;
-use vertep_core::null::WithNull;
 use vertep_core::tape::OracleRecord;
-use vertep_dm_ecma::EcmaRegistry;
 
-use crate::host::{Budget, DirLoader, Host, HostLog};
+use crate::host::{Budget, DirLoader, Host, HostLog, HostRegistry};
 use crate::manifest::TestCase;
 use crate::verdict::{FailReason, Verdict, judge};
 
@@ -72,7 +70,7 @@ pub struct RustCore {
 impl RustCore {
     /// Run one document with its directory as the source of `src` references.
     pub fn run_document(&self, dir: &Path, path: &Path) -> DocumentRun {
-        let registry = WithNull(EcmaRegistry);
+        let registry = HostRegistry;
         let loader = DirLoader::new(dir);
         let chart = match loader.compile_file(path) {
             Ok(c) => c,

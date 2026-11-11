@@ -8,8 +8,51 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+default = ["gossip", "quic", "runtime"]
+# SWIM gossip membership, sans-IO, with an in-process simulated network.
+gossip = []
+# The etcd and Kubernetes Lease authorities: record layouts only, no live client yet.
+etcd = []
+kubernetes = []
+# The QUIC cluster transport with mutual TLS.
+quic = ["dep:quinn", "dep:rustls", "dep:rustls-webpki", "dep:rcgen", "dep:tokio"]
+# The cluster inside the actor runtime: placement, sharded fenced storage, the cluster Event
+# I/O Processor, worker pool dispatch and the in-memory wire.
+runtime = ["dep:vertep-runtime", "dep:vertep-core", "dep:serde_json", "dep:tokio"]
+# The offline resharding of a directory of tiramemsu shard files (`vt cluster reshard`).
+tiramemsu = ["dep:vertep-tiramemsu"]
+# The shared membership test kit (`vertep_cluster::testkit`).
+testkit = []
+# Tests require the Lean lease oracle (`vertep-lease`) instead of skipping when it is not built.
+differential = []
+
 [dependencies]
-vertep-core = { workspace = true, features = ["std"] }
+vertep-store = { workspace = true }
+vertep-runtime = { workspace = true, optional = true }
+vertep-tiramemsu = { workspace = true, optional = true }
+vertep-core = { workspace = true, optional = true, features = ["std", "serde"] }
+serde_json = { version = "1", optional = true }
+quinn = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+rustls-webpki = { workspace = true, optional = true }
+rcgen = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["rt", "net", "time", "sync", "io-util"] }
+
+[dev-dependencies]
+vertep-cluster = { path = ".", default-features = false, features = ["testkit", "tiramemsu"] }
+vertep-runtime = { workspace = true, features = ["tiramemsu"] }
+vertep-core = { workspace = true, features = ["std", "serde"] }
+vertep-scxml = { workspace = true }
+vertep-dm-ecma = { workspace = true }
+vertep-store = { workspace = true, features = ["testkit"] }
+vertep-tiramemsu = { workspace = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "net", "time", "sync", "io-util", "macros"] }
+tempfile = "3"
+proptest = "1"
+serde_json = "1"
+# The Lean executables, for replaying fault-injection histories through the lease model.
+vertep-conformance = { path = "../vertep-conformance" }
 
 [lints]
 workspace = true

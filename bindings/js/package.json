@@ -1,0 +1,26 @@
+{
+  "name": "vertep-js-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The npm workspace of Vertep's JavaScript packages (@vertep/web, @vertep/dm-ecma)",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "workspaces": [
+    "packages/web",
+    "packages/dm-ecma"
+  ],
+  "scripts": {
+    "build": "sh scripts/build.sh",
+    "build:ts": "tsc -p packages/web && tsc -p packages/dm-ecma",
+    "test": "node --test --test-concurrency=1 packages/web/test/",
+    "check:size": "node scripts/check-size.mjs",
+    "check:version": "node scripts/check-version.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -191,3 +191,23 @@ Where the M6 spec refines the accepted decisions; the spec governs.
 - **JavaScript functions as named guards and actions.** The datamodel decision names `rust`, `ecmascript`, `null` and CEL. The browser reuses the `rust`-style named-function registry but binds IRIs to JavaScript functions from an implementations module. Purity is a documented contract checked only in development mode, unlike Rust where the type system helps; CEL is recommended for LLM-written charts.
 - **No tokio in the browser.** The decision chose tokio behind a small trait; M6 confirms the trait is the seam and uses `wasm-bindgen-futures` rather than tokio's wasm support.
 - **Storage never falls back.** The decision names tiramemsu as default; the spec forbids any silent fallback between `opfs` and `memory`, following tiramemsu's own rule about journal modes.
+
+## Implementation notes
+
+How `vertep-wasm` and `bindings/js` resolved what the M6 spec leaves open, as built on 2026-11-11.
+
+- describes:: [[decisions#One worker hosts the core, the shell and the journal]]
+- describes:: [[decisions#The browser shell implements the runtime shell trait]]
+- describes:: [[decisions#Implementations are a module imported by the worker]]
+- describes:: [[decisions#Browser storage is explicit, exclusive and native-format]]
+- describes:: [[decisions#TypeScript is one more projection of the type language]]
+- describes:: [[decisions#Separate packages keep the bundle budget]]
+- describes:: [[constraints#OPFS sync access handles need a dedicated worker]]
+
+- **Event shape.** A JavaScript event is `{type, ...fields}` for a record payload and `{type, data}` for any other payload; an object whose only key besides `type` is `data` reads as a non-record payload, so `vt gen ts` emits `{type, data}` for records with a `type` field or only a `data` field.
+- **Spawn before the first entry.** A virtual actor journals nothing until its first message (entry one carries the start macrostep), so `spawn` and `getSnapshot` before it report the start configuration computed by a scratch `start`, at position 0.
+- **First scheduling round.** It recovers overdue timers, so it waits for the first command; `createActorSystem({charts})` registers chart types before it, and an overdue timer then fires once.
+- **Transitions order.** Transition notifications list the transitions the journal entry recorded, which the runtime sorts by node IRI; execution order across microsteps is not recorded yet.
+- **Snapshots.** A subscriber gets one snapshot per macrostep whose configuration or context changed; the CEL datamodel's context is decoded from its exact snapshot encoding to plain JSON.
+- **Development mode.** Purity is checked by replaying the journal after each new entry and comparing with the live state, not by stepping twice in place.
+- **Size.** The 600 KB budget is not met by the core build (1.14 MB gzip); the check runs and fails, as the spec requires.

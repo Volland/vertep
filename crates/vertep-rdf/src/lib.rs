@@ -39,3 +39,10 @@ pub const VERIFICATION_ONTOLOGY_TTL: &str = include_str!("../ontology/vt-verific
 /// The runtime module of the `vt:` ontology: actors, journal entries, snapshots, timers,
 /// mailboxes and migrations.
 pub const RUNTIME_ONTOLOGY_TTL: &str = include_str!("../ontology/vt-runtime.ttl");
+
+/// The agent module of the ontology (`vt-agent:`): deciders, decisions, LLM calls, tools,
+/// tool calls, grants and plans, aligned with PROV-O by plain subclass triples.
+pub const AGENT_ONTOLOGY_TTL: &str = include_str!("../ontology/vt-agent.ttl");
+
+/// The SHACL Core shapes of the agent module.
+pub const AGENT_SHAPES_TTL: &str = include_str!("../shapes/vt-agent-shapes.ttl");

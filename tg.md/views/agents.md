@@ -621,3 +621,33 @@ Where the M3 specs refine or depart from the accepted decisions, the specs gover
 - **Candidates can be restricted.** The decision speaks of "the enabled events"; the spec intersects them with declared candidate descriptors and adds `vt.decide.none` for an empty set.
 - **LLM calls are invoked actors in M3, not stateless workers.** The decision on lifecycle classes names stateless workers as the home for LLM calls. M3 runs each call as an invoked actor on the local runtime; pooled LLM workers arrive with `worker-pools` in M4.
 - **Plans may also use the null datamodel**, not only CEL (`CEL-only Plans`).
+
+## Implementation in vertep-agent
+
+How M3 lowers the design onto code: a pure agent machine over journaled inputs, an imperative host that performs its effects, and grant filters on runtime actors.
+
+- describes:: [[components#vertep-agent]]
+- describes:: [[decisions#The agent host journals agent inputs]]
+- describes:: [[decisions#Decide bindings ride on vt extension attributes]]
+- describes:: [[decisions#Correlation ids derive from the journal position]]
+- describes:: [[decisions#vt:retry lowers to journaled retry timers]]
+- describes:: [[decisions#The agent ontology ships with vertep-rdf]]
+
+```mermaid
+flowchart LR
+    MB["mailbox"] --> H["AgentHost (shell)"]
+    H -- "append input" --> J["AgentJournal"]
+    H -- "apply(input, position)" --> M["AgentMachine (pure)"]
+    M -- "effects: Offer, StartLlm, StartTool, Timer, Send, Deliver" --> H
+    H --> D["Deciders"]
+    H --> P["Providers"]
+    H --> T["Tools"]
+    D -- "Decision or Refusal" --> MB
+    P -- "llm.result or LLM error" --> MB
+    T -- "tool result" --> MB
+    M -- "records" --> G["vt-agent graph"]
+```
+
+Every answer from outside — a decision, a model result, a tool result, a fired timer — is an input that the host journals before the machine applies it, so replaying a journal (or a prefix of it, for a fork) rebuilds the actor without consulting anything. The machine wraps the core's `step`: after each macrostep it recomputes the candidate sets of active decide states, re-offers when a fingerprint changes and closes offers of exited states. Plans run inside the parent's machine as bounded child sessions, so their state is rebuilt by the parent's replay and their duration bound is a durable timer of the parent.
+
+Runtime actors invoked from ordinary charts are restricted by `GrantedActor`, a wrapper around their factory: an ungranted send becomes `error.communication` (reason `not-granted`) to the sender and `vt.grant.denied` to the parent, which journals it.

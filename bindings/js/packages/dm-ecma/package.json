@@ -1,0 +1,35 @@
+{
+  "name": "@vertep/dm-ecma",
+  "version": "0.1.0",
+  "description": "The ECMAScript datamodel for @vertep/web: a build of the Vertep worker with the boa engine",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Volland/vertep",
+    "directory": "bindings/js/packages/dm-ecma"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "wasm/"
+  ],
+  "peerDependencies": {
+    "@vertep/web": "0.1.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  }
+}

@@ -29,10 +29,12 @@ pub mod verdict;
 
 pub use allow::{AllowList, AllowListError, Deviation};
 pub use engine::{CaseRun, DocumentRun, EngineUnderTest, RustCore};
-pub use host::{Budget, ChartLoader, DirLoader, Host, Stop};
+pub use host::{Budget, ChartLoader, DirLoader, Host, HostRegistry, Stop};
 pub use lean::{LeanOracle, LeanTools};
 pub use manifest::{Classification, Datamodel, Suite, TestCase};
-pub use report::{Record, Report, Status, Totals, run_differential, run_suite};
+pub use report::{
+    Exclusion, Record, Report, Status, Totals, cel_exclusions, run_differential, run_suite,
+};
 pub use verdict::{FailReason, Verdict};
 
 use std::path::PathBuf;

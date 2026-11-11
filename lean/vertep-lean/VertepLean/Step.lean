@@ -23,7 +23,9 @@ Deviations from the literal pseudo-code, all invisible on well-formed charts or 
 * recursion in the entry-set computation and in `isInFinalState` is bounded by fuel derived from
   the number of states (enough for every well-formed chart; exhaustion is `illFormed`);
 * the macrostep loop is bounded by `1000 * (budget + 1)` iterations as well as by the microstep
-  budget (`budgetExceeded` either way);
+  budget (`budgetExceeded` either way); the budget charges every microstep record, selections
+  that fire transitions and internal events consumed without enabling any (Rust `charge`), and
+  its exhaustion stops the macrostep where it is, leaving the partial result (`stepFull`);
 * a history value is used only when non-empty, otherwise the default transition is taken.
 -/
 
@@ -227,6 +229,8 @@ structure Core where
   sessions : Option (List String)
   micros : Array MicrostepTrace
   terminatedNow : Bool
+  /-- The microstep budget ran out: the macrostep stopped where it was (Rust `Err(Budget)`). -/
+  exhausted : Bool := false
   deriving Inhabited
 
 /-- What executable content may read: the configuration (for `In()`) and the session id. -/
@@ -822,12 +826,20 @@ def enterStates (ts : List Nat) : M cc Unit := do
             liftE cc (enqueue cc { name := s!"done.state.{(cc.st gp).id}", type := .platform })
         | none => pure ()
 
-/-- Appendix D `microstep` (Rust `microstep`), counted against the budget. -/
-def microstep (ev : Option String) (ts : List Nat) : M cc Unit := do
+/-- Rust `charge`: count one microstep record (a selection that fires transitions, or an
+internal event consumed without enabling any) against the budget; `false`, with the macrostep
+marked `exhausted`, when the budget has run out. -/
+def charge : M cc Bool := do
   let core ← get
   if core.used ≥ core.options.microstepBudget then
-    throw (.budgetExceeded core.options.microstepBudget)
+    set { core with exhausted := true }
+    return false
   set { core with used := core.used + 1 }
+  return true
+
+/-- Appendix D `microstep` (Rust `microstep`), counted against the budget. -/
+def microstep (ev : Option String) (ts : List Nat) : M cc Unit := do
+  if !(← charge cc) then return
   record cc ev ts
   exitStates cc ts
   for t in ts do runTrans cc t
@@ -873,6 +885,7 @@ then the invokes, repeated while invoking queued internal events. `fuel` bounds 
 def macroLoop : Nat → M cc Unit
   | 0 => do throw (.budgetExceeded (← get).options.microstepBudget)
   | fuel + 1 => do
+    if (← get).exhausted then return
     if !(← get).running then
       exitInterpreter cc false
       return
@@ -885,7 +898,8 @@ def macroLoop : Nat → M cc Unit
       | some e =>
         setEvent cc e
         let ts ← select cc (some e.name)
-        if ts.isEmpty then record cc (some e.name) []
+        if ts.isEmpty then
+          if ← charge cc then record cc (some e.name) []
         else microstep cc (some e.name) ts
         macroLoop fuel
       | none =>
@@ -971,9 +985,10 @@ def finish (input : TraceInput) (core : Core) (ex : ExecSt cc) : Out cc :=
     requests := ex.log.toList,
     tape := ex.tape }
 
-/-- Run an interpreter body from a session and a tape. -/
-def run (input : TraceInput) (body : M cc Unit) (s : Session) (tape : Tape)
-    (sessions : Option (List String)) : Except StepError (Out cc) :=
+/-- Run an interpreter body from a session and a tape: whether the microstep budget ran out, and
+the result (partial when it did, like Rust's `BudgetExceeded { partial }`). -/
+def runFull (input : TraceInput) (body : M cc Unit) (s : Session) (tape : Tape)
+    (sessions : Option (List String)) : Except StepError (Bool × Out cc) :=
   let core : Core :=
     { sessionid := s.sessionid, terminated := s.terminated, config := s.config,
       history := s.history, invocations := s.invocations, initialized := s.initialized,
@@ -983,7 +998,15 @@ def run (input : TraceInput) (body : M cc Unit) (s : Session) (tape : Tape)
     { tape, log := #[], effects := #[], internal := s.internal, sendCounter := s.sendCounter,
       invokeCounter := s.invokeCounter }
   match (body.run core).run ex with
-  | .ok (((), core), ex) => .ok (finish cc input core ex)
+  | .ok (((), core), ex) => .ok (core.exhausted, finish cc input core ex)
+  | .error e => .error e
+
+/-- Run an interpreter body from a session and a tape; budget exhaustion is an error. -/
+def run (input : TraceInput) (body : M cc Unit) (s : Session) (tape : Tape)
+    (sessions : Option (List String)) : Except StepError (Out cc) :=
+  match runFull cc input body s tape sessions with
+  | .ok (true, _) => .error (.budgetExceeded s.options.microstepBudget)
+  | .ok (false, o) => .ok o
   | .error e => .error e
 
 /-- The start body: `init_session` (a failure aborts the start), `set_environment`, then
@@ -1026,6 +1049,21 @@ tape. -/
 def step (cc : CChart) (s : Session) (i : Input) (tape : Tape) : Except StepError (Out cc) :=
   if s.terminated then .error .terminated
   else Interp.run cc (match i.kind with
+      | .event e => .event e
+      | .cancel => .cancel) (Interp.stepBody cc i) s tape i.sessions
+
+/-- `start` that also returns the partial result when the microstep budget runs out (Rust
+`StartError::BudgetExceeded { partial }`): whether it ran out, and the result. -/
+def startFull (cc : CChart) (si : StartInput) (tape : Tape) : Except StepError (Bool × Out cc) :=
+  Interp.runFull cc (.start si.info.sessionid) (Interp.startBody cc si)
+    (Session.fresh si.info.sessionid si.options) tape si.sessions
+
+/-- `step` that also returns the partial result when the microstep budget runs out (Rust
+`StepError::BudgetExceeded { partial }`). -/
+def stepFull (cc : CChart) (s : Session) (i : Input) (tape : Tape) :
+    Except StepError (Bool × Out cc) :=
+  if s.terminated then .error .terminated
+  else Interp.runFull cc (match i.kind with
       | .event e => .event e
       | .cancel => .cancel) (Interp.stepBody cc i) s tape i.sessions
 

@@ -391,7 +391,7 @@ Whole-chart rules are SHACL Core over triples the projection materializes, never
 
 ## Conformance variants are generated once and pinned
 
-IRP templates become `ecmascript` and `null` charts once, by a script; the results and their hashes are committed, every expected deviation has a reason, and an unexpected pass fails (M0 design D10).
+IRP templates become `ecmascript`, `null` and `cel` charts once, by a script; the results and their hashes are committed, every expected deviation has a reason, and an unexpected pass fails (M0 design D10).
 
 - motivated_by:: [[decisions#SCXML semantics are normative]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[decisions#IRP suite from a pinned mirror]] {weight: secondary}
@@ -491,6 +491,15 @@ The RDF, SHACL, JSON Schema and CEL projections of a type are tested to give the
 - motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary}
 
+## Type checking stops on non-contractive recursion
+
+`type A = optional<A>` stays valid, as the type-system spec allows recursion through an optional; the value checker reports a mismatch instead of expanding a named type again at the same value position.
+
+- motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary, note: "found by the protocol-model review; the Lean checker must mirror it"}
+
+The requirement `Recursive and Cyclic Type Definitions` admits recursion "only through a list or an optional", so rejecting `optional<A>` in `validate()` would contradict it; the type is well founded, its only value is `null`. The checker's `walk` used to recurse through `Named` and `Optional` without consuming the value and overflowed the stack on any non-null value. It now keeps the named types it is expanding at the current position, clears them when it descends into a list item, record field or union payload, and reports `Mismatch` when a name repeats: between two expansions of the same name at the same position only names and optionals can intervene, so a repeat means the expansion never ends. Rejected: rejecting non-contractive cycles in `validate()`, which the spec does not support, and a depth bound, which would accept or reject by an arbitrary constant.
+
 ## One macro pipeline for inline and included charts
 
 `statechart!` and `include_chart!` share one pipeline: tokens or a `.scxml`/`.yaml` file become IR, which is validated, type-checked and turned into the same generated types (M1 design 4).
@@ -570,3 +579,364 @@ A virtual actor of chart type `T` and key `K` is `<T>/<percent-encoded K>`, and 
 Each macrostep's random seed is derived from its entry IRI, so random values are not journaled one by one; the entry's configuration digest covers the datamodel they produced.
 
 - motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11"}
+
+## Decide bindings ride on vt extension attributes
+
+A `vt:decide` binding is read from `vt:` extension attributes, or a `vt:decide` element, on an ordinary state; the candidate set comes from the pure `enabled_events` in `vertep-agent` over the core's transition selection.
+
+- motivated_by:: [[decisions#Types ride on vt extension nodes]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Offer-time decider safety]] {weight: secondary}
+
+The M3 tasks placed the binding in the IR and `enabled_events` in `vertep-core`. Keeping both in `vertep-agent` leaves the no-std core, its compiled charts and the Lean model untouched, and every surface keeps the binding losslessly because SCXML and YAML already keep `vt:` extensions.
+
+## The agent host journals agent inputs
+
+`vertep-agent` runs agent actors in its own deterministic shell, `AgentHost`, over an `AgentJournal` of typed inputs: events, decisions, refusals, fired timers, `llm.result`, LLM errors and tool results.
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Every interaction is an effect]] {weight: secondary}
+
+The pure `AgentMachine` applies one input and returns effects; the host performs them, so replay and forks consult no decider, provider or tool. Agent actors reach runtime actors through a `NodeHandle`, and invoked runtime actors are restricted by `GrantedActor`, which filters their sends before they leave the actor.
+
+## Correlation ids derive from the journal position
+
+An offer's correlation id is `<actor>/decision/<position>.<k>`, the journal position of the input whose macrostep made the offer, so replay reproduces it and a fork renames only the actor prefix.
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Offer-time decider safety]] {weight: secondary}
+
+## vt:retry lowers to journaled retry timers
+
+`vt:retry="n"` with `vt:backoff` on an LLM invoke retries retryable error classes after a doubling durable backoff timer; every attempt and every fired timer is a journal entry.
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11"}
+
+The spec describes the extension as sugar for a generated retry substate. The machine-level lowering produces the same journal and the same `error.llm` (last class, attempt count) without rewriting the chart, so the chart's version hash is the one its author wrote.
+
+## LLM decisions count as LLM calls
+
+The model call behind an LLM decision is added to the actor's cumulative usage and recorded as a `vt-agent:LlmCall` keyed by the offer's correlation id, whether or not the decision is accepted.
+
+- motivated_by:: [[decisions#Deciders at choice points]] {weight: primary, since: "2026-11-11"}
+
+## Agent error events extend the error payload
+
+Agent `error.*` events carry the predefined `kind` and `message` fields plus their own, such as `reason`, `class` and `paths`; a typed chart may declare the richer payload under the event's exact name.
+
+- motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Typed charts fix the error payload]] {weight: secondary}
+
+`vertep-core` gives an exactly declared system event its declaration when typing transitions, as it already did when looking up payloads.
+
+## The agent ontology ships with vertep-rdf
+
+`vt-agent.ttl` and its SHACL shapes live in `vertep-rdf` beside the chart and runtime modules; `vertep-agent` writes the records and closes them under the module's PROV-O subclass and subproperty axioms.
+
+- motivated_by:: [[decisions#Modular vt ontology on RDF 1.2]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#The SHACL validator bounds only integers]] {weight: secondary}
+
+Decision annotations are RDF 1.2 reifiers of `decision vt-agent:chose event`, and confidence ranges are checked in Rust before a decision is accepted.
+
+## Enumerations are tagged unions in structured output
+
+A structured-output enumeration is a union of payload-free tags, so a model answers `{"tag": "tech"}` and guards read `ev.data.category.tag`.
+
+- motivated_by:: [[constraints#The type language has no string enumerations]] {weight: primary, since: "2026-11-11"}
+
+## DID resolution is a directory chosen by address scheme
+
+The runtime resolves `did:` addresses through a federation resolver registered for that scheme, which turns DID document services into routes and keys; `vt:` actors never reach it (M5 design D1).
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#IRI identity and lifecycle classes]] {weight: secondary, note: "a DID is one IRI scheme"}
+
+Rejected: a DID for every actor, which would put keys and a signature on every in-cluster message.
+
+## Method resolvers behind one trait
+
+`did:key` (offline), `did:peer` (pairwise) and `did:webvh` (verifiable history) ship behind one resolver trait and a registry that applications extend or override (M5 design D2).
+
+- motivated_by:: [[decisions#DID resolution is a directory chosen by address scheme]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: secondary}
+
+Rejected: a universal resolver over HTTP, which adds a network trust dependency to every resolution and fails offline.
+
+## Keys stay behind a key manager
+
+Signing, decryption and key agreement go through a `KeyManager` trait; journals, snapshots, datamodels and the graph hold only public keys and key ids (M5 design D3).
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary, note: "a never-forget store could only crypto-shred a key"}
+
+Hardware modules and remote key services plug in at the same seam.
+
+## Verification outcome is journaled with the input
+
+Sender authentication runs in the shell before `step`; the verified origin is journaled with the input event, so replay after a key rotation uses the recorded outcome (M5 design D4).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: secondary}
+
+Rejected: verifying in the datamodel or a guard, which would make `step` depend on resolution and cryptography.
+
+## Verified origin carried by origin presence
+
+Until `_event` has a verified flag in `vertep-core`, a relay delivery sets `_event.origin` only to a verified sender DID and `_event.origintype` to the relay processor; an unverified event has no origin.
+
+- motivated_by:: [[decisions#Verification outcome is journaled with the input]] {weight: primary, since: "2026-11-11"}
+- -contradicts:: [[decisions#Verification outcome is journaled with the input]] {ticket: "m5-federation 4.1", reason: "the core field touches every Event literal across crates other milestones are editing, and the Lean model"}
+
+Guards test `_event.origin`; the full outcome (verified flag, sender key, I/O processor) is in the actor's inbound records in graph `<actor>/inbound`.
+
+## DIDComm mailboxes acknowledge after the append
+
+A DIDComm mediator stores forwards for an actor; the actor's mailbox picks up in batches or live and acknowledges each message to the mediator only when the runtime acknowledges it after the journal append (M5 design D6).
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: primary}
+
+The relay mailbox implements the runtime's `Mailbox`, so the runtime's own acknowledgement after a durable turn, or after it drops a duplicate message id, is what releases the mediator's copy.
+
+## TSP direct when reachable, routed otherwise
+
+The TSP transport maps an actor's DID to its VID, sets up a relationship before the first direct event, and nests the event for the recipient inside routed messages through intermediaries (M5 design D7).
+
+- motivated_by:: [[decisions#TSP before DIDComm across trust boundaries]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary}
+
+The recipient's `TSPTransport` service lists its intermediaries as routing keys; the last intermediary delivers a nested message the recipient opens and verifies against the original sender.
+
+## Protocol-neutral event envelope
+
+One JSON-LD envelope carries an SCXML event over DIDComm and TSP alike: name, send id, typed data, sender chart version and message id; `origin` and `origintype` come from the verified sender and the I/O processor (M5 design D8).
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary, note: "the message id in the envelope is the deduplication key"}
+
+Rejected: per-protocol native message types, which would mean two mappings and protocol code that knows event semantics.
+
+## Transport selection follows the DID document
+
+A cross-trust send tries the recipient's services in a configured preference order, falls back to the next compatible one when an endpoint is unreachable, and records the fallback (M5 design D9).
+
+- motivated_by:: [[decisions#TSP before DIDComm across trust boundaries]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Non-blocking request and deferred events]] {weight: secondary, note: "retries never block the chart"}
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: secondary}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary, note: "a fallback re-send keeps the message id"}
+
+## Relay outbox owns cross-trust retries
+
+The runtime outbox hands a cross-trust send to a relay outbox queue in the same storage; that queue applies outbound grants, selection, fallback and the retry policy, and raises `error.communication` in the sender.
+
+- motivated_by:: [[decisions#Transport selection follows the DID document]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Non-blocking request and deferred events]] {weight: primary}
+
+The runtime's own retry loop knows no policy or reason; keeping cross-trust delivery in one place lets the error carry the send id and the reason, and leaves in-cluster delivery unchanged.
+
+## Pinned relay protocol libraries
+
+DIDComm v2 uses Affinidi's DIDComm 2.1 and JOSE crates, TSP the OpenWallet Foundation `tsp_sdk`, and `did:webvh` the DIF `didwebvh-rs`, each behind a cargo feature, with private-key steps through the key manager.
+
+- motivated_by:: [[decisions#Keys stay behind a key manager]] {weight: primary, since: "2026-11-11"}
+
+The libraries' own pack and unpack take raw private keys, so the JWE and TSP envelopes are composed from their primitives; output is checked wire-compatible with Affinidi's decrypt and `tsp_sdk`'s open.
+
+## Shards by IRI hash modulo a fixed count
+
+An actor's shard is a fixed, versioned 64-bit hash of its IRI modulo a power-of-two shard count recorded at cluster creation (M4 design D1).
+
+- motivated_by:: [[decisions#Shard-based placement]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Tiramemsu has a single writer per file]] {weight: primary}
+- motivated_by:: [[decisions#Power-of-two shard counts]] {weight: secondary}
+
+Hash version 1 is the FNV-1a placement of single-node tiramemsu backends, so a single node becomes a one-member cluster without moving data. Rejected: an Orleans per-actor directory, and consistent hashing with virtual nodes, which ties an actor's shard to the member set.
+
+## Leases with fencing epochs from the membership authority
+
+Every shard lease has an expiry and an epoch that increases strictly on each grant and stays on renewal; an owner stops a safety margin before expiry by its own monotonic clock (M4 design D2).
+
+- motivated_by:: [[decisions#Shard-based placement]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Fencing epochs on journal appends]] {weight: secondary}
+
+Rejected: journal compare-and-set alone, which neither stops a stale owner's outbox nor works across shipped file copies.
+
+## Local shard journals shipped on move
+
+In v1 a shard's journal is a tiramemsu file on its owner: a move drains, ships the missing suffix, verifies the end versions and then transfers the lease; failover uses optional standbys (M4 design D3).
+
+- motivated_by:: [[decisions#Two storage traits with tiramemsu as default]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Optional standby journal replication]] {weight: primary}
+
+Tiramemsu never mutates history, so shipping and replication are append-only copies. Rejected: a networked journal from day one; the lease-transfer move is specified and tested against a shared in-memory store so such a backend needs no spec change.
+
+## Fencing on appends and outbound frames
+
+Every append and every outbound frame of a virtual actor carries its shard and lease epoch; stores and standbys reject lower epochs, and receivers drop lower-epoch frames into the dead-letter graph (M4 design D4).
+
+- motivated_by:: [[decisions#Fencing epochs on journal appends]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Shard-based placement]] {weight: secondary}
+
+The store side is the M2 fencing token with the shard IRI as its scope; M4 is the first caller that sets it.
+
+## Membership behind one trait
+
+Static, gossip (SWIM) and external (etcd, Kubernetes Lease) membership implement one trait: view, subscribe, acquire, renew, release, revoke and hand over leases; one test kit runs on all (M4 design D5).
+
+- motivated_by:: [[decisions#Shard-based placement]] {weight: primary, since: "2026-11-11"}
+
+Rejected: embedding Raft. Gossip lease granting is weaker than consensus under partitions; fencing keeps safety there. The gossip implementation is a sans-IO SWIM in the crate rather than the `foca` crate, so the simulated network can drive it deterministically.
+
+## QUIC with mutual TLS and a stream per actor pair
+
+Each node keeps one QUIC connection per peer with cluster-issued certificates; messages from actor X to actor Y use a stream keyed by the pair, up to a cap, then share streams in order (M4 design D6).
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-11"}
+
+Rejected: TCP with TLS (head-of-line blocking across actors) and gRPC (a schema layer and weaker control over streams).
+
+## At-least-once inside the cluster with journal deduplication
+
+Senders retry until the receiver acknowledges that the message is stored; receivers deduplicate by message id, through the journal for virtual actors and a bounded id cache otherwise (M4 design D7).
+
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary}
+
+Rejected: an exactly-once transport, impossible across failures and redundant with the journal.
+
+## Rebalancing moves the fewest shards and resharding is offline
+
+The rebalancer keeps each shard with its live owner while that owner is within its share and moves only the rest; resharding doubles the shard count offline, splitting shard s into s and s plus N (M4 design D8).
+
+- motivated_by:: [[decisions#Shard-based placement]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Power-of-two shard counts]] {weight: primary}
+
+Each move is drain, ship or confirm the replica, verify the end version, hand the lease over at epoch plus one, resume. Online resharding is a non-goal of M4.
+
+## Workers are pooled, not sharded
+
+Stateless worker activations go to any member declaring the worker type, balanced by round robin, least outstanding or prefer local; they never lease a shard or touch a journal (M4 design D9).
+
+- motivated_by:: [[decisions#IRI identity and lifecycle classes]] {weight: primary, since: "2026-11-11"}
+
+Results reach a virtual actor caller as journaled reply events matched by correlation id. Failures are error events or request timeouts; only types declared idempotent are retried, once, on another activation.
+
+## Placement is a runtime hook with three answers
+
+A clustered runtime node asks a `Placement` where a virtual actor or worker lives before delivering or activating: local, remote through a mailbox that carries the message, or held in the local mailbox.
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Shard-based placement]] {weight: primary}
+
+Without a placement the runtime is unchanged. The hold answer is what keeps a non-owner from activating an actor whose shard has no live owner, and what makes messages wait in mailboxes with replication factor one.
+
+## A free shard goes only to a node holding its journal
+
+A node claims a shard whose lease is free only if it holds the shard's journal (old owner, shipped copy or standby replica) or the shard was never owned.
+
+- motivated_by:: [[decisions#Local shard journals shipped on move]] {weight: primary, since: "2026-11-11"}
+
+With replication factor one this keeps a failed owner's shards unavailable instead of restarting them from an empty journal on another node.
+
+## Unreplicated entries stay unreadable until the quorum catches up
+
+An owner appends locally, then ships to standbys; without the quorum the append fails and the actor's journal is neither read nor extended until a later shipment brings enough standbys level.
+
+- motivated_by:: [[decisions#Local shard journals shipped on move]] {weight: primary, since: "2026-11-11"}
+
+So an entry that missed the quorum never produces effects, and a standby taking over holds every entry whose effects anyone saw.
+
+## Worker pools dispatch from the sending node
+
+Each node runs its own dispatcher per worker type and balances its own requests over activations it creates on the members that declare the type in configuration; each reply passing through frees its activation's capacity.
+
+- motivated_by:: [[decisions#Workers are pooled, not sharded]] {weight: primary, since: "2026-11-11"}
+
+No cluster-wide pool state is needed. Per-node limits are therefore per dispatcher; the worker node's runtime pool bounds the true concurrency.
+
+## Fault-injection histories export as JSON lines
+
+The fault-injection harness records grants, appends, frames and acknowledgements, checks them in Rust, and can write them as JSON lines for the Lean lease and fencing model to replay as an oracle.
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
+
+The format is documented in `vertep-cluster` `history.rs`; the Lean side reads it in a later change.
+
+## Offline resharding reads a lease dump
+
+`vt cluster reshard` refuses to run while the data directory's `leases` file, dumped from the lease authority, lists a live lease, and names the nodes holding them.
+
+- motivated_by:: [[decisions#Rebalancing moves the fewest shards and resharding is offline]] {weight: primary, since: "2026-11-11"}
+
+The tool writes the doubled shard files and metadata to a new directory, so rolling back is keeping the old one.
+
+## One worker hosts the core, the shell and the journal
+
+In a browser the whole actor system (core, shell, tiramemsu journal and the application's guards and actions) runs in one dedicated worker; the page holds a thin typed client (M6 design D1).
+
+- motivated_by:: [[constraints#OPFS sync access handles need a dedicated worker]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#A node runs its actors on one thread]] {weight: secondary}
+- motivated_by:: [[decisions#SCXML semantics are normative]] {weight: secondary, note: "steps call guards synchronously, run to completion"}
+
+A core on the main thread with storage in a worker would make every journal append an asynchronous round trip inside a macrostep; a SharedWorker has no OPFS sync access handles. `vertep-wasm` implements this as `System` behind a JSON command bridge; `@vertep/web` posts commands and receives notifications.
+
+## The browser shell implements the runtime shell trait
+
+The browser shell maps spawn to `spawn_local`, sleep to a `setTimeout` future and the clock to `Date.now()`, read only when stamping an input; Node.js worker threads use the same shell (M6 design D2).
+
+- motivated_by:: [[decisions#No-std core and tokio shell]] {weight: primary, since: "2026-11-11"}
+
+The node is driven by `run_until_idle`, `Node::next_deadline` and `NodeHandle::wakeup` rather than tokio; the first scheduling round, which fires overdue durable timers, waits for the first command so that the application's chart types are registered first. The sleep future holds only shared state, so it is `Send` without `unsafe`.
+
+## Implementations are a module imported by the worker
+
+Applications pass a module URL whose `guards` and `actions` exports are bound, by IRI, into the `rust`-style named-function registry; the worker imports it and steps call the functions synchronously (M6 design D3).
+
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Rust actions lower to a foreach over the action IRI]] {weight: secondary}
+
+Functions cannot cross `postMessage`. Purity is a documented contract; development mode replays every new journal entry and reports a guard or action whose replay disagrees with the live step. CEL charts need no module.
+
+## Browser storage is explicit, exclusive and native-format
+
+Storage is `opfs` or `memory`, chosen explicitly with no fallback; an `opfs` store takes a Web Lock named after its path before it opens, and journal files keep tiramemsu's native format (M6 design D4).
+
+- motivated_by:: [[constraints#Tiramemsu has a single writer per file]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#OPFS sync access handles need a dedicated worker]] {weight: primary}
+- motivated_by:: [[decisions#Two storage traits with tiramemsu as default]] {weight: secondary}
+
+A plain `memory` store is `vertep-store`'s in-memory store and holds no SQLite; `memory` with `journal: true` is a tiramemsu file in the memory VFS that exports and imports, which is how Node.js persists. OPFS without sync access handles fails with `StorageUnavailable`; a second holder gets `StoreLocked`.
+
+## TypeScript is one more projection of the type language
+
+`vt gen ts` emits the event union, the context interface, the state-id union, a typed chart spec and a typed `create<Name>Actor` from the same IR types as the other projections (M6 design D5).
+
+- motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Type projections must agree with the checker]] {weight: primary}
+
+TypeScript cannot state integer ranges or string patterns, so it agrees with JSON Schema on structure while scalar refinements are checked when the event reaches the chart; a property test checks the agreement on structure.
+
+## JavaScript ergonomics follow XState and semantics follow SCXML
+
+The API borrows XState's names (`createActorSystem`, `spawn`, `send`, `request`, `subscribe`, `getSnapshot`, `matches`, `can`) while execution is exactly the core step (M6 design D6).
+
+- motivated_by:: [[decisions#SCXML semantics are normative]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Non-blocking request and deferred events]] {weight: secondary, note: "request is the external ask"}
+
+`can` selects enabled transitions, or a deferring active state, on a copy of the datamodel and journals nothing.
+
+## WebSocket is a transport and an Event I/O Processor
+
+Browser actors reach server actors through a WebSocket transport carrying Vertep envelopes and acknowledgements, with outbox redelivery after reconnect and deduplication by message id (M6 design D7).
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: primary}
+
+Not implemented yet: tasks 7.1 to 7.5 of `m6-wasm-js` are open.
+
+## Separate packages keep the bundle budget
+
+`@vertep/web` ships a core build without SQLite and a journal build loaded only for journaled stores; the boa ECMAScript datamodel ships as `@vertep/dm-ecma`, a worker build the application passes in (M6 design D8).
+
+- motivated_by:: [[decisions#Pluggable datamodel]] {weight: primary, since: "2026-11-11"}
+
+Measured 2026-11-11 (release, opt-level z, LTO, gzip -9): core 1.14 MB against the 600 KB budget, journal 2.18 MB within 2.5 MB. The core build carries a SPARQL engine (the in-memory store), CEL with its regex engine, and the SCXML, YAML and RDF readers; meeting the budget needs one of them moved out of the core build.

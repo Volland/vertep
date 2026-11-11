@@ -1,0 +1,110 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix vt-agent: <https://w3id.org/vertep/agent#> .
+@prefix vt:   <https://w3id.org/vertep/vt#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL Core shapes for the vt-agent: module (vertep-rdf/ontology/vt-agent.ttl), one per class.
+# Every record vertep-agent writes conforms. Confidence ranges are checked by vertep-agent
+# before a decision is accepted (the validator's numeric bounds cover integers only).
+
+vt-agent:DeciderShape
+    a sh:NodeShape ;
+    sh:targetClass vt-agent:Decider ;
+    rdfs:comment "A decider is named by an IRI and has one binding." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt-agent:binding ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt-agent:DecisionShape
+    a sh:NodeShape ;
+    sh:targetClass vt-agent:Decision ;
+    rdfs:comment "A decision chose one event for one offer, and was accepted or not." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt-agent:chose ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-agent:correlationId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:accepted ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:property [ sh:path vt-agent:actor ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-agent:decider ; sh:maxCount 1 ; sh:class vt-agent:Decider ] ;
+    sh:property [ sh:path vt-agent:decideState ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:reason ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt-agent:DecisionAnnotationShape
+    a sh:NodeShape ;
+    sh:targetSubjectsOf vt-agent:confidence , vt-agent:rationale ;
+    rdfs:comment "A decision annotation reifies exactly one statement and has at most one value of each annotation." ;
+    sh:property [ sh:path rdf:reifies ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path vt-agent:confidence ; sh:maxCount 1 ; sh:datatype xsd:decimal ] ;
+    sh:property [ sh:path vt-agent:rationale ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:model ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:promptHash ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:deciderKind ; sh:maxCount 1 ; sh:in ( "guard" "llm" "human" "actor" "custom" ) ] ;
+    sh:property [ sh:path vt-agent:fallback ; sh:maxCount 1 ; sh:datatype xsd:boolean ] .
+
+vt-agent:LlmCallShape
+    a sh:NodeShape ;
+    sh:targetClass vt-agent:LlmCall ;
+    rdfs:comment "A model call has its invoke id, provider binding, model identifier, prompt hash, token counts, latency and outcome." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt-agent:actor ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-agent:invokeId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:provider ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:model ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ] ;
+    sh:property [ sh:path vt-agent:promptHash ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^sha256:[0-9a-f]{64}$" ] ;
+    sh:property [ sh:path vt-agent:promptTokens ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 0 ] ;
+    sh:property [ sh:path vt-agent:completionTokens ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 0 ] ;
+    sh:property [ sh:path vt-agent:latencyMs ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 0 ] ;
+    sh:property [ sh:path vt-agent:attempt ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 1 ] ;
+    sh:property [ sh:path vt-agent:outcome ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:cost ; sh:maxCount 1 ; sh:datatype xsd:decimal ] ;
+    sh:property [ sh:path vt-agent:currency ; sh:maxCount 1 ; sh:pattern "^[A-Z]{3}$" ] .
+
+vt-agent:ToolShape
+    a sh:NodeShape ;
+    sh:targetClass vt-agent:Tool ;
+    rdfs:comment "A tool is named by an IRI." ;
+    sh:nodeKind sh:IRI .
+
+vt-agent:ToolCallShape
+    a sh:NodeShape ;
+    sh:targetClass vt-agent:ToolCall ;
+    rdfs:comment "A tool call names its tool, its caller and its outcome." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt-agent:tool ; sh:minCount 1 ; sh:maxCount 1 ; sh:class vt-agent:Tool ] ;
+    sh:property [ sh:path vt-agent:actor ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-agent:outcome ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt-agent:GrantShape
+    a sh:NodeShape ;
+    sh:targetClass vt-agent:Grant ;
+    rdfs:comment "A grant lists what it allows." ;
+    sh:property [ sh:path vt-agent:allows ; sh:datatype xsd:string ] .
+
+vt-agent:DeniedSendShape
+    a sh:NodeShape ;
+    sh:targetClass vt-agent:DeniedSend ;
+    rdfs:comment "A refused send names its sender, target and event." ;
+    sh:property [ sh:path vt-agent:sender ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-agent:target ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:eventName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt-agent:PlanShape
+    a sh:NodeShape ;
+    sh:targetClass vt-agent:Plan ;
+    rdfs:comment "A plan has a content hash, a validation outcome, its parent actor and invoking state; a rejected plan lists its violations." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt-agent:contentHash ; sh:minCount 1 ; sh:maxCount 1 ; sh:pattern "^sha256:[0-9a-f]{64}$" ] ;
+    sh:property [ sh:path vt-agent:accepted ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:property [ sh:path vt-agent:actor ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-agent:invokingState ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-agent:generatedBy ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-agent:violation ; sh:datatype xsd:string ] .
+
+vt-agent:PlanExecutionShape
+    a sh:NodeShape ;
+    sh:targetClass vt-agent:PlanExecution ;
+    rdfs:comment "A plan execution runs one plan for one parent and has an outcome." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt-agent:executes ; sh:minCount 1 ; sh:maxCount 1 ; sh:class vt-agent:Plan ] ;
+    sh:property [ sh:path vt-agent:actor ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-agent:outcome ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] .

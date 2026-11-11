@@ -1,0 +1,10 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+    "vt-id": "https://w3id.org/vertep/vt-id#",
+    "VertepGrantCredential": "vt-id:GrantCredential",
+    "target": { "@id": "vt-id:target", "@type": "@id" },
+    "events": { "@id": "vt-id:event", "@container": "@set" }
+  }
+}

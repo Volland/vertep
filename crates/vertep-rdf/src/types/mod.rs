@@ -8,6 +8,7 @@
 //!   [`value`] encodes runtime values in RDF so that the encoding of a value conforms to the
 //!   shapes of a type exactly when the core checker accepts the value.
 //! - [`json_schema`] projects types to JSON Schema 2020-12 documents with the same agreement.
+//! - [`typescript`] projects types and charts to TypeScript for `@vertep/web` (`vt gen ts`).
 //! - [`project_chart_types`] adds a chart's named types (definitions and shapes) to its RDF
 //!   projection, so the chart version covers its types.
 //!
@@ -17,6 +18,7 @@
 pub mod ident;
 pub mod json_schema;
 pub mod shapes;
+pub mod typescript;
 pub mod value;
 
 use oxrdf::{Graph, NamedNode, NamedNodeRef, TripleRef};

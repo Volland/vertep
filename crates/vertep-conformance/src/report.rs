@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::allow::AllowList;
 use crate::engine::{CaseRun, EngineUnderTest};
-use crate::manifest::{Classification, Datamodel, TestCase};
+use crate::manifest::{Classification, Datamodel, ManifestTest, Suite, SuiteError, TestCase};
 use crate::verdict::{FailReason, Verdict};
 
 /// What a variant's result means for the run.
@@ -123,6 +123,38 @@ pub struct Report {
     pub totals: BTreeMap<Classification, Totals>,
     /// Totals per classification and datamodel.
     pub totals_by_datamodel: BTreeMap<String, Totals>,
+    /// Tests deliberately not generated for a datamodel, with the reason.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub excluded: Vec<Exclusion>,
+}
+
+/// A test that has no variant for a datamodel on purpose.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Exclusion {
+    /// The IRP test identifier.
+    pub test: String,
+    /// The datamodel without a variant.
+    pub datamodel: Datamodel,
+    /// The IRP classification of the test.
+    pub classification: Classification,
+    /// Why there is no variant.
+    pub reason: String,
+}
+
+/// The tests of `suite` that have no `cel` variant, with their reasons.
+pub fn cel_exclusions(suite: &Suite) -> Result<Vec<Exclusion>, SuiteError> {
+    Ok(suite
+        .cel_exclusions()?
+        .into_iter()
+        .map(|(test, reason)| Exclusion {
+            classification: suite
+                .test(&test)
+                .map_or(Classification::Manual, ManifestTest::classification),
+            test,
+            datamodel: Datamodel::Cel,
+            reason,
+        })
+        .collect())
 }
 
 /// Classify a run against the allow-list and the gate
@@ -386,6 +418,35 @@ impl Report {
                     r.test,
                     r.datamodel,
                     r.reason.as_deref().unwrap_or("")
+                );
+            }
+        }
+        if !self.excluded.is_empty() {
+            let mut by_reason: BTreeMap<(Datamodel, &str), Vec<String>> = BTreeMap::new();
+            for e in &self.excluded {
+                by_reason
+                    .entry((e.datamodel, e.reason.as_str()))
+                    .or_default()
+                    .push(format!(
+                        "{}{}",
+                        e.test,
+                        match e.classification {
+                            Classification::Mandatory => "",
+                            Classification::Optional => "(o)",
+                            Classification::Manual => "(m)",
+                        }
+                    ));
+            }
+            let _ = writeln!(
+                s,
+                "not generated (o = optional, m = manual; all others mandatory):"
+            );
+            for ((dm, reason), tests) in by_reason {
+                let _ = writeln!(
+                    s,
+                    "  {dm}: {} tests, {reason}: {}",
+                    tests.len(),
+                    tests.join(" ")
                 );
             }
         }

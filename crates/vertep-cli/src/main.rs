@@ -55,6 +55,39 @@ enum Cmd {
         /// The chart file.
         chart: PathBuf,
     },
+    /// Generate code from a chart.
+    Gen {
+        #[command(subcommand)]
+        command: GenCmd,
+    },
+    /// Cluster operations.
+    Cluster {
+        #[command(subcommand)]
+        command: ClusterCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum GenCmd {
+    /// The TypeScript module for @vertep/web: events, context, state ids and a typed actor.
+    Ts {
+        /// The chart file.
+        chart: PathBuf,
+        /// The prefix of the generated names (default: the chart name or file stem).
+        #[arg(long)]
+        name: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum ClusterCmd {
+    /// Double the shard count of a stopped cluster (offline).
+    Reshard {
+        /// The cluster data directory: `cluster.meta`, the shard files and `leases`.
+        dir: PathBuf,
+        /// Where to write the resharded files and metadata.
+        out: PathBuf,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -101,6 +134,12 @@ fn main() -> ExitCode {
             output.as_deref(),
         ),
         Cmd::Certify { chart } => commands::certify(&chart),
+        Cmd::Gen {
+            command: GenCmd::Ts { chart, name },
+        } => commands::gen_ts(&chart, name.as_deref()),
+        Cmd::Cluster {
+            command: ClusterCmd::Reshard { dir, out },
+        } => commands::cluster_reshard(&dir, &out),
     };
     print!("{}", out.stdout);
     eprint!("{}", out.stderr);

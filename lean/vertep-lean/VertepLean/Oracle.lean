@@ -11,7 +11,9 @@ Rust run given as `OracleRecord` JSON Lines: for each record it runs `start` or 
 record's input with the record's datamodel answer tape and writes the Lean `MacrostepTrace`.
 With `--compare` it compares each Lean trace with the record's and reports the first differing
 record. A run whose datamodel requests differ from the tape (other requests, fewer, or more) is a
-difference too.
+difference too. A macrostep that runs out of the microstep budget is written as
+`{"budgetExceeded": BUDGET, "trace": PARTIAL}`: the error together with the partial trace, as
+Rust's `BudgetExceeded { partial }` returns both.
 
 ```
 vertep-oracle --chart CHART.nq --records RECORDS.jsonl [--out TRACES.jsonl] [--compare]
@@ -38,38 +40,42 @@ def loadChart (src : String) : Except String (Chart × CChart) := do
 
 /-- The outcome of replaying one record. -/
 inductive Replay where
-  /-- The Lean trace, the record's trace, and the next session. -/
+  /-- The Lean trace, the record's trace, the next session, and the microstep budget when it
+  ran out (the trace is then partial). -/
   | ok (lean : MacrostepTrace) (rust : MacrostepTrace) (next : Option Session)
+      (exceeded : Option Nat)
   /-- The Lean step failed or issued other datamodel requests than the tape records. -/
   | failed (msg : String) (rust : MacrostepTrace)
 
 /-- Replay one record from the current session. -/
 def replay (cc : CChart) (cur : Option Session) (r : Json.OracleRecord) : Replay :=
-  let res := match r.input, cur with
-    | .start si, _ => start cc si r.tape
-    | .step i, some s => step cc s i r.tape
-    | .step _, none => .error (.illFormed "a step record before the start record")
+  -- A macrostep that runs out of the microstep budget yields its partial result, as Rust's
+  -- `BudgetExceeded { partial }` does; it is replayed and written like any other.
+  let (res, budget) := match r.input, cur with
+    | .start si, _ => (startFull cc si r.tape, si.options.microstepBudget)
+    | .step i, some s => (stepFull cc s i r.tape, s.options.microstepBudget)
+    | .step _, none => (.error (.illFormed "a step record before the start record"), 0)
   match res with
   | .error e => .failed s!"the Lean step failed: {repr e}" r.trace
-  | .ok o =>
+  | .ok (exhausted, o) =>
     if o.requestList != r.tape.map (·.request) then
       .failed s!"datamodel requests differ from the tape: Lean issued {o.requestList.length}, the tape records {r.tape.length}" r.trace
-    else .ok o.trace r.trace (some o.session)
+    else .ok o.trace r.trace (some o.session) (if exhausted then some budget else none)
 
 /-- Replay every record; the Lean traces (or failures) in order. -/
 def replayAll (cc : CChart) (rs : List Json.OracleRecord) : List Replay :=
   (rs.foldl (fun (acc : List Replay × Option Session) r =>
     let x := replay cc acc.2 r
     match x with
-    | .ok _ _ next => (acc.1 ++ [x], next)
+    | .ok _ _ next _ => (acc.1 ++ [x], next)
     | .failed .. => (acc.1 ++ [x], acc.2)) ([], none)).1
 
 /-- Index and description of the first record whose Lean trace differs from the Rust one. -/
 def firstDifference (rs : List Replay) : Option (Nat × String) :=
   (rs.zipIdx.find? fun (x, _) => match x with
-    | .ok l r _ => l != r
+    | .ok l r _ _ => l != r
     | .failed .. => true).map fun (x, i) => match x with
-    | .ok l r _ =>
+    | .ok l r _ _ =>
       (i, s!"lean: {(Json.traceToJson l).compress}\nrust: {(Json.traceToJson r).compress}")
     | .failed m r => (i, s!"{m}\nrust: {(Json.traceToJson r).compress}")
 
@@ -97,7 +103,9 @@ def run (args : List String) : IO UInt32 := do
     | .error e => IO.eprintln s!"records: {e}"; return 3
   let replays := replayAll cc records
   let lines := replays.map fun x => match x with
-    | .ok l _ _ => (Json.traceToJson l).compress
+    | .ok l _ _ none => (Json.traceToJson l).compress
+    | .ok l _ _ (some b) =>
+      (Lean.Json.mkObj [("budgetExceeded", Lean.toJson b), ("trace", Json.traceToJson l)]).compress
     | .failed m _ => (Lean.Json.mkObj [("error", .str m)]).compress
   let out := String.join (lines.map (· ++ "\n"))
   match opt args "--out" with

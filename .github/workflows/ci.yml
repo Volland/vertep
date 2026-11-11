@@ -78,3 +78,79 @@ jobs:
           test: false
       - uses: Swatinem/rust-cache@v2
       - run: cargo test -p vertep-conformance --release --features differential -- --ignored differential
+
+  cluster-platforms:
+    name: Cluster shard hash on ${{ matrix.os }}
+    strategy:
+      matrix:
+        # Linux and macOS on x86_64 and aarch64: the golden vectors of the shard hash
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-13, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p vertep-cluster --test placement same_iri_same_shard_everywhere
+
+  cluster-faults:
+    name: Nightly cluster fault injection
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    env:
+      VERTEP_HISTORY_DIR: ${{ github.workspace }}/cluster-histories
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: lean/vertep-lean
+          build: true
+          test: false
+      - uses: Swatinem/rust-cache@v2
+      # `differential`: the histories must replay through the Lean lease model (m4-cluster 6.5)
+      - run: cargo test -p vertep-cluster --release --features differential --test faults --test simulation --test runtime
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cluster-histories
+          path: cluster-histories
+
+  wasm:
+    name: WebAssembly core, bindings and npm packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: vertep-core builds for wasm32 with default features
+        run: cargo build -p vertep-core --target wasm32-unknown-unknown
+      - name: No target-specific code in vertep-core
+        run: |
+          if grep -rnE 'target_(arch|os|family)|wasm_bindgen|js_sys|web_sys' crates/vertep-core/src; then
+            echo "vertep-core must have no target-specific code paths" >&2
+            exit 1
+          fi
+      - run: cargo test -p vertep-wasm --features journal
+      - name: wasm-bindgen CLI at the crate's pinned version
+        run: cargo install wasm-bindgen-cli --locked --version "$(sed -n 's/^wasm-bindgen = "=\(.*\)"/\1/p' crates/vertep-wasm/Cargo.toml)"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+      - working-directory: bindings/js
+        run: npm ci
+      - working-directory: bindings/js
+        run: npm run build
+      - name: Package versions equal the crate version
+        working-directory: bindings/js
+        run: npm run check:version
+      - name: Tests in Node.js and headless Chrome
+        working-directory: bindings/js
+        env:
+          CHROME: ${{ steps.chrome.outputs.chrome-path }}
+        run: npm test
+      - name: Bundle size budget
+        working-directory: bindings/js
+        run: npm run check:size

@@ -11,6 +11,7 @@
 //! | `tiramemsu` (default) | [`tiramemsu`] | the default storage backend |
 //! | `scxml` (default) | [`scxml`] | the SCXML reader and writer |
 //! | `ecmascript` | [`ecmascript`] | the ECMAScript datamodel |
+//! | `federation` | `federation` | DID identities, grants, DIDComm v2 and TSP relays |
 //!
 //! Start with [`prelude`] and `examples/quickstart.rs`: one virtual actor on tiramemsu, a
 //! durable delayed send, and a time-travel query.
@@ -32,6 +33,15 @@ pub use vertep_scxml as scxml;
 
 #[cfg(feature = "ecmascript")]
 pub use vertep_dm_ecma as ecmascript;
+
+#[cfg(feature = "agent")]
+pub use vertep_agent as agent;
+
+#[cfg(feature = "federation")]
+pub use vertep_federation as federation;
+
+#[cfg(feature = "cluster")]
+pub use vertep_cluster as cluster;
 
 /// The names most programs need.
 pub mod prelude {

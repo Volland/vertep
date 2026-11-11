@@ -177,6 +177,53 @@ flowchart LR
     M4 --> M5["M5<br/>interop tests, no new theorems"]
 ```
 
+## Protocol models
+
+The journal protocol, decide states with grants, and shard leases are modelled as nondeterministic systems over any interleaving; their theorems are invariants of every reachable state, and each model has an oracle executable.
+
+- describes:: [[capabilities#Event journal]]
+- describes:: [[capabilities#Deciders]]
+- describes:: [[capabilities#LLM actors]]
+- describes:: [[capabilities#Shard placement]]
+- describes:: [[components#vertep-runtime]] {note: "journal model and property tests"}
+- describes:: [[components#vertep-agent]] {note: "decider model and decide-state differential tests"}
+- describes:: [[components#vertep-cluster]] {note: "lease model and history replay"}
+- describes:: [[decisions#Fencing epochs on journal appends]]
+
+| Model (`VertepLean/`) | Proven, in every reachable state | Oracle and Rust test |
+|---|---|---|
+| `Journal`, `JournalTheorems` | `replay_determinism`, `replay_no_divergence`, `replay_equals_live`; `turn_idempotent`, `accepted_once`; `outbox_safe`, `outbox_complete`, `no_message_lost`; `cas_single`, `turn_cas_exclusive` | `vertep-journal` judges runs of `tests/journal_protocol.rs`: two nodes, crashes before and after append, redeliveries, concurrent activations |
+| `Agent`, `AgentTheorems` | `decider_safety`, `stale_not_taken`, `unknown_not_taken`, `decision_dedup`, `decision_once`, `replay_live`; `chainGrant_mem`, `grants_do_not_escalate`, `grant_enforced`, `ungranted_not_delivered` | `vertep-decide` replays decision outcomes of `tests/decide_differential.rs`: generated charts with a decide state, adversarial decisions |
+| `Lease`, `LeaseTheorems` | `grant_unique`, `one_writer_per_epoch`, `journal_epochs_ordered`, `shard_epochs_ordered`, `message_once`, `stale_append_fenced`, `frames_ordered`, `stale_frame_dropped` | `vertep-lease` replays `History::to_jsonl` of the cluster fault-injection test |
+
+```mermaid
+flowchart LR
+    subgraph models["Lean models (abstract machine, any interleaving)"]
+        J["Journal: CAS append, dedup, outbox, replay"]
+        A["Agent: offers, decide, grants"]
+        L["Lease: authorities, fenced store, receivers"]
+    end
+    subgraph rust["Rust under test"]
+        RT["vertep-runtime Node"]
+        AG["vertep-agent AgentMachine"]
+        CL["vertep-cluster fault injection"]
+    end
+    RT -- "observation JSON" --> OJ["vertep-journal"]
+    AG -- "decision outcomes JSONL" --> OD["vertep-decide"]
+    CL -- "history JSONL" --> OL["vertep-lease"]
+    J --> OJ
+    A --> OD
+    L --> OL
+```
+
+What the models abstract, and what the oracles found:
+
+- The agent model takes the SCXML core as parameters (candidate names, offer-time and decision-time selection, schema check, macrostep), so its theorems hold for the Lean `step` and for any other core; the decision oracle takes the two decision-time answers from the Rust run, like the datamodel answer tape.
+- The journal model advances the outbox mark only over delivered sends, as the Transactional Outbox requires. Rust used to advance it after handing sends to the transport and keep a refused send only as an in-memory retry, which a crash would lose; fixed 2026-11-11, the Rust mark now passes only delivered sends (`refused_send_survives_a_crash`).
+- The journal property tests found that two live nodes whose durable mailboxes share one store lose messages: `StoreMailbox` numbered row IRIs by its own sequence, so they collided and acknowledging one message stripped the other's type and recipient. Fixed 2026-11-11 with row IRIs that carry the envelope's digest; `journal_protocol_shared_durable_mailboxes_lose_no_message` runs.
+- The lease oracle needs every grant in the history. The fault-injection harness now records the grants `Membership::tick` makes as well as its own, and its histories replay in strict mode (11,241 decisions agree on five seeds) from the fault-injection test itself.
+- The protocol-model review also found that the Rust type checker did not terminate on `type A = optional<A>` against a non-null value; see [[decisions#Type checking stops on non-contractive recursion]], which the Lean type language (verification backlog 4.1) has to mirror.
+
 ## Differential oracle loop
 
 The Lean `step` runs as an executable on the same charts and inputs as Rust; any difference in configurations, effects or datamodel requests fails CI and is shrunk into a regression test.
@@ -266,6 +313,8 @@ flowchart TD
 | `Optional Test Reporting` | optional tests reported separately, outside the gate |
 | `Conformance Report` | per test: datamodel, class, Rust verdict, Lean verdict, reason; totals |
 | `Round Trip Corpus Checks` | every corpus chart survives SCXML and RDF round trips and conforms to the shapes |
+
+The CEL datamodel runs the same suite through `confCel.xsl` variants of every datamodel-neutral template (`suite/cel/`). Tests without a variant are listed in `suite/cel/EXCLUDED.tsv` with a reason: not a template, ECMAScript regular expressions over `_event.raw`, or `<script>`, which the expression-only CEL datamodel lacks. Every mandatory CEL variant gates CI like the other datamodels.
 
 Known risk: boa's ECMAScript gaps can fail tests unrelated to SCXML; those are allow-listed with the engine issue as reason, and the trait keeps another engine possible. M6 runs the same suite in WebAssembly (`Conformance Suite In WebAssembly`).
 

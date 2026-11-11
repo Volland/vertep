@@ -50,6 +50,7 @@ use crate::machine::{Ctx, Machine, MachineError};
 use crate::mailbox::{
     Envelope, Mailbox, MailboxError, MailboxFactory, MemoryMailbox, MemoryMailboxes,
 };
+use crate::placement::{Placement, Route};
 use crate::shell::Shell;
 use crate::storage::{Storage, select, text};
 use crate::transport::{Directory, Resolver, Transport, Transports};
@@ -413,6 +414,8 @@ struct Shared {
     counter: AtomicU64,
     nonce: u64,
     shutdown: AtomicBool,
+    /// Where virtual actors and workers live, on a clustered node.
+    placement: Option<Arc<dyn Placement>>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -524,6 +527,37 @@ impl Shared {
             .or_else(|| self.transports.get(SCXML_EVENT_PROCESSOR))
             .cloned()
             .ok_or_else(|| DeliveryError::Transport(format!("no transport for {type_}")))?;
+        if let Some(m) = self.placed_elsewhere(&to, &env) {
+            return transport
+                .deliver(m.as_ref(), env)
+                .map_err(|e| DeliveryError::Transport(e.0));
+        }
+        self.deliver_with(env, &to, transport.as_ref())
+    }
+
+    /// The mailbox that carries messages for `to` to another node, when the placement says
+    /// another node hosts it. Asks and invoked children always live here.
+    fn placed_elsewhere(&self, to: &Address, env: &Envelope) -> Option<Arc<dyn Mailbox>> {
+        let p = self.placement.as_ref()?;
+        let kind = self.kind(to);
+        if matches!(kind, Some(Kind::Ask | Kind::Child)) {
+            return None;
+        }
+        match p.route(to, kind == Some(Kind::Virtual), Some(env)) {
+            Route::Remote(m) => Some(m),
+            Route::Local | Route::Hold => None,
+        }
+    }
+
+    /// Delivers `env` to `to` on this node (or through the directory), without asking the
+    /// placement.
+    fn deliver_with(
+        &self,
+        env: Envelope,
+        to: &Address,
+        transport: &dyn Transport,
+    ) -> Result<(), DeliveryError> {
+        let to = to.clone();
         if let Some((m, kind)) = self.local_mailbox(&to) {
             transport
                 .deliver(m.as_ref(), env)
@@ -644,6 +678,28 @@ impl NodeHandle {
         self.shared.directory.register(scheme, resolver);
     }
 
+    /// Binds `address` to the virtual actor of `chart_type` with `key`: the actor is hosted
+    /// here and activated on message like `<chart_type>/<key>`, with `address` as its subject.
+    /// Used for actors whose address is a DID.
+    pub fn bind_address(&self, address: &Address, chart_type: &str, key: &str) {
+        self.shared
+            .charts_mut()
+            .bind(address.as_str(), chart_type, key);
+    }
+
+    /// Tells the node that the mailbox of the local actor `a` received messages from outside
+    /// the node (a relay pickup), so the actor is activated and receives them. False when `a`
+    /// is not hosted here.
+    pub fn notify(&self, a: &Address) -> bool {
+        match self.shared.local_mailbox(a) {
+            Some((_, kind)) if kind != Kind::Ask => {
+                self.shared.mark_ready(a);
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// Asks [`Node::run`] to return.
     pub fn shutdown(&self) {
         self.shared.shutdown.store(true, Ordering::SeqCst);
@@ -653,6 +709,44 @@ impl NodeHandle {
     /// The node's clock reading.
     pub fn now_ms(&self) -> i64 {
         self.shared.shell.clock.now_ms()
+    }
+
+    /// Completes once the node has new work (a delivered message, a finished background turn,
+    /// a shutdown request), for shells that drive the node with [`Node::run_until_idle`]. A
+    /// signal sent while nobody waits is kept for the next waiter.
+    pub fn wakeup(&self) -> crate::shell::BoxFuture<()> {
+        let shared = self.shared.clone();
+        Box::pin(async move { shared.wake.notified().await })
+    }
+
+    /// Delivers `env` to an actor hosted on this node without asking the placement: what a
+    /// cluster does with a message another node sent here for an actor this node owns.
+    ///
+    /// # Errors
+    ///
+    /// [`DeliveryError`] when its receiver cannot be resolved.
+    pub fn deliver_here(&self, env: Envelope) -> Result<(), DeliveryError> {
+        let to =
+            Address::parse(&env.to).map_err(|_| DeliveryError::Unresolvable(env.to.clone()))?;
+        let transport = self
+            .shared
+            .transports
+            .get(SCXML_EVENT_PROCESSOR)
+            .cloned()
+            .ok_or_else(|| DeliveryError::Transport("no local transport".into()))?;
+        self.shared.deliver_with(env, &to, transport.as_ref())
+    }
+
+    /// Records `env` in `receiver`'s dead-letter graph with `reason`, at the node's time.
+    pub fn record_dead_letter(&self, receiver: &Address, env: &Envelope, reason: &str) {
+        self.shared
+            .dead_letter(receiver, env, reason, self.shared.shell.clock.now_ms());
+    }
+
+    /// The number of messages waiting in the local mailbox of `a` (none when `a` has no
+    /// mailbox here).
+    pub fn pending(&self, a: &Address) -> usize {
+        lock(&self.shared.mailboxes).get(a).map_or(0, |m| m.len())
     }
 }
 
@@ -665,6 +759,7 @@ pub struct NodeBuilder {
     mailboxes: Arc<dyn MailboxFactory>,
     scheme_mailboxes: BTreeMap<String, Arc<dyn MailboxFactory>>,
     transports: Transports,
+    placement: Option<Arc<dyn Placement>>,
 }
 
 impl std::fmt::Debug for NodeBuilder {
@@ -706,6 +801,13 @@ impl NodeBuilder {
         self
     }
 
+    /// The placement of a clustered node: where virtual actors and workers live. Without one
+    /// the node hosts every virtual actor it knows the chart type of.
+    pub fn placement(mut self, p: Arc<dyn Placement>) -> Self {
+        self.placement = Some(p);
+        self
+    }
+
     /// Builds the node. On its first [`Node::pump`] (after the chart types are registered) it
     /// recovers what a previous process left: pending timers, undispatched sends and stored
     /// mailbox messages.
@@ -735,6 +837,7 @@ impl NodeBuilder {
             counter: AtomicU64::new(0),
             nonce,
             shutdown: AtomicBool::new(false),
+            placement: self.placement,
         });
 
         Node {
@@ -754,6 +857,7 @@ impl NodeBuilder {
             recovered: false,
             stats: NodeStats::default(),
             factories,
+            outbox: HashMap::new(),
         }
     }
 }
@@ -765,6 +869,9 @@ struct Armed {
 
 enum Volatile {
     Deliver(Box<Envelope>),
+    /// A recorded send of the entry at the position that its transport refused: retried until
+    /// delivered, and owed by the outbox until then.
+    Resend(Address, u64, Box<SendRecord>),
     Restart(Address, u64),
 }
 
@@ -833,6 +940,18 @@ pub struct Node {
     recovered: bool,
     stats: NodeStats,
     factories: Vec<Arc<dyn MailboxFactory>>,
+    outbox: HashMap<Address, Outbox>,
+}
+
+/// What one actor's outbox still owes in this process. The durable mark
+/// (`vt:dispatchedThrough`) moves only over entries whose sends were all delivered, so a send a
+/// transport refused is dispatched again after a crash.
+#[derive(Default)]
+struct Outbox {
+    /// The highest journal position whose sends were dispatched.
+    tip: u64,
+    /// Positions with sends a transport refused and that are not delivered yet: how many each.
+    owed: BTreeMap<u64, usize>,
 }
 
 impl std::fmt::Debug for Node {
@@ -867,6 +986,7 @@ impl Node {
             mailboxes: Arc::new(MemoryMailboxes),
             scheme_mailboxes: BTreeMap::new(),
             transports: Transports::local(),
+            placement: None,
         }
     }
 
@@ -1130,7 +1250,9 @@ impl Node {
         }
     }
 
-    fn next_deadline(&self) -> Option<i64> {
+    /// The earliest time something is due (a timer, a failed actor's back-off, an idle
+    /// deadline), for shells that drive the node with [`Node::run_until_idle`] themselves.
+    pub fn next_deadline(&self) -> Option<i64> {
         let mut d: Vec<i64> = Vec::new();
         d.extend(self.timers.keys().next().map(|k| k.0));
         d.extend(self.volatile.keys().next().map(|k| k.0));
@@ -1468,13 +1590,11 @@ impl Node {
         // the outbox: sends of entries after the last dispatched position
         for e in loaded.entries.iter().filter(|e| e.position > through) {
             if let Some(eff) = e.effects() {
-                for s in eff.sends.clone() {
-                    self.dispatch_send(a, &s, now);
-                }
+                self.dispatch_sends(a, e.position, &eff.sends, now);
             }
         }
         if loaded.head > through {
-            self.mark_through(a, loaded.head);
+            self.advance_outbox(a, loaded.head);
         }
         // invoked children live inside their parent: rebuild them
         for log in invocations {
@@ -1483,6 +1603,8 @@ impl Node {
         Ok(())
     }
 
+    /// Moves the durable outbox mark of `a` forward to `n` (never back: another node sharing
+    /// the store may have moved it further).
     fn mark_through(&self, a: &Address, n: u64) {
         let g = self.shared.storage.graph(a.node());
         let graph = GraphName::NamedNode(a.outbox_graph());
@@ -1492,6 +1614,17 @@ impl Node {
             .into_iter()
             .filter(|q| q.predicate == p)
             .collect();
+        let current = old
+            .iter()
+            .filter_map(|q| match &q.object {
+                Term::Literal(l) => l.value().parse::<u64>().ok(),
+                _ => None,
+            })
+            .max()
+            .unwrap_or(0);
+        if current >= n {
+            return;
+        }
         let _ = g.remove_quads(&old);
         let _ = g.insert_quads(&[Quad::new(
             a.node().clone(),
@@ -1525,6 +1658,9 @@ impl Node {
     // @tg: implements:: [[openspec:event-journal#Inputs Only From The Journal]]
     // @tg: implements:: [[openspec:messaging#Duplicate Reply Suppression]]
     fn virtual_turn(&mut self, a: &Address, now: i64) -> bool {
+        if let Some(progress) = self.placement_turn(a, now) {
+            return progress;
+        }
         if !self.actors.contains_key(a)
             && let Err(e) = self.activate(a, now)
         {
@@ -1771,11 +1907,9 @@ impl Node {
         now: i64,
     ) {
         let Some(eff) = data.effects() else { return };
-        for s in &eff.sends {
-            self.dispatch_send(a, s, now);
-        }
+        self.dispatch_sends(a, data.position, &eff.sends, now);
         if !eff.sends.is_empty() {
-            self.mark_through(a, data.position);
+            self.advance_outbox(a, data.position);
         }
         for c in &eff.cancels {
             self.disarm(c);
@@ -1808,10 +1942,55 @@ impl Node {
         let _ = self.shared.deliver(env, SCXML_EVENT_PROCESSOR);
     }
 
-    /// Dispatches one recorded send: resolves its recipient and delivers it with its send IRI
-    /// as message id; an unresolvable recipient becomes `error.communication` for the sender
-    /// and a dead letter.
-    fn dispatch_send(&mut self, from: &Address, s: &SendRecord, now: i64) {
+    /// Dispatches the recorded sends of the entry of `from` at `position`; the sends a transport
+    /// refused stay owed until a retry delivers them.
+    fn dispatch_sends(&mut self, from: &Address, position: u64, sends: &[SendRecord], now: i64) {
+        let refused = sends
+            .iter()
+            .filter(|s| !self.dispatch_send(from, position, s, now))
+            .count();
+        let o = self.outbox.entry(from.clone()).or_default();
+        o.tip = o.tip.max(position);
+        if refused > 0 {
+            *o.owed.entry(position).or_default() += refused;
+        }
+    }
+
+    /// Moves the durable outbox mark of `a` to `upto`, or to just before its first entry with
+    /// an owed send ([[openspec:event-journal#Transactional Outbox]]: the mark passes only
+    /// delivered sends, as in the Lean journal model's `outbox_safe`).
+    fn advance_outbox(&mut self, a: &Address, upto: u64) {
+        let o = self.outbox.entry(a.clone()).or_default();
+        o.tip = o.tip.max(upto);
+        let through = match o.owed.keys().next() {
+            Some(&p) => p.saturating_sub(1).min(o.tip),
+            None => o.tip,
+        };
+        if through > 0 {
+            self.mark_through(a, through);
+        }
+    }
+
+    /// A retried send of the entry of `from` at `position` was delivered (or dead-lettered).
+    fn settle_send(&mut self, from: &Address, position: u64) {
+        let Some(o) = self.outbox.get_mut(from) else {
+            return;
+        };
+        if let Some(n) = o.owed.get_mut(&position) {
+            *n = n.saturating_sub(1);
+            if *n == 0 {
+                o.owed.remove(&position);
+            }
+        }
+        let tip = o.tip;
+        self.advance_outbox(from, tip);
+    }
+
+    /// Dispatches one recorded send of the entry of `from` at `position`: resolves its
+    /// recipient and delivers it with its send IRI as message id; an unresolvable recipient
+    /// becomes `error.communication` for the sender and a dead letter. A send its transport
+    /// refuses is retried after the failure backoff; `false` then, as it is not delivered yet.
+    fn dispatch_send(&mut self, from: &Address, position: u64, s: &SendRecord, now: i64) -> bool {
         let env = Envelope {
             message_id: s.iri.clone(),
             to: s.recipient.clone().unwrap_or_default(),
@@ -1832,18 +2011,27 @@ impl Node {
                 self.dead_letter(&receiver, &env, "unresolvable", now);
             }
             Err(DeliveryError::Transport(_)) => {
-                // retried: keep it as a volatile delivery after the failure backoff
+                // retried after the failure backoff, and owed by the outbox until delivered
                 self.seq += 1;
                 self.volatile.insert(
                     (now.saturating_add(self.config.failure_backoff_ms), self.seq),
-                    Volatile::Deliver(Box::new(env)),
+                    Volatile::Resend(from.clone(), position, Box::new(s.clone())),
                 );
+                return false;
             }
         }
+        true
     }
 
     /// Records a dead letter in the receiver's dead-letter graph.
     // @tg: implements:: [[openspec:messaging#Queryable Dead Letters]]
+    fn dead_letter(&self, receiver: &Address, env: &Envelope, reason: &str, now: i64) {
+        self.shared.dead_letter(receiver, env, reason, now);
+    }
+}
+
+impl Shared {
+    /// Records a dead letter in the receiver's dead-letter graph.
     fn dead_letter(&self, receiver: &Address, env: &Envelope, reason: &str, now: i64) {
         let g = receiver.dead_letter_graph();
         let d = receiver.dead_letter_iri(&env.message_id);
@@ -1872,13 +2060,11 @@ impl Node {
         if let Some(o) = &env.event.origin {
             quads.push(q(vt::SENDER, Literal::new_simple_literal(o).into()));
         }
-        let _ = self
-            .shared
-            .storage
-            .graph(receiver.node())
-            .insert_quads(&quads);
+        let _ = self.storage.graph(receiver.node()).insert_quads(&quads);
     }
+}
 
+impl Node {
     /// The dead letters recorded for `receiver`, by SPARQL over its dead-letter graph.
     ///
     /// # Errors
@@ -1954,6 +2140,65 @@ impl Node {
             self.stats.deactivations += 1;
             if let Some((m, _)) = self.shared.local_mailbox(a) {
                 m.release_all();
+            }
+        }
+    }
+
+    /// The virtual actors active on this node.
+    pub fn active_actors(&self) -> Vec<Address> {
+        self.actors
+            .iter()
+            .filter(|(_, act)| matches!(act, Activation::Virtual(_)))
+            .map(|(a, _)| a.clone())
+            .collect()
+    }
+
+    /// Drains the virtual actors `which` selects, for a shard handover: runs until idle (every
+    /// macrostep in progress finishes and its outbox is dispatched), then deactivates them.
+    /// Returns the actors deactivated. Their messages that arrive afterwards follow the
+    /// placement.
+    pub fn drain(&mut self, which: &dyn Fn(&Address) -> bool) -> Vec<Address> {
+        self.run_until_idle();
+        let drained: Vec<Address> = self
+            .active_actors()
+            .into_iter()
+            .filter(|a| which(a))
+            .collect();
+        for a in &drained {
+            self.deactivate(a);
+        }
+        drained
+    }
+
+    /// Applies the placement before a turn of virtual actor `a`. `None` when `a` lives here
+    /// (or the node has no placement); otherwise the actor is deactivated here, and its
+    /// waiting messages either move to the node that hosts it or stay held.
+    fn placement_turn(&mut self, a: &Address, now: i64) -> Option<bool> {
+        let p = self.shared.placement.clone()?;
+        match p.route(a, true, None) {
+            Route::Local => None,
+            Route::Hold => {
+                self.deactivate(a);
+                self.park(a, now);
+                Some(false)
+            }
+            Route::Remote(remote) => {
+                self.deactivate(a);
+                let Some((m, _)) = self.shared.local_mailbox(a) else {
+                    return Some(false);
+                };
+                let mut moved = false;
+                for env in m.pending() {
+                    let id = env.message_id.clone();
+                    if remote.enqueue(env).is_ok() {
+                        let _ = m.ack(&id);
+                        moved = true;
+                    } else {
+                        self.park(a, now);
+                        break;
+                    }
+                }
+                Some(moved)
             }
         }
     }
@@ -2085,6 +2330,11 @@ impl Node {
                         );
                     }
                 }
+                Volatile::Resend(from, position, s) => {
+                    if self.dispatch_send(&from, position, &s, now) {
+                        self.settle_send(&from, position);
+                    }
+                }
                 Volatile::Restart(a, generation) => self.restart_child(&a, generation, now),
             }
         }
@@ -2146,12 +2396,10 @@ impl Node {
                     if let Ok(e) = EntryData::from_record(&a, &r)
                         && let Some(eff) = e.effects()
                     {
-                        for s in eff.sends.clone() {
-                            self.dispatch_send(&a, &s, now);
-                        }
+                        self.dispatch_sends(&a, e.position, &eff.sends, now);
                     }
                 }
-                self.mark_through(&a, head);
+                self.advance_outbox(&a, head);
             }
         }
         for f in self.factories.clone() {
@@ -2904,6 +3152,27 @@ impl Node {
         }
         let loaded = self.load(a, None)?;
         Ok(actor_state(loaded.machine.as_ref(), loaded.head))
+    }
+
+    /// Whether `a` would accept `event` in its current configuration: the event enables at
+    /// least one transition or an active state defers it. Guards are evaluated on a copy of the
+    /// datamodel; nothing changes and nothing is journaled. An actor without a journal has no
+    /// configuration yet and accepts nothing.
+    ///
+    /// # Errors
+    ///
+    /// [`ActivationError`] when the journal cannot be replayed.
+    pub fn can(&mut self, a: &Address, event: &Event) -> Result<bool, ActivationError> {
+        if let Some(Activation::Virtual(v)) = self.actors.get(a)
+            && let Some(m) = &v.machine
+        {
+            return Ok(m.can(self.registry.as_ref(), event));
+        }
+        let loaded = self.load(a, None)?;
+        Ok(loaded
+            .machine
+            .as_ref()
+            .is_some_and(|m| m.can(self.registry.as_ref(), event)))
     }
 
     /// The decoded journal of `a`.

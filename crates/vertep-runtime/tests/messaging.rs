@@ -184,6 +184,32 @@ fn durable_mailbox_survives_a_restart() {
     assert!(n2.mailbox(&a).is_empty());
 }
 
+/// Two live store mailboxes of one address on one store (two nodes sharing a store) number
+/// their rows independently; acknowledging a row of one must not touch the other's rows, so a
+/// restart still recovers every unacknowledged message (found by the Lean journal model).
+// @tg: verifies:: [[openspec:messaging#Mailboxes Outlive Activations#Durable mailbox survives a restart]] {level: unit}
+#[test]
+fn shared_store_mailboxes_keep_each_others_rows() {
+    let store = Arc::new(MemoryStore::new());
+    let boxes = StoreMailboxes::new(store.clone());
+    let a = va("sink", "k");
+    let env = |id: &str, name: &str| Envelope::new(id, &a, ev(name));
+    let m1 = vertep_runtime::MailboxFactory::create(&boxes, &a);
+    let m2 = vertep_runtime::MailboxFactory::create(&boxes, &a);
+    m1.enqueue(env("urn:vertep:test:m1", "one")).unwrap();
+    m2.enqueue(env("urn:vertep:test:m2", "two")).unwrap();
+    assert_eq!(m1.receive(&[]).unwrap().message_id, "urn:vertep:test:m1");
+    m1.ack("urn:vertep:test:m1").unwrap();
+    let reopened = vertep_runtime::MailboxFactory::create(&boxes, &a);
+    let left: Vec<String> = reopened
+        .pending()
+        .into_iter()
+        .map(|e| e.message_id)
+        .collect();
+    assert_eq!(left, vec!["urn:vertep:test:m2"]);
+    assert_eq!(vertep_runtime::MailboxFactory::recover(&boxes), vec![a]);
+}
+
 // @tg: verifies:: [[openspec:messaging#Pluggable Transports#Local transport as Event I/O Processor]] {level: integration}
 #[test]
 fn local_transport_as_event_io_processor() {

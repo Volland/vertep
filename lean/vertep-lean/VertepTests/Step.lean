@@ -173,6 +173,27 @@ def budgetCut : Bool :=
   | _ => false
 #guard budgetCut
 
+/-- The budget charges internal events consumed without enabling any (Rust `charge`): the
+failing guard of a parallel state's eventless transition, evaluated once per active atomic
+state, queues two `error.execution` per round and enables nothing, so only the budget ends the
+macrostep (regression `5cbfa3338d26b03f` of the differential harness). The partial result has
+one microstep record per charged round. -/
+-- @tg: verifies:: [[openspec:formal-model#Differential Oracle#Budget exhaustion agrees with Rust]] {level: unit}
+def idleLoop : Chart :=
+  { states := [node "p" (el := .parallel) (ts := [tr [] [] (cond := some "x")])
+                 (children := [node "a", node "b"])] }
+def idleLoopCut : Bool :=
+  let si : StartInput := { info := { sessionid := "s" }, options := { microstepBudget := 200 } }
+  (match start (cc idleLoop) si [] with
+   | .error (.budgetExceeded 200) => true
+   | _ => false) &&
+  (match startFull (cc idleLoop) si [] with
+   | .ok (true, o) => o.trace.microsteps.length == 200 &&
+       o.trace.microsteps.all (fun m => m.event == some "error.execution" && m.transitions.isEmpty) &&
+       o.trace.configuration == ["p", "a", "b"]
+   | _ => false)
+#guard idleLoopCut
+
 /-- Events after termination are rejected. -/
 def terminatedRejects : Bool :=
   match runEvents finals ["e", "again"] with

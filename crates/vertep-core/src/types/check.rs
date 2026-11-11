@@ -14,6 +14,11 @@
 //! - a tagged union is `{"tag": <tag>, "value": <payload>}`, without `value` for a variant
 //!   that has no payload;
 //! - an optional value is `null` or the value; `undefined` counts as `null`.
+//!
+//! Named types may recurse through `optional` alone (`type A = optional<A>` is guarded and
+//! valid; its only value is `null`). Checking stops when it would expand a named type it is
+//! already expanding at the same position of the value, since nothing of the value was consumed
+//! in between and the expansion would never end: the value is then a mismatch for that type.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -196,6 +201,7 @@ impl Declarations {
             decls: self,
             errors: Vec::new(),
             path: Vec::new(),
+            unfolding: Vec::new(),
         };
         c.walk(ty, value);
         if c.errors.is_empty() {
@@ -211,6 +217,7 @@ impl Declarations {
             decls: self,
             errors: Vec::new(),
             path: Vec::new(),
+            unfolding: Vec::new(),
         };
         let out = c.walk(ty, value);
         if c.errors.is_empty() {
@@ -244,6 +251,8 @@ struct Walker<'a> {
     decls: &'a Declarations,
     errors: Vec<TypeError>,
     path: Vec<PathSeg>,
+    /// The named types being expanded at the current position of the value.
+    unfolding: Vec<String>,
 }
 
 fn is_absent(v: &Value) -> bool {
@@ -290,7 +299,36 @@ impl<'a> Walker<'a> {
     }
 
     /// Check `v` against `ty` and build its canonical encoding.
+    ///
+    /// A named type that is already being expanded at this position of the value is a
+    /// non-contractive recursion (through `optional` only): nothing of `v` was consumed since,
+    /// so `v` is no value of it.
+    // @tg: implements:: [[decisions#Type checking stops on non-contractive recursion]]
     fn walk(&mut self, ty: &Type, v: &Value) -> Option<Value> {
+        let Type::Named(n) = ty else {
+            return self.walk_structure(ty, v);
+        };
+        if self.unfolding.contains(n) {
+            self.mismatch(ty, v);
+            return None;
+        }
+        self.unfolding.push(n.clone());
+        let out = self.walk_structure(ty, v);
+        self.unfolding.pop();
+        out
+    }
+
+    /// Check the part `v` of the value, at `seg` below the current position, against `ty`.
+    fn walk_child(&mut self, seg: PathSeg, ty: &Type, v: &Value) -> Option<Value> {
+        self.path.push(seg);
+        let unfolding = core::mem::take(&mut self.unfolding);
+        let r = self.walk(ty, v);
+        self.unfolding = unfolding;
+        self.path.pop();
+        r
+    }
+
+    fn walk_structure(&mut self, ty: &Type, v: &Value) -> Option<Value> {
         let ty = self.resolve(ty)?;
         match ty {
             Type::Value => Some(v.clone()),
@@ -310,10 +348,7 @@ impl<'a> Walker<'a> {
                 };
                 let mut out = Vec::new();
                 for (i, item) in items.iter().enumerate() {
-                    self.path.push(PathSeg::Index(i));
-                    let r = self.walk(inner, item);
-                    self.path.pop();
-                    if let Some(r) = r {
+                    if let Some(r) = self.walk_child(PathSeg::Index(i), inner, item) {
                         out.push(r);
                     }
                 }
@@ -339,9 +374,7 @@ impl<'a> Walker<'a> {
                         None if optional => {}
                         None => self.err(TypeErrorKind::MissingField(f.name.clone())),
                         Some(fv) => {
-                            self.path.push(PathSeg::Field(f.name.clone()));
-                            let r = self.walk(&f.ty, fv);
-                            self.path.pop();
+                            let r = self.walk_child(PathSeg::Field(f.name.clone()), &f.ty, fv);
                             if let Some(r) = r
                                 && !(optional && is_absent(&r))
                             {
@@ -392,9 +425,7 @@ impl<'a> Walker<'a> {
                         }
                     }
                     (Some(pt), Some(pv)) => {
-                        self.path.push(PathSeg::Variant(tag.clone()));
-                        let r = self.walk(pt, pv);
-                        self.path.pop();
+                        let r = self.walk_child(PathSeg::Variant(tag.clone()), pt, pv);
                         if let Some(r) = r {
                             out.push(("value".to_string(), r));
                         }

@@ -1,0 +1,40 @@
+{
+  "name": "@vertep/web",
+  "version": "0.1.0",
+  "description": "Vertep statecharts as durable actors in browsers and Node.js: SCXML semantics, typed events and a time-travelling journal, running in a worker",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Volland/vertep",
+    "directory": "bindings/js/packages/web"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "default": "./dist/worker.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "wasm/core/",
+    "wasm/journal/"
+  ],
+  "sideEffects": [
+    "./dist/worker.js"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  }
+}

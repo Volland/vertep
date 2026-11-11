@@ -19,6 +19,12 @@ tiramemsu = ["runtime", "dep:vertep-tiramemsu", "vertep-runtime/tiramemsu"]
 scxml = ["dep:vertep-scxml"]
 # The ECMAScript datamodel.
 ecmascript = ["dep:vertep-dm-ecma"]
+# Agents: decide states and deciders, LLM and tool actors, grants and plan charts.
+agent = ["runtime", "dep:vertep-agent"]
+# Federation: DID identities, grants, and DIDComm v2 and TSP relay mailboxes and transports.
+federation = ["runtime", "dep:vertep-federation", "vertep-federation/didcomm", "vertep-federation/tsp"]
+# Trusted clusters: membership, shard leases and placement, QUIC transport and worker pools.
+cluster = ["runtime", "dep:vertep-cluster", "vertep-cluster/gossip", "vertep-cluster/quic", "vertep-cluster/runtime"]
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
@@ -28,6 +34,9 @@ vertep-runtime = { workspace = true, optional = true }
 vertep-tiramemsu = { workspace = true, optional = true }
 vertep-scxml = { workspace = true, optional = true }
 vertep-dm-ecma = { workspace = true, optional = true }
+vertep-agent = { workspace = true, optional = true }
+vertep-federation = { workspace = true, optional = true }
+vertep-cluster = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "time"] }

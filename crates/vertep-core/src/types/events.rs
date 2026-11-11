@@ -98,6 +98,13 @@ impl EventTable {
         }
         let base = d.strip_suffix(".*").unwrap_or(d);
         let base = base.strip_suffix('.').unwrap_or(base);
+        // A chart that declares a system event by its exact name (an agent chart declaring the
+        // richer payload of `error.decide.invalid`, say) sees its declaration, as `payload_of`.
+        if let Some((_, t)) = self.entries.iter().find(|(n, _)| n == base)
+            && system_event_type(base).is_some()
+        {
+            return t.clone();
+        }
         if let Some(t) = system_event_type(base).or_else(|| {
             (base == "done" || base == "done.state" || base == "done.invoke").then_some(Type::Value)
         }) {

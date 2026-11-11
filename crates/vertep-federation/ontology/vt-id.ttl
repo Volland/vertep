@@ -1,0 +1,313 @@
+@prefix vt:    <https://w3id.org/vertep/vt#> .
+@prefix vt-id: <https://w3id.org/vertep/vt-id#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix prov:  <http://www.w3.org/ns/prov#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix sec:   <https://w3id.org/security#> .
+@prefix did:   <https://www.w3.org/ns/did#> .
+@prefix cred:  <https://www.w3.org/2018/credentials#> .
+
+# The identity module of the vt: ontology (RDF 1.2, Turtle), delivered with vertep-federation.
+#
+# DID actors, their verification methods and services, DID-scoped capability grants, the relay
+# envelope that carries SCXML events between DID actors, and the record of each inbound message
+# with its verification outcome.
+#
+# Alignment with DID Core (and the Security vocabulary it uses) is by rdfs:subClassOf and
+# rdfs:subPropertyOf only: the module names those IRIs but does not import them, and the runtime
+# never needs a reasoner. Private keys have no term here: the SHACL shape of a verification
+# method is closed, so a graph carrying private key material does not conform.
+#
+# Stable IRIs: a DID actor's address IRI is its DID; its verification methods and services are
+# the DID URLs of its DID document.
+
+<https://w3id.org/vertep/vt/identity>
+    a owl:Ontology ;
+    rdfs:label "Vertep identity module"@en ;
+    rdfs:comment "Classes and properties for actors with DID identities: DIDs, verification methods, services, capability grants, relay envelopes and verified origins."@en ;
+    dcterms:license <https://opensource.org/licenses/MIT> , <https://www.apache.org/licenses/LICENSE-2.0> ;
+    rdfs:seeAlso <https://www.w3.org/TR/did-core/> , <https://www.w3.org/TR/vc-data-model-2.0/> ;
+    owl:versionInfo "0.1.0" .
+
+# ---------------------------------------------------------------------------------------------
+# DID actors and DID documents
+
+vt-id:DidActor
+    a owl:Class ;
+    rdfs:subClassOf vt:Actor ;
+    rdfs:label "DID actor"@en ;
+    rdfs:comment "An actor whose address IRI is a DID. Only actors that cross a trust boundary have one."@en .
+
+vt-id:VerificationMethod
+    a owl:Class ;
+    rdfs:subClassOf sec:VerificationMethod ;
+    rdfs:label "verification method"@en ;
+    rdfs:comment "A public key of a DID subject, identified by a DID URL. Never a private key."@en .
+
+vt-id:Service
+    a owl:Class ;
+    rdfs:label "service"@en ;
+    rdfs:comment "A service entry of a DID document: a mailbox or transport endpoint through which the subject is reached."@en ;
+    rdfs:seeAlso did:service .
+
+vt-id:verificationMethod
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf sec:verificationMethod ;
+    rdfs:label "verification method"@en ;
+    rdfs:comment "Links a DID to one of its verification methods."@en ;
+    rdfs:range vt-id:VerificationMethod .
+
+vt-id:authentication
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf sec:authenticationMethod ;
+    rdfs:label "authentication"@en ;
+    rdfs:comment "A verification method that authenticates the DID subject as a sender."@en ;
+    rdfs:range vt-id:VerificationMethod .
+
+vt-id:assertionMethod
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf sec:assertionMethod ;
+    rdfs:label "assertion method"@en ;
+    rdfs:comment "A verification method the DID subject issues credentials (such as grants) with."@en ;
+    rdfs:range vt-id:VerificationMethod .
+
+vt-id:keyAgreement
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf sec:keyAgreementMethod ;
+    rdfs:label "key agreement"@en ;
+    rdfs:comment "A verification method senders encrypt to."@en ;
+    rdfs:range vt-id:VerificationMethod .
+
+vt-id:controller
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf sec:controller ;
+    rdfs:label "controller"@en ;
+    rdfs:comment "The DID that controls a verification method."@en ;
+    rdfs:domain vt-id:VerificationMethod .
+
+vt-id:publicKeyMultibase
+    a owl:DatatypeProperty ;
+    rdfs:subPropertyOf sec:publicKeyMultibase ;
+    rdfs:label "public key (multibase)"@en ;
+    rdfs:comment "The public key as a base58btc multikey."@en ;
+    rdfs:domain vt-id:VerificationMethod ;
+    rdfs:range xsd:string .
+
+vt-id:keyType
+    a owl:DatatypeProperty ;
+    rdfs:label "key type"@en ;
+    rdfs:comment "The key algorithm: Ed25519 or X25519."@en ;
+    rdfs:domain vt-id:VerificationMethod ;
+    rdfs:range xsd:string .
+
+vt-id:service
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf did:service ;
+    rdfs:label "service"@en ;
+    rdfs:comment "Links a DID to a service entry of its document."@en ;
+    rdfs:range vt-id:Service .
+
+vt-id:serviceType
+    a owl:DatatypeProperty ;
+    rdfs:label "service type"@en ;
+    rdfs:comment "A service type, such as DIDCommMessaging or TSPTransport."@en ;
+    rdfs:domain vt-id:Service ;
+    rdfs:range xsd:string .
+
+vt-id:serviceEndpoint
+    a owl:DatatypeProperty ;
+    rdfs:subPropertyOf did:serviceEndpoint ;
+    rdfs:label "service endpoint"@en ;
+    rdfs:comment "An endpoint URI (or mediator DID) of a service."@en ;
+    rdfs:domain vt-id:Service ;
+    rdfs:range xsd:string .
+
+vt-id:routingKey
+    a owl:DatatypeProperty ;
+    rdfs:label "routing key"@en ;
+    rdfs:comment "A DIDComm mediator routing key (a DID URL) of a service."@en ;
+    rdfs:domain vt-id:Service ;
+    rdfs:range xsd:string .
+
+vt-id:serves
+    a owl:ObjectProperty ;
+    rdfs:label "serves"@en ;
+    rdfs:comment "Links a service entry to the mailbox it delivers into."@en ;
+    rdfs:domain vt-id:Service ;
+    rdfs:range vt:Mailbox .
+
+vt-id:documentVersion
+    a owl:DatatypeProperty ;
+    rdfs:label "document version"@en ;
+    rdfs:comment "The DID document version id the graph reflects (did:webvh version id). Earlier versions stay queryable through the store's history."@en ;
+    rdfs:range xsd:string .
+
+# ---------------------------------------------------------------------------------------------
+# Capability grants
+
+vt-id:Grant
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "grant"@en ;
+    rdfs:comment "A statement that a grantee may send events matching some descriptors to a target actor, until an optional expiry."@en .
+
+vt-id:grantee
+    a owl:ObjectProperty ;
+    rdfs:label "grantee"@en ;
+    rdfs:comment "The sender a grant authorises."@en ;
+    rdfs:domain vt-id:Grant .
+
+vt-id:target
+    a owl:ObjectProperty ;
+    rdfs:label "target"@en ;
+    rdfs:comment "The actor a grant lets the grantee reach."@en ;
+    rdfs:domain vt-id:Grant .
+
+vt-id:event
+    a owl:DatatypeProperty ;
+    rdfs:label "event descriptor"@en ;
+    rdfs:comment "An SCXML event descriptor the grant covers."@en ;
+    rdfs:domain vt-id:Grant ;
+    rdfs:range xsd:string .
+
+vt-id:expires
+    a owl:DatatypeProperty ;
+    rdfs:label "expires"@en ;
+    rdfs:comment "When the grant stops applying."@en ;
+    rdfs:domain vt-id:Grant ;
+    rdfs:range xsd:dateTime .
+
+vt-id:issuer
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf cred:issuer ;
+    rdfs:label "issuer"@en ;
+    rdfs:comment "The DID that issued a grant as a verifiable credential."@en ;
+    rdfs:domain vt-id:Grant .
+
+vt-id:holdsGrant
+    a owl:ObjectProperty ;
+    rdfs:label "holds grant"@en ;
+    rdfs:comment "Links an actor to a grant it enforces or relies on."@en ;
+    rdfs:range vt-id:Grant .
+
+vt-id:issuedGrant
+    a owl:ObjectProperty ;
+    rdfs:label "issued grant"@en ;
+    rdfs:comment "Links an actor to a grant it issued."@en ;
+    rdfs:range vt-id:Grant .
+
+# ---------------------------------------------------------------------------------------------
+# Relay envelopes and Event I/O Processors
+
+vt-id:RelayEnvelope
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "relay envelope"@en ;
+    rdfs:comment "The protocol-neutral body of a TSP or DIDComm message: one SCXML event with its message id. It never carries origin or origin type."@en .
+
+vt-id:messageId
+    a owl:DatatypeProperty ;
+    rdfs:label "message id"@en ;
+    rdfs:comment "The deduplication key of a message, stable across redeliveries."@en ;
+    rdfs:range xsd:string .
+
+vt-id:payload
+    a owl:DatatypeProperty ;
+    rdfs:label "payload"@en ;
+    rdfs:comment "The event data as a JSON literal."@en ;
+    rdfs:domain vt-id:RelayEnvelope ;
+    rdfs:range rdf:JSON .
+
+vt-id:payloadType
+    a owl:ObjectProperty ;
+    rdfs:label "payload type"@en ;
+    rdfs:comment "The content-addressed IRI of the payload's declared type in the sender's chart."@en ;
+    rdfs:domain vt-id:RelayEnvelope .
+
+vt-id:senderChartVersion
+    a owl:ObjectProperty ;
+    rdfs:label "sender chart version"@en ;
+    rdfs:comment "The chart version IRI of the sending actor."@en ;
+    rdfs:domain vt-id:RelayEnvelope .
+
+vt-id:correlation
+    a owl:DatatypeProperty ;
+    rdfs:label "correlation"@en ;
+    rdfs:comment "A request correlation id, or the correlation id a reply answers."@en ;
+    rdfs:domain vt-id:RelayEnvelope ;
+    rdfs:range xsd:string .
+
+vt-id:EventIoProcessor
+    a owl:Class ;
+    rdfs:label "Event I/O Processor"@en ;
+    rdfs:comment "An SCXML Event I/O Processor type; its IRI is the origintype of events it delivers."@en .
+
+vt-id:TSPEventProcessor
+    a vt-id:EventIoProcessor ;
+    rdfs:label "TSP Event I/O Processor"@en ;
+    rdfs:comment "Delivers events carried by the ToIP Trust Spanning Protocol."@en .
+
+vt-id:DIDCommEventProcessor
+    a vt-id:EventIoProcessor ;
+    rdfs:label "DIDComm Event I/O Processor"@en ;
+    rdfs:comment "Delivers events carried by DIDComm Messaging v2."@en .
+
+# ---------------------------------------------------------------------------------------------
+# Inbound messages and verified origins
+
+vt-id:InboundMessage
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "inbound message"@en ;
+    rdfs:comment "The record of one cross-trust message an actor received: its verification outcome and whether it was accepted or refused."@en .
+
+vt-id:receivedBy
+    a owl:ObjectProperty ;
+    rdfs:label "received by"@en ;
+    rdfs:comment "The actor that received an inbound message."@en ;
+    rdfs:domain vt-id:InboundMessage .
+
+vt-id:verifiedOrigin
+    a owl:ObjectProperty ;
+    rdfs:label "verified origin"@en ;
+    rdfs:comment "The sender DID whose authentication verified. Absent for anonymous senders. Also stated on journal input events."@en .
+
+vt-id:originVerified
+    a owl:DatatypeProperty ;
+    rdfs:label "origin verified"@en ;
+    rdfs:comment "Whether the sender was authenticated, as recorded at receipt and used on replay."@en ;
+    rdfs:range xsd:boolean .
+
+vt-id:senderKey
+    a owl:ObjectProperty ;
+    rdfs:label "sender key"@en ;
+    rdfs:comment "The verification method that authenticated the sender."@en .
+
+vt-id:ioProcessor
+    a owl:ObjectProperty ;
+    rdfs:label "I/O processor"@en ;
+    rdfs:comment "The Event I/O Processor that delivered a message."@en ;
+    rdfs:range vt-id:EventIoProcessor .
+
+vt-id:accepted
+    a owl:DatatypeProperty ;
+    rdfs:label "accepted"@en ;
+    rdfs:comment "True when the message was delivered; false when it was refused and recorded."@en ;
+    rdfs:domain vt-id:InboundMessage ;
+    rdfs:range xsd:boolean .
+
+vt-id:refusalReason
+    a owl:DatatypeProperty ;
+    rdfs:label "refusal reason"@en ;
+    rdfs:comment "Why a message was refused: undecryptable, forged origin, anonymous, ungranted, wrong payload type or malformed."@en ;
+    rdfs:domain vt-id:InboundMessage ;
+    rdfs:range xsd:string .
+
+vt-id:receivedAt
+    a owl:DatatypeProperty ;
+    rdfs:label "received at"@en ;
+    rdfs:domain vt-id:InboundMessage ;
+    rdfs:range xsd:dateTime .

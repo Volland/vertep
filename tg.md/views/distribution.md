@@ -293,6 +293,50 @@ flowchart LR
 
 `Results Journaled By The Caller` keeps replay from repeating the work. `Worker Failure Reporting` forbids silent retries on another activation unless the worker type is declared idempotent, because a retried LLM or tool call can have external effects.
 
+## Cluster inside the runtime
+
+A `ClusterNode` joins one `vertep-runtime` node to the cluster as its placement, its sharded fenced storage, its cluster Event I/O Processor and its end of the wire.
+
+- describes:: [[components#vertep-cluster]]
+- describes:: [[components#vertep-runtime]]
+- describes:: [[decisions#Placement is a runtime hook with three answers]]
+- describes:: [[decisions#A free shard goes only to a node holding its journal]]
+- describes:: [[decisions#Unreplicated entries stay unreadable until the quorum catches up]]
+- describes:: [[decisions#Worker pools dispatch from the sending node]]
+
+Before the runtime delivers a message to a virtual actor or a worker, or activates a virtual actor, it asks the placement. The answer is local (this node holds an unexpired lease on the shard), remote (a mailbox that frames the envelope and sends it with retries until acknowledged or the delivery deadline, after which the sender gets `error.communication`), or hold (no live owner: the message waits in the local mailbox and the actor is not activated). Messages already waiting locally move to the owner on the actor's next turn. Every append goes through `ClusterStorage`, which routes it to the shard's store, stamps the node's lease epoch as the fencing token and, with standbys, acknowledges only after the quorum stored it. `Node::drain` finishes macrosteps and the outbox and deactivates a shard's actors for a leave or a handover.
+
+```mermaid
+flowchart LR
+    subgraph A["Node A"]
+        CA["chart a (shard 3)"] -- "send ping to b" --> RA["runtime deliver"]
+        RA -- "route(b)" --> PA{"placement"}
+        PA -- "remote: shard 5 owned by B" --> MA["remote mailbox<br/>frame with fence (3, epoch 4)"]
+        PA -- "hold: owner gone" --> HA["local mailbox, no activation"]
+    end
+    MA -- "QUIC or in-memory wire<br/>retry until ack" --> IB["B receive:<br/>dedup, epoch filter"]
+    subgraph B["Node B"]
+        IB -- "fenced" --> DL["dead-letter graph"]
+        IB -- "lease held" --> MB["b's mailbox<br/>origintype = cluster processor"]
+        IB -- "not owner" --> FW["forward + redirect"]
+        MB --> TB["turn: append via ClusterStorage<br/>fencing token (5, epoch 7)"]
+        TB --> SB[("shard 5 store")]
+        TB -. "replicate, ack after quorum" .-> RC[("standby replicas")]
+    end
+```
+
+A worker request is routed by the sending node's dispatcher for the worker type: it picks an activation by policy, creating one on a declaring member when none has capacity, queues within the bound, or refuses at once with an error event. The reply completes the request and frees capacity; a failed worker node fails its requests to their callers, or retries them once on another activation for idempotent types.
+
+## Fault injection
+
+An in-process harness partitions nodes from the lease authority, pauses them mid-append, crashes and restarts them, runs a clock slow, delays and drops frames and loses acknowledgements, while a checker verifies the recorded history.
+
+- describes:: [[capabilities#Shard placement]]
+- describes:: [[decisions#Fault-injection histories export as JSON lines]]
+- describes:: [[decisions#Lean verification bridge]]
+
+The checker requires every actor journal to be linear, at most one writer per shard and epoch, every acknowledged message processed exactly once, and no admitted frame from an append that was not accepted or from an epoch below one the receiver already admitted. Histories are written as JSON lines when `VERTEP_HISTORY_DIR` is set, so the Lean lease and fencing model can replay them and must reach the same accept and reject decisions. Container-based runs and the nightly matrix over every membership implementation and replication factor are still open.
+
 ## DID identity
 
 A DID is optional and per actor: an actor that crosses a trust boundary uses its DID as its address IRI, and a DID resolver acts as the directory that yields its mailboxes, transports and keys.
@@ -439,6 +483,40 @@ sequenceDiagram
 
 `Transport Selection From The DID Document` tries services in a configured preference order (TSP first by default, then DIDComm) with fallback. `Undeliverable Message Reporting` raises `error.communication` with the send id once the retry policy is exhausted, without blocking the chart. `Mailbox Ordering` promises order only within one mailbox; across relays or senders, charts use `vt:request` correlation ids.
 
+## Federation inside the runtime
+
+A `Federation` joins one `vertep-runtime` node to the trust-boundary layers through the runtime's own seams: the resolver of `did:` addresses, the mailboxes of local DID actors, and two Event I/O Processors.
+
+- describes:: [[components#vertep-federation]]
+- describes:: [[components#vertep-runtime]]
+- describes:: [[decisions#DID resolution is a directory chosen by address scheme]]
+- describes:: [[decisions#DIDComm mailboxes acknowledge after the append]]
+- describes:: [[decisions#Relay outbox owns cross-trust retries]]
+- describes:: [[decisions#Verified origin carried by origin presence]]
+- describes:: [[decisions#TSP direct when reachable, routed otherwise]]
+
+`Federation::provision` creates an instance's keys and DID and binds the DID to a chart type and key on the node, so the DID is the actor's address, journal subject and current-state graph. A send to a DID hosted elsewhere resolves to an outbound mailbox that only queues it in the relay outbox, a store-backed queue beside the actor journals; the runtime's outbox entry is done at that hand-off. The relay outbox checks the outbound grant, resolves the DID through the cache, tries the routes in preference order with fallback, and retries unreachable recipients with backoff; a failure becomes `error.communication` in the sending chart with the send id and the reason. `<send type="tsp">` or `type="didcomm"` restricts a send to one transport.
+
+```mermaid
+flowchart LR
+    subgraph A["Node A (org 1)"]
+        CA["chart, address did:peer A"] -- "send to did B" --> RA["runtime deliver"]
+        RA -- "did: resolver" --> OB["relay outbox queue<br/>grant, routes, retries"]
+        OB -- "failure" --> EA["error.communication<br/>to the chart"]
+    end
+    OB -- "TSP direct or routed,<br/>or DIDComm forward" --> RL[("mediator or<br/>intermediary")]
+    subgraph B["Node B (org 2)"]
+        PU["pickup: batch or live"] --> OP["open, verify sender,<br/>grant, payload type"]
+        OP -- "refused" --> RR["inbound record,<br/>ack, reply error"]
+        OP -- "admitted" --> MB["relay mailbox of did B<br/>origin = verified sender"]
+        MB -- "notify" --> TB["turn and journal append"]
+        TB -- "runtime ack" --> AK["ack to the relay"]
+    end
+    RL --> PU
+```
+
+Each local DID actor's relay mailbox is a runtime `Mailbox`: picked-up messages and messages from senders on the same node, in arrival order. The runtime acknowledges a message after its turn is durable, or when it drops it as a duplicate message id, and only that acknowledgement releases the relay's copy; after a crash the copy is fetched again and dropped by the journal. A refused message is recorded in graph `<actor>/inbound`, acknowledged, and answered with `error.communication` when the sender is verified and had contacted the actor first. Relay pickups wake actors with `NodeHandle::notify`, and after a restart the mailbox factory picks up what the relays held. The `testkit` feature has an in-process DIDComm mediator and TSP intermediary on a local network for tests and the `two_orgs` example.
+
 ## Failure modes
 
 The distributed failure cases and what the design guarantees in each; safety never depends on clocks or relays behaving well, only availability does.
@@ -470,3 +548,4 @@ Where the M4 and M5 specs refine the accepted decisions; the specs govern.
 - **Shard count must be a power of two**, a refinement that turns resharding into a split.
 - **Transport order is now chosen.** The decision left DIDComm versus TSP open; the spec defaults to TSP first, then DIDComm, configurable per deployment.
 - **Grants are enforced before the journal.** The decision placed authorization at trust boundaries; the spec specifies inbound refusal before any append, so ungranted traffic costs no journal space.
+- **The verified flag is not yet a field of `_event`.** Design D4 gives the core `_event.origin` plus one boolean; the implementation sets `_event.origin` only for a verified sender and keeps the flag in the inbound records, until `vertep-core` gains the field.

@@ -266,7 +266,9 @@ impl StoreMailbox {
                     found.push((seq, env));
                 }
             }
-            found.sort_by_key(|(s, _)| *s);
+            // Rows written by other nodes sharing the store may repeat a sequence number; the
+            // message id orders those deterministically.
+            found.sort_by(|(s, a), (t, b)| s.cmp(t).then_with(|| a.message_id.cmp(&b.message_id)));
             for (seq, env) in found {
                 rows.next = rows.next.max(seq + 1);
                 rows.rows.push_back(Row {
@@ -285,7 +287,8 @@ impl StoreMailbox {
 
     fn quads(&self, seq: u64, env: &Envelope) -> Vec<Quad> {
         let g = self.address.mailbox_graph();
-        let m = self.address.mailbox_row_iri(seq);
+        let json = serde_json::to_string(env).unwrap_or_default();
+        let m = self.address.mailbox_row_iri(seq, &json);
         let q = |p: &str, o: Term| Quad::new(m.clone(), node(p), o, g.clone());
         vec![
             q(vt::RDF_TYPE, node(vt::MESSAGE).into()),
@@ -298,10 +301,7 @@ impl StoreMailbox {
                 vt::MESSAGE_ID,
                 Literal::new_simple_literal(&env.message_id).into(),
             ),
-            q(
-                vt::ENVELOPE,
-                Literal::new_simple_literal(serde_json::to_string(env).unwrap_or_default()).into(),
-            ),
+            q(vt::ENVELOPE, Literal::new_simple_literal(json).into()),
         ]
     }
 }

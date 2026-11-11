@@ -1,0 +1,62 @@
+test	reason
+178	matches ECMAScript regular expressions against _event.raw of the Basic HTTP processor, which the CEL event does not have
+301	not a template: written for the default (null) datamodel
+302	uses <script>, which the expression-only CEL datamodel does not have
+303	uses <script>, which the expression-only CEL datamodel does not have
+304	uses <script>, which the expression-only CEL datamodel does not have
+436	not a template: written for the null datamodel
+444	not a template: written for the ecmascript datamodel
+445	not a template: written for the ecmascript datamodel
+446	not a template: written for the ecmascript datamodel
+448	not a template: written for the ecmascript datamodel
+449	not a template: written for the ecmascript datamodel
+451	not a template: written for the ecmascript datamodel
+452	not a template: written for the ecmascript datamodel
+453	not a template: written for the ecmascript datamodel
+456	not a template: written for the ecmascript datamodel
+457	not a template: written for the ecmascript datamodel
+459	not a template: written for the ecmascript datamodel
+460	not a template: written for the ecmascript datamodel
+463	not a template: written for the xpath datamodel
+464	not a template: written for the xpath datamodel
+465	not a template: written for the xpath datamodel
+466	not a template: written for the xpath datamodel
+467	not a template: written for the xpath datamodel
+468	not a template: written for the xpath datamodel
+469	not a template: written for the xpath datamodel
+470	not a template: written for the xpath datamodel
+473	not a template: written for the xpath datamodel
+474	not a template: written for the xpath datamodel
+475	not a template: written for the xpath datamodel
+476	not a template: written for the xpath datamodel
+477	not a template: written for the xpath datamodel
+478	not a template: written for the xpath datamodel
+479	not a template: written for the xpath datamodel
+480	not a template: written for the xpath datamodel
+481	not a template: written for the xpath datamodel
+482	not a template: written for the xpath datamodel
+483	not a template: written for the xpath datamodel
+509	matches ECMAScript regular expressions against _event.raw of the Basic HTTP processor, which the CEL event does not have
+513	no SCXML document: the test is a description for a manual check
+518	matches ECMAScript regular expressions against _event.raw of the Basic HTTP processor, which the CEL event does not have
+519	matches ECMAScript regular expressions against _event.raw of the Basic HTTP processor, which the CEL event does not have
+520	matches ECMAScript regular expressions against _event.raw of the Basic HTTP processor, which the CEL event does not have
+534	matches ECMAScript regular expressions against _event.raw of the Basic HTTP processor, which the CEL event does not have
+537	not a template: written for the xpath datamodel
+539	not a template: written for the xpath datamodel
+540	not a template: written for the xpath datamodel
+542	not a template: written for the xpath datamodel
+543	not a template: written for the xpath datamodel
+544	not a template: written for the xpath datamodel
+545	not a template: written for the xpath datamodel
+546	not a template: written for the xpath datamodel
+547	not a template: written for the xpath datamodel
+555	not a template: written for the xpath datamodel
+557	not a template: written for the ecmascript datamodel
+558	not a template: written for the ecmascript datamodel
+560	not a template: written for the ecmascript datamodel
+561	not a template: written for the ecmascript datamodel
+562	not a template: written for the ecmascript datamodel
+568	not a template: written for the xpath datamodel
+569	not a template: written for the ecmascript datamodel
+578	not a template: written for the ecmascript datamodel

@@ -8,8 +8,61 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 
+[features]
+default = []
+# The `did:webvh` method resolver with log verification (DIF didwebvh-rs).
+webvh = ["dep:didwebvh-rs", "dep:futures"]
+# TSP direct-mode message sealing and relationship setup (OpenWallet Foundation tsp_sdk).
+tsp = ["dep:tsp_sdk", "dep:url"]
+# DIDComm v2 authcrypt, anoncrypt and forward wrapping (Affinidi DIDComm v2.1 and JOSE crates).
+didcomm = ["dep:affinidi-messaging-didcomm", "dep:affinidi-crypto"]
+# In-process test relays: a DIDComm mediator and a TSP intermediary, for CI and examples.
+testkit = []
+
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
+vertep-runtime = { workspace = true }
+vertep-rdf = { workspace = true }
+oxrdf = { workspace = true }
+# The JSON-LD form of the relay envelope, read into RDF for the SHACL shape.
+oxjsonld = { version = "0.2.7", features = ["rdf-12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# JCS (RFC 8785) for the eddsa-jcs-2022 proofs of credential grants.
+serde_json_canonicalizer = "0.3"
+sha2 = "0.10"
+bs58 = "0.5"
+base64 = "0.22"
+# Ed25519 signatures and X25519 key agreement (dalek, audited).
+ed25519-dalek = "3"
+x25519-dalek = { version = "3", features = ["static_secrets"] }
+# RFC 9180 HPKE (X25519, HKDF-SHA256, ChaCha20-Poly1305) for `KeyManager::decrypt`.
+hpke = { version = "0.15.1", default-features = false, features = ["x25519", "chacha", "alloc", "getrandom"] }
+getrandom = "0.3"
+zeroize = "1"
+# Optional protocol libraries.
+didwebvh-rs = { version = "0.8.2", default-features = false, optional = true }
+futures = { workspace = true, features = ["executor"], optional = true }
+tsp_sdk = { version = "0.16.0", default-features = false, features = ["nacl"], optional = true }
+url = { version = "2", optional = true }
+affinidi-messaging-didcomm = { version = "0.15.11", optional = true }
+affinidi-crypto = { version = "0.2.11", optional = true }
+
+[dev-dependencies]
+vertep-federation = { path = ".", features = ["testkit"] }
+vertep-runtime = { workspace = true, features = ["tiramemsu"] }
+vertep-scxml = { workspace = true }
+vertep-dm-ecma = { workspace = true }
+vertep-store = { workspace = true }
+vertep-tiramemsu = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
+oxigraph = { workspace = true }
+tempfile = "3"
+futures = { workspace = true, features = ["executor"] }
 
 [lints]
 workspace = true
+
+[[example]]
+name = "two_orgs"
+required-features = ["didcomm", "testkit"]

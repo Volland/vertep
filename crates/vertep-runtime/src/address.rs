@@ -131,9 +131,13 @@ impl Address {
         NamedNode::new_unchecked(format!("{}/mailbox", self.as_str()))
     }
 
-    /// The IRI of the mailbox row with sequence number `seq`.
-    pub fn mailbox_row_iri(&self, seq: u64) -> NamedNode {
-        self.derived("mailbox", &seq.to_string())
+    /// The IRI of the mailbox row with sequence number `seq` holding the serialized envelope
+    /// `envelope`: `<self>/mailbox/<seq>-<digest>`. Mailboxes on different nodes sharing one
+    /// store number their rows independently, so the sequence number alone collides; with the
+    /// envelope's digest two rows share an IRI only when they hold the same message at the same
+    /// sequence number, and then they are the same triples.
+    pub fn mailbox_row_iri(&self, seq: u64, envelope: &str) -> NamedNode {
+        self.derived("mailbox", &format!("{seq}-{}", short_digest(envelope)))
     }
 
     /// The graph holding this actor's outbox marks.

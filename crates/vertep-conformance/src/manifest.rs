@@ -16,7 +16,7 @@ use quick_xml::events::Event as XmlEvent;
 use serde::Serialize;
 
 /// The datamodels the IRP suite is generated for.
-pub const DATAMODELS: [Datamodel; 2] = [Datamodel::Ecmascript, Datamodel::Null];
+pub const DATAMODELS: [Datamodel; 3] = [Datamodel::Ecmascript, Datamodel::Null, Datamodel::Cel];
 
 /// The datamodel of a generated test variant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
@@ -26,6 +26,8 @@ pub enum Datamodel {
     Ecmascript,
     /// `null/<id>/`.
     Null,
+    /// `cel/<id>/`: Vertep's CEL variant of the datamodel-neutral templates (`confCel.xsl`).
+    Cel,
 }
 
 impl Datamodel {
@@ -34,6 +36,7 @@ impl Datamodel {
         match self {
             Datamodel::Ecmascript => "ecmascript",
             Datamodel::Null => "null",
+            Datamodel::Cel => "cel",
         }
     }
 
@@ -317,6 +320,23 @@ impl Suite {
         } else {
             Err(problems)
         }
+    }
+
+    /// The tests that have no `cel` variant and why (`cel/EXCLUDED.tsv`, written by the
+    /// import script), in manifest-directory order.
+    pub fn cel_exclusions(&self) -> Result<Vec<(String, String)>, SuiteError> {
+        let path = self.root.join("cel/EXCLUDED.tsv");
+        let text = fs::read_to_string(&path)
+            .map_err(|e| SuiteError(format!("{}: {e}", path.display())))?;
+        text.lines()
+            .skip(1)
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| {
+                l.split_once('\t')
+                    .map(|(t, r)| (t.to_string(), r.to_string()))
+                    .ok_or_else(|| SuiteError(format!("cel/EXCLUDED.tsv: malformed line `{l}`")))
+            })
+            .collect()
     }
 
     /// Whether a variant of the test exists for the datamodel.

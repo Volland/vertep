@@ -59,6 +59,21 @@ impl FileClaim {
         }
         Ok(FileClaim(key))
     }
+
+    /// A claim on `key` as given, for files whose host has no file system to canonicalize
+    /// against (the WebAssembly memory and OPFS hosts).
+    fn take_key(key: PathBuf) -> Result<FileClaim, StoreError> {
+        let mut open = open_files()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !open.insert(key.clone()) {
+            return Err(StoreError::Unavailable(format!(
+                "{} is already open in this process (tiramemsu has one writer per file)",
+                key.display()
+            )));
+        }
+        Ok(FileClaim(key))
+    }
 }
 
 impl Drop for FileClaim {
@@ -245,6 +260,26 @@ impl TiramemsuShard {
         Ok(shard)
     }
 
+    /// A shard on a `Db` the caller opened, for example with `Db::open_with_host` on the
+    /// WebAssembly host. `path` names the file as that host knows it; it is claimed as given,
+    /// without touching a file system.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError::Unavailable`] when `path` is already open in this process, and the
+    /// errors of declaring the schema.
+    pub fn from_db(db: Db, path: impl Into<PathBuf>) -> Result<Self, StoreError> {
+        let path = path.into();
+        let claim = FileClaim::take_key(path.clone())?;
+        let shard = TiramemsuShard {
+            db,
+            path,
+            _claim: claim,
+        };
+        shard.declare_schema()?;
+        Ok(shard)
+    }
+
     /// Declares `vt:head` and `vt:fencingEpoch` cardinality one, once per file.
     fn declare_schema(&self) -> Result<(), StoreError> {
         let card = iri(SYS_CARDINALITY);
@@ -304,6 +339,15 @@ impl TiramemsuShard {
         TiramemsuView {
             db: &self.db,
             at: Some(TimeRef::Tx(t)),
+        }
+    }
+
+    /// The graphs of this shard as believed at wall-clock instant `ms` (epoch milliseconds of
+    /// the store's clock): as of the last transaction committed at or before it.
+    pub fn view_as_of_time(&self, ms: i64) -> TiramemsuView<'_> {
+        TiramemsuView {
+            db: &self.db,
+            at: Some(TimeRef::Instant(ms)),
         }
     }
 

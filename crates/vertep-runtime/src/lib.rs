@@ -18,6 +18,7 @@
 //! - [`actor`]: the actor contract and its chart, function and stream adapters.
 //! - [`chart`]: chart versions, the registry, `vt:` extension lowering and migrations.
 //! - [`ontology`]: the runtime ontology module and its SHACL shapes.
+//! - [`placement`]: the hook a cluster uses to place virtual actors and workers on nodes.
 //!
 //! @tg: implements:: [[decisions#SCXML-native actors with vt extensions]]
 //! @tg: implements:: [[decisions#IRI identity and lifecycle classes]]
@@ -38,6 +39,7 @@ pub mod machine;
 pub mod mailbox;
 pub mod node;
 pub mod ontology;
+pub mod placement;
 pub mod shell;
 pub mod storage;
 pub mod transport;
@@ -55,6 +57,7 @@ pub use node::{
     ActivationError, ActorState, AskError, CrashPoint, DeadLetter, DeliveryError, MigrateError,
     Node, NodeBuilder, NodeConfig, NodeHandle, NodeStats, RemoveError,
 };
+pub use placement::{Placement, Route};
 pub use shell::{Clock, Shell, Sleep, Spawn, VirtualClock};
 pub use storage::{SplitStorage, Storage};
 pub use transport::{LocalTransport, Resolver, Transport};

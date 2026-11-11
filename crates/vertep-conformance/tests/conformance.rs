@@ -6,7 +6,7 @@
 //! allow-listed test passes.
 
 use vertep_conformance::allow::default_allow_list_path;
-use vertep_conformance::{AllowList, RustCore, Suite, report_path, run_suite};
+use vertep_conformance::{AllowList, RustCore, Suite, cel_exclusions, report_path, run_suite};
 
 #[test]
 fn conformance() {
@@ -31,7 +31,8 @@ fn conformance() {
         }
         Err(_) => suite.cases(),
     };
-    let report = run_suite(&cases, &allow, &engine);
+    let mut report = run_suite(&cases, &allow, &engine);
+    report.excluded = cel_exclusions(&suite).expect("cel/EXCLUDED.tsv reads");
     let path = report_path();
     report.write_json(&path).expect("write the report");
     println!("{}", report.summary());

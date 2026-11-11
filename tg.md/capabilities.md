@@ -163,11 +163,15 @@ DID-backed actor identities, the DID resolver for address resolution, authentica
 
 - scheduled_in:: [[roadmap#M5 Federation]]
 
+Implemented in [[components#vertep-federation]]: every `did-identity` requirement carries `@tg: implements::` annotations in code and every scenario a `@tg: verifies::` test, most of them on runtime nodes exchanging events through a test mediator.
+
 ## Relay mailboxes
 
 DIDComm v2 and TSP mediators as mailboxes and transports, with routed envelopes through intermediaries and end-to-end encryption. OpenSpec: `relay-mailboxes`.
 
 - scheduled_in:: [[roadmap#M5 Federation]]
+
+Implemented in [[components#vertep-federation]] on the runtime's `Resolver`, `Mailbox` and `Transport` traits, with TSP interop against the reference wallet; interop with a third-party DIDComm mediator is still open in the change's tasks.
 
 ## WASM bindings
 

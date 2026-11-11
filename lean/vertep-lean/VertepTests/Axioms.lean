@@ -29,7 +29,24 @@ def mainTheorems : List Name :=
     ``Vertep.step_requests_declared, ``Vertep.start_requests_declared,
     ``Vertep.dynamic_typed_soundness, ``Vertep.violations_eq_nil_iff,
     ``Vertep.Rdf.fromRDF_sound, ``Vertep.Rdf.canonical_determined,
-    ``Vertep.Rdf.version_determined, ``Vertep.Certify.check_certified_wellFormed ]
+    ``Vertep.Rdf.version_determined, ``Vertep.Certify.check_certified_wellFormed,
+    ``Vertep.Rdf.RT.percentEncode_inj, ``Vertep.Rdf.RT.ordered_eq, ``Vertep.Rdf.RT.Cap.kid,
+    ``Vertep.Rdf.RT.dec_exec, ``Vertep.Rdf.RT.dec_transition,
+    ``Vertep.Journal.replay_determinism, ``Vertep.Journal.replay_no_divergence,
+    ``Vertep.Journal.replay_equals_live, ``Vertep.Journal.turn_idempotent,
+    ``Vertep.Journal.accepted_once, ``Vertep.Journal.outbox_safe,
+    ``Vertep.Journal.outbox_complete, ``Vertep.Journal.no_message_lost,
+    ``Vertep.Journal.cas_single, ``Vertep.Journal.turn_cas_exclusive,
+    ``Vertep.Journal.accepts_iff, ``Vertep.Journal.reachable_admissible,
+    ``Vertep.Agent.decider_safety, ``Vertep.Agent.stale_not_taken,
+    ``Vertep.Agent.unknown_not_taken, ``Vertep.Agent.decision_dedup,
+    ``Vertep.Agent.decision_once, ``Vertep.Agent.replay_live, ``Vertep.Agent.chainGrant_mem,
+    ``Vertep.Agent.grants_do_not_escalate, ``Vertep.Agent.grant_enforced,
+    ``Vertep.Agent.ungranted_not_delivered, ``Vertep.Agent.granted_delivered,
+    ``Vertep.Lease.grant_unique, ``Vertep.Lease.accepted_granted,
+    ``Vertep.Lease.one_writer_per_epoch, ``Vertep.Lease.journal_epochs_ordered,
+    ``Vertep.Lease.shard_epochs_ordered, ``Vertep.Lease.message_once, ``Vertep.Lease.stale_append_fenced,
+    ``Vertep.Lease.frames_ordered, ``Vertep.Lease.stale_frame_dropped ]
 
 /-- The axioms of `n` outside the allowed set. -/
 def disallowed (n : Name) : CoreM (Array Name) := do

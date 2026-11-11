@@ -40,6 +40,21 @@ lean_exe «vertep-oracle» where
 lean_exe «vt-certify» where
   root := `VertepCertifyMain
 
+/-- The journal protocol model as a test oracle (verification-backlog 5.6):
+`lake exe vertep-journal --obs OBS.json`. -/
+lean_exe «vertep-journal» where
+  root := `VertepJournalMain
+
+/-- The lease and fencing model as a differential oracle for fault-injection histories
+(m4-cluster 6.5): `lake exe vertep-lease --history HISTORY.jsonl`. -/
+lean_exe «vertep-lease» where
+  root := `VertepLeaseMain
+
+/-- Decision validation as a differential oracle for agent runs (m3-agents 8.5):
+`lake exe vertep-decide --obs DECISIONS.jsonl`. -/
+lean_exe «vertep-decide» where
+  root := `VertepDecideMain
+
 /-- Empirical agreement of the chart shapes (LeanRDF SHACL Core) with `WellFormed`:
 `lake exe vertep-shapes FILE.nq…`. -/
 lean_exe «vertep-shapes» where

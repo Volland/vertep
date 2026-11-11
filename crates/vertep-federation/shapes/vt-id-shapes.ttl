@@ -1,0 +1,103 @@
+@prefix sh:    <http://www.w3.org/ns/shacl#> .
+@prefix vt:    <https://w3id.org/vertep/vt#> .
+@prefix vt-id: <https://w3id.org/vertep/vt-id#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL Core shapes for the vt-id: identity module (ontology/vt-id.ttl). Every graph
+# vertep-federation projects conforms: DID documents, DID actors, grants, relay envelopes read
+# through their JSON-LD context, and inbound message records. The verification-method and
+# envelope shapes are closed: private key material and sender-chosen origins have no place in
+# the graph.
+
+vt-id:DidSubjectShape
+    a sh:NodeShape ;
+    sh:targetSubjectsOf vt-id:verificationMethod ;
+    rdfs:comment "A DID subject: its methods are verification methods, its relationships name them, its services are services." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt-id:verificationMethod ; sh:minCount 1 ; sh:nodeKind sh:IRI ; sh:class vt-id:VerificationMethod ] ;
+    sh:property [ sh:path vt-id:authentication ; sh:nodeKind sh:IRI ; sh:class vt-id:VerificationMethod ] ;
+    sh:property [ sh:path vt-id:assertionMethod ; sh:nodeKind sh:IRI ; sh:class vt-id:VerificationMethod ] ;
+    sh:property [ sh:path vt-id:keyAgreement ; sh:nodeKind sh:IRI ; sh:class vt-id:VerificationMethod ] ;
+    sh:property [ sh:path vt-id:service ; sh:nodeKind sh:IRI ; sh:class vt-id:Service ] ;
+    sh:property [ sh:path vt-id:documentVersion ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt-id:DidActorShape
+    a sh:NodeShape ;
+    sh:targetClass vt-id:DidActor ;
+    rdfs:comment "A DID actor is addressed by its DID and has at least one verification method." ;
+    sh:nodeKind sh:IRI ;
+    sh:pattern "^did:[a-z0-9]+:" ;
+    sh:property [ sh:path vt-id:verificationMethod ; sh:minCount 1 ] .
+
+vt-id:VerificationMethodShape
+    a sh:NodeShape ;
+    sh:targetClass vt-id:VerificationMethod ;
+    rdfs:comment "A public key only: the shape is closed, so no private key property can appear." ;
+    sh:nodeKind sh:IRI ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path vt-id:controller ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-id:publicKeyMultibase ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ;
+                  sh:pattern "^z[1-9A-HJ-NP-Za-km-z]+$" ] ;
+    sh:property [ sh:path vt-id:keyType ; sh:minCount 1 ; sh:maxCount 1 ; sh:in ( "Ed25519" "X25519" ) ] .
+
+vt-id:ServiceShape
+    a sh:NodeShape ;
+    sh:targetClass vt-id:Service ;
+    rdfs:comment "A service entry has a type and an endpoint." ;
+    sh:nodeKind sh:IRI ;
+    sh:property [ sh:path vt-id:serviceType ; sh:minCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-id:serviceEndpoint ; sh:minCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ] ;
+    sh:property [ sh:path vt-id:routingKey ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-id:serves ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] .
+
+vt-id:GrantShape
+    a sh:NodeShape ;
+    sh:targetClass vt-id:Grant ;
+    rdfs:comment "A grant names one grantee, one target and at least one event descriptor, with at most one expiry and issuer." ;
+    sh:property [ sh:path vt-id:grantee ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-id:target ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-id:event ; sh:minCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ] ;
+    sh:property [ sh:path vt-id:expires ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
+    sh:property [ sh:path vt-id:issuer ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] .
+
+vt-id:GrantHolderShape
+    a sh:NodeShape ;
+    sh:targetSubjectsOf vt-id:holdsGrant ;
+    rdfs:comment "Holders link to grants." ;
+    sh:property [ sh:path vt-id:holdsGrant ; sh:class vt-id:Grant ] .
+
+vt-id:RelayEnvelopeShape
+    a sh:NodeShape ;
+    sh:targetClass vt-id:RelayEnvelope ;
+    rdfs:comment "An envelope carries one message id and one event name; it is closed, so it never carries an origin." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type ) ;
+    sh:property [ sh:path vt-id:messageId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ] ;
+    sh:property [ sh:path vt:eventName ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ; sh:minLength 1 ] ;
+    sh:property [ sh:path vt:sendId ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-id:payload ; sh:maxCount 1 ; sh:datatype rdf:JSON ] ;
+    sh:property [ sh:path vt-id:payloadType ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-id:senderChartVersion ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-id:correlation ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+
+vt-id:InboundMessageShape
+    a sh:NodeShape ;
+    sh:targetClass vt-id:InboundMessage ;
+    rdfs:comment "An inbound record names its receiver and states whether the origin verified and whether it was accepted; a refused one says why." ;
+    sh:property [ sh:path vt-id:receivedBy ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-id:originVerified ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:property [ sh:path vt-id:accepted ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:boolean ] ;
+    sh:property [ sh:path vt-id:verifiedOrigin ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-id:senderKey ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-id:ioProcessor ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path vt-id:messageId ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:eventName ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-id:refusalReason ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt-id:receivedAt ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
+    sh:or (
+        [ sh:property [ sh:path vt-id:accepted ; sh:hasValue true ] ]
+        [ sh:property [ sh:path vt-id:refusalReason ; sh:minCount 1 ] ]
+    ) .

@@ -47,6 +47,17 @@ Store-and-forward mailboxes such as DIDComm mediators and TSP intermediaries red
 
 - constrains:: [[decisions#Event-sourced actors]] {strength: must, source: "DIDComm v2 mediators; ToIP TSP"}
 - constrains:: [[decisions#Identity, mailbox and transport layers]] {strength: must, source: "DIDComm v2 mediators; ToIP TSP"}
+- constrains:: [[decisions#DIDComm mailboxes acknowledge after the append]] {strength: must, source: "DIDComm v2 mediators; ToIP TSP"}
+- constrains:: [[decisions#Relay outbox owns cross-trust retries]] {strength: must, source: "DIDComm v2 mediators; ToIP TSP", note: "a re-send keeps its message id"}
+
+## OPFS sync access handles need a dedicated worker
+
+The Origin Private File System's synchronous access handles, which tiramemsu's OPFS VFS needs, exist only in dedicated workers, and each handle is exclusive to one holder.
+
+- constrains:: [[decisions#One worker hosts the core, the shell and the journal]] {strength: must, source: "WHATWG File System Standard; sqlite-wasm-vfs opfs-sahpool"}
+- constrains:: [[decisions#Browser storage is explicit, exclusive and native-format]] {strength: must, source: "WHATWG File System Standard"}
+
+Neither the page's main thread nor a SharedWorker can open the store, and a second tab must be refused rather than wait. Requirements `Browser Journal Storage` and `Worker-Hosted Actor System` of `wasm-bindings` follow from it.
 
 ## Tiramemsu has a single writer per file
 
@@ -95,3 +106,40 @@ A tiramemsu query without `GRAPH` also sees entry graphs, state graphs and bookk
 Tiramemsu stores literals in canonical form, for example `"08"^^xsd:integer` reads back as `"8"`, so entries with non-canonical lexical forms do not round-trip byte for byte.
 
 - constrains:: [[decisions#Journal entries are stamped by the store]] {strength: should, source: "tiramemsu"}
+
+## Typed charts fix the error payload
+
+The type checker gives every `error.*` event the payload `{ kind: string, message: string }` unless the chart declares that event by name.
+
+- constrains:: [[decisions#Agent error events extend the error payload]] {strength: must, source: "vertep-core types/events.rs system_event_type"}
+
+## The type language has no string enumerations
+
+The IR type language spells an enumeration as a union of tags, which its JSON Schema projection turns into objects with a constant `tag`.
+
+- constrains:: [[decisions#Enumerations are tagged unions in structured output]] {strength: must, source: "vertep-core types/syntax.rs and the vertep-rdf JSON Schema projection"}
+
+## The SHACL validator bounds only integers
+
+The `vertep-rdf` SHACL Core validator supports `sh:minInclusive` and its siblings on integers only, so decimal ranges cannot be shapes.
+
+- constrains:: [[decisions#The agent ontology ships with vertep-rdf]] {strength: should, source: "vertep-rdf shacl.rs"}
+
+## Clock skew beyond the safety margin breaks lease exclusivity
+
+A lease holder judges expiry by its own clock; a pause or skew longer than the safety margin lets a stale owner believe it still holds a lease the authority has granted again.
+
+- constrains:: [[decisions#Leases with fencing epochs from the membership authority]] {strength: must, source: "distributed systems: leases without synchronized clocks (Gray and Cheriton 1989)"}
+- constrains:: [[decisions#Fencing on appends and outbound frames]] {strength: must, source: "distributed systems: leases without synchronized clocks (Gray and Cheriton 1989)", note: "fencing, not timing, carries safety"}
+- constrains:: [[crates/vertep-cluster/src/lease.rs#HeldLeases]] {strength: must, source: "Gray and Cheriton 1989"}
+
+Safety therefore never depends on clocks; availability does.
+
+## QUIC limits streams per connection
+
+A QUIC peer advertises a maximum number of concurrent bidirectional streams per connection, so one stream per actor pair cannot grow without bound.
+
+- constrains:: [[decisions#QUIC with mutual TLS and a stream per actor pair]] {strength: must, source: "RFC 9000 section 4.6, MAX_STREAMS"}
+- constrains:: [[crates/vertep-cluster/src/transport.rs#TransportConfig]] {strength: must, source: "RFC 9000 section 4.6"}
+
+Past the cap, pairs share streams and stay ordered per pair.

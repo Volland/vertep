@@ -13,13 +13,11 @@ use vertep_conformance::{
     Verdict, run_suite,
 };
 use vertep_core::datamodel::DatamodelRegistry;
-use vertep_core::null::WithNull;
-use vertep_dm_ecma::EcmaRegistry;
 
 /// Run an SCXML document on the in-memory host with `budget`; returns the verdict, the stop
 /// reason and the host log.
 fn run_text(xml: &str, budget: Budget) -> (Verdict, Stop, Vec<HostLog>, u64) {
-    let registry = WithNull(EcmaRegistry);
+    let registry = vertep_conformance::host::HostRegistry;
     let reg: &dyn DatamodelRegistry = &registry;
     let loader = DirLoader::new(std::env::temp_dir());
     let chart = loader.compile(xml).expect("the chart compiles");
@@ -395,9 +393,10 @@ fn conformance_manual_tests_are_listed_as_not_run() {
             .summary()
             .contains("manual tests not run: 301/ecmascript")
     );
-    // The committed suite lists all nine manual tests, 513 (a text description) included.
+    // The committed suite lists all nine manual tests, 513 (a text description) included; a
+    // test with variants for several datamodels counts once.
     let suite = Suite::committed().unwrap();
-    let manual: Vec<String> = suite
+    let manual: std::collections::BTreeSet<String> = suite
         .cases()
         .into_iter()
         .filter(|c| c.classification == Classification::Manual)

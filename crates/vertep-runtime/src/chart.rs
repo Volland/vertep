@@ -796,6 +796,8 @@ pub struct ChartRegistry {
     versions: BTreeMap<String, Arc<ChartInfo>>,
     types: BTreeMap<String, Vec<String>>,
     migrations: BTreeMap<String, Migration>,
+    /// Addresses bound to a chart type and key without the `<type>/<key>` form (DIDs).
+    bindings: BTreeMap<String, (String, String)>,
 }
 
 impl std::fmt::Debug for ChartRegistry {
@@ -849,8 +851,11 @@ impl ChartRegistry {
     }
 
     /// The chart type and key of a virtual actor address (`<type>/<key>`), for the longest
-    /// registered type that prefixes it.
+    /// registered type that prefixes it, or the type and key the address is bound to.
     pub fn type_of(&self, address: &str) -> Option<(String, String)> {
+        if let Some(b) = self.bindings.get(address) {
+            return Some(b.clone());
+        }
         self.types
             .keys()
             .filter_map(|t| {
@@ -859,6 +864,13 @@ impl ChartRegistry {
             })
             .max_by_key(|(t, _)| t.len())
             .and_then(|(t, k)| Some((t.clone(), crate::address::percent_decode(k)?)))
+    }
+
+    /// Binds `address` to the virtual actor of `chart_type` with `key`, for addresses that do
+    /// not have the `<type>/<key>` form, such as an instance whose address is its DID.
+    pub fn bind(&mut self, address: &str, chart_type: &str, key: &str) {
+        self.bindings
+            .insert(address.to_owned(), (chart_type.to_owned(), key.to_owned()));
     }
 
     /// Removes version `iri`; the caller has checked that no non-final actor uses it.

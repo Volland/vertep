@@ -61,6 +61,7 @@ The `no_std` heart: the chart IR, the type language, the `Datamodel` trait and t
 - realizes:: [[decisions#IR is the hub]]
 - realizes:: [[decisions#SCXML semantics are normative]]
 - realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the core half"}
+- realizes:: [[decisions#Type checking stops on non-contractive recursion]] {confidence: full}
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
 Implemented 2026-11-11: `validate`, `order`, `compile` (states numbered in document order, root 0, an in-crate bitset), the pure Appendix D `kernel`, `session::{start, step}` with effects, the `null` datamodel and registry, and the `tape`/`trace` exchange format for the Lean oracle, following [[decisions#Appendix D readings in the Rust core]].
@@ -102,6 +103,7 @@ The `vt:` ontology modules, IR to RDF 1.2 and back, SHACL shapes, RDFC-1.0 canon
 - uses:: [[components#vertep-core]] {kind: required}
 - realizes:: [[decisions#Modular vt ontology on RDF 1.2]]
 - realizes:: [[decisions#Content-addressed chart versions]] {confidence: partial, note: "hashing; pinning lives in vertep-runtime"}
+- realizes:: [[decisions#The agent ontology ships with vertep-rdf]] {note: "ontology/vt-agent.ttl and shapes/vt-agent-shapes.ttl"}
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
 Implemented 2026-11-11 on oxrdf 0.3 with RDF 1.2 and built-in RDFC-1.0 (86/86 W3C RDFC tests): a chart module of 29 classes and 69 properties, node IRIs `<base>#<fragment>` with no blank nodes, the version hash computed under the fixed base `urn:vertep:chart:self` and rebased to `urn:vertep:chart:sha256:<hex>`, SHACL Core shapes with an in-crate validator, and reconstruction gated by the shapes. Its verdicts agree with `vertep-core` validation on generated charts and on 46 single-rule mutations.
@@ -120,6 +122,8 @@ First phase landed 2026-11-11 on Lean v4.35.0 and LeanRDF `b407b97`: the IR, `We
 
 Second phase landed 2026-11-11: Lean projection, canonical N-Quads, SHA-256 and reconstruction; the `vertep-oracle` executable, which replays recorded tapes and reproduces the Rust traces on all 201 IRP root documents; `vt-certify`, which recomputes the chart version and emits a `vt:certifiedBy` certificate; and `vertep-shapes`, which runs the chart shapes on LeanRDF's proven SHACL validator. Proven: reconstruction soundness, canonical form and version determined by the chart, certified charts are `WellFormed`. The RDF round trip and shapes equivalence are checked differentially, not yet proven. Its certificate terms are declared in the `vt:` verification module, `crates/vertep-rdf/ontology/vt-verification.ttl`.
 
+Third phase landed 2026-11-11. The oracle charges idle internal events against the microstep budget like `vertep-core` and writes the partial trace with the budget error, so regression `5cbfa3338d26b03f` terminates and the harness lost its budget special case. Three protocol models with proofs over every interleaving, no `sorry`, axioms pinned: the journal protocol (`Journal`, `JournalTheorems`: replay determinism, deduplication, outbox safety and completeness, compare-and-set single activation), decide states and grants over an abstract SCXML core (`Agent`, `AgentTheorems`: decider safety, replay without deciders, grant intersection and enforcement), and leases and fencing (`Lease`, `LeaseTheorems`: one writer per shard and epoch, epochs ordered along every journal, stale appends and frames fenced). Each has an oracle executable: `vertep-journal`, `vertep-decide`, `vertep-lease`.
+
 ## vertep-conformance
 
 A dev-only harness that runs the W3C SCXML IRP suite on the Rust core and on the Lean model, and the property-based differential tests between them.
@@ -131,6 +135,9 @@ A dev-only harness that runs the W3C SCXML IRP suite on the Rust core and on the
 - uses:: [[components#vertep-lean]] {kind: dev, note: "the oracle binary"}
 - uses:: [[components#vertep-testkit]] {kind: dev}
 - uses:: [[components#vertep-rdf]] {kind: required, note: "corpus round-trip and shape checks"}
+- uses:: [[components#vertep-runtime]] {kind: dev, note: "journal protocol property tests"}
+- uses:: [[components#vertep-store]] {kind: dev, note: "journal protocol property tests"}
+- uses:: [[components#vertep-agent]] {kind: dev, note: "decide-state differential tests"}
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
 The suite under `suite/` comes from [[decisions#IRP suite from a pinned mirror]]: 236 ECMAScript charts and one `null` chart, checked by `scripts/check-suite-hash.sh`.
@@ -247,6 +254,8 @@ The tokio shell: actors and lifecycle classes, mailboxes, transports, the direct
 
 Implemented 2026-11-11: a `Node` per [[decisions#A node runs its actors on one thread]] with virtual, invoked and stateless actors, an RDF journal with message dedup, a transactional outbox, snapshots and deterministic replay that detects divergence; pluggable mailboxes (memory, store) and transports (local SCXML processor); `vt:request`, `vt:defer` and unhandled-event policies; durable timers and reminders; checked migrations and forks; the runtime ontology module with SHACL shapes. 128 tests run on a virtual clock. Known limits: dedup scans the whole journal, nested invokes inside invoked children are not supported, and the store mailbox acknowledges in a separate write.
 
+Fixed 2026-11-11 after the Lean journal model's findings: store-mailbox row IRIs are `<address>/mailbox/<seq>-<digest of the envelope>`, so mailboxes of two nodes sharing a store no longer overwrite each other's rows; and the outbox mark (`vt:dispatchedThrough`) moves only over entries whose sends were all delivered, never backwards, so a send a transport refused is owed until a retry delivers it and is dispatched again after a crash. A retry keeps the send's original transport.
+
 ## vertep-agent
 
 Agents on charts: `vt:decide` and the `Decider` trait, LLM and tool actors, capability grants and LLM-written plan charts.
@@ -257,21 +266,47 @@ Agents on charts: `vt:decide` and the `Decider` trait, LLM and tool actors, capa
 - uses:: [[components#vertep-runtime]] {kind: required}
 - uses:: [[components#vertep-dm-cel]] {kind: required}
 - uses:: [[components#vertep-rdf]] {kind: required}
+- uses:: [[components#vertep-core]] {kind: required}
+- uses:: [[components#vertep-yaml]] {kind: required, note: "plans are submitted as YAML"}
 - realizes:: [[decisions#Deciders at choice points]]
+- realizes:: [[decisions#Offer-time decider safety]] {confidence: partial, note: "checked at runtime; the theorem lives in vertep-lean"}
+- realizes:: [[decisions#LLM calls as invoked actors first]]
+- realizes:: [[decisions#Plan charts may use the null datamodel]]
+- realizes:: [[decisions#Decide bindings ride on vt extension attributes]]
+- realizes:: [[decisions#The agent host journals agent inputs]]
+- realizes:: [[decisions#Correlation ids derive from the journal position]]
+- realizes:: [[decisions#vt:retry lowers to journaled retry timers]]
+- realizes:: [[decisions#LLM decisions count as LLM calls]]
+- realizes:: [[decisions#Agent error events extend the error payload]]
 - scheduled_in:: [[roadmap#M3 Agents]]
+
+`AgentMachine` is the pure step over journaled agent inputs and `AgentHost` its shell; the reference provider (the Anthropic Messages API over an application-supplied HTTP client) is the `anthropic` feature, and `ScriptedProvider` is the deterministic mock. The `agent` feature of the facade re-exports the crate.
+
+Known cost: `enabled_events` restores a probe datamodel from the actor's snapshot for every candidate event after every macrostep, so ECMAScript charts with large contexts spend most of a turn encoding snapshots; the decide differential smoke sample takes about 5 s in release and 4 minutes in debug.
 
 ## vertep-cluster
 
 Trusted clusters: the `Membership` trait and its implementations, shard leases and placement, the QUIC transport and worker pools.
 
-- provides:: [[capabilities#Cluster membership]] {confidence: full}
+- provides:: [[capabilities#Cluster membership]] {confidence: partial, note: "etcd and Kubernetes Lease authorities are an in-memory stand-in with their record layouts; no live client yet"}
 - provides:: [[capabilities#Shard placement]] {confidence: full}
 - provides:: [[capabilities#Cluster transport]] {confidence: full}
 - provides:: [[capabilities#Worker pools]] {confidence: full}
-- uses:: [[components#vertep-runtime]] {kind: required}
+- uses:: [[components#vertep-runtime]] {kind: required, note: "feature runtime: placement hook, storage, transports"}
 - uses:: [[components#vertep-store]] {kind: required}
+- uses:: [[components#vertep-tiramemsu]] {kind: optional, note: "feature tiramemsu: offline resharding of shard files"}
+- uses:: [[components#vertep-conformance]] {kind: dev, note: "LeanTools locates vertep-lease for the fault-injection history replay"}
 - realizes:: [[decisions#Shard-based placement]]
+- realizes:: [[decisions#Fencing on appends and outbound frames]]
+- realizes:: [[decisions#Membership behind one trait]]
+- realizes:: [[decisions#QUIC with mutual TLS and a stream per actor pair]]
+- realizes:: [[decisions#At-least-once inside the cluster with journal deduplication]]
+- realizes:: [[decisions#Rebalancing moves the fewest shards and resharding is offline]]
+- realizes:: [[decisions#Workers are pooled, not sharded]]
+- realizes:: [[decisions#Local shard journals shipped on move]]
 - scheduled_in:: [[roadmap#M4 Cluster]]
+
+Status: in progress. Membership (static, gossip, external stand-in), leases with fencing epochs, placement, fenced shard storage, standby replication, rebalancing, offline resharding, the QUIC transport, the runtime integration (`ClusterNode` as placement, `ClusterStorage`, the cluster Event I/O Processor) and worker pools are implemented and tested. Open: live etcd and Kubernetes clients, container-based fault injection and its nightly matrix. The fault-injection test replays every history through the Lean lease model in strict mode (m4-cluster 6.5, 2026-11-11), recording the grants `Membership::tick` makes as well as the harness's own.
 
 ## vertep-federation
 
@@ -280,8 +315,26 @@ Trust-boundary actors: DID identities and resolution, authenticated senders, gra
 - provides:: [[capabilities#DID identity]] {confidence: full}
 - provides:: [[capabilities#Relay mailboxes]] {confidence: full}
 - uses:: [[components#vertep-runtime]] {kind: required}
-- realizes:: [[decisions#Identity, mailbox and transport layers]] {confidence: partial, note: "the cross-trust layers"}
+- uses:: [[components#vertep-core]] {kind: required}
+- uses:: [[components#vertep-rdf]] {kind: required}
+- uses:: [[components#vertep-tiramemsu]] {kind: dev, note: "identity history test"}
+- realizes:: [[decisions#Identity, mailbox and transport layers]] {confidence: full, note: "the cross-trust layers on the runtime's Resolver, Mailbox and Transport traits"}
+- realizes:: [[decisions#Grants enforced before the journal]]
+- realizes:: [[decisions#TSP before DIDComm across trust boundaries]]
+- realizes:: [[decisions#DID resolution is a directory chosen by address scheme]]
+- realizes:: [[decisions#Method resolvers behind one trait]]
+- realizes:: [[decisions#Keys stay behind a key manager]]
+- realizes:: [[decisions#Verification outcome is journaled with the input]] {confidence: partial, note: "the flag is origin presence until vertep-core has the field"}
+- realizes:: [[decisions#Verified origin carried by origin presence]]
+- realizes:: [[decisions#DIDComm mailboxes acknowledge after the append]]
+- realizes:: [[decisions#TSP direct when reachable, routed otherwise]]
+- realizes:: [[decisions#Protocol-neutral event envelope]]
+- realizes:: [[decisions#Transport selection follows the DID document]]
+- realizes:: [[decisions#Relay outbox owns cross-trust retries]]
+- realizes:: [[decisions#Pinned relay protocol libraries]]
 - scheduled_in:: [[roadmap#M5 Federation]]
+
+Cargo features `didcomm`, `tsp` and `webvh` select the protocol libraries; `testkit` adds an in-process DIDComm mediator and TSP intermediary for tests. The runtime gained two additive hooks for it: address binding (a DID as a virtual actor's address) and `NodeHandle::notify` (a relay pickup wakes the actor).
 
 ## vertep-wasm
 
@@ -290,7 +343,24 @@ The WebAssembly build of the core and a browser shell with a TypeScript API and 
 - provides:: [[capabilities#WASM bindings]] {confidence: full}
 - uses:: [[components#vertep-runtime]] {kind: required}
 - uses:: [[components#vertep-tiramemsu]] {kind: required}
+- uses:: [[components#vertep-scxml]] {kind: required}
+- uses:: [[components#vertep-yaml]] {kind: required}
+- uses:: [[components#vertep-rdf]] {kind: required}
+- uses:: [[components#vertep-dm-cel]] {kind: required}
+- uses:: [[components#vertep-dm-rust]] {kind: required, note: "the named-function registry binds JavaScript guards and actions"}
+- realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the browser shell half"}
+- realizes:: [[decisions#Two storage traits with tiramemsu as default]] {confidence: partial, note: "tiramemsu on its WebAssembly host"}
+- realizes:: [[decisions#SCXML semantics are normative]]
+- realizes:: [[decisions#One worker hosts the core, the shell and the journal]]
+- realizes:: [[decisions#The browser shell implements the runtime shell trait]]
+- realizes:: [[decisions#Implementations are a module imported by the worker]]
+- realizes:: [[decisions#Browser storage is explicit, exclusive and native-format]]
+- realizes:: [[decisions#TypeScript is one more projection of the type language]] {note: "the projection lives in vertep-rdf, the command in vertep-cli"}
+- realizes:: [[decisions#JavaScript ergonomics follow XState and semantics follow SCXML]]
+- realizes:: [[decisions#Separate packages keep the bundle budget]] {confidence: partial, note: "the core build exceeds its 600 KB budget"}
 - scheduled_in:: [[roadmap#M6 WASM and JS]]
+
+Implemented 2026-11-11: the crate (`System` and its JSON command bridge, the browser shell, explicit storage on `tm-wasm`, JavaScript implementations bound by IRI, step and differential traces, the native helper `vertep-wasm-native`) and the npm workspace `bindings/js` with `@vertep/web` (client, worker entry, core and journal builds) and `@vertep/dm-ecma`. Built by `bindings/js/scripts/build.sh` with the `wasm-bindgen` CLI pinned to the crate; tested natively, in Node.js worker threads and in headless Chrome (OPFS). Open: the WebSocket transport, the W3C suite runner in WebAssembly, the core build's size budget, publishing.
 
 ## vertep-cli
 

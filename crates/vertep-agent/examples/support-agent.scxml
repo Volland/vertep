@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A ReAct support agent: the LLM drives the agent through one decide loop.
+
+  `task` triages the ticket with an LLM call, then `decide` offers the agent's actions to the
+  LLM decider: call a tool (search the knowledge base or look up an order), finish with an
+  answer, or escalate to a person. Tool results are journaled replies that go back into the
+  context, so the next decision sees them. vt:maxDecisions bounds the loop: the eleventh entry
+  raises vt.agent.budget-exhausted instead of consulting the model again.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" initial="idle" name="support-agent">
+  <datamodel>
+    <data id="ticket" expr="null"/>
+    <data id="triage" expr="''"/>
+    <data id="steps" expr="0"/>
+    <data id="observations" expr="[]"/>
+    <data id="answer" expr="null"/>
+  </datamodel>
+
+  <state id="idle">
+    <transition event="task" target="triaging"><assign location="ticket" expr="ev.data"/></transition>
+  </state>
+
+  <state id="triaging">
+    <invoke type="vt:llm" id="triage" vt:provider="triage" vt:model="claude-opus-5-5"
+            vt:template="Triage this support ticket in one line: {{context.ticket.text}}"/>
+    <transition event="done.invoke.triage" target="decide"><assign location="triage" expr="ev.data.text"/></transition>
+    <transition event="error.llm" target="decide"/>
+  </state>
+
+  <state id="decide" vt:decide="llm/claude" vt:fallback="human/support" vt:deadline="30s"
+         vt:maxDecisions="10" vt:candidates="call_tool finish escalate">
+    <transition event="call_tool" target="tooling">
+      <send event="tool.call" targetexpr="ev.data.tool"><content expr="ev.data.args"/></send>
+    </transition>
+    <transition event="finish" target="done"><assign location="answer" expr="ev.data"/></transition>
+    <transition event="escalate" target="human"/>
+    <transition event="vt.agent.budget-exhausted" target="budget_out"/>
+    <transition event="error.decide.invalid" target="decide"/>
+    <transition event="vt.decide.refused" target="human"/>
+  </state>
+
+  <state id="tooling">
+    <transition event="vt:reply" target="decide">
+      <assign location="observations" expr="ctx.observations + [ev.data.result]"/>
+      <assign location="steps" expr="ctx.steps + 1"/>
+    </transition>
+    <transition event="error.tool" target="decide"><assign location="steps" expr="ctx.steps + 1"/></transition>
+  </state>
+
+  <state id="human" vt:decide="human/support" vt:candidates="finish">
+    <transition event="finish" target="done"><assign location="answer" expr="ev.data"/></transition>
+  </state>
+
+  <final id="done">
+    <donedata><param name="answer" expr="ctx.answer"/><param name="steps" expr="ctx.steps"/></donedata>
+  </final>
+  <final id="budget_out">
+    <donedata><param name="steps" expr="ctx.steps"/></donedata>
+  </final>
+</scxml>

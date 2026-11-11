@@ -201,6 +201,56 @@ impl Machine {
         )
     }
 
+    /// Whether `event` would be accepted now: an active state defers it (`vt:defer`), or it
+    /// enables at least one transition of the current configuration. Guards run on a scratch
+    /// copy of the datamodel made from `registry`, so the machine is unchanged.
+    pub fn can(&self, registry: &dyn DatamodelRegistry, event: &Event) -> bool {
+        if self.session.is_terminated() {
+            return false;
+        }
+        if self
+            .info
+            .deferred(&self.session)
+            .iter()
+            .any(|d| vertep_core::kernel::descriptor_matches(d, &event.name))
+        {
+            return true;
+        }
+        let Ok(mut dm) =
+            vertep_core::null::create_datamodel(registry, self.info.compiled.datamodel())
+        else {
+            return false;
+        };
+        let info = SessionInfo {
+            sessionid: self.address.as_str().to_owned(),
+            name: self.info.ir.name.clone(),
+            ioprocessors: Value::Undefined,
+        };
+        if dm.init_session(&info).is_err() || dm.restore(&self.dm.snapshot()).is_err() {
+            return false;
+        }
+        dm.set_event(event);
+        let chart = &self.info.compiled;
+        let q = ActiveIn {
+            chart,
+            session: &self.session,
+        };
+        !vertep_core::kernel::select_transitions(
+            chart,
+            &self.session.configuration,
+            &self.session.history,
+            Some(&event.name),
+            |t| {
+                chart
+                    .transition(t)
+                    .cond
+                    .as_deref()
+                    .is_none_or(|c| dm.eval_cond(c, &q).unwrap_or(false))
+            },
+        )
+        .is_empty()
+    }
+
     /// A snapshot with IRI `iri` at `position`.
     pub fn snapshot(&self, iri: &NamedNode, position: u64) -> SnapshotData {
         SnapshotData {
@@ -584,6 +634,22 @@ impl Machine {
         e.origin = Some(self.address.as_str().to_owned());
         e.origintype = Some(SCXML_EVENT_PROCESSOR.to_owned());
         e
+    }
+}
+
+/// `In()` against a session's configuration, for guards evaluated by [`Machine::can`].
+struct ActiveIn<'a> {
+    chart: &'a vertep_core::compile::CompiledChart,
+    session: &'a Session,
+}
+
+impl vertep_core::datamodel::StateQuery for ActiveIn<'_> {
+    fn in_state(&self, id: &str) -> bool {
+        self.session.is_active(self.chart, id)
+    }
+
+    fn active_states(&self) -> Option<Vec<String>> {
+        Some(self.session.active(self.chart))
     }
 }
 

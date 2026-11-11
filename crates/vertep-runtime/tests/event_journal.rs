@@ -429,6 +429,127 @@ fn crash_before_append() {
     assert_eq!(store.head(b.node()).unwrap(), Position::new(2));
 }
 
+/// A transport that refuses every message while `down` is set and counts what it accepts.
+struct Flaky {
+    down: Arc<std::sync::atomic::AtomicBool>,
+    accepted: Arc<AtomicUsize>,
+}
+
+const FLAKY: &str = "urn:vertep:test:flaky";
+
+impl vertep_runtime::Transport for Flaky {
+    fn type_iri(&self) -> &str {
+        FLAKY
+    }
+
+    fn deliver(
+        &self,
+        mailbox: &dyn vertep_runtime::Mailbox,
+        env: Envelope,
+    ) -> Result<(), vertep_runtime::transport::TransportError> {
+        if self.down.load(Ordering::SeqCst) {
+            return Err(vertep_runtime::transport::TransportError("down".into()));
+        }
+        mailbox
+            .enqueue(env)
+            .map_err(|e| vertep_runtime::transport::TransportError(e.0))?;
+        self.accepted.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+/// A node with the flaky transport, a sink `b` and an actor `a` that sends one event to `b`
+/// through it on `go`.
+fn flaky_node(
+    store: &Arc<MemoryStore>,
+    clock: &vertep_runtime::VirtualClock,
+    flaky: &Flaky,
+) -> (vertep_runtime::Node, Address, Address) {
+    let shell = vertep_runtime::Shell {
+        spawn: Arc::new(vertep_runtime::shell::TokioSpawn),
+        clock: Arc::new(clock.clone()),
+        sleep: Arc::new(clock.clone()),
+    };
+    let mut n = vertep_runtime::Node::builder(store.clone(), shell)
+        .transport(Arc::new(Flaky {
+            down: flaky.down.clone(),
+            accepted: flaky.accepted.clone(),
+        }))
+        .build();
+    n.register_type(&ty("sink"), scxml("s", SINK)).unwrap();
+    let b = va("sink", "b");
+    n.register_type(
+        &ty("fan"),
+        scxml(
+            "s",
+            &format!(
+                r#"<state id="s"><transition event="go"><send event="one" type="{FLAKY}" target="{b}"/></transition></state>"#
+            ),
+        ),
+    )
+    .unwrap();
+    (n, va("fan", "a"), b)
+}
+
+/// A send its transport refused is still owed: the outbox mark does not pass its entry, so a
+/// crash before the retry succeeds loses nothing and the restarted node delivers it (the Lean
+/// journal model's `outbox_safe`: the mark moves only over delivered sends).
+// @tg: verifies:: [[openspec:event-journal#Transactional Outbox#Crash after append, before dispatch]] {level: integration}
+#[test]
+fn refused_send_survives_a_crash() {
+    let store = Arc::new(MemoryStore::new());
+    let clock = vertep_runtime::VirtualClock::new(T0);
+    let flaky = Flaky {
+        down: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+        accepted: Arc::new(AtomicUsize::new(0)),
+    };
+    let (mut n1, a, b) = flaky_node(&store, &clock, &flaky);
+    n1.send(&a, ev("go")).unwrap();
+    n1.run_until_idle();
+    assert_eq!(store.head(a.node()).unwrap(), Position::new(1));
+    assert_eq!(store.head(b.node()).unwrap(), Position::ZERO, "refused");
+    // the process dies before the retry; the transport comes back
+    drop(n1);
+    flaky.down.store(false, Ordering::SeqCst);
+    let (mut n2, _, _) = flaky_node(&store, &clock, &flaky);
+    n2.run_until_idle();
+    assert_eq!(
+        store.head(b.node()).unwrap(),
+        Position::new(1),
+        "the restarted node delivered the owed send"
+    );
+    assert_eq!(flaky.accepted.load(Ordering::SeqCst), 1);
+}
+
+/// A refused send retried in the same process advances the outbox mark once delivered: a later
+/// restart dispatches nothing again.
+// @tg: verifies:: [[openspec:event-journal#Transactional Outbox#Stable send ids enable receiver dedup]] {level: integration}
+#[test]
+fn retried_send_advances_the_outbox_mark() {
+    let store = Arc::new(MemoryStore::new());
+    let clock = vertep_runtime::VirtualClock::new(T0);
+    let flaky = Flaky {
+        down: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+        accepted: Arc::new(AtomicUsize::new(0)),
+    };
+    let (mut n1, a, b) = flaky_node(&store, &clock, &flaky);
+    n1.send(&a, ev("go")).unwrap();
+    n1.run_until_idle();
+    assert_eq!(store.head(b.node()).unwrap(), Position::ZERO, "refused");
+    flaky.down.store(false, Ordering::SeqCst);
+    clock.advance(Duration::from_millis(1_500));
+    n1.run_until_idle();
+    assert_eq!(store.head(b.node()).unwrap(), Position::new(1), "retried");
+    drop(n1);
+    let (mut n2, _, _) = flaky_node(&store, &clock, &flaky);
+    n2.run_until_idle();
+    assert_eq!(
+        flaky.accepted.load(Ordering::SeqCst),
+        1,
+        "the mark passed the delivered send: no redispatch after the restart"
+    );
+}
+
 // @tg: verifies:: [[openspec:event-journal#Transactional Outbox#Stable send ids enable receiver dedup]] {level: integration}
 #[test]
 fn stable_send_ids_enable_receiver_dedup() {

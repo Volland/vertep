@@ -1,0 +1,83 @@
+[package]
+name = "vertep-wasm"
+description = "Vertep in WebAssembly: the core and a browser shell behind a worker command bridge, with a tiramemsu journal in OPFS or memory"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# Shipped as the npm packages in `bindings/js`, not on crates.io.
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "vertep-wasm-native"
+required-features = ["journal"]
+
+[features]
+default = []
+# The tiramemsu journal (SQLite compiled to WebAssembly). Without it the build holds only the
+# core, the shell and the in-memory store, which keeps the storage-free bundle small.
+journal = ["dep:vertep-tiramemsu", "dep:tm-wasm", "vertep-runtime/tiramemsu"]
+# The ECMAScript datamodel (boa), shipped separately as `@vertep/dm-ecma`.
+ecmascript = ["dep:vertep-dm-ecma", "dep:getrandom_04"]
+
+[dependencies]
+vertep-core = { workspace = true, features = ["std", "serde"] }
+vertep-runtime = { workspace = true }
+vertep-store = { workspace = true }
+vertep-rdf = { workspace = true }
+vertep-scxml = { workspace = true }
+vertep-yaml = { workspace = true }
+vertep-dm-cel = { workspace = true }
+vertep-dm-rust = { workspace = true }
+vertep-tiramemsu = { workspace = true, optional = true }
+vertep-dm-ecma = { workspace = true, optional = true }
+tm-wasm = { version = "0.12.0", optional = true }
+oxrdf = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures = { workspace = true }
+
+# The native helper's generator of differential cases (the same generator as the
+# Rust-versus-Lean differential test).
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+vertep-testkit = { workspace = true }
+proptest = "1.12"
+
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+# Pinned to the installed `wasm-bindgen` CLI: the CLI and the crate must agree exactly.
+wasm-bindgen = "=0.2.128"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["console"] }
+# oxrdf draws random blank-node ids; the cfg `getrandom_backend="wasm_js"` is set by the build
+# script in `bindings/js/scripts/build.sh`.
+getrandom = { version = "0.3", features = ["wasm_js"] }
+# SPARQL's NOW() reads the clock through oxsdatatypes, whose `js` feature uses `Date.now()`
+# instead of `SystemTime`, which panics on wasm32-unknown-unknown.
+oxsdatatypes = { version = "0.2.4", features = ["js"] }
+# boa (the `ecmascript` feature) seeds its random numbers through getrandom 0.4.
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"], optional = true }
+
+[dev-dependencies]
+# The tests open journal files, so they always build with the journal.
+vertep-wasm = { path = ".", features = ["journal"] }
+# Checks that the WebAssembly differential records are the ones the Lean oracle is given.
+vertep-conformance = { path = "../vertep-conformance" }
+proptest = "1.12"
+vertep-runtime = { workspace = true, features = ["tiramemsu"] }
+vertep-tiramemsu = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
+tempfile = "3"
+
+# No `[lints] workspace = true`: the wasm-bindgen macros emit `unsafe` glue and the workspace
+# forbids it (as tiramemsu's own WebAssembly binding does).
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

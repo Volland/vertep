@@ -1,0 +1,187 @@
+@prefix vt-agent: <https://w3id.org/vertep/agent#> .
+@prefix vt:   <https://w3id.org/vertep/vt#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+# The agent module of the vt: ontology (RDF 1.2, Turtle).
+#
+# Deciders, decisions, LLM calls, tools, tool calls, grants, plans and plan executions, as
+# written by vertep-agent. A chart that uses no decide states, LLM invocations, tools or plans
+# never needs this module: its projection contains no vt-agent: terms. The chart module class
+# vt:DecideState (a state carrying a vt:decide binding) is declared here, because only agent
+# charts use it.
+#
+# PROV-O alignment is by rdfs:subClassOf and rdfs:subPropertyOf only, and the alignment axioms
+# are plain triples. vertep-agent also materializes the PROV-O view of every record it writes
+# (prov:Activity, prov:Agent, prov:wasAssociatedWith, prov:wasGeneratedBy, prov:used), so PROV
+# queries work without a reasoner.
+#
+# Decision annotations are RDF 1.2 reifiers of the statement `decision vt-agent:chose event`:
+#   << :d42 vt-agent:chose vt:event/approve ~ :r42 >> .
+#   :r42 vt-agent:rationale "invoice matches PO" ; vt-agent:confidence 0.82 .
+
+<https://w3id.org/vertep/vt/agent>
+    a owl:Ontology ;
+    rdfs:label "Vertep agent ontology module"@en ;
+    rdfs:comment "Classes and properties for Vertep agents: deciders and their decisions, LLM calls with usage and cost, tools and tool calls, capability grants, and LLM-written plan charts with their lineage."@en ;
+    dcterms:license <https://opensource.org/licenses/MIT> , <https://www.apache.org/licenses/LICENSE-2.0> ;
+    rdfs:seeAlso <http://www.w3.org/ns/prov#> ;
+    owl:versionInfo "0.1.0" .
+
+# ---------------------------------------------------------------------------------------------
+# Classes
+
+vt:DecideState
+    a owl:Class ;
+    rdfs:subClassOf vt:State ;
+    rdfs:label "decide state"@en ;
+    rdfs:comment "A state carrying a vt:decide binding: on entry its enabled events are offered to a decider."@en .
+
+vt-agent:Decider
+    a owl:Class ;
+    rdfs:subClassOf prov:Agent ;
+    rdfs:label "decider"@en ;
+    rdfs:comment "Something that chooses among the enabled events of a decide state: deterministic guards, a language model, a person or another actor."@en .
+
+vt-agent:Decision
+    a owl:Class ;
+    rdfs:subClassOf prov:Activity ;
+    rdfs:label "decision"@en ;
+    rdfs:comment "One answer of a decider to an offer, accepted or rejected, as journaled."@en .
+
+vt-agent:LlmCall
+    a owl:Class ;
+    rdfs:subClassOf prov:Activity ;
+    rdfs:label "LLM call"@en ;
+    rdfs:comment "One attempt of a model call made by an LLM invocation, with its usage, latency and cost."@en .
+
+vt-agent:Tool
+    a owl:Class ;
+    rdfs:subClassOf prov:Agent ;
+    rdfs:label "tool"@en ;
+    rdfs:comment "A registered tool actor with typed arguments and results."@en .
+
+vt-agent:ToolCall
+    a owl:Class ;
+    rdfs:subClassOf prov:Activity ;
+    rdfs:label "tool call"@en ;
+    rdfs:comment "One execution of a tool on behalf of an agent."@en .
+
+vt-agent:Grant
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "grant"@en ;
+    rdfs:comment "The send targets, tools, deciders and functions an invoked actor may use; a refused send is recorded against it."@en .
+
+vt-agent:Plan
+    a owl:Class ;
+    rdfs:subClassOf prov:Entity ;
+    rdfs:label "plan"@en ;
+    rdfs:comment "A chart fragment submitted by an LLM or a decider, with its validation outcome; an accepted plan is named by its chart version IRI."@en .
+
+vt-agent:PlanExecution
+    a owl:Class ;
+    rdfs:subClassOf prov:Activity ;
+    rdfs:label "plan execution"@en ;
+    rdfs:comment "One run of an accepted plan as an invoked child, with its outcome."@en .
+
+vt-agent:DeniedSend
+    a owl:Class ;
+    rdfs:subClassOf prov:Activity ;
+    rdfs:label "denied send"@en ;
+    rdfs:comment "A send refused because its target was not granted to the sender."@en .
+
+# ---------------------------------------------------------------------------------------------
+# Provenance links (aligned with PROV-O)
+
+vt-agent:actor
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:wasAssociatedWith ;
+    rdfs:label "actor"@en ;
+    rdfs:comment "The agent actor on whose behalf a decision, call or plan execution happened."@en .
+
+vt-agent:decider
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:wasAssociatedWith ;
+    rdfs:domain vt-agent:Decision ;
+    rdfs:range vt-agent:Decider ;
+    rdfs:label "decider"@en ;
+    rdfs:comment "The decider that answered."@en .
+
+vt-agent:tool
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:wasAssociatedWith ;
+    rdfs:domain vt-agent:ToolCall ;
+    rdfs:range vt-agent:Tool ;
+    rdfs:label "tool"@en .
+
+vt-agent:generatedBy
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:wasGeneratedBy ;
+    rdfs:domain vt-agent:Plan ;
+    rdfs:label "generated by"@en ;
+    rdfs:comment "The LLM call or decision that proposed a plan."@en .
+
+vt-agent:executes
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:used ;
+    rdfs:domain vt-agent:PlanExecution ;
+    rdfs:range vt-agent:Plan ;
+    rdfs:label "executes"@en .
+
+vt-agent:chose
+    a owl:ObjectProperty ;
+    rdfs:domain vt-agent:Decision ;
+    rdfs:label "chose"@en ;
+    rdfs:comment "The event a decision chose (an IRI under vt:event/). Annotations are reifiers of this statement."@en .
+
+# ---------------------------------------------------------------------------------------------
+# Decision properties
+
+vt-agent:correlationId a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "correlation id"@en .
+vt-agent:decideState a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "decide state"@en .
+vt-agent:binding a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "decider binding"@en .
+vt-agent:deciderKind a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "decider kind"@en ;
+    rdfs:comment "guard, llm, human, actor or custom."@en .
+vt-agent:accepted a owl:DatatypeProperty ; rdfs:range xsd:boolean ; rdfs:label "accepted"@en .
+vt-agent:reason a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "rejection reason"@en ;
+    rdfs:comment "not-a-candidate, payload-schema, stale, annotation or not-enabled."@en .
+vt-agent:rationale a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "rationale"@en .
+vt-agent:confidence a owl:DatatypeProperty ; rdfs:range xsd:decimal ; rdfs:label "confidence"@en ;
+    rdfs:comment "Between 0 and 1."@en .
+vt-agent:fallback a owl:DatatypeProperty ; rdfs:range xsd:boolean ; rdfs:label "fallback"@en ;
+    rdfs:comment "True when a fallback decider answered after the deadline."@en .
+
+# ---------------------------------------------------------------------------------------------
+# LLM call properties
+
+vt-agent:invokeId a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "invoke id"@en .
+vt-agent:provider a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "provider binding"@en .
+vt-agent:model a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "model identifier"@en .
+vt-agent:promptHash a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "prompt hash"@en ;
+    rdfs:comment "sha256:<hex> of the rendered prompt's UTF-8 bytes."@en .
+vt-agent:promptTokens a owl:DatatypeProperty ; rdfs:range xsd:integer ; rdfs:label "prompt tokens"@en .
+vt-agent:completionTokens a owl:DatatypeProperty ; rdfs:range xsd:integer ; rdfs:label "completion tokens"@en .
+vt-agent:latencyMs a owl:DatatypeProperty ; rdfs:range xsd:integer ; rdfs:label "latency in milliseconds"@en .
+vt-agent:cost a owl:DatatypeProperty ; rdfs:range xsd:decimal ; rdfs:label "cost"@en .
+vt-agent:currency a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "currency"@en ;
+    rdfs:comment "An ISO 4217 code."@en .
+vt-agent:attempt a owl:DatatypeProperty ; rdfs:range xsd:integer ; rdfs:label "attempt"@en .
+vt-agent:outcome a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "outcome"@en ;
+    rdfs:comment "ok, or the error class of a call; done, cancelled, failed, result or bounds:<bound> for a plan execution."@en .
+
+# ---------------------------------------------------------------------------------------------
+# Plan, grant and denied-send properties
+
+vt-agent:contentHash a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "content hash"@en .
+vt-agent:invokingState a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "invoking state"@en .
+vt-agent:violation a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "violation"@en .
+vt-agent:sender a owl:ObjectProperty ; rdfs:label "sender"@en .
+vt-agent:target a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "target"@en .
+vt-agent:eventName a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "event name"@en .
+vt-agent:allows a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "allows"@en ;
+    rdfs:comment "A target, tool, decider binding or function a grant allows."@en .

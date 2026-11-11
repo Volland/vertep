@@ -1,0 +1,23 @@
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" initial="cart" datamodel="cel" name="shop">
+  <vt:types><![CDATA[
+    type Line = { sku: string, qty: int, note: optional<string> };
+    type Payment = Card { last4: string } | Cash;
+    type Order = { id: string, lines: list<Line>, total: decimal, pay: Payment, meta: value, when: optional<datetime> };
+    event submit: Order; event pay: Payment; event count: int; event ping;
+  ]]></vt:types>
+  <datamodel>
+    <data id="total" vt:type="decimal" expr="0"/>
+    <data id="orders" vt:type="int" expr="0"/>
+  </datamodel>
+  <state id="cart">
+    <transition event="submit" target="checkout">
+      <assign location="ctx.total" expr="ev.data.total"/>
+      <assign location="ctx.orders" expr="ctx.orders + 1"/>
+    </transition>
+  </state>
+  <state id="checkout" initial="payment">
+    <state id="payment"><transition event="pay" target="done"/></state>
+  </state>
+  <final id="done"/>
+</scxml>

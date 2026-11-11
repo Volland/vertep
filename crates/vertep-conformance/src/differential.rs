@@ -18,13 +18,12 @@ use sha2::{Digest, Sha256};
 use vertep_core::compile::CompiledChart;
 use vertep_core::datamodel::{Environment, Event, EventType, SessionInfo, Value};
 use vertep_core::ir::{Chart, State};
-use vertep_core::null::{WithNull, create_datamodel};
+use vertep_core::null::create_datamodel;
 use vertep_core::session::{self, Input, InputKind, Options, StartError, StartInput, StepError};
 use vertep_core::tape::{OracleInput, OracleRecord, TapeDatamodel};
-use vertep_dm_ecma::EcmaRegistry;
 use vertep_testkit::{ChartConfig, arb_chart_with};
 
-use crate::lean::{LeanLine, LeanTools, compare, replay};
+use crate::lean::{LeanTools, compare_run, replay};
 
 /// One input of a generated case.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -129,7 +128,7 @@ pub struct RustRun {
 pub fn rust_records(case: &GeneratedCase) -> Result<RustRun, String> {
     let chart =
         CompiledChart::new(case.chart.clone()).map_err(|v| format!("not well-formed: {v:?}"))?;
-    let registry = WithNull(EcmaRegistry);
+    let registry = crate::host::HostRegistry;
     let mut dm = create_datamodel(&registry, chart.datamodel()).map_err(|e| format!("{e:?}"))?;
     let env = |i: u64| Environment {
         now_ms: 1_767_225_600_000 + 1_000 * i64::try_from(i).unwrap_or(0),
@@ -223,18 +222,10 @@ pub trait TraceOracle {
 
 impl TraceOracle for LeanTools {
     fn check(&self, case: &GeneratedCase, run: &RustRun) -> Result<(), String> {
-        let mut lines = replay(self, &case.chart, &run.records)?;
-        // Both ran out of the microstep budget in the last macrostep: Rust returns the partial
-        // trace with its error, the oracle only the error. That is agreement.
-        let n = run.records.len();
-        if run.budget_exceeded
-            && n == lines.len()
-            && matches!(lines.last(), Some(LeanLine::Error(e)) if e.contains("budgetExceeded"))
-        {
-            lines.pop();
-            return compare(&run.records[..n - 1], &lines).map_err(|d| d.to_string());
-        }
-        compare(&run.records, &lines).map_err(|d| d.to_string())
+        // A run that ran out of the microstep budget agrees when the oracle reports the budget
+        // error on the same macrostep with the same partial trace.
+        let lines = replay(self, &case.chart, &run.records)?;
+        compare_run(&run.records, Some(run.budget_exceeded), &lines).map_err(|d| d.to_string())
     }
 }
 
@@ -243,8 +234,7 @@ impl TraceOracle for LeanTools {
 pub struct DifferentialOutcome {
     /// Cases compared (including shrinking steps).
     pub compared: u64,
-    /// Generated charts the Rust validator rejected, or runs skipped for exhausting the
-    /// microstep budget when [`DifferentialConfig::skip_budget_exceeded`] is set.
+    /// Generated charts the Rust validator rejected.
     pub skipped: u64,
     /// The shrunk counterexample, if the two disagreed, with the file it was stored in.
     pub counterexample: Option<Counterexample>,
@@ -276,11 +266,6 @@ pub struct DifferentialConfig {
     pub max_inputs: usize,
     /// Where counterexamples are stored.
     pub regressions: PathBuf,
-    /// Skip cases whose Rust run exhausts the microstep budget. The Lean oracle does not yet
-    /// charge internal events that enable nothing against the budget, so it does not terminate
-    /// on such runs; the gate's smoke sample skips them until it does, the full differential
-    /// run does not.
-    pub skip_budget_exceeded: bool,
 }
 
 impl Default for DifferentialConfig {
@@ -291,7 +276,6 @@ impl Default for DifferentialConfig {
             chart: chart_config(),
             max_inputs: 6,
             regressions: default_regressions_dir(),
-            skip_budget_exceeded: false,
         }
     }
 }
@@ -324,10 +308,6 @@ pub fn run_generated(cfg: &DifferentialConfig, oracle: &dyn TraceOracle) -> Diff
     let strategy = arb_case(cfg.chart.clone(), cfg.max_inputs);
     let result = runner.run(&strategy, |case| {
         let run = match rust_records(&case) {
-            Ok(r) if r.budget_exceeded && cfg.skip_budget_exceeded => {
-                skipped.set(skipped.get() + 1);
-                return Err(TestCaseError::reject("exhausts the microstep budget"));
-            }
             Ok(r) => r,
             Err(why) => {
                 skipped.set(skipped.get() + 1);
@@ -416,20 +396,11 @@ pub fn load_regressions(dir: &Path) -> Result<Vec<(PathBuf, Regression)>, String
         .collect()
 }
 
-/// Replay every stored counterexample; returns the ones that still disagree. With
-/// `skip_budget_exceeded`, cases whose Rust run exhausts the microstep budget are skipped (see
-/// [`DifferentialConfig::skip_budget_exceeded`]).
-pub fn replay_regressions(
-    dir: &Path,
-    oracle: &dyn TraceOracle,
-    skip_budget_exceeded: bool,
-) -> Result<Vec<String>, String> {
+/// Replay every stored counterexample; returns the ones that still disagree.
+pub fn replay_regressions(dir: &Path, oracle: &dyn TraceOracle) -> Result<Vec<String>, String> {
     let mut failing = Vec::new();
     for (path, r) in load_regressions(dir)? {
         let run = rust_records(&r.case)?;
-        if skip_budget_exceeded && run.budget_exceeded {
-            continue;
-        }
         if let Err(e) = oracle.check(&r.case, &run) {
             failing.push(format!("{}: {e}", path.display()));
         }

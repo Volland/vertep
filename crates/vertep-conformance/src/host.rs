@@ -58,7 +58,21 @@ use vertep_scxml::{ReadOptions, Resolution, ResolveError, SourceRequest};
 pub type SessionIdx = usize;
 
 /// The datamodels the host's documents may name.
-pub const HOST_DATAMODELS: [&str; 2] = ["null", "ecmascript"];
+pub const HOST_DATAMODELS: [&str; 3] = ["null", "ecmascript", "cel"];
+
+/// The datamodels the host offers: `ecmascript` (vertep-dm-ecma), `cel` (vertep-dm-cel,
+/// untyped, default limits) and `null`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct HostRegistry;
+
+impl DatamodelRegistry for HostRegistry {
+    fn create(&self, name: &str) -> Option<Box<dyn Datamodel>> {
+        vertep_dm_ecma::EcmaRegistry
+            .create(name)
+            .or_else(|| vertep_dm_cel::CelRegistry.create(name))
+            .or_else(|| vertep_core::null::NullRegistry.create(name))
+    }
+}
 
 /// Limits of one host run ([[openspec:scxml-conformance#Pass Fail Protocol]]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

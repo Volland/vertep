@@ -229,6 +229,26 @@ impl CelDatamodel {
         parse_location(src, self.limits.max_depth)
     }
 
+    /// The value at a bare location (`Var1`, `Var1.a`) whose root is a data item, or `None`.
+    ///
+    /// The interpreter reads `namelist` names and `<param location>` with
+    /// [`Datamodel::eval_value`], because the datamodel contract has no location read; [`crate::load`]
+    /// checks them as locations, where a bare location means a field of `ctx`. So an expression
+    /// that fails only as an undeclared reference and is such a location reads the location
+    /// (IRP tests 240, 241, 244, 245, 354 under CEL).
+    fn read_location(&mut self, src: &str, states: &dyn StateQuery) -> Option<CelValue> {
+        let loc = self.location(src.trim()).ok()?;
+        let CelValue::Map(m) = &self.ctx else {
+            return None;
+        };
+        let mut cur = m.get(&Key::String(loc.root.clone()))?.clone();
+        let keys = self.keys(&loc, states).ok()?;
+        for k in keys.iter().skip(1) {
+            cur = crate::eval::index_value(&cur, k).ok()?;
+        }
+        Some(cur)
+    }
+
     /// Evaluate the index expressions of a location's path into keys.
     fn keys(&mut self, loc: &Location, states: &dyn StateQuery) -> Result<Vec<CelValue>, CelError> {
         let mut keys = Vec::with_capacity(loc.path.len() + 1);
@@ -404,6 +424,10 @@ impl Datamodel for CelDatamodel {
         self.last = None;
         match self.run(expr, states) {
             Ok(v) => Ok(self.remember(v)),
+            Err(e) if e.kind == ErrorKind::Undeclared => match self.read_location(expr, states) {
+                Some(v) => Ok(self.remember(v)),
+                None => Err(self.fail(expr, e)),
+            },
             Err(e) => Err(self.fail(expr, e)),
         }
     }

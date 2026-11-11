@@ -192,7 +192,7 @@ sequenceDiagram
 4. **Deduplicate.** `Message Deduplication` drops a redelivered message whose id is already journaled; delivery is at least once, processing effectively once.
 5. **Step.** One turn is one macrostep (`Turn Is One Macrostep`); `step` is pure (`Pure Step Function`) and returns effects instead of performing them.
 6. **Append.** `Compare-And-Set Append` writes the input, the chart version and the outbox in one entry; on tiramemsu the derived state facts commit in the same transaction (`Input And State In One Transaction`) with support links to the entry (`State Facts Carry Their Cause`).
-7. **Dispatch.** Only after the append commits does `Transactional Outbox` dispatch sends, timers and invokes; a crash in between re-dispatches the same sends with the same ids.
+7. **Dispatch.** Only after the append commits does `Transactional Outbox` dispatch sends, timers and invokes; a crash in between re-dispatches the same sends with the same ids. The outbox mark passes an entry only once all its sends were delivered, so a send its transport refused is retried, and re-dispatched after a crash, until delivered.
 8. **Query.** `db.now()` is the current-state graph and `db.as_of(t)` is time travel without replay (`Time Travel Views`).
 
 ```rust

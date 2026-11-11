@@ -229,6 +229,51 @@ pub fn validate(path: &Path) -> Outcome {
     }
 }
 
+/// `vt gen ts <chart> [--name N]`: print the TypeScript module for `@vertep/web`: the event
+/// union, the context interface, the state-id union, the typed chart spec and a typed
+/// `create<N>Actor`. An untyped chart gets dynamic JSON value types.
+// @tg: implements:: [[openspec:wasm-bindings#Generated TypeScript Types]]
+pub fn gen_ts(path: &Path, name: Option<&str>) -> Outcome {
+    let loaded = match load(path, Checks::Types) {
+        Ok(l) => l,
+        Err(o) => return o,
+    };
+    let file = path.display().to_string();
+    let types = match typecheck_chart(&file, &loaded.chart) {
+        Ok(t) => t,
+        Err(errs) => return Outcome::fail(1, errs),
+    };
+    let text = match read_file(path) {
+        Ok(t) => t,
+        Err(o) => return o,
+    };
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let prefix = vertep_rdf::types::typescript::pascal(
+        name.or(loaded.chart.name.as_deref())
+            .unwrap_or(stem.split('.').next().unwrap_or("chart")),
+    );
+    let format = match loaded.surface {
+        Surface::Scxml => "scxml",
+        Surface::Yaml => "yaml",
+        _ => "rdf",
+    };
+    let version = chart_version(&loaded.chart);
+    let src = vertep_rdf::types::typescript::TsSource {
+        name: &prefix,
+        text: &text,
+        format,
+        version: version.as_str(),
+    };
+    Outcome::ok(vertep_rdf::types::typescript::ts_module(
+        &loaded.chart,
+        &types,
+        &src,
+    ))
+}
+
 /// `vt hash <chart>`: print the chart version IRI.
 // @tg: implements:: [[openspec:type-system#Command Line Type Tools]]
 pub fn hash(path: &Path) -> Outcome {
@@ -358,5 +403,25 @@ pub fn certify(path: &Path) -> Outcome {
             }
         }
         Err(e) => Outcome::fail(2, [format!("{}: {e}", checker.display())]),
+    }
+}
+
+/// `vt cluster reshard <dir> <out>`: the offline doubling of a stopped cluster's shard count.
+/// Reads the cluster metadata and shard files of `dir`, refuses while its `leases` file lists
+/// a live lease (naming the nodes), writes twice as many shard files and the new metadata to
+/// `out`, and verifies every actor's journal there. `dir` is left untouched.
+// @tg: implements:: [[openspec:shard-placement#Resharding Procedure]]
+pub fn cluster_reshard(dir: &Path, out: &Path) -> Outcome {
+    match vertep_cluster::rebalance::reshard_directory(dir, out) {
+        Ok((meta, report)) => Outcome::ok(format!(
+            "resharded {} to {} shards: {} actors, {} entries copied to {}\n",
+            report.old.get(),
+            meta.shard_count.get(),
+            report.actors.len(),
+            report.entries,
+            out.display()
+        )),
+        Err(e @ vertep_cluster::ReshardError::LeasesHeld(_)) => Outcome::fail(1, [e.to_string()]),
+        Err(e) => Outcome::fail(2, [e.to_string()]),
     }
 }

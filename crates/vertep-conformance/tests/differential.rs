@@ -9,9 +9,10 @@
 
 use vertep_conformance::LeanTools;
 use vertep_conformance::differential::{
-    DifferentialConfig, GeneratedCase, RustRun, TraceOracle, default_regressions_dir,
-    load_regressions, replay_regressions, run_generated,
+    DifferentialConfig, GENERATED_MICROSTEP_BUDGET, GeneratedCase, RustRun, TraceOracle,
+    default_regressions_dir, load_regressions, replay_regressions, run_generated,
 };
+use vertep_conformance::lean::LeanLine;
 
 const REQUIRED: bool = cfg!(feature = "differential");
 
@@ -22,10 +23,9 @@ fn cases_from_env(default: u32) -> u32 {
         .unwrap_or(default)
 }
 
-fn assert_agreement(tools: &LeanTools, cases: u32, skip_budget_exceeded: bool) {
+fn assert_agreement(tools: &LeanTools, cases: u32) {
     let cfg = DifferentialConfig {
         cases,
-        skip_budget_exceeded,
         ..DifferentialConfig::default()
     };
     let out = run_generated(&cfg, tools);
@@ -43,8 +43,7 @@ fn assert_agreement(tools: &LeanTools, cases: u32, skip_budget_exceeded: bool) {
             c.reason
         );
     }
-    let failing = replay_regressions(&default_regressions_dir(), tools, skip_budget_exceeded)
-        .expect("corpus reads");
+    let failing = replay_regressions(&default_regressions_dir(), tools).expect("corpus reads");
     assert!(
         failing.is_empty(),
         "stored regressions disagree:\n{}",
@@ -59,9 +58,7 @@ fn differential_generated_charts_agree_with_lean() {
     let Some(tools) = LeanTools::for_test(REQUIRED) else {
         return;
     };
-    // `VT_DIFF_SKIP_BUDGET=1` skips budget-exhausting runs, as the smoke sample does.
-    let skip = std::env::var("VT_DIFF_SKIP_BUDGET").is_ok_and(|v| v == "1");
-    assert_agreement(&tools, cases_from_env(512), skip);
+    assert_agreement(&tools, cases_from_env(512));
 }
 
 #[test]
@@ -69,9 +66,36 @@ fn conformance_differential_smoke_sample() {
     let Some(tools) = LeanTools::for_test(REQUIRED) else {
         return;
     };
-    // Skips runs that exhaust the microstep budget until the Lean oracle counts events that
-    // enable nothing (see `DifferentialConfig::skip_budget_exceeded`).
-    assert_agreement(&tools, 24, true);
+    assert_agreement(&tools, 24);
+}
+
+/// The idle-event loop of regression `5cbfa3338d26b03f` (a parallel state's failing eventless
+/// guard queues two `error.execution` per round and enables nothing): Rust runs out of the
+/// microstep budget, and the oracle terminates with the budget error and the same partial trace.
+// @tg: verifies:: [[openspec:formal-model#Differential Oracle#Budget exhaustion agrees with Rust]] {level: integration}
+#[test]
+fn differential_budget_exhaustion_reported_with_partial_trace() {
+    let Some(tools) = LeanTools::for_test(REQUIRED) else {
+        return;
+    };
+    let (_, r) = load_regressions(&default_regressions_dir())
+        .unwrap()
+        .into_iter()
+        .find(|(p, _)| p.ends_with("5cbfa3338d26b03f.json"))
+        .expect("the regression is committed");
+    let run = vertep_conformance::differential::rust_records(&r.case).unwrap();
+    assert!(run.budget_exceeded, "Rust runs out of the budget");
+    let lines = vertep_conformance::lean::replay(&tools, &r.case.chart, &run.records).unwrap();
+    assert_eq!(lines.len(), run.records.len());
+    match lines.last() {
+        Some(LeanLine::BudgetExceeded { budget, trace }) => {
+            assert_eq!(*budget, u64::from(GENERATED_MICROSTEP_BUDGET));
+            let micro = trace["microsteps"].as_array().unwrap();
+            assert_eq!(micro.len(), GENERATED_MICROSTEP_BUDGET as usize);
+        }
+        other => panic!("expected the budget error with the partial trace, got {other:?}"),
+    }
+    tools.check(&r.case, &run).expect("agreement");
 }
 
 /// A stand-in second implementation that "disagrees" whenever the chart has two or more
@@ -124,7 +148,7 @@ fn conformance_counterexample_is_shrunk_and_kept() {
             .as_deref()
             .is_some_and(|x| x.contains("<scxml"))
     );
-    let failing = replay_regressions(&dir, &DisagreesOnSize, false).unwrap();
+    let failing = replay_regressions(&dir, &DisagreesOnSize).unwrap();
     assert_eq!(failing.len(), 1);
     let _ = std::fs::remove_dir_all(&dir);
 }

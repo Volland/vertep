@@ -5,3 +5,6 @@ import VertepTests.WellFormed
 import VertepTests.Step
 import VertepTests.Theorems
 import VertepTests.Rdf
+import VertepTests.Journal
+import VertepTests.Agent
+import VertepTests.Lease
