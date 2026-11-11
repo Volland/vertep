@@ -1,0 +1,15 @@
+[package]
+name = "vertep-store"
+description = "Storage contracts for Vertep: JournalStore, GraphStore and their test kit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+vertep-core = { workspace = true, features = ["std"] }
+
+[lints]
+workspace = true

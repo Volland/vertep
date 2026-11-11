@@ -7,6 +7,11 @@ members = [
     "crates/vertep-rdf",
     "crates/vertep-conformance",
     "crates/vertep-testkit",
+    "crates/vertep-yaml",
+    "crates/vertep-dm-cel",
+    "crates/vertep-store",
+    "crates/vertep-tiramemsu",
+    "crates/vertep-oxigraph",
 ]
 
 [workspace.package]
@@ -23,6 +28,12 @@ vertep-scxml = { path = "crates/vertep-scxml", version = "0.1.0" }
 vertep-dm-ecma = { path = "crates/vertep-dm-ecma", version = "0.1.0" }
 vertep-rdf = { path = "crates/vertep-rdf", version = "0.1.0" }
 vertep-testkit = { path = "crates/vertep-testkit" }
+vertep-yaml = { path = "crates/vertep-yaml", version = "0.1.0" }
+vertep-dm-cel = { path = "crates/vertep-dm-cel", version = "0.1.0" }
+vertep-store = { path = "crates/vertep-store", version = "0.1.0" }
+vertep-tiramemsu = { path = "crates/vertep-tiramemsu", version = "0.1.0" }
+vertep-oxigraph = { path = "crates/vertep-oxigraph", version = "0.1.0" }
+boa_engine = { version = "0.22.0", default-features = false, features = ["annex-b"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
