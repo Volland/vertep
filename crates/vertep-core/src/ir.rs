@@ -464,7 +464,7 @@ pub struct Script {
 
 /// A `<data>` item.
 // @tg: implements:: [[openspec:chart-model#Datamodel Declaration]]
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Data {
     /// `id`.
@@ -524,4 +524,20 @@ pub struct Invoke {
     pub extensions: Vec<Extension>,
     /// Source location.
     pub span: Span,
+}
+
+#[cfg(test)]
+mod default_tests {
+    use super::*;
+
+    #[test]
+    fn data_default_is_empty() {
+        let d = Data {
+            id: "x".into(),
+            ..Data::default()
+        };
+        assert_eq!(d.id, "x");
+        assert!(d.src.is_none() && d.expr.is_none() && d.content.is_none());
+        assert!(d.extensions.is_empty());
+    }
 }

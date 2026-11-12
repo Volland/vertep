@@ -188,7 +188,7 @@ EXAMPLES = [
             ("p", "It spawns a cart actor from SCXML text with in-memory storage, subscribes to snapshots, sends events as <code>{ type, ...payload }</code>, reads the journal with the transitions each entry took, and reads the state as of an earlier entry."),
             ("code", (read("browser-js/main.mjs"), "JavaScript")),
             ("h2", "Build once, then run"),
-            ("p", "The packages are not on npm yet. Build them from the checkout once; the example's <code>package.json</code> links <code>@vertep/web</code> to the local build."),
+            ("p", "In your own project, <code>npm install @vertep/web</code> is all you need. This example runs against the checkout instead: its <code>package.json</code> links <code>@vertep/web</code> to the local build, so build the packages once first."),
             ("raw", run("rustup target add wasm32-unknown-unknown\ncargo install wasm-bindgen-cli --version 0.2.128\ncd bindings/js && npm install && npm run build\n\ncd ../../examples/browser-js\nnpm install     # links the local @vertep/web; no download\nnpm start")),
             ("out", (read("browser-js/expected-output.txt"), "Output")),
             ("ul", [
@@ -252,7 +252,7 @@ def page(title: str, desc: str, current: str, sidebar: str, main: str) -> str:
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a></nav>
   </div>
 </footer>
 </body>

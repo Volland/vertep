@@ -68,7 +68,7 @@
     </table>
     <p>Both packages are ES modules, both are at version <code>0.1.0</code>, and both need Node.js 22 or later. A release script, <code>bindings/js/scripts/check-version.mjs</code>, fails when a package version differs from the Rust workspace version.</p>
 
-    <div class="nb warn"><p>Neither package is published to npm yet. Their <code>package.json</code> files carry <code>publishConfig</code> with the <code>next</code> tag, but the publish task in <code>openspec/changes/m6-wasm-js/tasks.md</code> is still open. Build them from source as shown below.</p></div>
+    <div class="nb"><p>Install both from npm: <code>npm install @vertep/web</code>, plus <code>@vertep/dm-ecma</code> for charts on the ECMAScript datamodel. Build them from source, as below, only to work on the bindings themselves.</p></div>
 
     <h2 id="build">Building from source</h2>
     <p>You need the Rust toolchain pinned in <code>rust-toolchain.toml</code> (it already lists the <code>wasm32-unknown-unknown</code> target), Node.js 22 or later, and the <code>wasm-bindgen</code> CLI at exactly the version <code>crates/vertep-wasm/Cargo.toml</code> pins, which is <code>0.2.128</code> today. The build script stops if the two versions differ.</p>
@@ -459,7 +459,7 @@ journal: 2198.1 KB gzip (budget 2500 KB)</code></pre>
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a></nav>
   </div>
 </footer>
 </body>

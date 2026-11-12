@@ -52,6 +52,10 @@ impl fmt::Display for LoadErrors {
     }
 }
 
+impl core::error::Error for LoadError {}
+
+impl core::error::Error for LoadErrors {}
+
 /// How to load a chart.
 #[derive(Clone, Debug, Default)]
 pub struct LoadOptions {
@@ -489,4 +493,26 @@ fn is_ident(s: &str) -> bool {
     cs.next()
         .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
         && cs.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+    use alloc::string::ToString;
+    use alloc::vec;
+
+    #[test]
+    fn load_errors_box_with_question_mark() {
+        let e = LoadError {
+            at: "state `s` › transition 1 › cond".into(),
+            message: "a guard must have type bool".into(),
+        };
+        let _: &dyn core::error::Error = &e;
+        fn run(e: LoadError) -> Result<(), alloc::boxed::Box<dyn core::error::Error>> {
+            Err(LoadErrors(vec![e.clone(), e]))?
+        }
+        let msg = run(e).unwrap_err().to_string();
+        assert_eq!(msg.lines().count(), 2);
+        assert!(msg.starts_with("state `s` › transition 1 › cond: a guard"));
+    }
 }

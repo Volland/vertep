@@ -121,3 +121,7 @@ pub use view::{Member, MemberStatus, ShardOwner, Subscription, View, ViewTracker
 pub use workers::{
     ActivationId, Assignment, Failure, Outcome, Policy, Refusal, Submit, WorkerPool, WorkerType,
 };
+
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

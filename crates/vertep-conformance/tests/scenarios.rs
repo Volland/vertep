@@ -403,7 +403,7 @@ fn conformance_manual_tests_are_listed_as_not_run() {
         .map(|c| c.id)
         .collect();
     assert_eq!(manual.len(), 9, "{manual:?}");
-    assert!(manual.contains(&"513".to_string()));
+    assert!(manual.contains("513"));
 }
 
 // ----- Conformance Report ----------------------------------------------------------------------

@@ -49,6 +49,10 @@
 
 extern crate self as vertep_dm_rust;
 
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 pub mod datamodel;
 pub mod decimal;
 pub mod emit;

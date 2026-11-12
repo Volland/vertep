@@ -7,6 +7,11 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "README.md"
+homepage = "https://volland.github.io/vertep/"
+documentation = "https://docs.rs/vertep-runtime"
+keywords = ["statecharts", "scxml", "actors", "event-sourcing", "durable"]
+categories = ["asynchronous", "concurrency"]
 
 [features]
 default = []

@@ -20,3 +20,7 @@ pub use shard::{CAPABILITIES, TiramemsuShard, TiramemsuView, graph_capabilities}
 
 /// The tiramemsu crate this backend is built on.
 pub use tiramemsu;
+
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

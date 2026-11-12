@@ -12,6 +12,10 @@
 //! @tg: implements:: [[decisions#Modular vt ontology on RDF 1.2]]
 //! @tg: implements:: [[decisions#Content-addressed chart versions]] {confidence: partial, note: "hashing and version IRIs; pinning lives in vertep-runtime"}
 
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 pub mod canon;
 pub mod hash;
 pub mod io;

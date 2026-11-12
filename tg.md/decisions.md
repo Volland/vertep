@@ -1142,7 +1142,7 @@ The website in `site/` is hand-written HTML with one stylesheet and SVG marks: n
 
 - motivated_by:: [[glossary#Vertep]] {weight: secondary, since: "2026-11-12", note: "the Alatyr star and the vertep goat are its marks"}
 
-The look is woodcut gravure in three inks, black, white and orange, with paper and ink swapped in dark mode; the tokens and components are in `site/assets/css/vertep.css`. Code on the pages is taken from files in the repository, and command output is pasted from real runs, so a page that disagrees with the code is a bug in the page. The example pages are written by `site/tools/sync-examples.py` from the sources and recorded outputs that `cargo test -p vertep-examples` checks; the pages are committed, so viewing the site still needs no build.
+The look is woodcut gravure in three inks, black, white and orange, with paper and ink swapped in dark mode; the tokens and components are in `site/assets/css/vertep.css`. Code on the pages is taken from files in the repository, and command output is pasted from real runs, so a page that disagrees with the code is a bug in the page. The example pages are written by `site/tools/sync-examples.py` from the sources and recorded outputs that `cargo test -p vertep-examples` checks; the pages are committed, so viewing the site still needs no build. The workflow `.github/workflows/pages.yml` deploys `site/` unchanged to GitHub Pages at https://volland.github.io/vertep/ on every push that touches it; package READMEs and crate metadata (`homepage`) link there, and load the logo from it.
 
 ## Hosts instantiate CEL charts typed
 
@@ -1173,3 +1173,11 @@ The Lean type soundness theorem takes a chart's static typing as data and states
 - motivated_by:: [[decisions#Datamodel typers plug into one core checker]] {weight: secondary}
 
 The Lean `step` has no expression typer, and the typers belong to the datamodels, so the theorem is relative to what the checker computed: the declared types of locations and events and the static type of each expression, inline content and `foreach` array. A typed tape (an answer to a request for an expression of static type `T` is a `T`) is what the typed CEL and `rust` datamodels promise; a datamodel kept typed by typed requests is what their checked conversion on every store (`CelDatamodel::store`, `Context::set`) gives. Three limits are explicit in `VertepLean/TypedStep/Basic.lean`: expression types are given per expression text, so an expression read under event scopes with different payload types needs a type valid in all of them; a value whose expression or content the typer cannot type (`Unknown`) is left to the datamodel's checked conversion, as the Rust checker leaves it; and a `<send eventexpr>`, whose event name is known only at runtime, must carry a payload that fits every declared event. The agreement of Rust `is_assignable` with assignability of values (`Sub`) is not proven.
+
+## Core errors are standard errors
+
+`vertep-core` and `vertep-dm-cel` errors implement `Display` and `core::error::Error`, so callers can use `?` into `Box<dyn Error>`; chart validation keeps returning `Vec<Violation>`, and `Violations` wraps it as one error.
+
+- motivated_by:: [[decisions#No-std core and tokio shell]] {weight: secondary, since: "2026-11-12", note: "core::error::Error keeps the core no_std"}
+
+`StartError`, `StepError`, `EvalError`, `Violation` and `Violations` (`From<Vec<Violation>>`) in the core, and `CelError`, `LoadError` and `LoadErrors` in the CEL datamodel. Messages are short and lowercase and name the offending state, transition or location. `StartError::source` returns the datamodel's `EvalError`. `CelValue` also derives `PartialEq`, which is structural equality (`Int(1) != Uint(1)`, NaN unequal to itself), not CEL `==` (`cel_eq`), and `ir::Data` derives `Default`. Existing signatures are unchanged, so the change is additive; it came out of writing the crate READMEs, whose examples had to format every error by hand.

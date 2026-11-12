@@ -158,7 +158,7 @@ c:s.idle a vt:State , vt:StateNode ;
   &lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f#s.idle:t0&gt; vt:source: a transition has exactly one source state (MinCountConstraintComponent)</code></pre>
     <p>The command exits with status 1. Each violation names the focus node, the path and the constraint component, so a report points at the triple to fix.</p>
     <p>A few rules cannot be written in SHACL Core and are checked by reconstruction instead: the <code>vt:order</code> values of a list are exactly 0 to n−1, expression datatypes match the chart's datamodel, a graph holds one chart, and the derived triples agree with a fresh projection. Triples that are not part of the projection, such as your own comments on a state, are ignored by reconstruction and by hashing.</p>
-    <p>The same shapes are transcribed into the Lean model, and a theorem tying them to the Lean <code>WellFormed</code> predicate is planned but not yet proven; see <a href="verification.html#open">Verification</a>.</p>
+    <p>The same shapes are transcribed into the Lean model, and the theorem <code>shapes_equivalence</code> proves that a chart's projection conforms to them exactly when the chart is well-formed; see <a href="verification.html#open">Verification</a>.</p>
 
     <h2 id="versions">Content-addressed versions</h2>
     <p>A chart's version IRI is <code>urn:vertep:chart:sha256:</code> followed by the lowercase hex SHA-256 of the RDFC-1.0 canonical N-Quads of its projection. The steps, from <code>crates/vertep-rdf/src/hash.rs</code> and <code>iri.rs</code>:</p>
@@ -326,7 +326,7 @@ let now  = shard.view_now().query(&amp;q)?.into_solutions()?;      // states now
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a></nav>
   </div>
 </footer>
 </body>

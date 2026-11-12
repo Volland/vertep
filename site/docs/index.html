@@ -88,8 +88,15 @@
     </table>
     <p>With <code>rustup</code> installed you do not pick the Rust version yourself: the first <code>cargo</code> command inside the repository installs the toolchain named in <code>rust-toolchain.toml</code>, together with <code>rustfmt</code>, <code>clippy</code> and the <code>wasm32-unknown-unknown</code> and <code>thumbv7em-none-eabihf</code> targets. The embedded target is there because the core is <code>no_std</code>: CI runs <code>cargo build -p vertep-core --no-default-features --target thumbv7em-none-eabihf</code> to show it needs no standard library.</p>
 
+    <h2 id="install">Installing</h2>
+    <p>The crates are on <a href="https://crates.io/crates/vertep">crates.io</a> and the JavaScript packages on <a href="https://www.npmjs.com/package/@vertep/web">npm</a>. Most Rust programs depend on the facade crate <code>vertep</code> and turn on the layers they need with features; the API reference is on <a href="https://docs.rs/vertep">docs.rs</a>.</p>
+<pre data-lang="TOML"><code>[dependencies]
+vertep = "0.1"</code></pre>
+<pre data-lang="Shell"><code>cargo install vertep-cli          # the vt command
+npm install @vertep/web           # browsers and Node.js; add @vertep/dm-ecma for ECMAScript charts</code></pre>
+
     <h2 id="build">Building from source</h2>
-    <div class="nb warn"><p>Vertep is not published yet. There are no crates on crates.io and no packages on npm. Build from a checkout of the repository and depend on it by path.</p></div>
+    <p>To work on Vertep itself, or to run the examples and the proofs, build from a checkout:</p>
 <pre data-lang="Shell"><code>git clone https://github.com/Volland/vertep.git
 cd vertep
 cargo build --workspace          # every crate and the examples
@@ -233,7 +240,7 @@ tokio = { version = "1.54", features = ["rt", "macros", "time"] }</code></pre>
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a></nav>
   </div>
 </footer>
 </body>

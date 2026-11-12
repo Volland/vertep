@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Verification — Vertep docs</title>
-<meta name="description" content="How Vertep checks itself: a Lean 4 model with pinned theorems, Rust traces replayed by the Lean oracle, the W3C SCXML IRP suite with an allow-list, vt certify, and the proofs still open.">
+<meta name="description" content="How Vertep checks itself: a Lean 4 model with pinned theorems, Rust traces replayed by the Lean oracle, the W3C SCXML IRP suite with an allow-list, vt certify, and the verification backlog.">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -55,7 +55,7 @@
   <main id="main" class="content">
     <p class="breadcrumb"><a href="index.html">Docs</a> · Reference</p>
     <h1>Verification</h1>
-    <p class="lede">The Rust code is fast and untrusted. A small Lean 4 model carries the proofs, runs as an oracle on the same inputs as Rust, and must produce the same traces. This page lists what is proven, what is still open, and how to run every check yourself.</p>
+    <p class="lede">The Rust code is fast and untrusted. A small Lean 4 model carries the proofs, runs as an oracle on the same inputs as Rust, and must produce the same traces. This page lists what is proven and how to run every check yourself.</p>
 
     <h2 id="trust">Where the trust sits</h2>
     <p>The theorems are about the Lean model, not about the Rust code. The bridge between the two is <em>trace equality</em>: Rust runs a chart, records what it did, and the Lean <code>step</code> replays the same chart and inputs and must produce exactly the same configurations, effects and datamodel requests. Nothing is extracted from Lean into Rust.</p>
@@ -163,12 +163,13 @@ theorem configuration_wellformedness : ConfigurationWellFormedness :=
     <p>Proving it was not a formality. The attempt found three bugs in the W3C Appendix D entry algorithm as both cores implemented it, each producing an illegal configuration from a valid chart with history states. All three are fixed in Rust and Lean, with regression tests on both sides. The Rust property test <code>crates/vertep-conformance/tests/config_legality.rs</code> never generated those shapes, which is why the proof, not the test, found them. The protocol models found two more bugs in the Rust runtime (an outbox mark that passed refused sends, and colliding mailbox row IRIs when two nodes share a store), also fixed.</p>
     <div class="nb"><p>Some limits are deliberate. The type theorems read a <code>pattern</code> as the lexical rule its regular expression encodes; the regular expressions themselves are not proven equal to those rules. Lean decides <code>int</code> on the exact decimal while Rust decides it on an <code>f64</code>, so differential cases stay away from the edges of the signed 64-bit range.</p></div>
 
-    <h2 id="open">The backlog</h2>
+    <h2 id="open">The verification backlog</h2>
+    <p>Every item below is done: the backlog change was archived on 2026-11-12 with all formal-model requirements implemented and verified.</p>
     <p>The open items are tracked in <code>openspec/changes/verification-backlog/tasks.md</code>. As that file stands:</p>
     <table>
       <thead><tr><th>Task</th><th>Statement</th><th>State</th></tr></thead>
       <tbody>
-        <tr><td>2.3 Shapes equivalence</td><td>the chart shapes accept the projection of <code>c</code> exactly when <code>WellFormed c</code></td><td>Not started as a proof. The statement is in <code>lean/vertep-lean/Pending/ShapesEquiv.lean</code>, outside the library. <code>vertep-shapes</code> checks the agreement empirically, at about a minute per small chart.</td></tr>
+        <tr><td>2.3 Shapes equivalence</td><td>the chart shapes accept the projection of <code>c</code> exactly when <code>WellFormed c</code></td><td>Done. <code>Rdf.Equiv.shapes_equivalence</code>: for every base IRI, the projection of <code>c</code> conforms to the chart shapes exactly when <code>WellFormed c</code>. The shapes are a Lean term that a test checks against <code>vt-chart-shapes.ttl</code>; the proof splits along <code>WellFormed</code>'s rules (per-node rules, unique state ids, legal target sets, acyclic history defaults, unique data ids). No counterexample and no shape defect turned up.</td></tr>
         <tr><td>4.2 SHACL projection of types</td><td>a value's RDF encoding conforms to its type's generated shape exactly when it has the type</td><td>Done. <code>Types.Shacl.shacl_agrees</code>: a value's encoding conforms to its type's shape (named types unfolded far enough) exactly when it has the type, also stated against LeanRDF's validator. It assumes distinct union tags and object keys, and that LeanRDF's regular expressions decide the decimal, datetime and IRI patterns as the type checker does (checked on samples, not proven). The shapes Rust publishes for lists use an IRI where SHACL needs a path, so a standard engine skips list members; fixed in task 4.7: list members now carry a <code>vt:listMember</code> predicate, so the shapes use plain predicate paths.</td></tr>
         <tr><td>4.4 Type soundness of <code>step</code></td><td>a well-typed chart, configuration and input give a well-typed datamodel and well-typed output events</td><td>Done. <code>Typed.typed_step_soundness</code> and <code>typed_start_soundness</code>: from a typed datamodel, session, input and answer tape, <code>step</code> and <code>start</code> write only typed values, emit typed sends and queue typed events. The theorems take the chart's static typing as given and state each check of <code>check_chart</code> as a property; the datamodel's evaluation enters as a typed answer tape. The proof found six checker bugs, now fixed: a bare <code>&lt;assign&gt;</code> to a required location, <code>idlocation</code> into a non-string location, <code>foreach</code> item and index types, <code>namelist</code> keys, and declared <code>error.*</code> and <code>done.state.*</code> payloads.</td></tr>
         <tr><td>4.5 <code>vt certify</code> for typed charts</td><td>certify charts with a <code>vt:types</code> block</td><td>Done. The checker reads the <code>vt:types</code> block, derives the type triples as Rust does and hashes them into the version; 1,000 generated typed charts certify under the Rust version.</td></tr>
@@ -329,7 +330,7 @@ OK: no sorry, only propext, Classical.choice and Quot.sound</code></pre>
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a></nav>
   </div>
 </footer>
 </body>

@@ -7,6 +7,11 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
+readme = "README.md"
+homepage = "https://volland.github.io/vertep/"
+documentation = "https://docs.rs/vertep-yaml"
+keywords = ["yaml", "statechart", "scxml", "state-machine", "parser"]
+categories = ["parser-implementations", "encoding"]
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }

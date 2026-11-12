@@ -25,7 +25,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.95"
 license = "MIT OR Apache-2.0"
@@ -33,22 +33,22 @@ repository = "https://github.com/Volland/vertep"
 authors = ["Volodymyr Pavlyshyn"]
 
 [workspace.dependencies]
-vertep-core = { path = "crates/vertep-core", version = "0.1.0", default-features = false }
-vertep-scxml = { path = "crates/vertep-scxml", version = "0.1.0" }
-vertep-dm-ecma = { path = "crates/vertep-dm-ecma", version = "0.1.0" }
-vertep-rdf = { path = "crates/vertep-rdf", version = "0.1.0" }
+vertep-core = { path = "crates/vertep-core", version = "0.1.1", default-features = false }
+vertep-scxml = { path = "crates/vertep-scxml", version = "0.1.1" }
+vertep-dm-ecma = { path = "crates/vertep-dm-ecma", version = "0.1.1" }
+vertep-rdf = { path = "crates/vertep-rdf", version = "0.1.1" }
 vertep-testkit = { path = "crates/vertep-testkit" }
-vertep-yaml = { path = "crates/vertep-yaml", version = "0.1.0" }
-vertep-dm-cel = { path = "crates/vertep-dm-cel", version = "0.1.0" }
-vertep-store = { path = "crates/vertep-store", version = "0.1.0" }
-vertep-tiramemsu = { path = "crates/vertep-tiramemsu", version = "0.1.0" }
-vertep-oxigraph = { path = "crates/vertep-oxigraph", version = "0.1.0" }
-vertep-runtime = { path = "crates/vertep-runtime", version = "0.1.0" }
-vertep-macros = { path = "crates/vertep-macros", version = "0.1.0" }
-vertep-dm-rust = { path = "crates/vertep-dm-rust", version = "0.1.0" }
-vertep-agent = { path = "crates/vertep-agent", version = "0.1.0" }
-vertep-federation = { path = "crates/vertep-federation", version = "0.1.0" }
-vertep-cluster = { path = "crates/vertep-cluster", version = "0.1.0", default-features = false }
+vertep-yaml = { path = "crates/vertep-yaml", version = "0.1.1" }
+vertep-dm-cel = { path = "crates/vertep-dm-cel", version = "0.1.1" }
+vertep-store = { path = "crates/vertep-store", version = "0.1.1" }
+vertep-tiramemsu = { path = "crates/vertep-tiramemsu", version = "0.1.1" }
+vertep-oxigraph = { path = "crates/vertep-oxigraph", version = "0.1.1" }
+vertep-runtime = { path = "crates/vertep-runtime", version = "0.1.1" }
+vertep-macros = { path = "crates/vertep-macros", version = "0.1.1" }
+vertep-dm-rust = { path = "crates/vertep-dm-rust", version = "0.1.1" }
+vertep-agent = { path = "crates/vertep-agent", version = "0.1.1" }
+vertep-federation = { path = "crates/vertep-federation", version = "0.1.1" }
+vertep-cluster = { path = "crates/vertep-cluster", version = "0.1.1", default-features = false }
 # vertep-macros: token parsing and code generation for statechart! and include_chart!.
 # `span-locations` gives the line and column of macro input tokens for IR spans.
 syn = { version = "2.0.119", features = ["full", "extra-traits"] }

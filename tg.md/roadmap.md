@@ -25,7 +25,7 @@ The complete SCXML core: chart IR, interpretation algorithm, SCXML format, datam
 
 Delivered by the OpenSpec change `m0-scxml-core`. A throwaway spike of a journaled actor with an LLM decider runs alongside it, see [[decisions#Full SCXML first]]; its code is deleted when M2 starts.
 
-Archived 2026-11-11 as `openspec/changes/archive/2026-11-11-m0-scxml-core` with 78 requirements in `openspec/specs/`. The three unproven Lean theorems and the Lean oracle hang moved to the `verification-backlog` change.
+Archived 2026-11-11 as `openspec/changes/archive/2026-11-11-m0-scxml-core` with 78 requirements in `openspec/specs/`. The three unproven Lean theorems and the Lean oracle hang moved to the `verification-backlog` change. That change was archived 2026-11-12 as `openspec/changes/archive/2026-11-12-verification-backlog` with every formal-model requirement implemented and verified in Lean: shapes equivalence, configuration well-formedness, the RDF round trip, the type checker with its JSON Schema and SHACL projections, type soundness of `start` and `step`, and certificates for typed charts. The proofs found thirteen runtime and checker bugs and one defect in the published list shapes, all fixed with regression tests in both cores.
 
 ## M1 Typed authoring
 

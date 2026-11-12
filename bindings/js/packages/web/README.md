@@ -1,4 +1,16 @@
-# @vertep/web
+<p align="center">
+  <a href="https://volland.github.io/vertep/"><img src="https://volland.github.io/vertep/assets/img/logo.svg" alt="Vertep" width="120"></a>
+</p>
+
+<h1 align="center">@vertep/web</h1>
+
+<p align="center">W3C SCXML statecharts as journaled actors, in the browser and in Node.js</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@vertep/web"><img src="https://img.shields.io/npm/v/@vertep/web.svg" alt="npm"></a>
+  <a href="https://github.com/Volland/vertep"><img src="https://img.shields.io/badge/github-Volland%2Fvertep-black.svg" alt="GitHub"></a>
+  <a href="https://github.com/Volland/vertep/blob/main/LICENSE-MIT"><img src="https://img.shields.io/npm/l/@vertep/web.svg" alt="license"></a>
+</p>
 
 W3C SCXML statecharts as journaled actors in the browser and in Node.js. The Vertep core runs in a worker, compiled to WebAssembly; this package is the thin typed client on the main thread, and every call returns a Promise.
 
@@ -53,7 +65,12 @@ Typed charts get generated TypeScript types with `vt gen ts` from the Vertep com
 
 ## Documentation
 
-Source, documentation and runnable examples: <https://github.com/Volland/vertep> (see `site/` and `examples/browser-js`).
+- Website and guide: <https://volland.github.io/vertep/>
+- Browser and JavaScript guide: <https://volland.github.io/vertep/docs/browser.html>
+- The example above, complete with its output: <https://volland.github.io/vertep/examples/browser-js.html>
+- All examples: <https://volland.github.io/vertep/examples/>
+- Why deterministic agents: <https://volland.github.io/vertep/articles/deterministic-agents.html>
+- Source: <https://github.com/Volland/vertep> (`bindings/js/packages/web`)
 
 ## License
 

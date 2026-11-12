@@ -16,6 +16,10 @@
 //! Start with [`prelude`] and `examples/quickstart.rs`: one virtual actor on tiramemsu, a
 //! durable delayed send, and a time-travel query.
 
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 pub use vertep_core as core;
 pub use vertep_rdf as rdf;
 pub use vertep_store as store;

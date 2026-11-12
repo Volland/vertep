@@ -47,7 +47,7 @@ theorem mem_parented_iff {c : Chart} {Z : State} : Z ∈ c.allStates ↔ ∃ q �
 set_option maxHeartbeats 1000000 in
 /-- **The node shapes hold on the projection of a chart with unique state identifiers exactly when
 its node rules do.** -/
--- @tg: implements:: [[openspec:formal-model#Shapes Equivalence Theorem]] {confidence: partial, note: "node shapes; target sets, history cycles, data identifiers and unique state identifiers remain pending"}
+-- @tg: implements:: [[openspec:formal-model#Shapes Equivalence Theorem]] {confidence: partial, note: "node shapes; the full theorem is shapes_equivalence"}
 theorem nodeShapes_iff (c : Chart) (base : String) (hnd : c.ids.Nodup) :
     (∀ x, ShapesL.Good (toRDF c base) x) ↔ WFNodes c := by
   rw [goodAll_iff c base hnd]
@@ -92,8 +92,9 @@ theorem uniqueStateId_ok (c : Chart) (base : String) :
 
 /-- **Conformance to the chart shapes, for a chart with unique state identifiers**: the node rules
 of `WellFormed` together with the shapes over the whole chart (selection nodes, history default
-cycles, data identifiers), whose equivalence with the remaining rules of `WellFormed` is pending. -/
--- @tg: implements:: [[openspec:formal-model#Shapes Equivalence Theorem]] {confidence: partial, note: "node shapes proven; selection, cycle and data-identifier shapes stated over the graph"}
+cycles, data identifiers), which `selection_iff`, `cycle_iff` and `dataId_iff` tie to the
+remaining rules of `WellFormed`. -/
+-- @tg: implements:: [[openspec:formal-model#Shapes Equivalence Theorem]] {confidence: partial, note: "conformance split by shape; the full theorem is shapes_equivalence"}
 theorem shapes_equiv_nodes (c : Chart) (base : String) (hnd : c.ids.Nodup) :
     (Shacl.validate (toRDF c base) chartShapesL).conforms = true ↔
       WFNodes c ∧

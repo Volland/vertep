@@ -78,3 +78,7 @@ pub use resolver::{
     CachingResolver, DidResolver, HttpFetcher, Resolution, ResolutionError, ResolverRegistry,
 };
 pub use time::{Clock, ManualClock, SystemClock, Timestamp};
+
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

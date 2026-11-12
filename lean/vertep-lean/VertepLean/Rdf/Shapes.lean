@@ -659,7 +659,7 @@ def chartShapes : Except String (List Shacl.Shape) := do
   Shacl.readShapes (Shacl.renameShapes g)
 
 /-- Whether a graph conforms to the chart shapes (`none` if the shapes do not read). -/
--- @tg: implements:: [[openspec:formal-model#Shapes Equivalence Theorem]] {confidence: partial, note: "executable shapes; the equivalence theorem is pending"}
+-- @tg: implements:: [[openspec:formal-model#Shapes Equivalence Theorem]] {confidence: partial, note: "executable shapes read from Turtle; the theorem is shapes_equivalence over chartShapesL"}
 def shapesConform (g : Graph) : Option Bool :=
   match chartShapes with
   | .ok s => some (Shacl.validate g s).conforms

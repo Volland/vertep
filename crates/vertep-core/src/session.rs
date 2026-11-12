@@ -354,6 +354,61 @@ pub enum StepError {
     },
 }
 
+impl core::fmt::Display for StartError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            StartError::UnsupportedDatamodel { name } => {
+                write!(f, "unsupported datamodel `{name}`")
+            }
+            StartError::DatamodelMismatch { chart, given } => {
+                write!(
+                    f,
+                    "the chart names datamodel `{chart}` but `{given}` was given"
+                )
+            }
+            StartError::Datamodel(e) => write!(f, "the datamodel failed to initialize: {e}"),
+            StartError::ChartRefused {
+                datamodel,
+                problems,
+            } => {
+                write!(f, "datamodel `{datamodel}` refused the chart")?;
+                for p in problems {
+                    write!(f, "\n{p}")?;
+                }
+                Ok(())
+            }
+            StartError::BudgetExceeded { budget, .. } => {
+                write!(
+                    f,
+                    "the start macrostep exceeded the microstep budget of {budget}"
+                )
+            }
+        }
+    }
+}
+
+impl core::error::Error for StartError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match self {
+            StartError::Datamodel(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl core::fmt::Display for StepError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            StepError::Terminated => f.write_str("the session has terminated"),
+            StepError::BudgetExceeded { budget, .. } => {
+                write!(f, "the macrostep exceeded the microstep budget of {budget}")
+            }
+        }
+    }
+}
+
+impl core::error::Error for StepError {}
+
 /// A fresh session value for `chart`, before the start macrostep.
 fn new_session(chart: &CompiledChart, sessionid: String, options: Options) -> Session {
     Session {
@@ -1455,5 +1510,39 @@ impl<'c, 'd> Driver<'c, 'd> {
         self.s.status = Status::Terminated;
         self.running = false;
         self.terminated_now = true;
+    }
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+    use alloc::string::ToString;
+    use alloc::vec;
+
+    #[test]
+    fn start_error_displays_and_boxes() {
+        let e = StartError::ChartRefused {
+            datamodel: "cel".into(),
+            problems: vec!["state `s` › cond: not bool".into()],
+        };
+        assert_eq!(
+            e.to_string(),
+            "datamodel `cel` refused the chart\nstate `s` › cond: not bool"
+        );
+        let e = StartError::Datamodel(EvalError::new("boom"));
+        assert_eq!(e.to_string(), "the datamodel failed to initialize: boom");
+        assert_eq!(core::error::Error::source(&e).unwrap().to_string(), "boom");
+        fn run() -> Result<(), alloc::boxed::Box<dyn core::error::Error>> {
+            Err(StartError::UnsupportedDatamodel { name: "x".into() })?
+        }
+        assert_eq!(run().unwrap_err().to_string(), "unsupported datamodel `x`");
+    }
+
+    #[test]
+    fn step_error_displays_and_boxes() {
+        fn run() -> Result<(), alloc::boxed::Box<dyn core::error::Error>> {
+            Err(StepError::Terminated)?
+        }
+        assert_eq!(run().unwrap_err().to_string(), "the session has terminated");
     }
 }

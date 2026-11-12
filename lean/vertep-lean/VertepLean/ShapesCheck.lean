@@ -7,7 +7,9 @@ import VertepLean.Oracle
 `vertep-shapes FILE.nq…` validates each chart graph against the chart shapes with LeanRDF's
 SHACL Core validator and, when the graph decodes, decides `WellFormed` on the decoded chart; it
 prints one line per file and exits `1` if any verdicts disagree. This is the empirical side of
-the Shapes Equivalence Theorem, which is not proven (see `Pending/ShapesEquiv.lean`).
+the Shapes Equivalence Theorem (`Rdf.Equiv.shapes_equivalence`), which is proven over the shapes
+as a Lean term, `Rdf.ShapesL.chartShapesL`; this executable reads the Turtle shapes, which
+`VertepTests/ShapesEquiv.lean` checks against that term.
 -/
 
 namespace Vertep.ShapesCheck

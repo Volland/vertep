@@ -19,3 +19,7 @@ pub use remote::SparqlEndpoint;
 
 /// The Oxigraph crate this adapter is built on.
 pub use oxigraph;
+
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

@@ -64,6 +64,10 @@
 //! `vt:` extension nodes (see [`vertep_core::types`]); `type` on context entries, `payload_type`
 //! on `send`, `type` on list-form `params` and the `types`/`events` blocks are their spellings.
 
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 mod node;
 mod read;
 mod types_yaml;

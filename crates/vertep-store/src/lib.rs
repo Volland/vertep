@@ -42,3 +42,7 @@ pub use projector::{ProjectionReport, Projector};
 
 /// The RDF model the contracts are written in (the `oxrdf` crate, with RDF 1.2 terms).
 pub use oxrdf;
+
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

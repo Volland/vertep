@@ -130,7 +130,7 @@ async function until(ready, timeoutMs = 5000) {
   }
 }</code></pre>
     <h2 id="build-once,-then-run">Build once, then run</h2>
-    <p>The packages are not on npm yet. Build them from the checkout once; the example's <code>package.json</code> links <code>@vertep/web</code> to the local build.</p>
+    <p>In your own project, <code>npm install @vertep/web</code> is all you need. This example runs against the checkout instead: its <code>package.json</code> links <code>@vertep/web</code> to the local build, so build the packages once first.</p>
 <pre data-lang="Shell"><code>rustup target add wasm32-unknown-unknown
 cargo install wasm-bindgen-cli --version 0.2.128
 cd bindings/js &amp;&amp; npm install &amp;&amp; npm run build
@@ -166,7 +166,7 @@ as of entry 1: [&quot;filled&quot;] items = 2</code></pre>
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a></nav>
   </div>
 </footer>
 </body>

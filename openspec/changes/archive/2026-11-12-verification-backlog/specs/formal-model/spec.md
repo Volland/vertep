@@ -31,15 +31,15 @@ The project SHALL provide a Lean-compiled checker, invoked as `vt certify`, that
 - **THEN** it emits a certificate whose subject is the version IRI Rust computes for the chart, types included, and refuses a graph that lacks one of the chart's type triples
 
 ### Requirement: Shapes Equivalence Theorem
-The Lean package SHALL prove, using LeanRDF's proven SHACL Core validator, that validating the projection of a chart against the chart shapes conforms exactly when the chart is `WellFormed`. The chart shapes in the theorem SHALL be a Lean term (`Rdf.ShapesL.chartShapesL`), because the Turtle parser and the shapes reader are `partial` and say nothing in the logic; a test SHALL check that reading `vt-chart-shapes.ttl` gives that term up to identifiers, messages, severities and order. The part of the theorem over the node shapes (every shape with a class target, the initial-reference scope shape, the history shape without its cycle component) SHALL be proven first, for charts with unique state identifiers; the graph-wide shapes (selection, history-default cycles, unique data identifiers) and the step from conformance to unique state identifiers stay open in `Pending/ShapesEquiv.lean` until proven.
+The Lean package SHALL prove, using LeanRDF's proven SHACL Core validator, that validating the projection of a chart against the chart shapes conforms exactly when the chart is `WellFormed`. The chart shapes in the theorem SHALL be a Lean term (`Rdf.ShapesL.chartShapesL`), because the Turtle parser and the shapes reader are `partial` and say nothing in the logic; a test SHALL check that reading `vt-chart-shapes.ttl` gives that term up to identifiers, messages, severities and order. The theorem SHALL hold for every base IRI, and its proof SHALL split along the rules of `WellFormed`: conformance forces unique state identifiers, the node shapes (every shape with a class target, the initial-reference scope shape, the history shape without its cycle component) are equivalent to the per-node rules, the selection nodes to legal target sets, the cycle component of the history shape to acyclic history defaults, and the unique data identifier shape to unique data identifiers.
 
 #### Scenario: Forward direction
 - **WHEN** a chart is `WellFormed`
-- **THEN** the theorem gives that its projection conforms to the chart shapes
+- **THEN** the theorem gives that its projection, under any base IRI, conforms to the chart shapes
 
 #### Scenario: Backward direction
 - **WHEN** a chart's projection conforms to the chart shapes
-- **THEN** the theorem gives that the chart is `WellFormed`
+- **THEN** the theorem gives that the chart is `WellFormed`, so a chart with a duplicate state identifier or an illegal target set does not conform
 
 #### Scenario: Shapes term
 - **WHEN** `vt-chart-shapes.ttl` is read with LeanRDF's Turtle parser and shapes reader

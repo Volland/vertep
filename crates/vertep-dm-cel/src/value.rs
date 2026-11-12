@@ -19,7 +19,10 @@ pub type CelMap = BTreeMap<Key, CelValue>;
 
 /// A CEL runtime value. Aggregates are shared and immutable; updating one copies the path to
 /// the change.
-#[derive(Clone, Debug)]
+///
+/// `PartialEq` is structural, not CEL `==` (use [`CelValue::cel_eq`] for that): `Int(1)` and
+/// `Uint(1)` differ, and `Double(NaN)` is not equal to itself.
+#[derive(Clone, Debug, PartialEq)]
 pub enum CelValue {
     /// `null`.
     Null,
@@ -367,6 +370,15 @@ pub fn base64(b: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn partial_eq_is_structural() {
+        use alloc::vec;
+        let l = |v: Vec<CelValue>| CelValue::List(Arc::new(v));
+        assert_eq!(l(vec![CelValue::Int(1)]), l(vec![CelValue::Int(1)]));
+        assert_ne!(CelValue::Int(1), CelValue::Uint(1));
+        assert_ne!(CelValue::Double(f64::NAN), CelValue::Double(f64::NAN));
+    }
 
     #[test]
     fn numbers_compare_across_types() {

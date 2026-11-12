@@ -21,6 +21,10 @@
 
 extern crate alloc;
 
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 mod check;
 mod convert;
 mod datamodel;

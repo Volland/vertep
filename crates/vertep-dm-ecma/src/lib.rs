@@ -19,6 +19,10 @@
 //!
 //! @tg: implements:: [[decisions#Pluggable datamodel]]
 
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 #[cfg(feature = "ecmascript")]
 mod ecma;
 

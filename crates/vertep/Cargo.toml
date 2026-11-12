@@ -7,7 +7,11 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 authors.workspace = true
-readme = "../../README.md"
+readme = "README.md"
+homepage = "https://volland.github.io/vertep/"
+documentation = "https://docs.rs/vertep"
+keywords = ["scxml", "statechart", "actor", "rdf", "state-machine"]
+categories = ["asynchronous", "concurrency", "data-structures"]
 
 [features]
 default = ["runtime", "tiramemsu", "scxml"]

@@ -67,7 +67,13 @@ def mainTheorems : List Name :=
     ``Vertep.Rdf.Equiv.nodeShapes_iff, ``Vertep.Rdf.Equiv.shapes_equiv_nodes,
     ``Vertep.Rdf.Equiv.wellFormed_iff, ``Vertep.Rdf.Equiv.uniqueStateId_ok,
     ``Vertep.Rdf.Equiv.goodAll_iff, ``Vertep.Rdf.Equiv.reg_exec, ``Vertep.Rdf.Equiv.reg_state,
-    ``Vertep.Rdf.Equiv.mem_descIds_iff ]
+    ``Vertep.Rdf.Equiv.mem_descIds_iff,
+    ``Vertep.Rdf.Equiv.shapes_equivalence, ``Vertep.Rdf.Equiv.shapes_forward,
+    ``Vertep.Rdf.Equiv.shapes_backward, ``Vertep.Rdf.Equiv.conforms_nodup,
+    ``Vertep.Rdf.Equiv.selection_iff, ``Vertep.Rdf.Equiv.cycle_iff, ``Vertep.Rdf.Equiv.dataId_iff,
+    ``Vertep.Rdf.Equiv.acyclic_iff, ``Vertep.Rdf.Equiv.hd_iff, ``Vertep.Rdf.Equiv.pairOk_iff,
+    ``Vertep.Rdf.Equiv.compat_iff, ``Vertep.Rdf.Equiv.agree_iff_tso, ``Vertep.Rdf.Equiv.wp_prefix,
+    ``Vertep.Rdf.Equiv.chain_func ]
 
 /-- The axioms of `n` outside the allowed set. -/
 def disallowed (n : Name) : CoreM (Array Name) := do

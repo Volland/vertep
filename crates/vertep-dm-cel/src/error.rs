@@ -67,6 +67,8 @@ impl fmt::Display for CelError {
     }
 }
 
+impl core::error::Error for CelError {}
+
 /// Bounds on evaluation cost ([[openspec:cel-datamodel#Guaranteed Termination]]).
 ///
 /// Every evaluated node costs one step, every comprehension iteration one more, and string,
@@ -98,5 +100,19 @@ impl Default for Limits {
             max_expr_len: 1 << 16,
             max_value_depth: 128,
         }
+    }
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+    use alloc::string::ToString;
+
+    #[test]
+    fn cel_error_boxes_with_question_mark() {
+        fn run() -> Result<(), alloc::boxed::Box<dyn core::error::Error>> {
+            Err(CelError::new(ErrorKind::DivisionByZero, "division by zero"))?
+        }
+        assert_eq!(run().unwrap_err().to_string(), "division by zero");
     }
 }

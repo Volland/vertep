@@ -1,6 +1,6 @@
 {
   "name": "@vertep/web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vertep statecharts as durable actors in browsers and Node.js: SCXML semantics, typed events and a time-travelling journal, running in a worker",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -39,5 +39,6 @@
   "publishConfig": {
     "access": "public",
     "tag": "next"
-  }
+  },
+  "homepage": "https://volland.github.io/vertep/"
 }

@@ -23,3 +23,7 @@ pub mod surface;
 
 pub use commands::{Outcome, SchemaFormat};
 pub use surface::Surface;
+
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

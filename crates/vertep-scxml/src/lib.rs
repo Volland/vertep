@@ -44,6 +44,10 @@
 //! @tg: implements:: [[decisions#IR is the hub]]
 //! @tg: implements:: [[decisions#Full SCXML first]]
 
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 pub mod datamodels;
 pub mod error;
 mod ids;

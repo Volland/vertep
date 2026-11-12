@@ -226,11 +226,120 @@ pub struct Violation {
     pub span: Span,
 }
 
-impl core::fmt::Display for Violation {
+impl core::fmt::Display for NodeRef {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?} at {:?}", self.kind, self.node)
+        match self {
+            NodeRef::Root => f.write_str("the root"),
+            NodeRef::State { id } => write!(f, "state `{id}`"),
+            NodeRef::Transition { source, index } => {
+                write!(f, "transition {index} of state `{source}`")
+            }
+            NodeRef::Initial { state } => write!(f, "the initial of state `{state}`"),
+            NodeRef::Data { id } => write!(f, "data `{id}`"),
+            NodeRef::Invoke { state, index } => write!(f, "invoke {index} of state `{state}`"),
+            NodeRef::Exec { state } => write!(f, "executable content in state `{state}`"),
+        }
     }
 }
+
+impl core::fmt::Display for ViolationKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ViolationKind::EmptyChart => f.write_str("the chart has no states"),
+            ViolationKind::MissingId => f.write_str("a state has no identifier"),
+            ViolationKind::DuplicateStateId { id } => write!(f, "duplicate state id `{id}`"),
+            ViolationKind::UnknownTarget { target } => write!(f, "unknown target `{target}`"),
+            ViolationKind::IllegalInitialTarget { target } => {
+                write!(f, "initial target `{target}` is not a proper descendant")
+            }
+            ViolationKind::InitialAttributeAndElement => {
+                f.write_str("both an initial attribute and an <initial> element")
+            }
+            ViolationKind::InitialOnNonCompound => f.write_str("initial on a non-compound state"),
+            ViolationKind::IllegalInitialTransition => {
+                f.write_str("an <initial> transition needs a target and no event or condition")
+            }
+            ViolationKind::HistoryTransitionCount => {
+                f.write_str("a history state has more than one transition")
+            }
+            ViolationKind::IllegalHistoryTransition => {
+                f.write_str("a history default transition needs a target and no event or condition")
+            }
+            ViolationKind::IllegalHistoryTarget { target } => {
+                write!(
+                    f,
+                    "history default target `{target}` is outside the history's parent"
+                )
+            }
+            ViolationKind::HistoryAtRoot => f.write_str("a history state at the root"),
+            ViolationKind::HistoryContent => {
+                f.write_str("a history state with content other than its default transition")
+            }
+            ViolationKind::FinalContent { what } => write!(f, "a final state contains {what}"),
+            ViolationKind::DoneDataOutsideFinal => f.write_str("donedata on a non-final state"),
+            ViolationKind::ParallelHistoryOnly => {
+                f.write_str("a parallel state whose children are all history states")
+            }
+            ViolationKind::StateHistoryOnly => {
+                f.write_str("a state whose children are all history states")
+            }
+            ViolationKind::IllegalTargetSet { first, second } => {
+                write!(
+                    f,
+                    "targets `{first}` and `{second}` cannot be active together"
+                )
+            }
+            ViolationKind::HistoryDefaultCycle { history } => {
+                write!(
+                    f,
+                    "the default entry of history `{history}` never reaches a state"
+                )
+            }
+            ViolationKind::DuplicateDataId { id } => write!(f, "duplicate data id `{id}`"),
+            ViolationKind::ConflictingAttributes {
+                element,
+                attributes,
+            } => write!(f, "<{element}>: conflicting or missing {attributes}"),
+        }
+    }
+}
+
+impl core::fmt::Display for Violation {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}: {}", self.node, self.kind)
+    }
+}
+
+impl core::error::Error for Violation {}
+
+/// Every well-formedness violation of a chart, as one error value.
+///
+/// [`crate::compile::CompiledChart::new`] returns the violations as a `Vec<Violation>`; wrap
+/// them with `map_err(Violations)` to use `?` into `Box<dyn Error>`. Displays one violation
+/// per line.
+// @tg: implements:: [[decisions#Core errors are standard errors]]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Violations(pub Vec<Violation>);
+
+impl From<Vec<Violation>> for Violations {
+    fn from(v: Vec<Violation>) -> Self {
+        Violations(v)
+    }
+}
+
+impl core::fmt::Display for Violations {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for (i, v) in self.0.iter().enumerate() {
+            if i > 0 {
+                f.write_str("\n")?;
+            }
+            write!(f, "{v}")?;
+        }
+        Ok(())
+    }
+}
+
+impl core::error::Error for Violations {}
 
 /// Flat pre-order view of the state tree used by validation and compilation.
 pub(crate) struct Flat<'a> {
@@ -794,5 +903,50 @@ fn check_exec(e: &Exec, state: &str, push: &mut impl FnMut(ViolationKind, NodeRe
             check_block(body, state, push);
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::*;
+    use alloc::string::ToString;
+    use alloc::vec;
+
+    fn unknown(source: &str, target: &str) -> Violation {
+        Violation {
+            kind: ViolationKind::UnknownTarget {
+                target: target.into(),
+            },
+            node: NodeRef::Transition {
+                source: source.into(),
+                index: 0,
+            },
+            span: Span::default(),
+        }
+    }
+
+    #[test]
+    fn violation_displays_node_and_kind() {
+        let v = unknown("a", "nowhere");
+        assert_eq!(
+            v.to_string(),
+            "transition 0 of state `a`: unknown target `nowhere`"
+        );
+        let _: &dyn core::error::Error = &v;
+    }
+
+    #[test]
+    fn violations_display_one_per_line_and_box_with_question_mark() {
+        let vs = vec![unknown("a", "x"), unknown("b", "y")];
+        let w = Violations::from(vs.clone());
+        assert_eq!(w.0, vs);
+        assert_eq!(
+            w.to_string(),
+            "transition 0 of state `a`: unknown target `x`\ntransition 0 of state `b`: unknown target `y`"
+        );
+        fn run(vs: Vec<Violation>) -> Result<(), alloc::boxed::Box<dyn core::error::Error>> {
+            Err(Violations(vs))?
+        }
+        assert!(run(vs).unwrap_err().to_string().contains("`y`"));
     }
 }

@@ -51,6 +51,8 @@ impl core::fmt::Display for EvalError {
     }
 }
 
+impl core::error::Error for EvalError {}
+
 /// The `_event.type` field.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

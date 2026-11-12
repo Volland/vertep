@@ -69,3 +69,7 @@ pub use transport::{LocalTransport, Resolver, Transport};
 pub use vertep_rdf;
 /// The storage contracts.
 pub use vertep_store;
+
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

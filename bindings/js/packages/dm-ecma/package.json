@@ -1,6 +1,6 @@
 {
   "name": "@vertep/dm-ecma",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The ECMAScript datamodel for @vertep/web: a build of the Vertep worker with the boa engine",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -26,7 +26,7 @@
     "LICENSE-APACHE"
   ],
   "peerDependencies": {
-    "@vertep/web": "0.1.0"
+    "@vertep/web": "0.1.1"
   },
   "engines": {
     "node": ">=22"
@@ -34,5 +34,6 @@
   "publishConfig": {
     "access": "public",
     "tag": "next"
-  }
+  },
+  "homepage": "https://volland.github.io/vertep/"
 }

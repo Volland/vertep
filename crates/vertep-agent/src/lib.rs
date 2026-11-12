@@ -61,3 +61,7 @@ pub use machine::{
 };
 pub use plan::{AcceptedPlan, PlanBounds, PlanError, PlanErrorClass, PlanFormat};
 pub use tool::{Tool, ToolRegistry};
+
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;

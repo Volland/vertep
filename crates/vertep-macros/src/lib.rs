@@ -14,6 +14,10 @@
 //! @tg: implements:: [[decisions#One IR type language]]
 //! @tg: implements:: [[decisions#Types ride on vt extension nodes]]
 
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 mod check;
 mod codegen;
 mod conventions;
