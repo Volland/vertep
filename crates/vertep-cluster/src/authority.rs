@@ -717,8 +717,9 @@ impl<A: Authority> AuthorityMembership<A> {
     }
 
     /// Leaves gracefully: marks this node draining so it gets no new leases, drains each held
-    /// shard through `drain` and hands it to the active member the assignment of the remaining
-    /// members gives it, at a higher epoch, and only then leaves the view.
+    /// shard through `drain`, ships it to the active member the assignment of the remaining
+    /// members gives it ([`Drain::ship_shard`]) and hands it over at a higher epoch, and only
+    /// then leaves the view.
     ///
     /// # Errors
     ///
@@ -749,6 +750,12 @@ impl<A: Authority> AuthorityMembership<A> {
                 return Err(MembershipError::NoSuccessor(lease.shard));
             }
             let to = &others[lease.shard.index() % others.len()];
+            drain
+                .ship_shard(lease.shard, to)
+                .map_err(|reason| MembershipError::Drain {
+                    shard: lease.shard,
+                    reason,
+                })?;
             match Membership::handover(self, &lease, to) {
                 Ok(_) => {}
                 Err(LeaseError::Expired { .. } | LeaseError::Stale { .. }) => {
@@ -886,6 +893,8 @@ impl StaticConfig {
 /// assigned deterministically with [`AuthorityMembership::claim_assigned`].
 pub type StaticMembership<A> = AuthorityMembership<A>;
 
-/// An external membership: an etcd or Kubernetes Lease authority (or its in-memory stand-in,
-/// [`MemoryAuthority`]) is the authority for members and leases.
+/// An external membership: an etcd or Kubernetes Lease authority
+/// ([`crate::external::etcd::EtcdAuthority`], [`crate::external::kubernetes::KubeAuthority`],
+/// features `etcd` and `kubernetes`), or its in-memory stand-in [`MemoryAuthority`], is the
+/// authority for members and leases.
 pub type ExternalMembership<A> = AuthorityMembership<A>;

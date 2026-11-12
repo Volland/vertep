@@ -26,8 +26,11 @@
 //!   sharded fenced storage, the cluster Event I/O Processor, outbound retries, inbound
 //!   delivery and forwarding, shard drain and worker dispatch.
 //!
-//! Not here: live etcd and Kubernetes clients (the external authorities are an in-memory
-//! stand-in plus their record layouts), and container-based fault injection.
+//! - `external` (features `etcd`, `kubernetes`): the etcd (v3 JSON gateway) and Kubernetes
+//!   (`coordination.k8s.io/v1` Lease API) lease authorities, over a small blocking HTTP client.
+//!
+//! The `vertep-fault-node` executable (feature `fault-node`) is one node of the container
+//! fault-injection harness (`tests/containers.rs`).
 //!
 //! @tg: implements:: [[decisions#Shard-based placement]]
 //! @tg: implements:: [[decisions#Shards by IRI hash modulo a fixed count]]
@@ -48,6 +51,15 @@
 //! @tg: implements:: [[decisions#Power-of-two shard counts]]
 //! @tg: implements:: [[decisions#Single-node shards placed by FNV-1a of the address IRI]] {note: "the cluster hash version 1 is the same FNV-1a placement"}
 //! @tg: implements:: [[decisions#Stores without fencing refuse tokens]] {note: "a shard journal refuses a store without fencing"}
+//! @tg: implements:: [[decisions#External authorities over etcd and the Kubernetes Lease API]]
+//! @tg: implements:: [[decisions#etcd expires shard grants and a permanent key holds each shard's epoch]]
+//! @tg: implements:: [[decisions#Kubernetes grants expire by observation]]
+//! @tg: implements:: [[decisions#An owner checks its standbys before writing its own copy]]
+//! @tg: implements:: [[decisions#A standby's fence rises only with entries it stores]]
+//! @tg: implements:: [[decisions#A new owner replicates to the shard's current standbys]]
+//! @tg: implements:: [[decisions#Gossip leader epochs carry a per-start tag]]
+//! @tg: implements:: [[decisions#A leaving node ships each shard before handing it over]]
+//! @tg: implements:: [[decisions#Frames to other nodes are kept until settled]]
 
 pub mod authority;
 pub mod clock;
@@ -102,7 +114,7 @@ pub use rebalance::{
 };
 pub use replication::{
     LocalStandby, ReplicaError, ReplicatedJournal, ReplicationBatch, StandbyLink, StandbyReplica,
-    may_take, replica_set,
+    may_take, replica_set, standbys_of,
 };
 pub use routing::{ActivationGate, DedupCache, Inbound, NotOwner, Redirect, RoutingTable};
 pub use view::{Member, MemberStatus, ShardOwner, Subscription, View, ViewTracker};

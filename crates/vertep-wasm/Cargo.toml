@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "vertep-wasm-native"
-required-features = ["journal"]
+required-features = ["journal", "conformance"]
 
 [features]
 default = []
@@ -24,6 +24,10 @@ default = []
 journal = ["dep:vertep-tiramemsu", "dep:tm-wasm", "vertep-runtime/tiramemsu"]
 # The ECMAScript datamodel (boa), shipped separately as `@vertep/dm-ecma`.
 ecmascript = ["dep:vertep-dm-ecma", "dep:getrandom_04"]
+# Test-only exports, never in the published packages: step traces and differential records
+# (`traceCases`, `differentialRecords`) and the W3C IRP suite runner (`conformanceRun`).
+trace = []
+conformance = ["trace", "ecmascript", "dep:vertep-conformance"]
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std", "serde"] }
@@ -36,6 +40,7 @@ vertep-dm-cel = { workspace = true }
 vertep-dm-rust = { workspace = true }
 vertep-tiramemsu = { workspace = true, optional = true }
 vertep-dm-ecma = { workspace = true, optional = true }
+vertep-conformance = { path = "../vertep-conformance", optional = true }
 tm-wasm = { version = "0.12.0", optional = true }
 oxrdf = { workspace = true }
 serde = { version = "1", features = ["derive"] }
@@ -47,13 +52,16 @@ futures = { workspace = true }
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 vertep-testkit = { workspace = true }
 proptest = "1.12"
+# The native helper's WebSocket server (`ws-server`) for the end-to-end tests.
+vertep-runtime = { workspace = true, features = ["websocket"] }
+tokio = { workspace = true, features = ["rt", "net", "macros", "time", "sync"] }
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 # Pinned to the installed `wasm-bindgen` CLI: the CLI and the crate must agree exactly.
 wasm-bindgen = "=0.2.128"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
-web-sys = { version = "0.3", features = ["console"] }
+web-sys = { version = "0.3", features = ["console", "WebSocket", "MessageEvent", "CloseEvent", "Event"] }
 # oxrdf draws random blank-node ids; the cfg `getrandom_backend="wasm_js"` is set by the build
 # script in `bindings/js/scripts/build.sh`.
 getrandom = { version = "0.3", features = ["wasm_js"] }

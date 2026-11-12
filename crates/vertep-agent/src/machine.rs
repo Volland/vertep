@@ -31,7 +31,10 @@ use vertep_core::datamodel::{
 };
 use vertep_core::ir::{Chart, Invoke, State};
 use vertep_core::kernel::{descriptor_matches, transition_domain};
-use vertep_core::session::{self, Effect, Input, InvokeRequest, SendRequest, Session, StartInput};
+use vertep_core::session::{
+    self, Effect, Input, InvokeRequest, SendRequest, Session, StartInput, StepError,
+};
+use vertep_core::tape::{OracleInput, OracleRecord, TapeDatamodel};
 use vertep_core::trace::MacrostepTrace;
 use vertep_rdf::ChartVersion;
 
@@ -308,6 +311,33 @@ pub struct Applied {
     pub dropped: bool,
     /// Decisions accepted by this input.
     pub accepted: Vec<AcceptedDecision>,
+}
+
+/// How [`AgentMachine::start_with`] starts a machine.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StartOptions {
+    /// Record the core macrosteps ([`CoreTape`]).
+    pub record_core: bool,
+    /// The microstep budget of each macrostep; `None` keeps the core default.
+    pub microstep_budget: Option<u32>,
+}
+
+/// The core macrosteps of the actor's own session, recorded for the Lean oracle by a machine
+/// started with [`StartOptions::record_core`]: one [`OracleRecord`] (input, datamodel
+/// answer tape, trace) per `session::start` or `session::step`, in order, in the JSON Lines
+/// format `vertep-oracle --records` reads.
+///
+/// Only the core is recorded. What the agent layer does between macrosteps (offers, decision
+/// validation on a probe datamodel, binding `vt_usage`) does not go through the session, and
+/// the sessions of plan charts are not the actor's; the events the agent layer raises appear
+/// as the inputs of the macrosteps they cause.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CoreTape {
+    /// One record per macrostep.
+    pub records: Vec<OracleRecord>,
+    /// True when the last recorded macrostep ran out of the microstep budget (its trace is
+    /// partial and the machine returned [`MachineError::Step`]).
+    pub budget_exceeded: bool,
 }
 
 /// A provenance record, projected into the `vt-agent:` graph.
@@ -628,6 +658,7 @@ pub struct AgentMachine {
     records: Vec<Record>,
     done: Option<Value>,
     delivered: u64,
+    core: Option<CoreTape>,
 }
 
 impl std::fmt::Debug for AgentMachine {
@@ -706,6 +737,26 @@ impl AgentMachine {
         registry: Arc<dyn DatamodelRegistry + Send + Sync>,
         ts: i64,
     ) -> Result<(AgentMachine, Applied), MachineError> {
+        AgentMachine::start_with(actor, chart, registry, ts, StartOptions::default())
+    }
+
+    /// Starts `actor` like [`AgentMachine::start`] with `options`: a microstep budget other than
+    /// the core default, and recording the core macrosteps of its session with their datamodel
+    /// answer tape ([`AgentMachine::core_tape`]) so that a test can replay them through the Lean
+    /// oracle. Neither changes anything else.
+    ///
+    /// # Errors
+    ///
+    /// As [`AgentMachine::start`].
+    pub fn start_with(
+        actor: &str,
+        chart: Arc<AgentChart>,
+        registry: Arc<dyn DatamodelRegistry + Send + Sync>,
+        ts: i64,
+        options: StartOptions,
+    ) -> Result<(AgentMachine, Applied), MachineError> {
+        let record = options.record_core;
+        let options_budget = options.microstep_budget;
         let inner =
             vertep_core::null::create_datamodel(registry.as_ref(), chart.compiled.datamodel())
                 .map_err(|e| MachineError::Datamodel(format!("{e:?}")))?;
@@ -715,6 +766,9 @@ impl AgentMachine {
             seed: seed(actor, 1),
         };
         let mut options = session::Options::default();
+        if let Some(b) = options_budget {
+            options.microstep_budget = b;
+        }
         for t in [
             vocab::LLM_INVOKE_TYPE,
             vocab::TOOL_INVOKE_TYPE,
@@ -739,8 +793,24 @@ impl AgentMachine {
             data: Vec::new(),
             sessions: None,
         };
-        let o = session::start(&chart.compiled, start, &mut dm)
-            .map_err(|e| MachineError::Step(format!("{e:?}")))?;
+        let mut core = None;
+        let o = if record {
+            let mut tape = TapeDatamodel::new(&mut dm);
+            let o = session::start(&chart.compiled, start.clone(), &mut tape)
+                .map_err(|e| MachineError::Step(format!("{e:?}")))?;
+            core = Some(CoreTape {
+                records: vec![OracleRecord {
+                    input: OracleInput::Start(start),
+                    tape: tape.take(),
+                    trace: o.trace.clone(),
+                }],
+                budget_exceeded: false,
+            });
+            o
+        } else {
+            session::start(&chart.compiled, start, &mut dm)
+                .map_err(|e| MachineError::Step(format!("{e:?}")))?
+        };
         let mut m = AgentMachine {
             actor: actor.to_owned(),
             chart,
@@ -759,6 +829,7 @@ impl AgentMachine {
             records: Vec::new(),
             done: None,
             delivered: 0,
+            core,
         };
         let mut cx = Cx {
             position: 1,
@@ -882,6 +953,12 @@ impl AgentMachine {
     /// The provenance records so far.
     pub fn records(&self) -> &[Record] {
         &self.records
+    }
+
+    /// The core macrosteps recorded so far, for a machine started with
+    /// [`StartOptions::record_core`]; `None` otherwise.
+    pub fn core_tape(&self) -> Option<&CoreTape> {
+        self.core.as_ref()
     }
 
     /// Applies one journaled input at `position`, accepted at `ts`.
@@ -1062,13 +1139,41 @@ impl AgentMachine {
                 return Err(MachineError::Livelock);
             }
             self.bind_usage();
-            let o = session::step(
-                &self.chart.compiled,
-                self.session.clone(),
-                Input::event(ev.clone(), cx.env),
-                &mut self.dm,
-            )
-            .map_err(|e| MachineError::Step(format!("{e:?}")))?;
+            let input = Input::event(ev.clone(), cx.env);
+            let r = match self.core.as_mut() {
+                None => session::step(
+                    &self.chart.compiled,
+                    self.session.clone(),
+                    input,
+                    &mut self.dm,
+                ),
+                Some(core) => {
+                    let mut tape = TapeDatamodel::new(&mut self.dm);
+                    let r = session::step(
+                        &self.chart.compiled,
+                        self.session.clone(),
+                        input.clone(),
+                        &mut tape,
+                    );
+                    let trace = match &r {
+                        Ok(o) => Some(o.trace.clone()),
+                        Err(StepError::BudgetExceeded { partial, .. }) => {
+                            core.budget_exceeded = true;
+                            Some(partial.trace.clone())
+                        }
+                        Err(StepError::Terminated) => None,
+                    };
+                    if let Some(trace) = trace {
+                        core.records.push(OracleRecord {
+                            input: OracleInput::Step(input),
+                            tape: tape.take(),
+                            trace,
+                        });
+                    }
+                    r
+                }
+            };
+            let o = r.map_err(|e| MachineError::Step(format!("{e:?}")))?;
             if let Some((corr, event, offered)) = cx.pending_decision.take() {
                 let taken = o
                     .trace

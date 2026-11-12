@@ -355,6 +355,12 @@ vt:originType
     rdfs:label "origin type"@en ;
     rdfs:comment "The SCXML `_event.origintype`: the type IRI of the transport that delivered the event."@en .
 
+vt:originVerified
+    a owl:DatatypeProperty ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "origin verified"@en ;
+    rdfs:comment "The SCXML `_event.originverified`: true when the shell verified the sender DID in `vt:origin` against its DID document before the event entered the session. Stated only when true."@en .
+
 vt:payload
     a owl:DatatypeProperty ;
     rdfs:range xsd:string ;

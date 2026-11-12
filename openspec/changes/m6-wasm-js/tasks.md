@@ -29,7 +29,7 @@
 
 ## 5. TypeScript API
 
-- [ ] 5.1 Implement `createActorSystem` with storage, path, implementations and transports options (OPEN: storage, path, implementations, dev, import and charts work; the transports option is accepted but there is no transport until section 7)
+- [x] 5.1 Implement `createActorSystem` with storage, path, implementations and transports options (`transports.websocket: {url, credentials, targets, hosts, node, reconnectMs}` connects the WebSocket processor of section 7)
 - [x] 5.2 Implement actor creation from SCXML, YAML and RDF sources with validation errors as `ChartInvalid` and chart version IRIs in snapshots
 - [x] 5.3 Implement virtual actor addressing by chart type and key with activation on first message
 - [x] 5.4 Implement `send` with message ids and deduplication, and `request` with timeout and `RequestTimeout`
@@ -46,19 +46,19 @@
 
 ## 7. WebSocket interop
 
-- [ ] 7.1 Implement the WebSocket Event I/O Processor in `vertep-wasm` with envelopes (target, origin, message id, event, payload) and acknowledgements (OPEN: not started: the WebSocket client, server endpoint, redelivery and credentials need a server-side WebSocket library in vertep-runtime and an end-to-end harness; deferred)
-- [ ] 7.2 Implement the server side of the WebSocket processor in `vertep-runtime` (OPEN: not started, see 7.1)
-- [ ] 7.3 Redeliver unacknowledged outbox entries after reconnect; deduplicate by message id on receipt (OPEN: not started, see 7.1)
-- [ ] 7.4 Add the pluggable credential provider and `TransportRefused` errors (OPEN: not started, see 7.1; `TransportRefused` exists as an error code)
-- [ ] 7.5 Add an integration test: a browser actor and a server actor exchange events across a forced disconnect, each processing every message once (OPEN: not started, see 7.1)
+- [x] 7.1 Implement the WebSocket Event I/O Processor in `vertep-wasm` with envelopes (target, origin, message id, event, payload) and acknowledgements (`vertep-wasm::ws` on the platform `WebSocket`, browsers and Node.js 22+; the frames and the per-peer link are `vertep_runtime::websocket`, shared with the server; type IRI `vt:WebSocketEventProcessor`, alias `websocket`)
+- [x] 7.2 Implement the server side of the WebSocket processor in `vertep-runtime` (`websocket::server::WebSocketServer` behind the `websocket` feature, tokio-tungstenite; the default build does not grow)
+- [x] 7.3 Redeliver unacknowledged outbox entries after reconnect; deduplicate by message id on receipt (a send stays owed by the outbox until the peer's `ack`, is sent again on every reconnect, and the receiver's journal drops a message id it already has)
+- [x] 7.4 Add the pluggable credential provider and `TransportRefused` errors (the provider runs on the main thread and is asked before each connection; its credential goes in `hello`; a refusal rejects pending JavaScript sends with `TransportRefused` and dead-letters actor sends with reason `transport-refused`)
+- [x] 7.5 Add an integration test: a browser actor and a server actor exchange events across a forced disconnect, each processing every message once (native-to-native in `vertep-runtime/tests/websocket.rs`; WebAssembly against the native server `vertep-wasm-native ws-server` in Node.js (`websocket.test.mjs`) and in headless Chrome (`browser.test.mjs`), with a held acknowledgement plus a forced disconnect, and duplicated server frames)
 
 ## 8. Conformance, packaging and budget
 
-- [ ] 8.1 Run the W3C SCXML conformance suite in headless Chrome and Node.js with the shared allow-list; fail on unexpected passes or failures (OPEN: the IRP harness in vertep-conformance reads the suite from files and is not ported to WebAssembly; the generated differential traces do run in headless Chrome and Node.js (8.2))
+- [x] 8.1 Run the W3C SCXML conformance suite in headless Chrome and Node.js with the shared allow-list; fail on unexpected passes or failures (the test build's `conformanceRun` runs `vertep-conformance`'s host on documents passed in as text; its verdicts equal the native harness's on all 386 non-manual variants, and the allow-list gate passes, in Node.js and headless Chrome)
 - [x] 8.2 Run the Lean differential traces in WebAssembly and compare them with native traces (the Rust/WebAssembly side: generated cases run in WebAssembly (Node.js and headless Chrome) give byte-identical oracle records to native, and the native records are checked equal to the ones vertep-conformance hands the Lean oracle; the Lean replay itself stays in the native nightly job)
 - [x] 8.3 Create the npm workspace `bindings/js` with `@vertep/web` and `@vertep/dm-ecma` as ES modules with declarations and the worker entry
 - [x] 8.4 Fail releases whose package version differs from the workspace crate version
-- [x] 8.5 Add the CI size check: 600 KB gzip without storage, 2.5 MB gzip with the tiramemsu journal (the check runs in CI and in the tests; it currently fails: the core build is 1.14 MB gzip against 600 KB, the journal build 2.18 MB within 2.5 MB)
+- [x] 8.5 Add the CI size check: 1.2 MB gzip without storage, 2.5 MB gzip with the tiramemsu journal (the check runs in CI and in the tests and passes: the core build is 1,159.7 KB gzip, the journal build 2,198.0 KB. The budget was 600 KB until 2026-11-11, raised by the user because 600 KB is out of reach while `GraphStore` reads only through SPARQL: the SPARQL engine that `GraphStore` reads through is 637 KB gzip on its own, and core, SCXML and CEL add 148 KB to it; see `decisions#Separate packages keep the bundle budget`)
 - [ ] 8.6 Publish to npm under the `next` tag, then `latest` after the budget and round-trip tests hold (OPEN: not published, by instruction; the packages carry publishConfig tag next)
 
 ## 9. Traceability and docs
@@ -67,4 +67,4 @@
 - [x] 9.2 Annotate each test that proves a scenario with `// @tg: verifies:: [[openspec:wasm-bindings#<Requirement>#<Scenario>]]` directly above the test call
 - [x] 9.3 Record the design decisions D1 to D8 in `tg.md/decisions.md` as `Decision` sections with `motivated_by` edges, and add any new constraint (for example, OPFS exclusivity) to `tg.md/constraints.md` with `constrains` edges to the requirements (the OPFS constraint constrains the new decisions; doc edges to openspec requirements are not resolvable in tg 0.22, so the requirements are named in prose)
 - [x] 9.4 DONE AS FRONTMATTER (tg 0.22 does not resolve doc links to openspec requirements; capabilities.md lists wasm-bindings in its openspec frontmatter and code carries @tg annotations), was: Update `tg.md/capabilities.md#WASM bindings` with `specified_by` edges to its requirements, and keep `wasm-bindings` listed in that file's `openspec:` frontmatter
-- [ ] 9.5 Run `tg check`, `tg ontology check` and `tg trace wasm-bindings --gaps`, and close every gap they report (OPEN: tg check and tg ontology check pass; tg trace wasm-bindings reports 14 of 15 implemented and 13 verified: the WebSocket requirement (section 7) and the W3C suite scenario (8.1) remain)
+- [x] 9.5 Run `tg check`, `tg ontology check` and `tg trace wasm-bindings --gaps`, and close every gap they report (all pass; 15 of 15 requirements implemented, verified and documented)

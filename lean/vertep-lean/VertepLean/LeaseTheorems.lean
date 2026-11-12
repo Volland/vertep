@@ -312,6 +312,7 @@ theorem message_once (hd : Disjoint pol) {s : Sys} (h : Reachable pol dur shardO
   (inv_of_reachable pol dur shardOf hd h).jonce actor
 
 /-- **Accepted appends of a shard are ordered by epoch**, across all its actors. -/
+-- @tg: implements:: [[openspec:shard-placement#Single Activation Guarantee]]
 theorem shard_epochs_ordered (hd : Disjoint pol) {s : Sys} (h : Reachable pol dur shardOf s)
     (k : Nat) (i j : Nat) (hi : i < (s.accepted k).length) (hj : j < (s.accepted k).length)
     (hij : i < j) : ((s.accepted k)[i]).epoch ≤ ((s.accepted k)[j]).epoch :=
@@ -337,6 +338,7 @@ theorem frames_ordered (hd : Disjoint pol) {s : Sys} (h : Reachable pol dur shar
 
 /-- **Stale frames are dropped.** A frame below an epoch the receiver admitted is not
 admitted. -/
+-- @tg: implements:: [[openspec:shard-placement#Journal Fencing Backstop]]
 theorem stale_frame_dropped (hd : Disjoint pol) {s : Sys} (h : Reachable pol dur shardOf s)
     {r : String} {k e e' : Nat} (he' : e' ∈ s.admitted r k) (he : e < e') :
     admits s r k e = false := by

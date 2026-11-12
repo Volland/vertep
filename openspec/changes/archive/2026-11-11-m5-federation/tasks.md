@@ -23,7 +23,7 @@
 
 ## 4. Authenticated origin and grants
 
-- [ ] 4.1 Verify sender authentication in the shell and set `_event.origin` plus the verified flag, and add the verified-origin field to `_event` in `vertep-core` (OPEN: shell verification, `_event.origin` only for verified senders and the journaled outcome are done; the `_event` field in `vertep-core` is not added, because it changes every `Event` literal across crates other milestones are editing and the Lean model; recorded as Decision `Verified origin carried by origin presence` with a `-contradicts` edge)
+- [x] 4.1 Verify sender authentication in the shell and set `_event.origin` plus the verified flag, and add the verified-origin field to `_event` in `vertep-core` (`Event::originverified`, false by default so `..Event::default()` literals compile, set by `VerifiedOrigin::apply`; exposed as `_event.originverified` in ECMAScript and `rust`, `ev.originverified` in CEL, `Sys::verified_origin`; journaled as `vt:originVerified`; carried by the Lean `Event` and oracle JSON, with every third differential input from a verified sender; Decision `Verified origin flag in the event` supersedes `Verified origin carried by origin presence`)
 - [x] 4.2 Journal the verification outcome with the input, and make replay use it without re-verifying (the outcome is the input's `origin`, set only for a verified sender, and `origintype`, both journaled; replay after the sender's key rotation is tested; the full outcome with the sender key is in graph `<actor>/inbound`)
 - [x] 4.3 Apply the anonymous-sender policy per actor, and mark unverified events
 - [x] 4.4 Implement grant statements (grantee, target, event descriptors, expiry) and inbound enforcement before the journal append
@@ -66,7 +66,7 @@
 
 ## 10. Interop and end-to-end tests
 
-- [ ] 10.1 Interop test against an existing third-party DIDComm v2 mediator: forward, pickup, acknowledgement (OPEN: needs a running third-party mediator, which tests here cannot reach offline; wire compatibility of authcrypt, anoncrypt and forward with Affinidi's library is tested, the Pickup 3.0 message binding is not written)
+- [x] 10.1 Interop test against an existing third-party DIDComm v2 mediator: forward, pickup, acknowledgement (`pickup::MediatorClient` binds Mediator Coordination 2.0 and Message Pickup 3.0; `tests/mediator_interop.rs` runs against the Hyperledger Identus mediator `ghcr.io/hyperledger/identus-mediator:1.0.0` with `mongo:6.0.19` in Docker when `VERTEP_MEDIATOR_INTEROP=1`, or a running one at `VERTEP_MEDIATOR_URL`, and skips otherwise; the same wire path runs in CI against the in-process test mediator, which answers those messages; live delivery over WebSocket is not bound)
 - [x] 10.2 Interop test against the TSP reference implementation: direct and routed modes
 - [x] 10.3 End-to-end test across two clusters through a mediator: verified origin, guard on a sender DID, grant refusal (`two_clusters_through_a_mediator` in `tests/identity_runtime.rs`)
 - [x] 10.4 Crash-recovery test: kill the receiving node between journal append and acknowledgement, and assert a single processing (`crash_before_acknowledgement` in `tests/relay_didcomm.rs`, with the runtime's `CrashPoint::AfterAppend`)

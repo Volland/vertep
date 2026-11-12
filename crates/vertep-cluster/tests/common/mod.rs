@@ -1,6 +1,9 @@
 //! Shared helpers of the integration tests.
 #![allow(dead_code)]
 
+pub mod containers;
+pub mod oracle;
+
 use std::sync::Arc;
 use std::time::Duration;
 

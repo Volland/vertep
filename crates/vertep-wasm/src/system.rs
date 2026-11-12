@@ -14,6 +14,7 @@ use serde_json::{Map, Value as J, json};
 use vertep_core::datamodel::{Environment, Event, EventType, SessionInfo, Value};
 use vertep_core::session::{self, Options, StartInput};
 use vertep_runtime::chart::{ChartInfo, find_state};
+use vertep_runtime::websocket::{ClientResolver, Link, Offer, WebSocketTransport};
 use vertep_runtime::{
     ActivationError, ActorState, Address, AskError, EntryBody, EntryData, Envelope, Node,
     NodeConfig, NodeHandle, Shell,
@@ -39,10 +40,84 @@ pub struct SystemOptions {
     pub guards: Vec<String>,
     /// Action IRIs the implementations provide.
     pub actions: Vec<String>,
+    /// The WebSocket transport to a server, when configured.
+    pub websocket: Option<WebSocketOptions>,
+}
+
+/// The WebSocket transport of a system: where its server is and which addresses it serves.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WebSocketOptions {
+    /// The server endpoint (`ws:` or `wss:` URL).
+    pub url: String,
+    /// This system's node IRI in `hello`; a fresh one per system when absent.
+    pub node: Option<String>,
+    /// IRI prefixes of the server's actors; every non-local address when empty.
+    pub targets: Vec<String>,
+    /// IRI prefixes of this system's actors, announced in `hello`.
+    pub hosts: Vec<String>,
+    /// The first reconnect delay in milliseconds (it doubles up to 5 s).
+    pub reconnect_ms: u32,
+}
+
+impl WebSocketOptions {
+    /// Parses `{url, node?, targets?, hosts?, reconnectMs?}`.
+    ///
+    /// # Errors
+    ///
+    /// `InvalidArgument` without a `ws:` or `wss:` URL, or for malformed lists.
+    pub fn from_json(j: &J) -> Res<Self> {
+        let url = j
+            .get("url")
+            .and_then(J::as_str)
+            .filter(|u| u.starts_with("ws://") || u.starts_with("wss://"))
+            .ok_or_else(|| ApiError::arg("transports.websocket.url is a ws: or wss: URL"))?
+            .to_owned();
+        Ok(WebSocketOptions {
+            url,
+            node: j.get("node").and_then(J::as_str).map(str::to_owned),
+            targets: strings(j, "targets")?,
+            hosts: strings(j, "hosts")?,
+            reconnect_ms: j
+                .get("reconnectMs")
+                .and_then(J::as_u64)
+                .map_or(200, |n| u32::try_from(n).unwrap_or(u32::MAX).max(10)),
+        })
+    }
+
+    /// The IRI schemes whose addresses may go to the server: those of the targets, or `http`,
+    /// `https` and `urn` without targets.
+    pub fn schemes(&self) -> Vec<String> {
+        if self.targets.is_empty() {
+            return vec!["http".into(), "https".into(), "urn".into()];
+        }
+        let mut s: Vec<String> = self
+            .targets
+            .iter()
+            .filter_map(|t| t.split_once(':').map(|(s, _)| s.to_ascii_lowercase()))
+            .collect();
+        s.sort();
+        s.dedup();
+        s
+    }
+}
+
+fn strings(j: &J, k: &str) -> Res<Vec<String>> {
+    match j.get(k) {
+        None | Some(J::Null) => Ok(Vec::new()),
+        Some(J::Array(a)) => a
+            .iter()
+            .map(|v| {
+                v.as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| ApiError::arg(format!("{k} lists strings")))
+            })
+            .collect(),
+        Some(_) => Err(ApiError::arg(format!("{k} is an array of IRIs"))),
+    }
 }
 
 impl SystemOptions {
-    /// Parses `{storage, path?, journal?, dev?, idleTimeoutMs?, guards?, actions?}`.
+    /// Parses `{storage, path?, journal?, dev?, idleTimeoutMs?, guards?, actions?, websocket?}`.
     ///
     /// # Errors
     ///
@@ -57,20 +132,6 @@ impl SystemOptions {
         if path.is_empty() {
             return Err(ApiError::arg("path must not be empty"));
         }
-        let strings = |k: &str| -> Res<Vec<String>> {
-            match j.get(k) {
-                None | Some(J::Null) => Ok(Vec::new()),
-                Some(J::Array(a)) => a
-                    .iter()
-                    .map(|v| {
-                        v.as_str()
-                            .map(str::to_owned)
-                            .ok_or_else(|| ApiError::arg(format!("{k} lists strings")))
-                    })
-                    .collect(),
-                Some(_) => Err(ApiError::arg(format!("{k} is an array of IRIs"))),
-            }
-        };
         Ok(SystemOptions {
             store: StoreOptions {
                 kind,
@@ -79,8 +140,12 @@ impl SystemOptions {
             },
             dev: j.get("dev").and_then(J::as_bool).unwrap_or(false),
             idle_timeout_ms: j.get("idleTimeoutMs").and_then(J::as_i64),
-            guards: strings("guards")?,
-            actions: strings("actions")?,
+            guards: strings(j, "guards")?,
+            actions: strings(j, "actions")?,
+            websocket: match j.get("websocket") {
+                None | Some(J::Null) => None,
+                Some(w) => Some(WebSocketOptions::from_json(w)?),
+            },
         })
     }
 }
@@ -110,6 +175,14 @@ pub struct System {
     subs: BTreeMap<u64, Sub>,
     next_sub: u64,
     out: Vec<J>,
+    remote: Option<Remote>,
+}
+
+/// The WebSocket transport's link to the server and the options it connects with.
+struct Remote {
+    link: Arc<Link>,
+    resolver: Arc<ClientResolver>,
+    options: WebSocketOptions,
 }
 
 impl std::fmt::Debug for System {
@@ -119,6 +192,13 @@ impl std::fmt::Debug for System {
             .field("dev", &self.dev)
             .finish_non_exhaustive()
     }
+}
+
+fn refused(reason: &str) -> ApiError {
+    ApiError::new(
+        Code::TransportRefused,
+        format!("the WebSocket server refused the connection credential: {reason}"),
+    )
 }
 
 fn activation(e: ActivationError) -> ApiError {
@@ -360,10 +440,34 @@ impl System {
             // every macrostep must be re-run on replay, so no snapshot may short-cut it
             config.snapshot_interval = 0;
         }
-        let node = Node::builder(store.storage(), shell)
+        let mut builder = Node::builder(store.storage(), shell)
             .datamodels(Arc::new(Datamodels::new(registry)))
-            .config(config)
-            .build();
+            .config(config);
+        if opts.websocket.is_some() {
+            builder = builder.transport(Arc::new(WebSocketTransport));
+        }
+        let node = builder.build();
+        let remote = opts.websocket.as_ref().map(|w| {
+            let mut options = w.clone();
+            if options.node.is_none() {
+                options.node = Some(node.fresh_id("urn:vertep:node:"));
+            }
+            let link = Arc::new(Link::new());
+            let handle = node.handle();
+            let resolver = Arc::new(ClientResolver::new(
+                link.clone(),
+                Some(handle.clone()),
+                options.targets.clone(),
+            ));
+            for scheme in options.schemes() {
+                handle.register_resolver(&scheme, resolver.clone());
+            }
+            Remote {
+                link,
+                resolver,
+                options,
+            }
+        });
         Ok(System {
             node,
             store,
@@ -374,6 +478,7 @@ impl System {
             subs: BTreeMap::new(),
             next_sub: 1,
             out: Vec::new(),
+            remote,
         })
     }
 
@@ -390,6 +495,43 @@ impl System {
     /// The store.
     pub fn store(&self) -> &Store {
         &self.store
+    }
+
+    /// The WebSocket link to the server and the options to connect with (the node IRI filled
+    /// in), when the system has the WebSocket transport.
+    pub fn websocket(&self) -> Option<(Arc<Link>, WebSocketOptions)> {
+        self.remote
+            .as_ref()
+            .map(|r| (r.link.clone(), r.options.clone()))
+    }
+
+    /// Whether `a` is hosted here: it has a journal, or its chart type is registered.
+    fn is_local(&self, a: &Address) -> bool {
+        self.head(a) > 0
+            || a.as_str()
+                .rsplit_once('/')
+                .is_some_and(|(t, _)| self.node.latest(t).is_some())
+    }
+
+    /// The link that carries messages to `a`, when `a` is a server actor.
+    fn remote_link(&self, a: &Address) -> Option<Arc<Link>> {
+        let r = self.remote.as_ref()?;
+        (r.resolver.claims(a.as_str()) && !self.is_local(a)).then(|| r.link.clone())
+    }
+
+    /// Sends `ev` to the server actor `to` over `link`: `{messageId, pending: true}` until the
+    /// server acknowledges it (a `delivery` notification follows), or `TransportRefused`.
+    // @tg: implements:: [[openspec:wasm-bindings#Server Interop Over WebSocket]] {confidence: partial, note: "sends from JavaScript to server actors"}
+    fn send_remote(&self, link: &Link, to: &Address, ev: Event, id: Option<&str>) -> Res<J> {
+        let id = id.map_or_else(|| self.node.fresh_id("urn:vertep:message:"), str::to_owned);
+        match link.offer(Envelope::new(id.clone(), to, ev)) {
+            Offer::Delivered => Ok(json!({ "messageId": id })),
+            Offer::Pending => {
+                link.watch(&id);
+                Ok(json!({ "messageId": id, "pending": true }))
+            }
+            Offer::Refused(reason) => Err(refused(&reason)),
+        }
     }
 
     fn address(&self, args: &J, key: &str) -> Res<Address> {
@@ -560,6 +702,10 @@ impl System {
             "send" => {
                 let to = self.address(args, "to")?;
                 let ev = event_from_json(args.get("event").unwrap_or(&J::Null))?;
+                if let Some(link) = self.remote_link(&to) {
+                    let id = args.get("messageId").and_then(J::as_str);
+                    return self.send_remote(&link, &to, ev, id);
+                }
                 self.know(&to);
                 let id = match args.get("messageId").and_then(J::as_str) {
                     Some(id) => {
@@ -718,6 +864,19 @@ impl System {
 
     // @tg: implements:: [[openspec:wasm-bindings#Snapshot And Transition Subscriptions]]
     fn collect(&mut self) {
+        if let Some(r) = &self.remote {
+            for (id, result) in r.link.take_settled() {
+                self.out.push(match result {
+                    Ok(()) => json!({ "kind": "delivery", "messageId": id, "ok": true }),
+                    Err(reason) => json!({
+                        "kind": "delivery",
+                        "messageId": id,
+                        "ok": false,
+                        "error": refused(&reason).to_json(),
+                    }),
+                });
+            }
+        }
         let known: Vec<Address> = self.known.iter().cloned().collect();
         for a in known {
             let head = self.head(&a);

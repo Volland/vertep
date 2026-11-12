@@ -11,7 +11,9 @@ publish = false
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
-proptest = "1.12"
+# Without the default `fork` and `timeout` features (unused), so it also builds for
+# wasm32-unknown-unknown (through vertep-conformance in `vertep-wasm`).
+proptest = { version = "1.12", default-features = false, features = ["std"] }
 
 [lints]
 workspace = true

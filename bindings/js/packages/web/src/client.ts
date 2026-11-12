@@ -5,7 +5,7 @@
 // @tg: implements:: [[openspec:wasm-bindings#Worker-Hosted Actor System]]
 // @tg: implements:: [[openspec:wasm-bindings#Node.js Support]] {confidence: partial, note: "the same client on worker_threads"}
 
-import { VertepError, fromWire } from "./errors.js";
+import { VertepError, fromWire, toWire } from "./errors.js";
 import type { BuildRef, EventData, FromWorker, InitOptions, Notification, SnapshotData, ToWorker, TransitionData } from "./protocol.js";
 import { type JsonValue, type Snapshot, snapshot } from "./snapshot.js";
 
@@ -49,10 +49,34 @@ export interface SystemOptions {
   charts?: (ChartSpec<any, any, any> | { source: string; format?: string; type?: string })[];
   /** Another worker build, for example `ecmascript` from `@vertep/dm-ecma`. */
   datamodel?: BuildRef;
-  /** Transports (see `WebSocketTransportOptions`). */
-  transports?: { websocket?: unknown };
+  /** Transports: the WebSocket Event I/O Processor to a server's actors. */
+  transports?: { websocket?: WebSocketTransportOptions };
   /** The worker entry; the bundled one by default. */
   workerUrl?: URL | string;
+}
+
+/**
+ * The WebSocket transport: actors reach the server's actors by IRI (`<send>` with type
+ * `websocket`, or any address under `targets`), with at-least-once delivery and
+ * deduplication by message id; `send` to a server actor resolves once the server
+ * acknowledged it.
+ */
+export interface WebSocketTransportOptions {
+  /** The server endpoint, `ws:` or `wss:`. */
+  url: string | URL;
+  /**
+   * The credential provider, asked before every connection; its value is presented in the
+   * `hello` frame. A refused credential rejects pending sends with `TransportRefused`.
+   */
+  credentials?: () => string | null | undefined | Promise<string | null | undefined>;
+  /** IRI prefixes of the server's actors; every address not hosted here when absent. */
+  targets?: string[];
+  /** IRI prefixes of this system's actors, announced to the server. */
+  hosts?: string[];
+  /** This system's node IRI; a fresh one per system by default. */
+  node?: string;
+  /** The first reconnect delay in milliseconds (doubling up to 5 s); 200 by default. */
+  reconnectMs?: number;
 }
 
 /** A transition taken by a macrostep. */
@@ -152,14 +176,31 @@ export class ActorSystem {
   #dead: VertepError | null = null;
   #registered = new Map<string, Promise<string>>();
   #onImpurity?: SystemOptions["onImpurity"];
+  #credentials?: WebSocketTransportOptions["credentials"];
   /** Which WebAssembly build the worker loaded: `core` (no SQLite), `journal` or `custom`. */
   readonly build: "core" | "journal" | "custom";
 
   /** @internal */
-  constructor(port: Port, build: "core" | "journal" | "custom", onImpurity?: SystemOptions["onImpurity"]) {
+  constructor(
+    port: Port,
+    build: "core" | "journal" | "custom",
+    onImpurity?: SystemOptions["onImpurity"],
+    credentials?: WebSocketTransportOptions["credentials"],
+  ) {
     this.#port = port;
     this.build = build;
     this.#onImpurity = onImpurity;
+    this.#credentials = credentials;
+  }
+
+  /** @internal Answers the worker's request for a connection credential. */
+  async _credential(id: number): Promise<void> {
+    try {
+      const v = this.#credentials ? await this.#credentials() : null;
+      this.#port.post({ t: "credential", id, ok: true, value: v ?? null });
+    } catch (e) {
+      this.#port.post({ t: "credential", id, ok: false, error: toWire(e) });
+    }
   }
 
   /** @internal */
@@ -170,8 +211,11 @@ export class ActorSystem {
       this.#pending.delete(m.id);
       if (m.ok) p.resolve(m.value);
       else p.reject(fromWire(m.error));
+    } else if (m.t === "credential") {
+      void this._credential(m.id);
     } else if (m.t === "notify") {
       const n = m.payload;
+      if (n.kind === "delivery") return;
       if (n.kind === "impurity") {
         if (this.#onImpurity) this.#onImpurity(n);
         else console.warn(`vertep: ${n.message} (${n.address} at ${n.position})`);
@@ -313,7 +357,9 @@ export class ActorRef<E extends AnyEvent = AnyEvent, C = JsonValue, S extends st
 
   /**
    * Sends an event. It carries `messageId` (a fresh one by default), so a duplicate delivery
-   * of the same id is journaled and processed once.
+   * of the same id is journaled and processed once. To a server actor (over
+   * `transports.websocket`) it resolves once the server acknowledged the message, and rejects
+   * with `TransportRefused` when the server refuses the connection credential.
    */
   async send(event: E, options: { messageId?: string } = {}): Promise<{ messageId: string }> {
     const to = await this.address;
@@ -389,6 +435,7 @@ export async function createActorSystem(options: SystemOptions): Promise<ActorSy
     throw new VertepError("InvalidArgument", 'storage must be chosen explicitly: "opfs" or "memory"');
   }
   const url = options.workerUrl ? new URL(String(options.workerUrl)) : new URL("./worker.js", import.meta.url);
+  const ws = options.transports?.websocket;
   let system: ActorSystem | null = null;
   let settle: { resolve: (s: ActorSystem) => void; reject: (e: unknown) => void } | null = null;
   const started = new Promise<ActorSystem>((resolve, reject) => {
@@ -398,8 +445,11 @@ export async function createActorSystem(options: SystemOptions): Promise<ActorSy
     url,
     (m) => {
       if (m.t === "ready") {
-        system = new ActorSystem(port, m.build, options.onImpurity);
+        system = new ActorSystem(port, m.build, options.onImpurity, ws?.credentials);
         settle?.resolve(system);
+      } else if (m.t === "credential" && !system) {
+        // asked before ready: the provider answers through a provisional system object
+        void new ActorSystem(port, "core", undefined, ws?.credentials)._credential(m.id);
       } else if (m.t === "fatal") {
         settle?.reject(fromWire(m.error));
         port.terminate();
@@ -422,6 +472,16 @@ export async function createActorSystem(options: SystemOptions): Promise<ActorSy
     import: options.import,
     build: options.datamodel,
     charts: options.charts?.map((c) => ({ source: c.source, format: c.format, type: c.type })),
+    websocket: ws
+      ? {
+          url: String(ws.url),
+          node: ws.node,
+          targets: ws.targets,
+          hosts: ws.hosts,
+          reconnectMs: ws.reconnectMs,
+          credentials: typeof ws.credentials === "function",
+        }
+      : undefined,
   };
   port.post({ t: "init", options: init });
   return started;

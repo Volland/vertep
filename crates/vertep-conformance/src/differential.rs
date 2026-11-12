@@ -43,6 +43,9 @@ pub struct GeneratedCase {
     pub inputs: Vec<GenInput>,
 }
 
+/// The sender DID of the generated inputs that arrive with a verified origin.
+pub const VERIFIED_SENDER: &str = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK";
+
 /// The microstep budget of generated runs: small, so eventless loops end quickly.
 pub const GENERATED_MICROSTEP_BUDGET: u32 = 200;
 
@@ -177,6 +180,11 @@ pub fn rust_records(case: &GeneratedCase) -> Result<RustRun, String> {
             break;
         }
         let kind = match gi {
+            // Every third event arrives from a verified sender DID, so both sides read, carry
+            // and expose `_event.originverified` (M5 task 4.1).
+            GenInput::Event(n) if i % 3 == 2 => InputKind::Event(
+                Event::named(n.clone(), EventType::External).with_verified_origin(VERIFIED_SENDER),
+            ),
             GenInput::Event(n) => InputKind::Event(Event::named(n.clone(), EventType::External)),
             GenInput::Cancel => InputKind::Cancel,
         };

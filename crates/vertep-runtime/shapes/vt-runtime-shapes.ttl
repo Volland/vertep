@@ -128,7 +128,8 @@ vt:InputEventRuntimeShape
     sh:property [ sh:path vt:messageId ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
     sh:property [ sh:path vt:eventType ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
     sh:property [ sh:path vt:origin ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
-    sh:property [ sh:path vt:originType ; sh:maxCount 1 ; sh:datatype xsd:string ] .
+    sh:property [ sh:path vt:originType ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path vt:originVerified ; sh:maxCount 1 ; sh:datatype xsd:boolean ] .
 
 vt:OutgoingSendRuntimeShape
     a sh:NodeShape ;

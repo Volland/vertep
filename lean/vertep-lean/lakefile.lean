@@ -59,3 +59,8 @@ lean_exe «vertep-decide» where
 `lake exe vertep-shapes FILE.nq…`. -/
 lean_exe «vertep-shapes» where
   root := `VertepShapesMain
+
+/-- The type checker as a differential oracle for the Rust value checker (verification backlog
+4.5): `lake exe vertep-types --cases CASES.jsonl`. -/
+lean_exe «vertep-types» where
+  root := `VertepTypesMain

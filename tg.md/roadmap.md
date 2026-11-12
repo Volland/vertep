@@ -55,6 +55,8 @@ Deciders at choice points, LLM actors with journaled results and tool actors, an
 
 Delivered by the OpenSpec change `m3-agents`.
 
+Archived 2026-11-11 with 33 requirements; decider safety, grant enforcement and replay without deciders are proven in `vertep-lean`, and agent runs replay through the Lean oracle.
+
 ## M4 Cluster
 
 Trusted multi-node clusters: pluggable membership with leases, shard placement, the QUIC cluster transport and pooled stateless workers.
@@ -63,11 +65,15 @@ Trusted multi-node clusters: pluggable membership with leases, shard placement, 
 
 Delivered by the OpenSpec change `m4-cluster`.
 
+Archived 2026-11-11 with 36 requirements. etcd and Kubernetes Lease membership and the container fault harness run against Docker with `VERTEP_CONTAINER_TESTS=1`; every fault history replays through the Lean lease model in strict mode. Journal shipping between nodes has no wire protocol yet.
+
 ## M5 Federation
 
 Actors across trust boundaries: DID identities, authenticated senders, capability grants, and DIDComm and TSP relay mailboxes and transports.
 
 Delivered by the OpenSpec change `m5-federation`.
+
+Archived 2026-11-11 with 27 requirements. Interop with a third-party mediator (Hyperledger Identus) runs against Docker when `VERTEP_MEDIATOR_INTEROP=1`; live delivery over WebSocket is not bound yet.
 
 ## M6 WASM and JS
 

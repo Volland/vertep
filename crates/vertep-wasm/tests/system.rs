@@ -52,6 +52,7 @@ fn options(kind: StorageKind, path: &str, journal: bool) -> SystemOptions {
         idle_timeout_ms: None,
         guards: Vec::new(),
         actions: Vec::new(),
+        websocket: None,
     }
 }
 

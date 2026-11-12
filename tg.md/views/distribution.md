@@ -60,6 +60,10 @@ One `Membership` trait reports the view, notifies subscribers and grants, renews
 
 - describes:: [[capabilities#Cluster membership]]
 - describes:: [[components#vertep-cluster]]
+- describes:: [[decisions#External authorities over etcd and the Kubernetes Lease API]]
+- describes:: [[decisions#etcd expires shard grants and a permanent key holds each shard's epoch]]
+- describes:: [[decisions#Kubernetes grants expire by observation]]
+- describes:: [[decisions#A leaving node ships each shard before handing it over]]
 
 The runtime never depends on which implementation is configured (`Membership Trait`). Views carry strictly increasing version numbers, and a node rejects any view not newer than the one it holds (`Membership View Versions`). Joining checks cluster id and shard count (`Graceful Join`); leaving drains first (`Graceful Leave With Drain`); failure detection marks members suspect, then failed, within configured bounds, and a failed member's leases become available only after they expire (`Failure Detection`).
 
@@ -303,6 +307,8 @@ A `ClusterNode` joins one `vertep-runtime` node to the cluster as its placement,
 - describes:: [[decisions#A free shard goes only to a node holding its journal]]
 - describes:: [[decisions#Unreplicated entries stay unreadable until the quorum catches up]]
 - describes:: [[decisions#Worker pools dispatch from the sending node]]
+- describes:: [[decisions#A new owner replicates to the shard's current standbys]]
+- describes:: [[decisions#Frames to other nodes are kept until settled]]
 
 Before the runtime delivers a message to a virtual actor or a worker, or activates a virtual actor, it asks the placement. The answer is local (this node holds an unexpired lease on the shard), remote (a mailbox that frames the envelope and sends it with retries until acknowledged or the delivery deadline, after which the sender gets `error.communication`), or hold (no live owner: the message waits in the local mailbox and the actor is not activated). Messages already waiting locally move to the owner on the actor's next turn. Every append goes through `ClusterStorage`, which routes it to the shard's store, stamps the node's lease epoch as the fencing token and, with standbys, acknowledges only after the quorum stored it. `Node::drain` finishes macrosteps and the outbox and deactivates a shard's actors for a leave or a handover.
 
@@ -329,13 +335,42 @@ A worker request is routed by the sending node's dispatcher for the worker type:
 
 ## Fault injection
 
-An in-process harness partitions nodes from the lease authority, pauses them mid-append, crashes and restarts them, runs a clock slow, delays and drops frames and loses acknowledgements, while a checker verifies the recorded history.
+Harnesses partition nodes, pause them mid-append, crash and restart them, run a clock slow, delay and drop frames and lose acknowledgements, while a checker and the Lean lease model verify the recorded history.
 
 - describes:: [[capabilities#Shard placement]]
 - describes:: [[decisions#Fault-injection histories export as JSON lines]]
 - describes:: [[decisions#Lean verification bridge]]
+- describes:: [[decisions#Container fault injection runs every node as a process]]
+- describes:: [[decisions#Gossip leader epochs carry a per-start tag]]
+- describes:: [[decisions#A standby's fence rises only with entries it stores]]
+- describes:: [[decisions#An owner checks its standbys before writing its own copy]]
+- describes:: [[constraints#The Docker Desktop kernel has no netem]]
 
-The checker requires every actor journal to be linear, at most one writer per shard and epoch, every acknowledged message processed exactly once, and no admitted frame from an append that was not accepted or from an epoch below one the receiver already admitted. Histories are written as JSON lines when `VERTEP_HISTORY_DIR` is set, so the Lean lease and fencing model can replay them and must reach the same accept and reject decisions. Container-based runs and the nightly matrix over every membership implementation and replication factor are still open.
+The checker requires every actor journal to be linear, at most one writer per shard and epoch, every acknowledged message processed exactly once, and no admitted frame from an append that was not accepted or from an epoch below one the receiver already admitted. Histories are written as JSON lines when `VERTEP_HISTORY_DIR` is set, and every run replays them through the Lean lease and fencing model in strict mode, which must reach the same accept and reject decisions.
+
+The in-process harness (`tests/faults.rs`) is generic over the membership and the journals: static, the external stand-in and gossip on simulated time, etcd and Kubernetes in containers on real time; one shared fenced store, or local journals with replication factor 1 (only a shard's home node takes it) or 3 (two standbys, both required). The container harness (`tests/containers.rs`) runs every node as a process:
+
+```mermaid
+flowchart LR
+    subgraph host["test process"]
+        W["world: client messages, fenced store, receivers, history"]
+        H["fault schedule"]
+    end
+    subgraph auth["network: lease authority"]
+        A["etcd or k3s"]
+    end
+    subgraph data["network: data"]
+        N0["vertep-fault-node n0"]
+        N1["n1"]
+        N2["n2"]
+        N3["n3, lease clock at half speed"]
+    end
+    N0 & N1 & N2 & N3 --- A
+    N0 & N1 & N2 & N3 -- "grant, work, append (TCP); side effects (UDP)" --> W
+    H -. "network disconnect, pause, kill and start, loss" .-> data
+```
+
+The nightly `cluster-faults` job runs both with `VERTEP_CONTAINER_TESTS=require`.
 
 ## DID identity
 
@@ -492,7 +527,8 @@ A `Federation` joins one `vertep-runtime` node to the trust-boundary layers thro
 - describes:: [[decisions#DID resolution is a directory chosen by address scheme]]
 - describes:: [[decisions#DIDComm mailboxes acknowledge after the append]]
 - describes:: [[decisions#Relay outbox owns cross-trust retries]]
-- describes:: [[decisions#Verified origin carried by origin presence]]
+- describes:: [[decisions#Verified origin flag in the event]]
+- describes:: [[decisions#Remote mediators through Pickup 3.0]]
 - describes:: [[decisions#TSP direct when reachable, routed otherwise]]
 
 `Federation::provision` creates an instance's keys and DID and binds the DID to a chart type and key on the node, so the DID is the actor's address, journal subject and current-state graph. A send to a DID hosted elsewhere resolves to an outbound mailbox that only queues it in the relay outbox, a store-backed queue beside the actor journals; the runtime's outbox entry is done at that hand-off. The relay outbox checks the outbound grant, resolves the DID through the cache, tries the routes in preference order with fallback, and retries unreachable recipients with backoff; a failure becomes `error.communication` in the sending chart with the send id and the reason. `<send type="tsp">` or `type="didcomm"` restricts a send to one transport.
@@ -508,14 +544,14 @@ flowchart LR
     subgraph B["Node B (org 2)"]
         PU["pickup: batch or live"] --> OP["open, verify sender,<br/>grant, payload type"]
         OP -- "refused" --> RR["inbound record,<br/>ack, reply error"]
-        OP -- "admitted" --> MB["relay mailbox of did B<br/>origin = verified sender"]
+        OP -- "admitted" --> MB["relay mailbox of did B<br/>origin, originverified"]
         MB -- "notify" --> TB["turn and journal append"]
         TB -- "runtime ack" --> AK["ack to the relay"]
     end
     RL --> PU
 ```
 
-Each local DID actor's relay mailbox is a runtime `Mailbox`: picked-up messages and messages from senders on the same node, in arrival order. The runtime acknowledges a message after its turn is durable, or when it drops it as a duplicate message id, and only that acknowledgement releases the relay's copy; after a crash the copy is fetched again and dropped by the journal. A refused message is recorded in graph `<actor>/inbound`, acknowledged, and answered with `error.communication` when the sender is verified and had contacted the actor first. Relay pickups wake actors with `NodeHandle::notify`, and after a restart the mailbox factory picks up what the relays held. The `testkit` feature has an in-process DIDComm mediator and TSP intermediary on a local network for tests and the `two_orgs` example.
+Each local DID actor's relay mailbox is a runtime `Mailbox`: picked-up messages and messages from senders on the same node, in arrival order. The runtime acknowledges a message after its turn is durable, or when it drops it as a duplicate message id, and only that acknowledgement releases the relay's copy; after a crash the copy is fetched again and dropped by the journal. A refused message is recorded in graph `<actor>/inbound`, acknowledged, and answered with `error.communication` when the sender is verified and had contacted the actor first. Relay pickups wake actors with `NodeHandle::notify`, and after a restart the mailbox factory picks up what the relays held. An admitted event carries the sender DID in `_event.origin` and `_event.originverified` true; an anonymous one has neither. A remote mediator is a `pickup::MediatorClient` binding, speaking Mediator Coordination 2.0 and Message Pickup 3.0 over the deployment's `RelayNetwork`. The `testkit` feature has an in-process DIDComm mediator and TSP intermediary on a local network for tests and the `two_orgs` example.
 
 ## Failure modes
 

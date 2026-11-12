@@ -1050,6 +1050,7 @@ impl<'c, 'd> Driver<'c, 'd> {
             },
             invokeid: None,
             data,
+            ..Event::default()
         };
         self.effects.push(Effect::Send(SendRequest {
             sendid,
@@ -1113,12 +1114,13 @@ impl<'c, 'd> Driver<'c, 'd> {
     fn microstep(&mut self, event: Option<String>, ts: &[TransIdx]) -> Result<(), Budget> {
         self.charge()?;
         self.record(event, ts);
-        self.exit_states(ts);
         let chart = self.chart;
+        let domains = kernel::transition_domains(chart, &self.s.history, ts);
+        self.exit_states(ts);
         for &t in ts {
             let _ = self.exec_block(&chart.transition(t).body);
         }
-        self.enter_states(ts);
+        self.enter_states(ts, &domains);
         Ok(())
     }
 
@@ -1154,9 +1156,9 @@ impl<'c, 'd> Driver<'c, 'd> {
     }
 
     // @tg: implements:: [[openspec:scxml-interpretation#Final States And Done Events]]
-    fn enter_states(&mut self, ts: &[TransIdx]) {
+    fn enter_states(&mut self, ts: &[TransIdx], domains: &[Option<StateIdx>]) {
         let chart = self.chart;
-        let plan = kernel::compute_entry_set(chart, &self.s.history, ts);
+        let plan = kernel::compute_entry_set(chart, &self.s.history, ts, domains);
         let late = chart.binding() == Binding::Late;
         for s in plan.states.to_vec() {
             self.s.configuration.insert(s);
@@ -1298,7 +1300,8 @@ impl<'c, 'd> Driver<'c, 'd> {
             }
         }
         if let Some(it) = chart.state(ROOT).initial {
-            self.enter_states(&[it]);
+            let domains = kernel::transition_domains(chart, &self.s.history, &[it]);
+            self.enter_states(&[it], &domains);
         }
         self.run_macrostep()
     }

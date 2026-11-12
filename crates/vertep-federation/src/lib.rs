@@ -46,6 +46,8 @@ pub mod net;
 pub mod ontology;
 pub mod origin;
 pub mod outbox;
+#[cfg(feature = "didcomm")]
+pub mod pickup;
 pub mod relay;
 pub mod resolver;
 #[cfg(all(feature = "testkit", any(feature = "didcomm", feature = "tsp")))]

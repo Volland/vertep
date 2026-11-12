@@ -381,8 +381,8 @@ fn unlisted_node_cannot_join() {
     assert_eq!(authority_view(&h.authority), before);
 }
 
-// The external scenarios run against the in-memory stand-in of the external authority here;
-// runs against containerised etcd and kind are not written yet (task 2.8 stays open).
+// The external scenarios against the in-memory stand-in of the external authority; the same
+// scenarios run against etcd and Kubernetes (k3s) in containers in `tests/external.rs`.
 // @tg: verifies:: [[openspec:cluster-membership#External Membership#Leases follow the external service]] {level: integration}
 #[test]
 fn leases_follow_the_external_service_stand_in() {

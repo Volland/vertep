@@ -32,6 +32,7 @@ def mainTheorems : List Name :=
     ``Vertep.Rdf.version_determined, ``Vertep.Certify.check_certified_wellFormed,
     ``Vertep.Rdf.RT.percentEncode_inj, ``Vertep.Rdf.RT.ordered_eq, ``Vertep.Rdf.RT.Cap.kid,
     ``Vertep.Rdf.RT.dec_exec, ``Vertep.Rdf.RT.dec_transition,
+    ``Vertep.Rdf.RT.dec_state, ``Vertep.Rdf.RT.decode_project, ``Vertep.Rdf.fromRDF_project,
     ``Vertep.Journal.replay_determinism, ``Vertep.Journal.replay_no_divergence,
     ``Vertep.Journal.replay_equals_live, ``Vertep.Journal.turn_idempotent,
     ``Vertep.Journal.accepted_once, ``Vertep.Journal.outbox_safe,
@@ -46,7 +47,9 @@ def mainTheorems : List Name :=
     ``Vertep.Lease.grant_unique, ``Vertep.Lease.accepted_granted,
     ``Vertep.Lease.one_writer_per_epoch, ``Vertep.Lease.journal_epochs_ordered,
     ``Vertep.Lease.shard_epochs_ordered, ``Vertep.Lease.message_once, ``Vertep.Lease.stale_append_fenced,
-    ``Vertep.Lease.frames_ordered, ``Vertep.Lease.stale_frame_dropped ]
+    ``Vertep.Lease.frames_ordered, ``Vertep.Lease.stale_frame_dropped,
+    ``Vertep.Types.check_iff, ``Vertep.Types.check_sound, ``Vertep.Types.Chain.dedup,
+    ``Vertep.Types.JsonSchema.validate_proj, ``Vertep.Types.JsonSchema.jsonSchema_agrees ]
 
 /-- The axioms of `n` outside the allowed set. -/
 def disallowed (n : Name) : CoreM (Array Name) := do

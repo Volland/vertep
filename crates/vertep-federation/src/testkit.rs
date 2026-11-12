@@ -3,7 +3,9 @@
 //!
 //! Vertep is a client of existing mediators and intermediaries; these exist only so tests can
 //! exercise forward routing, store-and-forward, pickup, acknowledgement and routed mode offline.
-//! They see exactly what a real relay sees: routing data and encrypted bytes.
+//! They see exactly what a real relay sees: routing data and encrypted bytes. The mediator also
+//! answers the DIDComm wire protocols of [`crate::pickup`] (Mediator Coordination 2.0, Message
+//! Pickup 3.0) on the request's connection, as the third-party mediators do.
 
 use std::fmt;
 use std::sync::Arc;
@@ -21,6 +23,8 @@ pub struct TestMediator {
     net: Arc<dyn RelayNetwork>,
     resolver: Arc<dyn DidResolver>,
     refuse: AtomicBool,
+    /// Mediated DIDs and the recipient DIDs each registered (`keylist-update`).
+    keylists: std::sync::Mutex<std::collections::BTreeMap<String, Vec<String>>>,
 }
 
 #[cfg(feature = "didcomm")]
@@ -62,7 +66,176 @@ impl TestMediator {
             net,
             resolver,
             refuse: AtomicBool::new(false),
+            keylists: std::sync::Mutex::new(std::collections::BTreeMap::new()),
         }))
+    }
+
+    /// Answers one Mediator Coordination 2.0 or Message Pickup 3.0 request from the
+    /// authenticated `from`: the reply, or a problem report.
+    fn answer(&self, from: &str, msg: &serde_json::Value) -> serde_json::Value {
+        use crate::pickup::{
+            DELIVERY, DELIVERY_REQUEST, KEYLIST_UPDATE, KEYLIST_UPDATE_RESPONSE, MEDIATE_GRANT,
+            MEDIATE_REQUEST, MESSAGES_RECEIVED, PROBLEM_REPORT, STATUS, STATUS_REQUEST,
+        };
+        use serde_json::{Value, json};
+        let mut keylists = self
+            .keylists
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let problem = |code: &str, comment: &str| {
+            (
+                PROBLEM_REPORT,
+                json!({"code": code, "comment": comment}),
+                Vec::new(),
+            )
+        };
+        let mediated = keylists.contains_key(from);
+        // A requester may pick up for itself and for the recipients it registered.
+        let allowed = |r: &str, k: &std::collections::BTreeMap<String, Vec<String>>| {
+            r == from || k.get(from).is_some_and(|l| l.iter().any(|x| x == r))
+        };
+        let recipients = |k: &std::collections::BTreeMap<String, Vec<String>>| {
+            let mut v = k.get(from).cloned().unwrap_or_default();
+            v.push(from.to_owned());
+            v
+        };
+        let body = msg.get("body").cloned().unwrap_or(Value::Null);
+        let asked = body.get("recipient_did").and_then(Value::as_str);
+        let (type_, body, attachments) = match msg.get("type").and_then(Value::as_str) {
+            Some(MEDIATE_REQUEST) => {
+                keylists.entry(from.to_owned()).or_default();
+                (
+                    MEDIATE_GRANT,
+                    json!({"routing_did": [self.did()]}),
+                    Vec::new(),
+                )
+            }
+            Some(_) if !mediated => problem("e.p.req.not_enrolled", "request mediation first"),
+            Some(KEYLIST_UPDATE) => {
+                let mut updated = Vec::new();
+                for u in body
+                    .get("updates")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                {
+                    let did = u
+                        .get("recipient_did")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default();
+                    let action = u.get("action").and_then(Value::as_str).unwrap_or_default();
+                    let list = keylists.entry(from.to_owned()).or_default();
+                    match action {
+                        "add" if !list.iter().any(|x| x == did) => list.push(did.to_owned()),
+                        "remove" => list.retain(|x| x != did),
+                        _ => {}
+                    }
+                    updated
+                        .push(json!({"recipient_did": did, "action": action, "result": "success"}));
+                }
+                (
+                    KEYLIST_UPDATE_RESPONSE,
+                    json!({ "updated": updated }),
+                    Vec::new(),
+                )
+            }
+            Some(STATUS_REQUEST | DELIVERY_REQUEST | MESSAGES_RECEIVED)
+                if asked.is_some_and(|r| !allowed(r, &keylists)) =>
+            {
+                problem(
+                    "e.p.req.not_authorized",
+                    "not a recipient of this requester",
+                )
+            }
+            Some(STATUS_REQUEST) => {
+                let rs = asked.map_or_else(|| recipients(&keylists), |r| vec![r.to_owned()]);
+                let count = self
+                    .store
+                    .held()
+                    .iter()
+                    .filter(|m| rs.contains(&m.recipient))
+                    .count();
+                (
+                    STATUS,
+                    json!({"message_count": count, "live_delivery": false}),
+                    Vec::new(),
+                )
+            }
+            Some(DELIVERY_REQUEST) => {
+                let rs = asked.map_or_else(|| recipients(&keylists), |r| vec![r.to_owned()]);
+                let limit = body
+                    .get("limit")
+                    .and_then(Value::as_u64)
+                    .and_then(|l| usize::try_from(l).ok())
+                    .unwrap_or(10);
+                let held = self.store.fetch(&rs, limit).unwrap_or_default();
+                if held.is_empty() {
+                    (
+                        STATUS,
+                        json!({"message_count": 0, "live_delivery": false}),
+                        Vec::new(),
+                    )
+                } else {
+                    let attachments = held
+                        .iter()
+                        .map(|m| {
+                            let json: Value =
+                                serde_json::from_slice(&m.bytes).unwrap_or(Value::Null);
+                            json!({"id": m.id, "data": {"json": json}})
+                        })
+                        .collect();
+                    (DELIVERY, json!({}), attachments)
+                }
+            }
+            Some(MESSAGES_RECEIVED) => {
+                // Only copies held for this requester's recipients are released.
+                let rs = recipients(&keylists);
+                let mine: Vec<String> = self
+                    .store
+                    .held()
+                    .into_iter()
+                    .filter(|m| rs.contains(&m.recipient))
+                    .map(|m| m.id)
+                    .collect();
+                let ids: Vec<String> = body
+                    .get("message_id_list")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|v| v.as_str().map(str::to_owned))
+                    .filter(|id| mine.contains(id))
+                    .collect();
+                let _ = self.store.ack(&ids);
+                let left = mine.len() - ids.len();
+                (
+                    STATUS,
+                    json!({"message_count": left, "live_delivery": false}),
+                    Vec::new(),
+                )
+            }
+            other => problem(
+                "e.p.msg.unsupported",
+                &format!("unsupported message type {other:?}"),
+            ),
+        };
+        let mut reply = crate::pickup::protocol_message(
+            &format!(
+                "{}-reply",
+                msg.get("id").and_then(Value::as_str).unwrap_or("")
+            ),
+            type_,
+            self.did(),
+            from,
+            body,
+        );
+        if let Some(o) = reply.as_object_mut() {
+            o.remove("return_route");
+            o.insert("thid".into(), msg.get("id").cloned().unwrap_or(Value::Null));
+            if !attachments.is_empty() {
+                o.insert("attachments".into(), Value::Array(attachments));
+            }
+        }
+        reply
     }
 
     /// The mediator's DID.
@@ -94,10 +267,32 @@ impl RelayEndpoint for TestMediator {
             return Err(NetError::Refused("mediator refuses".into()));
         }
         let jwe = std::str::from_utf8(body).map_err(|e| NetError::Refused(e.to_string()))?;
-        match self
-            .agent
-            .open(jwe, self.resolver.as_ref(), crate::Timestamp::now())
+        let now = crate::Timestamp::now();
+        // A protocol request from an authenticated DID is answered on the same connection.
+        if let Ok(plain) = self.agent.decrypt(jwe, self.resolver.as_ref(), now)
+            && let Some((from, _)) = &plain.sender
+            && plain
+                .message
+                .get("type")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|t| {
+                    t.starts_with("https://didcomm.org/coordinate-mediation/2.0/")
+                        || t.starts_with("https://didcomm.org/messagepickup/3.0/")
+                })
         {
+            let reply = self.answer(from.as_str(), &plain.message);
+            let doc = self
+                .resolver
+                .resolve(from)
+                .map_err(|e| NetError::Refused(e.to_string()))?
+                .document;
+            let sealed = self
+                .agent
+                .seal_message(&reply, &doc)
+                .map_err(|e| NetError::Refused(e.to_string()))?;
+            return Ok(sealed.into_bytes());
+        }
+        match self.agent.open(jwe, self.resolver.as_ref(), now) {
             Ok(DidCommReceived::Forward { next, message }) => {
                 if next.contains('#') {
                     // The next hop is another mediator's routing key.

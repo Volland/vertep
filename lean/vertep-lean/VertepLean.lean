@@ -22,6 +22,9 @@ import VertepLean.Rdf.RoundTrip.Loc
 import VertepLean.Rdf.RoundTrip.Kids
 import VertepLean.Rdf.RoundTrip.Decode
 import VertepLean.Rdf.RoundTrip.Transition
+import VertepLean.Rdf.RoundTrip.Nodes
+import VertepLean.Rdf.RoundTrip.State
+import VertepLean.Rdf.RoundTrip.Chart
 import VertepLean.Journal
 import VertepLean.JournalTheorems
 import VertepLean.JournalCheck
@@ -31,3 +34,7 @@ import VertepLean.Lease
 import VertepLean.LeaseTheorems
 import VertepLean.LeaseCheck
 import VertepLean.DecideCheck
+import VertepLean.Types.Basic
+import VertepLean.Types.Check
+import VertepLean.Types.JsonSchema
+import VertepLean.Types.Oracle

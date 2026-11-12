@@ -22,12 +22,13 @@ use core::fmt;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, Weak};
 use std::time::Duration;
 
 use vertep_core::datamodel::Value;
 use vertep_runtime::actor::platform_event;
-use vertep_runtime::mailbox::{Envelope, Mailbox, MailboxError};
+use vertep_runtime::mailbox::{Envelope, Mailbox, MailboxError, StoreMailbox};
 use vertep_runtime::transport::{Transport, TransportError};
 use vertep_runtime::vocab::REPLY_EVENT;
 use vertep_runtime::{Address, Node, NodeHandle, Placement, Route, Storage};
@@ -118,7 +119,13 @@ pub struct ClusterNode {
     /// The virtual actors this node has hosted (their output carries a fence).
     virtuals: Mutex<HashSet<String>>,
     workers: Mutex<Workers>,
+    /// Where frames handed off to other nodes are kept until they are settled.
+    outbound: OnceLock<Arc<dyn Storage>>,
+    /// The outbound queue of each destination node, once opened.
+    queues: Mutex<BTreeMap<NodeId, Arc<StoreMailbox>>>,
     view_version: Mutex<u64>,
+    /// Set once the node stopped: it sends and retries nothing more.
+    stopped: AtomicBool,
     me: Weak<ClusterNode>,
 }
 
@@ -159,9 +166,20 @@ impl ClusterNode {
             fences: Mutex::new(BTreeMap::new()),
             virtuals: Mutex::new(HashSet::new()),
             workers: Mutex::new(Workers::default()),
+            outbound: OnceLock::new(),
+            queues: Mutex::new(BTreeMap::new()),
             view_version: Mutex::new(0),
+            stopped: AtomicBool::new(false),
             me: me.clone(),
         })
+    }
+
+    /// Stops this node's cluster side for good: it sends nothing more and abandons the retries
+    /// in flight, as a process that stops or crashes does. What it had handed off but not yet
+    /// delivered is sent again by the next process over the same storage when outbound frames
+    /// are kept ([`ClusterNode::keep_outbound`]).
+    pub fn stop(&self) {
+        self.stopped.store(true, Ordering::SeqCst);
     }
 
     /// This node.
@@ -384,30 +402,129 @@ impl ClusterNode {
         }
     }
 
-    /// Sends `env` to `node`, retrying until it is acknowledged or the deadline passes.
+    /// Keeps every frame this node hands off to another node in a store-backed queue in
+    /// `storage` until it is settled (acknowledged, redirected, rejected or past its delivery
+    /// deadline), so a node that restarts over the same storage sends again what it had not
+    /// delivered ([`ClusterNode::resume_outbound`]). Without it, a frame handed off to the
+    /// wire is retried only while this process runs.
+    pub fn keep_outbound(&self, storage: Arc<dyn Storage>) {
+        let _ = self.outbound.set(storage);
+    }
+
+    /// Sends again every frame a previous process over the same storage handed off to another
+    /// member but did not see settled, with its original identifier and fence; receivers
+    /// discard what they already stored. Returns how many frames were sent again.
+    pub fn resume_outbound(&self) -> usize {
+        let view = self.membership.view();
+        let mut sent = 0;
+        for to in view.members.keys().filter(|m| *m != self.local()) {
+            let Some(q) = self.outbound_queue(to) else {
+                continue;
+            };
+            for kept in q.pending() {
+                let frame = match &kept.event.data {
+                    Value::String(h) => unhex(h).and_then(|b| Frame::decode(&b).ok()),
+                    _ => None,
+                };
+                let env = frame
+                    .as_ref()
+                    .and_then(|f| serde_json::from_slice::<Envelope>(&f.data).ok());
+                match (frame, env) {
+                    // without a runtime to send from it stays kept for a later resume
+                    (Some(frame), Some(env)) => {
+                        if self.retry_remote(to.clone(), env, frame).is_ok() {
+                            sent += 1;
+                        }
+                    }
+                    // unreadable: dropped rather than kept forever
+                    _ => {
+                        let _ = q.ack(&kept.message_id);
+                    }
+                }
+            }
+        }
+        sent
+    }
+
+    /// The outbound queue to `to`, when outbound frames are kept.
+    fn outbound_queue(&self, to: &NodeId) -> Option<Arc<StoreMailbox>> {
+        let storage = self.outbound.get()?;
+        let address = Address::parse(&format!(
+            "urn:vertep:cluster:{}:outbound:{}:{to}",
+            self.meta.cluster,
+            self.local()
+        ))
+        .ok()?;
+        Some(
+            lock(&self.queues)
+                .entry(to.clone())
+                .or_insert_with(|| Arc::new(StoreMailbox::open(address, storage.clone())))
+                .clone(),
+        )
+    }
+
+    /// Forgets the kept frame `id` to `to`: it is settled.
+    fn settled(&self, to: &NodeId, id: &str) {
+        if let Some(q) = self.outbound_queue(to) {
+            let _ = q.ack(id);
+        }
+    }
+
+    /// Sends `env` to `node`, retrying until it is acknowledged or the deadline passes; with
+    /// outbound frames kept, the frame is stored before the hand-off counts as done.
     // @tg: implements:: [[openspec:cluster-transport#At-Least-Once Delivery With Deduplication]]
     // @tg: implements:: [[openspec:cluster-transport#Redirect On Stale Routing]]
     fn send_remote(&self, node: NodeId, env: Envelope) -> Result<(), String> {
+        let frame = self.frame_of(&env, 0);
+        if let Some(q) = self.outbound_queue(&node) {
+            let kept = Envelope::new(
+                frame.id.clone(),
+                &Address::parse(&env.to).map_err(|e| e.to_string())?,
+                platform_event("vt:outbound", Value::String(hex(&frame.encode()))),
+            );
+            q.enqueue(kept).map_err(|e| e.0)?;
+        }
+        self.retry_remote(node, env, frame)
+    }
+
+    /// Retries `frame` (carrying `env`) to `node` until it is settled or this node stops.
+    fn retry_remote(&self, node: NodeId, env: Envelope, frame: Frame) -> Result<(), String> {
         let Some(wire) = self.wire.get().cloned() else {
             return Err("no cluster wire".into());
         };
         let rt = tokio::runtime::Handle::try_current().map_err(|e| e.to_string())?;
-        let me = self.me.upgrade().ok_or("the cluster node is gone")?;
-        let frame = self.frame_of(&env, 0);
+        let (me, local) = (self.me.clone(), self.local().clone());
+        // a node that is gone (stopped, crashed) retries nothing
+        let alive =
+            |me: &Weak<ClusterNode>| me.upgrade().filter(|m| !m.stopped.load(Ordering::SeqCst));
         rt.spawn(async move {
             let start = tokio::time::Instant::now();
             loop {
-                let last = match wire.send(me.local(), &node, frame.clone()).await {
-                    Ok(Reply::Ack { .. }) => return,
+                if alive(&me).is_none() {
+                    return;
+                }
+                let reply = wire.send(&local, &node, frame.clone()).await;
+                let Some(me) = alive(&me) else {
+                    return;
+                };
+                let last = match reply {
+                    Ok(Reply::Ack { .. }) => {
+                        me.settled(&node, &frame.id);
+                        return;
+                    }
                     Ok(Reply::Forwarded { redirect, .. }) => {
                         lock(&me.routing).apply_redirect(&redirect);
+                        me.settled(&node, &frame.id);
                         return;
                     }
                     // the receiver recorded it as a dead letter: the sender is stale
                     Ok(Reply::Rejected {
                         kind: RejectKind::Fenced,
                         ..
-                    }) => return,
+                    }) => {
+                        me.settled(&node, &frame.id);
+                        return;
+                    }
                     Ok(Reply::Rejected {
                         kind: RejectKind::Unavailable,
                         message,
@@ -415,6 +532,7 @@ impl ClusterNode {
                     }) => message,
                     Ok(Reply::Rejected { message, .. }) => {
                         me.report(&env, &message);
+                        me.settled(&node, &frame.id);
                         return;
                     }
                     Err(e) => e,
@@ -424,9 +542,12 @@ impl ClusterNode {
                         &env,
                         &format!("not acknowledged before the deadline: {last}"),
                     );
+                    me.settled(&node, &frame.id);
                     return;
                 }
-                tokio::time::sleep(me.config.retry_backoff).await;
+                let backoff = me.config.retry_backoff;
+                drop(me);
+                tokio::time::sleep(backoff).await;
             }
         });
         Ok(())
@@ -754,7 +875,11 @@ impl DeadLetters for RuntimeDeadLetters {
 pub struct NodeDrain<'a> {
     node: &'a mut Node,
     meta: ClusterMeta,
+    ship: Option<Box<ShipFn<'a>>>,
 }
+
+/// Ships one shard's journal to the node taking the shard over.
+type ShipFn<'a> = dyn FnMut(ShardId, &NodeId) -> Result<(), String> + 'a;
 
 impl fmt::Debug for NodeDrain<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -765,7 +890,22 @@ impl fmt::Debug for NodeDrain<'_> {
 impl<'a> NodeDrain<'a> {
     /// The drain of `node`, whose actors are placed by `meta`.
     pub fn new(node: &'a mut Node, meta: ClusterMeta) -> Self {
-        NodeDrain { node, meta }
+        NodeDrain {
+            node,
+            meta,
+            ship: None,
+        }
+    }
+
+    /// This drain, shipping each drained shard's journal with `ship(shard, to)` before the
+    /// shard's lease moves to `to`: for shard journals kept in local files
+    /// ([`crate::ship_journal`] between the stores, or a network copy).
+    pub fn with_shipping(
+        mut self,
+        ship: impl FnMut(ShardId, &NodeId) -> Result<(), String> + 'a,
+    ) -> Self {
+        self.ship = Some(Box::new(ship));
+        self
     }
 }
 
@@ -775,6 +915,13 @@ impl Drain for NodeDrain<'_> {
         self.node
             .drain(&|a: &Address| meta.shard_of(a.as_str()) == shard);
         Ok(())
+    }
+
+    fn ship_shard(&mut self, shard: ShardId, to: &NodeId) -> Result<(), String> {
+        match &mut self.ship {
+            Some(ship) => ship(shard, to),
+            None => Ok(()),
+        }
     }
 }
 
@@ -991,14 +1138,24 @@ impl<S: JournalStore> Backend<S> {
 }
 
 /// A node's storage in a cluster: one store per shard, each actor's journal and graphs in the
-/// store of its shard, every append fenced by this node's lease on the shard and, for the
-/// shards given standbys, acknowledged only once enough standbys stored it.
+/// store of its shard, every append fenced by this node's lease on the shard and, with
+/// replication, acknowledged only once enough standbys stored it. The standbys of a shard are
+/// asked for again whenever this node gets a new lease on it, so a node that takes a shard
+/// over (a failover, a move) replicates to the shard's current standbys.
 // @tg: implements:: [[openspec:shard-placement#One Journal File Per Shard]]
 // @tg: implements:: [[openspec:shard-placement#Journal Fencing Backstop]]
+// @tg: implements:: [[openspec:shard-placement#Journal Replication To Standbys]]
 pub struct ClusterStorage<S> {
     meta: ClusterMeta,
     shards: Vec<Backend<S>>,
+    membership: Arc<dyn Membership>,
+    standbys: Box<StandbysFn>,
+    /// Per shard, the lease epoch the replication links were last chosen for.
+    linked: Mutex<Vec<u64>>,
 }
+
+/// The standbys a shard's appends go to while this node owns it.
+type StandbysFn = dyn Fn(ShardId) -> Vec<Arc<dyn StandbyLink>> + Send + Sync;
 
 impl<S> fmt::Debug for ClusterStorage<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1023,8 +1180,9 @@ impl<S: JournalStore + GraphStore> ClusterStorage<S> {
     }
 
     /// The same, with `standbys(shard)` receiving each shard's appends and an append
-    /// acknowledged once `required` of them stored it (shards with no standby are not
-    /// replicated).
+    /// acknowledged once `required` of them stored it. `standbys` is asked again each time this
+    /// node gets a new lease epoch on a shard (see [`crate::standbys_of`] for the usual
+    /// choice); with `required` zero, shards with no standby are not replicated.
     ///
     /// # Errors
     ///
@@ -1036,7 +1194,7 @@ impl<S: JournalStore + GraphStore> ClusterStorage<S> {
     pub fn with_standbys(
         membership: Arc<dyn Membership>,
         stores: Vec<S>,
-        standbys: impl Fn(ShardId) -> Vec<Arc<dyn StandbyLink>>,
+        standbys: impl Fn(ShardId) -> Vec<Arc<dyn StandbyLink>> + Send + Sync + 'static,
         required: usize,
     ) -> Result<Self, ShardJournalError> {
         let meta = membership.meta().clone();
@@ -1050,13 +1208,37 @@ impl<S: JournalStore + GraphStore> ClusterStorage<S> {
             let shard = ShardId::new(i as u32);
             let j = ShardJournal::new(store, shard, membership.clone())?;
             let links = standbys(shard);
-            shards.push(if links.is_empty() {
+            shards.push(if links.is_empty() && required == 0 {
                 Backend::Plain(j)
             } else {
                 Backend::Replicated(ReplicatedJournal::new(j, links, required))
             });
         }
-        Ok(ClusterStorage { meta, shards })
+        let linked = Mutex::new(vec![0; shards.len()]);
+        Ok(ClusterStorage {
+            meta,
+            shards,
+            membership,
+            standbys: Box::new(standbys),
+            linked,
+        })
+    }
+
+    /// Chooses the replication links of `shard` again when this node holds it at an epoch
+    /// it has not linked for yet.
+    fn relink(&self, shard: ShardId) {
+        let Backend::Replicated(j) = &self.shards[shard.index()] else {
+            return;
+        };
+        let Some(lease) = self.membership.held(shard) else {
+            return;
+        };
+        let mut linked = lock(&self.linked);
+        if linked[shard.index()] != lease.epoch {
+            linked[shard.index()] = lease.epoch;
+            drop(linked);
+            j.set_standbys((self.standbys)(shard));
+        }
     }
 
     /// The store of `shard`.
@@ -1070,7 +1252,9 @@ impl<S: JournalStore + GraphStore> ClusterStorage<S> {
     }
 
     fn backend(&self, actor: &str) -> &Backend<S> {
-        &self.shards[self.meta.shard_of(actor).index()]
+        let shard = self.meta.shard_of(actor);
+        self.relink(shard);
+        &self.shards[shard.index()]
     }
 }
 
@@ -1123,4 +1307,20 @@ impl<S: JournalStore + GraphStore + 'static> Storage for ClusterStorage<S> {
             .map(|s| s.store() as &dyn GraphStore)
             .collect()
     }
+}
+
+/// `bytes` as lowercase hexadecimal.
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The bytes of lowercase or uppercase hexadecimal `text`.
+fn unhex(text: &str) -> Option<Vec<u8>> {
+    if !text.len().is_multiple_of(2) {
+        return None;
+    }
+    (0..text.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(text.get(i..i + 2)?, 16).ok())
+        .collect()
 }

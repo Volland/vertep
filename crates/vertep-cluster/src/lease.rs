@@ -437,6 +437,14 @@ impl LeaseTable {
             .collect()
     }
 
+    /// Raises the highest epoch known for `shard` to `epoch`, without a grant: the next grant
+    /// will be above it.
+    pub fn note_epoch(&mut self, shard: ShardId, epoch: u64) {
+        if let Some(slot) = self.slots.get_mut(shard.index()) {
+            slot.highest = slot.highest.max(epoch);
+        }
+    }
+
     /// The highest epoch ever granted for `shard`.
     pub fn highest_epoch(&self, shard: ShardId) -> u64 {
         self.slots.get(shard.index()).map_or(0, |s| s.highest)

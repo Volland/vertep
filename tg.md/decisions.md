@@ -681,12 +681,21 @@ Rejected: verifying in the datamodel or a guard, which would make `step` depend 
 
 ## Verified origin carried by origin presence
 
-Until `_event` has a verified flag in `vertep-core`, a relay delivery sets `_event.origin` only to a verified sender DID and `_event.origintype` to the relay processor; an unverified event has no origin.
+Superseded interim rule: before `_event` had a verified flag, a relay delivery set `_event.origin` only to a verified sender DID, so an origin's presence meant a verified sender.
 
 - motivated_by:: [[decisions#Verification outcome is journaled with the input]] {weight: primary, since: "2026-11-11"}
-- -contradicts:: [[decisions#Verification outcome is journaled with the input]] {ticket: "m5-federation 4.1", reason: "the core field touches every Event literal across crates other milestones are editing, and the Lean model"}
 
-Guards test `_event.origin`; the full outcome (verified flag, sender key, I/O processor) is in the actor's inbound records in graph `<actor>/inbound`.
+Replaced by [[decisions#Verified origin flag in the event]]. The rule that an unverified event has no origin stays; what changed is that guards no longer infer verification from presence.
+
+## Verified origin flag in the event
+
+`_event.originverified` is true only when the shell verified the sender DID in `_event.origin` against its DID document; every datamodel exposes it, the journal stores it, and the Lean model carries it.
+
+- supersedes:: [[decisions#Verified origin carried by origin presence]] {since: "2026-11-11", reason: "m5-federation 4.1 added the field to vertep-core"}
+- motivated_by:: [[decisions#Verification outcome is journaled with the input]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary}
+
+The field is a `bool` defaulting to false, so `Event { .., ..Event::default() }` literals keep compiling and `Event::with_verified_origin` sets origin and flag together. It is read as false from older journals (`vt:originVerified` absent), ECMAScript snapshots and oracle tapes, and written to the journal and snapshots only when true, so existing data is unchanged. `VerifiedOrigin::apply` is the one place that sets it; the runtime clears it wherever it assigns a cluster origin itself, since a trusted-cluster origin is not a verified DID. ECMAScript and the `rust` datamodel expose `_event.originverified`, CEL `ev.originverified` (typed `bool`), and `Sys::verified_origin` gives Rust actions the verified sender; the `null` datamodel has no `_event`. Rejected: an origin-kind enum, which would change every datamodel's `_event` shape for no extra information.
 
 ## DIDComm mailboxes acknowledge after the append
 
@@ -696,6 +705,15 @@ A DIDComm mediator stores forwards for an actor; the actor's mailbox picks up in
 - motivated_by:: [[constraints#Relays deliver at least once]] {weight: primary}
 
 The relay mailbox implements the runtime's `Mailbox`, so the runtime's own acknowledgement after a durable turn, or after it drops a duplicate message id, is what releases the mediator's copy.
+
+## Remote mediators through Pickup 3.0
+
+A mailbox picks up from any DIDComm v2 mediator with `MediatorClient`: Mediator Coordination 2.0 and Message Pickup 3.0 requests authcrypted from the actor with `return_route: "all"`, replies read from the response.
+
+- motivated_by:: [[decisions#DIDComm mailboxes acknowledge after the append]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary}
+
+A reply counts only when it is authcrypted by the mediator's DID and threads to the request. `delivery-request` is not an acknowledgement; `messages-received` goes out only when the runtime acknowledges after the append, and the mediator may leave it unanswered (Identus does). Senders need nothing new: the recipient's DIDComm service names the mediator's endpoint and its key-agreement key as routing key, and the usual forward wrapping applies. Interop is checked against the Hyperledger Identus mediator (`ghcr.io/hyperledger/identus-mediator:1.0.0` with `mongo:6.0.19`, task 10.1) in an opt-in Docker test, and the in-process test mediator answers the same messages so CI covers the binding. The HTTP client is the deployment's `RelayNetwork`; live delivery (`live-delivery-change` over WebSocket) is not bound yet.
 
 ## TSP direct when reachable, routed otherwise
 
@@ -869,6 +887,97 @@ The format is documented in `vertep-cluster` `history.rs`; the Lean side reads i
 
 The tool writes the doubled shard files and metadata to a new directory, so rolling back is keeping the old one.
 
+## External authorities over etcd and the Kubernetes Lease API
+
+`EtcdAuthority` and `KubeAuthority` implement the lease authority over etcd's v3 JSON gateway and the `coordination.k8s.io/v1` Lease API, behind features `etcd` and `kubernetes`, with a small blocking HTTP/1.1 client of the crate's own.
+
+- motivated_by:: [[decisions#Membership behind one trait]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#QUIC with mutual TLS and a stream per actor pair]] {weight: secondary, note: "the same rustls with ring, no aws-lc"}
+
+A node's membership is `ExternalMembership` over either, exactly as the static membership is over its hosted authority. No gRPC, async client stack or Kubernetes client crate is needed for a few small JSON requests per tick; the available `ureq` 2 would pull rustls's aws-lc provider.
+
+## etcd expires shard grants and a permanent key holds each shard's epoch
+
+A shard lease is an etcd key attached to an etcd lease whose TTL is the term, so etcd itself expires it; a never-deleted epoch key per shard makes every grant's epoch exceed the last.
+
+- motivated_by:: [[decisions#Leases with fencing epochs from the membership authority]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#etcd lease TTLs are whole seconds]] {weight: secondary}
+
+Grants and handovers are transactions comparing the `mod_revision` of the shard key and the epoch key. Members are keys on two etcd leases (suspicion and failure time), so a member is active, suspect or failed by which of its keys etcd still holds. View versions are etcd revisions, taken only when the view changes.
+
+## Kubernetes grants expire by observation
+
+A node takes a shard another node holds in Kubernetes only after seeing the holder's record unchanged for a whole term on its own monotonic clock, as client-go leader election does.
+
+- motivated_by:: [[constraints#Kubernetes stores leases but does not expire them]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Clock skew beyond the safety margin breaks lease exclusivity]] {weight: secondary}
+
+The node first saw the record after the holder sent that renewal, so the holder's local deadline has passed by then whatever the wall clocks say. `leaseTransitions` is the epoch and every write carries the `resourceVersion` read. Any node seeing a member's heartbeat unchanged for the suspicion or failure time writes the new status, guarded the same way, so a heartbeat in between wins.
+
+## An owner checks its standbys before writing its own copy
+
+Before a replicated append, the owner ships what its standbys lack and requires the quorum under its epoch; a standby that stored a newer epoch fences the owner, and an unreachable quorum stops the append, both before the owner writes.
+
+- motivated_by:: [[decisions#Unreplicated entries stay unreadable until the quorum catches up]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Fencing on appends and outbound frames]] {weight: secondary}
+
+A copy that only the owner holds can still arise from a race between the check and the shipment, which the unreadable-until-caught-up rule covers; it no longer arises from a standby that was simply down or newer.
+
+## A standby's fence rises only with entries it stores
+
+A standby replica refuses batches below the highest epoch it accepted, but that epoch rises only when it stores entries, as a fenced journal store's does; a batch that only checks or catches up fences no one.
+
+- motivated_by:: [[decisions#Fencing on appends and outbound frames]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Fault-injection histories export as JSON lines]] {weight: secondary, note: "replicated histories then match the Lean model's single fenced store"}
+
+With replication factor 3 and every standby required, the replica set then fences exactly when the model's one store would.
+
+## A new owner replicates to the shard's current standbys
+
+`ClusterStorage` asks for a shard's standbys again whenever its node gets a new lease epoch on the shard, so after a failover or a move the new owner replicates to the next active members after itself.
+
+- motivated_by:: [[decisions#A free shard goes only to a node holding its journal]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Local shard journals shipped on move]] {weight: secondary}
+
+A member that replaces a failed standby receives the whole journal with the next shipment. With fewer live members than the replication factor, appends wait rather than acknowledge with fewer copies than configured: a three-node cluster with factor 3 stops writing a shard while one node is down.
+
+## Gossip leader epochs carry a per-start tag
+
+A gossip leader's epoch tag comes from its identifier and its start, and a node keeps the highest epochs it granted across its terms as leader, so a leader that restarted or lost and regained leadership never grants an epoch again.
+
+- motivated_by:: [[decisions#Fencing on appends and outbound frames]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Membership behind one trait]] {weight: secondary}
+
+The fault matrix found a restarted leader granting an epoch it had already granted, which no node it could reach remembered: two writers per epoch, which fencing cannot tell apart. Uniqueness across starts is by tag, so it is probabilistic over the 15-bit tag space, as uniqueness across leaders already was.
+
+## A leaving node ships each shard before handing it over
+
+A graceful leave drains each shard, ships it to its successor through `Drain::ship_shard` (for journals kept in local files), then hands the lease over; a shipment that fails stops the leave with the lease kept.
+
+- motivated_by:: [[decisions#Local shard journals shipped on move]] {weight: primary, since: "2026-11-11"}
+
+`NodeDrain::with_shipping` carries the shipment, which `ship_journal` does between stores; a network copy plugs in the same way.
+
+## Frames to other nodes are kept until settled
+
+With `ClusterNode::keep_outbound`, a frame handed to another node is stored in the sender's storage until it is settled, and a restarted node sends again what it kept.
+
+Settled means acknowledged, redirected, rejected or past its delivery deadline; the hand-off counts as done only once the frame is stored.
+
+- motivated_by:: [[decisions#At-least-once inside the cluster with journal deduplication]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary}
+
+The kept frame is the encoded frame itself, so a resend keeps its identifier and the fence it was produced under; receivers discard what they already stored. A stopped node (`ClusterNode::stop`) abandons its retries, as a crashed process does.
+
+## Container fault injection runs every node as a process
+
+The container harness runs each node as `vertep-fault-node` in its own container, with etcd or k3s beside them, and injects partitions, pauses, crashes and restarts through the container engine.
+
+- motivated_by:: [[decisions#Fault-injection histories export as JSON lines]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[constraints#The Docker Desktop kernel has no netem]] {weight: secondary}
+
+The world (client messages, the fenced store, receivers and the history) runs in the test process, so the history is checked and replayed through the Lean model exactly as the in-process one. One-way loss uses `tc netem` where the kernel has it and otherwise drops the node's side-effect datagrams at the receiver; clock skew runs one node's lease clock at half speed, since containers share the host kernel's clock.
+
 ## One worker hosts the core, the shell and the journal
 
 In a browser the whole actor system (core, shell, tiramemsu journal and the application's guards and actions) runs in one dedicated worker; the page holds a thin typed client (M6 design D1).
@@ -931,12 +1040,59 @@ Browser actors reach server actors through a WebSocket transport carrying Vertep
 - motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[constraints#Relays deliver at least once]] {weight: primary}
 
-Not implemented yet: tasks 7.1 to 7.5 of `m6-wasm-js` are open.
+Implemented 2026-11-11. The processor's type IRI is `vt:WebSocketEventProcessor` (alias `websocket`); received events carry it as `_event.origintype` and the sender actor's IRI as `_event.origin`. Frames are JSON: `hello` (node IRI, credential, hosted prefixes), `welcome` or `refused`, `message` (id, target, origin, event, payload, send id, correlation) and `ack`. The frames and the per-peer link live in `vertep-runtime::websocket`, shared by both ends; the server end is `vertep-runtime`'s `websocket` feature (tokio-tungstenite), so the default build and the WebAssembly builds stay without a WebSocket server. The browser end in `vertep-wasm` uses the platform `WebSocket` (browsers, Node.js 22 and later) and asks the main thread's credential provider before every connection. A refused credential rejects the pending JavaScript sends with `TransportRefused`, and an actor's send to the server becomes a dead letter with reason `transport-refused`.
+
+## WebSocket sends stay owed until the peer acknowledges them
+
+A send over WebSocket counts as delivered only when the peer's `ack` for its message id arrives; until then the link reports it undelivered, so the runtime's transactional outbox keeps it owed and retries it.
+
+- motivated_by:: [[decisions#WebSocket is a transport and an Event I/O Processor]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, note: "the outbox mark passes only delivered sends"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary}
+
+The link sends each message once per connection and again after every reconnect; receivers deduplicate by the journaled message id, so each side processes a message once. Holding the outbox mark until the acknowledgement makes redelivery survive a crash of the sender as well as a dropped connection, without a second queue. The cost is that the durable outbox mark trails delivery by up to one failure back-off. A send from JavaScript to a server actor does not go through an outbox: its Promise resolves on the acknowledgement.
 
 ## Separate packages keep the bundle budget
 
 `@vertep/web` ships a core build without SQLite and a journal build loaded only for journaled stores; the boa ECMAScript datamodel ships as `@vertep/dm-ecma`, a worker build the application passes in (M6 design D8).
 
 - motivated_by:: [[decisions#Pluggable datamodel]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Two storage traits with tiramemsu as default]] {weight: secondary, since: "2026-11-11", note: "SPARQL-only reads set the floor of the storage-free build"}
 
-Measured 2026-11-11 (release, opt-level z, LTO, gzip -9): core 1.14 MB against the 600 KB budget, journal 2.18 MB within 2.5 MB. The core build carries a SPARQL engine (the in-memory store), CEL with its regex engine, and the SCXML, YAML and RDF readers; meeting the budget needs one of them moved out of the core build.
+Measured 2026-11-11 (release, opt-level z, fat LTO, one codegen unit, gzip -9, WebAssembly plus glue plus client and worker JavaScript): core 1,159.7 KB (budget now 1.2 MB, formerly 600 KB), journal 2,198.0 KB within 2.5 MB. The core WebAssembly alone is 1,120 KB. The test-only exports moved to a test build saved 38 KB, and the WebSocket client added about 24 KB.
+
+The budget is out of reach while the spec holds. Probe builds of the WebAssembly alone show:
+
+- The core, the SCXML reader and CEL take 341 KB.
+- `vertep-store`'s in-memory store with its SPARQL engine (spargebra, spareval, regex, oxrdf) takes 637 KB on its own.
+- The two together take 785 KB, before the runtime, the YAML reader (56 KB) and the RDF chart reader (72 KB).
+
+SPARQL cannot leave the core build: `GraphStore` reads only through SPARQL, and the runtime itself queries its graphs for timers, store mailboxes and dead letters. `wasm-opt -Oz` makes the gzip larger (1,205 KB), and opt-level `s` or `2` are larger too.
+
+The storage-free budget was therefore raised from 600 KB to 1.2 MB gzip on 2026-11-11, by the user's choice, so the CI check passes and guards against growth. Reaching the original 600 KB needs a storage contract with a non-SPARQL read path and a lazily loaded SPARQL module, plus lazily loaded YAML and RDF readers: a change to the `storage` capability, left as follow-up work.
+
+## Test-only WebAssembly exports live in a test build
+
+Step traces, differential records and the W3C IRP suite runner are exported only by a test build of `vertep-wasm` (features `trace` and `conformance`). That build is written to `bindings/js/.native/wasm-test` and is never published.
+
+- motivated_by:: [[decisions#Separate packages keep the bundle budget]] {weight: primary, since: "2026-11-11"}
+
+The published core, journal and ECMAScript builds hold the same core and datamodels without the harnesses, which saves 38 KB gzip in the core build. The IRP runner takes the suite's documents as text because the target has no file system. It reuses `vertep-conformance`'s host and verdicts, and its verdicts must equal the native harness's.
+
+## Agent machines record their core macrosteps on request
+
+`AgentMachine::start_with` and `StartOptions::record_core` record each core macrostep of the actor's session with its answer tape (`CoreTape`, the `vertep-oracle` record format), so agent runs replay through the Lean oracle.
+
+- motivated_by:: [[decisions#The Lean model sees the datamodel as an answer tape]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary}
+
+Recording is opt-in, so `start` and hosts pay nothing. Only the core is recorded: offers, decision validation on the probe datamodel and `vt_usage` binding stay outside the session, and plan charts run their own sessions; the events the agent layer raises are the inputs of the macrosteps they cause. A macrostep that runs out of the microstep budget is recorded with its partial trace and flagged; `StartOptions::microstep_budget` lets generated runs use the small budget of the plain differential runs, so eventless loops end quickly.
+
+## The decision oracle checks payload conformance itself
+
+`vertep-decide` decides whether a decision payload conforms to the candidate's schema with its own port of the agent's payload validator, instead of taking the answer from the Rust run.
+
+- motivated_by:: [[decisions#Offer-time decider safety]] {weight: primary, since: "2026-11-11"}
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary}
+
+Each observation line carries the candidate's JSON Schema and the payload. The port covers the keywords of the type system's JSON Schema projection except `pattern`, which it reports as an input error, so the generated payload types avoid `decimal`, `datetime` and `iri`. Whether selection still takes the offered transition remains an answer from the Rust run.

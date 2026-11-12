@@ -587,6 +587,7 @@ theorem selected_conflictFree (hsym : ∀ x y, conflict x y = conflict y x) :
       exact hpw.2.1.1 y hy
 
 /-- **Selected transitions are distinct.** -/
+-- @tg: implements:: [[openspec:formal-model#Transition Selection Theorem]]
 theorem selected_nodup : (selectPure atomics cands p g conflict desc).Nodup :=
   (removeConflicting_inv conflict desc _
     (enabledOf_nodup (choicesP cands (fun i k t => p t && g i k) atomics 0))).nodup

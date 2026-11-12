@@ -24,6 +24,7 @@
 //! @tg: implements:: [[decisions#Offer-time decider safety]] {confidence: partial, note: "checked at runtime; the Lean theorem is owned by vertep-lean"}
 //! @tg: implements:: [[decisions#LLM calls as invoked actors first]]
 //! @tg: implements:: [[decisions#Plan charts may use the null datamodel]]
+//! @tg: implements:: [[decisions#Agent machines record their core macrosteps on request]]
 
 #[cfg(feature = "anthropic")]
 pub mod anthropic;
@@ -55,6 +56,8 @@ pub use llm::{
     ErrorClass, Provider, ProviderError, ProviderRegistry, ProviderRequest, ProviderResult,
     ScriptedProvider, Usage,
 };
-pub use machine::{AgentChart, AgentEffect, AgentMachine, ChartError, Record, UsageTotals};
+pub use machine::{
+    AgentChart, AgentEffect, AgentMachine, ChartError, CoreTape, Record, StartOptions, UsageTotals,
+};
 pub use plan::{AcceptedPlan, PlanBounds, PlanError, PlanErrorClass, PlanFormat};
 pub use tool::{Tool, ToolRegistry};

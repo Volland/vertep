@@ -47,6 +47,16 @@ impl Sys {
         &self.event.name
     }
 
+    /// `_event.origin` when `_event.originverified` is set: the sender DID the shell verified,
+    /// for guards that accept only a specific sender.
+    // @tg: implements:: [[openspec:did-identity#Authenticated Event Origin]]
+    pub fn verified_origin(&self) -> Option<&str> {
+        self.event
+            .originverified
+            .then_some(self.event.origin.as_deref())
+            .flatten()
+    }
+
     /// `_sessionid`.
     pub fn session_id(&self) -> &str {
         &self.info.sessionid

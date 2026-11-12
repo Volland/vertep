@@ -228,3 +228,47 @@ fn without_indirect_probes_a_cut_link_causes_suspicion() {
     });
     assert!(suspected, "the control run must see a false suspicion");
 }
+
+/// Acquires `shard` on `h`, running the network while the request is pending.
+fn acquire_on(net: &mut SimNetwork, h: &GossipMembership, shard: ShardId) -> Option<u64> {
+    for _ in 0..60 {
+        match h.acquire(shard) {
+            Ok(l) => return Some(l.epoch),
+            Err(LeaseError::Pending { .. } | LeaseError::Unavailable(_)) => {
+                net.run_for(Duration::from_millis(500));
+            }
+            Err(LeaseError::Held { .. }) => net.run_for(Duration::from_millis(500)),
+            Err(e) => panic!("{e}"),
+        }
+    }
+    None
+}
+
+#[test]
+fn a_restarted_leader_never_regrants_an_epoch_it_forgot() {
+    let mut h = GossipHarness::new(3);
+    let (n0, n1, n2) = (node("n0"), node("n1"), node("n2"));
+    let shard = ShardId::new(5);
+    // n2 hears nothing of the grant n0 (the leader) makes to n1
+    h.net.cut(&n2, &n0);
+    h.net.cut(&n2, &n1);
+    let first = acquire_on(&mut h.net, &h.nodes[1].clone(), shard).expect("granted to n1");
+    // n0 crashes before anyone else learns of it; it restarts and joins through n2, still
+    // cut off from n1, which is the only other node that knows the epoch
+    h.net.crash(&n0);
+    h.net.run_for(Duration::from_secs(2));
+    h.net.reconnect(&n2);
+    h.net.cut(&n1, &n0);
+    h.net.cut(&n1, &n2);
+    let n0h = h
+        .net
+        .restart(&meta(64), &n0, GossipConfig::default(), &endpoint(2))
+        .expect("restarted");
+    h.net.run_for(Duration::from_secs(3));
+    assert_eq!(n0h.node().leader(), Some(n0.clone()), "n0 leads again");
+    let second = acquire_on(&mut h.net, &h.nodes[2].clone(), shard).expect("granted to n2");
+    assert_ne!(
+        second, first,
+        "epoch {first} was granted to n1 before the restart; n2 must get another"
+    );
+}

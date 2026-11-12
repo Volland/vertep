@@ -85,7 +85,7 @@ pub fn receiver() -> Chart {
         r##"<datamodel><data id="approver" expr="''"/></datamodel>
             <state id="idle">
               <transition event="set.approver"><assign location="approver" expr="_event.data"/></transition>
-              <transition event="approve" cond="_event.origin === approver" target="approved"/>
+              <transition event="approve" cond="_event.originverified &amp;&amp; _event.origin === approver" target="approved"/>
               <transition event="*"/>
             </state>
             <state id="approved"><transition event="*"/></state>"##,

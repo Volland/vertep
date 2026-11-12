@@ -227,6 +227,7 @@ fn event_value(e: &Event) -> Value {
         ("sendid".to_string(), opt(&e.sendid)),
         ("origin".to_string(), opt(&e.origin)),
         ("origintype".to_string(), opt(&e.origintype)),
+        ("originverified".to_string(), Value::Bool(e.originverified)),
         ("invokeid".to_string(), opt(&e.invokeid)),
         ("data".to_string(), e.data.clone()),
     ])
@@ -642,5 +643,32 @@ mod tests {
         );
         assert_eq!(parse_literal("ctx.total"), None);
         assert_eq!(parse_literal("truex"), None);
+    }
+
+    struct NoStates;
+    impl StateQuery for NoStates {
+        fn in_state(&self, _id: &str) -> bool {
+            false
+        }
+    }
+
+    // @tg: verifies:: [[openspec:did-identity#Authenticated Event Origin#Verified sender]] {level: unit}
+    #[test]
+    fn verified_origin_is_exposed() {
+        use vertep_core::datamodel::EventType;
+        let approver = "did:key:z6MkApprover";
+        let mut dm = RustDatamodel::<DynContext>::new(Arc::new(Registry::new()));
+        dm.set_event(&Event::named("approve", EventType::External).with_verified_origin(approver));
+        assert_eq!(dm.eval_cond("_event.originverified", &NoStates), Ok(true));
+        assert_eq!(
+            dm.eval_value("_event.origin", &NoStates),
+            Ok(Value::String(approver.into()))
+        );
+        assert_eq!(dm.sys().verified_origin(), Some(approver));
+        let mut claimed = Event::named("approve", EventType::External);
+        claimed.origin = Some(approver.into());
+        dm.set_event(&claimed);
+        assert_eq!(dm.eval_cond("_event.originverified", &NoStates), Ok(false));
+        assert_eq!(dm.sys().verified_origin(), None);
     }
 }

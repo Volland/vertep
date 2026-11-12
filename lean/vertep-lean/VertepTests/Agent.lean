@@ -1,4 +1,5 @@
 import VertepLean.AgentTheorems
+import VertepLean.DecideCheck
 
 /-!
 # Decide states and grants
@@ -85,5 +86,22 @@ def grantChecks : Bool :=
       [⟨.named "search", "q"⟩, ⟨.itself, "error.communication"⟩, ⟨.parent, "vt.grant.denied"⟩,
        ⟨.parent, "done"⟩]
 #guard grantChecks
+
+/-- The payload checker of `vertep-decide` on schemas of the type system's JSON Schema
+projection: a closed record, `int` bounds, `optional`, a union and a named type. -/
+def conformsChecks : Bool :=
+  let ok (s p : String) : Bool := match Lean.Json.parse s, Lean.Json.parse p with
+    | .ok s, .ok p => (Check.conformsJson s p).toOption == some true
+    | _, _ => false
+  let rec_ := "{\"type\":\"object\",\"properties\":{\"n\":{\"type\":\"integer\",\"minimum\":-9223372036854775808,\"exclusiveMaximum\":9223372036854775808},\"b\":{\"anyOf\":[{\"type\":\"null\"},{\"type\":\"boolean\"}]}},\"required\":[\"n\"],\"additionalProperties\":false}"
+  let union := "{\"anyOf\":[{\"type\":\"object\",\"properties\":{\"tag\":{\"const\":\"ok\"},\"value\":{\"type\":\"string\"}},\"required\":[\"tag\",\"value\"],\"additionalProperties\":false},{\"type\":\"object\",\"properties\":{\"tag\":{\"const\":\"none\"}},\"required\":[\"tag\"],\"additionalProperties\":false}]}"
+  let named := "{\"$ref\":\"#/$defs/L\",\"$defs\":{\"L\":{\"type\":\"array\",\"items\":{\"type\":\"number\"}}}}"
+  ok rec_ "{\"n\":3}" && ok rec_ "{\"n\":3.0,\"b\":true}" && !ok rec_ "{\"n\":1.5}" &&
+    !ok rec_ "{}" && !ok rec_ "{\"n\":1,\"x\":1}" && !ok rec_ "{\"n\":1,\"b\":2}" &&
+    !ok rec_ "null" && ok union "{\"tag\":\"none\"}" && ok union "{\"tag\":\"ok\",\"value\":\"v\"}" &&
+    !ok union "{\"tag\":\"ok\"}" && !ok union "{\"tag\":\"bad\"}" && ok named "[1, 2.5]" &&
+    !ok named "[1, \"x\"]" && ok "{}" "null" && !ok "{\"type\":\"null\"}" "1" &&
+    (Check.conformsJson (.str "x") (.str "y")).toOption == some true
+#guard conformsChecks
 
 end Vertep.Agent.Test

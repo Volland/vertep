@@ -4,8 +4,11 @@
 #   core     packages/web/wasm/core      core, shell, null/cel/rust datamodels, in-memory store
 #   journal  packages/web/wasm/journal   + tiramemsu on SQLite in WebAssembly (lazy-loaded)
 #   ecma     packages/dm-ecma/wasm       + the boa ECMAScript datamodel (separate package)
+#   test     .native/wasm-test           + the test-only exports (traces, differential records,
+#                                          the W3C IRP suite runner); never published
 #
-# and the native helper `vertep-wasm-native` the native-versus-WebAssembly tests compare with.
+# and the native helper `vertep-wasm-native` the native-versus-WebAssembly tests compare with
+# (it also hosts the WebSocket server of the end-to-end tests).
 # Needs the wasm32-unknown-unknown target and the wasm-bindgen CLI at the version pinned in
 # crates/vertep-wasm/Cargo.toml. Set VERTEP_PROFILE=dev for a fast unoptimised build.
 set -eu
@@ -50,10 +53,11 @@ build "" "$here/packages/web/wasm/core"
 build journal "$here/packages/web/wasm/journal"
 if [ "${VERTEP_SKIP_ECMA:-0}" != 1 ]; then
   build "journal,ecmascript" "$here/packages/dm-ecma/wasm"
+  build "journal,ecmascript,conformance" "$here/.native/wasm-test"
 fi
 
 echo "building the native helper and vt" >&2
-cargo build -p vertep-wasm --features journal,ecmascript --bin vertep-wasm-native
+cargo build -p vertep-wasm --features journal,ecmascript,conformance --bin vertep-wasm-native
 cargo build -p vertep-cli --bin vt
 mkdir -p "$here/.native"
 cp "$CARGO_TARGET_DIR/debug/vertep-wasm-native" "$here/.native/vertep-wasm-native"

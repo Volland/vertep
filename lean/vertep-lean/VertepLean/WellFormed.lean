@@ -167,6 +167,7 @@ def branchesOkB : List (Option Expr × List Exec) → Bool
 end
 
 mutual
+-- @tg: implements:: [[openspec:formal-model#IR Model In Lean]]
 theorem execOkB_iff : ∀ e : Exec, execOkB e = true ↔ ExecOk e
   | .mk k _ => by simp only [execOkB, ExecOk]; exact execKindOkB_iff k
 theorem execKindOkB_iff : ∀ k : ExecKind, execKindOkB k = true ↔ ExecKindOk k

@@ -25,6 +25,7 @@ export type {
   TransitionInfo,
   TransitionNotice,
   Unsubscribe,
+  WebSocketTransportOptions,
 } from "./client.js";
 export { VertepError } from "./errors.js";
 export type { ErrorCode, Violation } from "./errors.js";

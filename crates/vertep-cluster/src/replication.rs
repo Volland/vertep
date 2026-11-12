@@ -52,6 +52,22 @@ pub fn replica_set(view: &View, count: ShardCount, rf: u32) -> BTreeMap<ShardId,
     out
 }
 
+/// The standbys of a shard owned by `owner` under `view`: the next `rf - 1` active members
+/// after the owner in identifier order, wrapping (fewer when fewer are active). A new owner
+/// replicates to these, so after a failover a member replaces the failed one.
+pub fn standbys_of(view: &View, owner: &NodeId, rf: u32) -> Vec<NodeId> {
+    let mut members: Vec<NodeId> = view.active().map(|m| m.id.clone()).collect();
+    if !members.contains(owner) {
+        members.push(owner.clone());
+        members.sort();
+    }
+    let at = members.iter().position(|m| m == owner).unwrap_or(0);
+    let k = (rf.max(1) as usize).min(members.len());
+    (1..k)
+        .map(|i| members[(at + i) % members.len()].clone())
+        .collect()
+}
+
 /// Whether a node may take a free shard: only when it holds the shard's journal (it owned
 /// the shard, received it by shipping, or keeps a replica of it) or the shard was never
 /// owned. With a replication factor of one this keeps a failed owner's shards unavailable
@@ -173,7 +189,7 @@ impl<J: JournalStore> StandbyReplica<J> {
     }
 
     /// Stores `batch`: entries the replica already holds are checked and skipped, the rest
-    /// appended in order under the batch's epoch.
+    /// appended in order under the batch's epoch, which then becomes the replica's fence.
     ///
     /// # Errors
     ///
@@ -197,7 +213,6 @@ impl<J: JournalStore> StandbyReplica<J> {
                 highest: *highest,
             });
         }
-        *highest = batch.fence.epoch;
         let store_err = |e: StoreError| ReplicaError::Store(e.to_string());
         let mut head = self.store.head(&batch.actor).map_err(store_err)?;
         if head < batch.after {
@@ -230,6 +245,10 @@ impl<J: JournalStore> StandbyReplica<J> {
                     }
                     other => ReplicaError::Store(other.to_string()),
                 })?;
+            // like a fenced journal store, the replica's fence rises with the entries it
+            // stores; a batch that only checks the replica (an owner's pre-flight, a catch-up
+            // with nothing new) does not fence anyone
+            *highest = batch.fence.epoch;
         }
         Ok(head)
     }
@@ -301,7 +320,7 @@ struct Shipping {
 // @tg: implements:: [[openspec:shard-placement#Journal Replication To Standbys]]
 pub struct ReplicatedJournal<J, M: ?Sized> {
     inner: ShardJournal<J, M>,
-    standbys: Vec<Arc<dyn StandbyLink>>,
+    standbys: Mutex<Vec<Arc<dyn StandbyLink>>>,
     required: usize,
     state: Mutex<Shipping>,
 }
@@ -324,7 +343,7 @@ impl<J: JournalStore, M: Membership + ?Sized> ReplicatedJournal<J, M> {
     ) -> Self {
         ReplicatedJournal {
             inner,
-            standbys,
+            standbys: Mutex::new(standbys),
             required,
             state: Mutex::new(Shipping {
                 acked: BTreeMap::new(),
@@ -338,6 +357,30 @@ impl<J: JournalStore, M: Membership + ?Sized> ReplicatedJournal<J, M> {
         &self.inner
     }
 
+    /// Replicates to `standbys` from now on: what a new owner does when it takes the shard
+    /// (the shard's current standbys, see [`standbys_of`]). A standby new to the journal gets
+    /// the whole journal with the next shipment.
+    pub fn set_standbys(&self, standbys: Vec<Arc<dyn StandbyLink>>) {
+        let nodes: BTreeSet<NodeId> = standbys.iter().map(|l| l.node().clone()).collect();
+        self.lock().acked.retain(|(n, _), _| nodes.contains(n));
+        *self
+            .standbys
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = standbys;
+    }
+
+    /// The standbys this journal replicates to.
+    pub fn standbys(&self) -> Vec<NodeId> {
+        self.links().iter().map(|l| l.node().clone()).collect()
+    }
+
+    fn links(&self) -> Vec<Arc<dyn StandbyLink>> {
+        self.standbys
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
     fn lock(&self) -> MutexGuard<'_, Shipping> {
         self.state
             .lock()
@@ -346,12 +389,19 @@ impl<J: JournalStore, M: Membership + ?Sized> ReplicatedJournal<J, M> {
 
     /// Ships `actor`'s suffix to every standby; returns how many hold the whole journal.
     fn ship(&self, actor: &NamedNode) -> Result<usize, StoreError> {
+        Ok(self.ship_fenced(actor)?.0)
+    }
+
+    /// Ships `actor`'s suffix to every standby; returns how many hold the whole journal, and
+    /// the highest epoch of a standby that fenced the batch, if one did.
+    fn ship_fenced(&self, actor: &NamedNode) -> Result<(usize, Option<u64>), StoreError> {
         let Some(fence) = self.inner.fence() else {
-            return Ok(0);
+            return Ok((0, None));
         };
         let head = self.inner.store().head(actor)?;
         let mut acks = 0;
-        for link in &self.standbys {
+        let mut fenced = None;
+        for link in &self.links() {
             let key = (link.node().clone(), actor.clone());
             let mut from = self
                 .lock()
@@ -382,11 +432,44 @@ impl<J: JournalStore, M: Membership + ?Sized> ReplicatedJournal<J, M> {
                         break;
                     }
                     Err(ReplicaError::Behind { head }) => from = head,
+                    Err(ReplicaError::Fenced { highest, .. }) => {
+                        fenced = Some(fenced.map_or(highest, |h: u64| h.max(highest)));
+                        break;
+                    }
                     Err(_) => break,
                 }
             }
         }
-        Ok(acks)
+        Ok((acks, fenced))
+    }
+
+    /// Before the owner writes its own copy: brings the standbys level with it and checks that
+    /// `required` of them hold the whole journal under the owner's epoch. A standby that has
+    /// seen a newer epoch fences the owner, and an unreachable quorum stops the append, both
+    /// before anything is written, so the owner's copy never gets an entry the standbys refused.
+    fn prepare(&self, actor: &NamedNode) -> Result<(), AppendError> {
+        if self.required == 0 {
+            return Ok(());
+        }
+        let Some(fence) = self.inner.fence() else {
+            return Ok(()); // no lease: the fenced journal refuses the append itself
+        };
+        let (acks, fenced) = self.ship_fenced(actor).map_err(AppendError::Storage)?;
+        if let Some(highest) = fenced {
+            self.inner.superseded();
+            return Err(AppendError::Fenced {
+                scope: self.inner.scope(),
+                epoch: fence.epoch,
+                highest,
+            });
+        }
+        if acks < self.required {
+            return Err(AppendError::Storage(StoreError::Unavailable(format!(
+                "replication quorum unreachable: {acks} of {} standbys hold the journal of {actor}",
+                self.required
+            ))));
+        }
+        Ok(())
     }
 
     /// Ships what the standbys lack of `actor`'s journal; once the quorum holds all of it the
@@ -428,6 +511,7 @@ impl<J: JournalStore, M: Membership + ?Sized> JournalStore for ReplicatedJournal
         meta: &AppendMeta,
     ) -> Result<Position, AppendError> {
         self.usable(actor).map_err(AppendError::Storage)?;
+        self.prepare(actor)?;
         let pos = self.inner.append(actor, expected, entries, meta)?;
         let acks = self.ship(actor).map_err(AppendError::Storage)?;
         if acks < self.required {

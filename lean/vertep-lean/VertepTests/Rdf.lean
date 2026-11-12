@@ -30,6 +30,12 @@ def roundTrips (c : Chart) : Bool :=
 #guard [initialEntry, descendantWins, exitOrder, historyChart .deep, historyChart .shallow, finals,
   sends, ecmaChart, nullIn, internalTr .internal, wfChart, parallelTargets].all roundTrips
 
+/-- Reconstruction after projection is the identity on every well-formed chart, under any base
+(the RDF Round Trip Theorem, used on a test chart the decision procedure accepts). -/
+-- @tg: verifies:: [[openspec:formal-model#RDF Round Trip Theorem#Round trip]] {level: unit}
+example (base : String) : fromRDF (project wfChart base) = .ok (wfChart, base) :=
+  fromRDF_project wfChart ((checkWF_iff wfChart).1 (by decide)) base
+
 /-- The canonical form is a function of the chart. -/
 -- @tg: verifies:: [[openspec:formal-model#RDF Round Trip Theorem#Canonical form determined by the chart]] {level: unit}
 theorem canonical_form_determined (c₁ c₂ : Chart) (h : c₁ = c₂) :

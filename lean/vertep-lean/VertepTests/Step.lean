@@ -135,6 +135,37 @@ def historyChart (h : HistoryType) : Chart :=
 #guard idsAfter (historyChart .deep) ["next", "out", "back"] == ["a", "a2", "a2y"]
 #guard idsAfter (historyChart .shallow) ["back"] == ["a", "a1"]
 
+/-- Regression (found by the Configuration Well-Formedness proof): a transition from inside a
+parallel state with one region to its deep history, before any history is recorded, exits the
+parallel state and must enter it again. With the domain recomputed on entry from the history
+just recorded (Appendix D), the session ended in `["a", "a1"]` with `p` inactive; Rust test
+`deep_history_of_single_region_parallel_reenters_the_parallel`. -/
+def singleRegionDeepHistory : Chart :=
+  { states := [node "p" .parallel [node "h" (.history .deep),
+                 node "a" (children := [node "a1" (ts := [tr ["e"] ["h"]]), node "a2"])]] }
+#guard checkWF singleRegionDeepHistory
+#guard idsAfter singleRegionDeepHistory ["e"] == ["p", "a", "a1"]
+#guard idsAfter singleRegionDeepHistory ["e", "e"] == ["p", "a", "a1"]
+
+/-- A history state with an explicit default transition. -/
+def histNode (id : String) (h : HistoryType) (targets : List String) : State :=
+  .mk id false (.history h) [] none [] [tr [] targets] [] [] [] [] none []
+
+/-- Regression (found by the Configuration Well-Formedness proof): `P`'s history defaults to
+`A1`, deep inside region `R1` of the parallel `Q`; the transition `A2 -> h` has domain `A`, below
+`P`, so only `A2` is exited. Entering the default with its ancestors up to `P` (Appendix D)
+entered `Q` again and completed `R2` by default next to the active `B2`; the entry now stops at
+the domain. Rust test `history_entry_stops_at_the_transition_domain`. -/
+def historyBelowDomain : Chart :=
+  { states := [node "P" (children := [histNode "h" .deep ["A1"],
+      node "Q" .parallel [
+        node "R1" (children := [node "A" (children := [node "A1" (ts := [tr ["g"] ["A2"]]),
+                                                       node "A2" (ts := [tr ["e"] ["h"]])])]),
+        node "R2" (children := [node "B1" (ts := [tr ["f"] ["B2"]]), node "B2"])]])] }
+#guard checkWF historyBelowDomain
+#guard idsAfter historyBelowDomain ["f", "g"] == ["P", "Q", "R1", "A", "A2", "R2", "B2"]
+#guard idsAfter historyBelowDomain ["f", "g", "e"] == ["P", "Q", "R1", "A", "A1", "R2", "B2"]
+
 /-- Final states: `done.state.a` is raised and handled; a top-level final ends the session. -/
 def finals : Chart :=
   { states := [node "a" (children := [node "a1" (ts := [tr ["e"] ["f"]]), node "f" .final])

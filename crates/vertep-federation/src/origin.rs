@@ -8,9 +8,8 @@
 //! journal.
 //!
 //! The verification outcome is an input (design D4): the runtime journals the
-//! [`VerifiedOrigin`] with the event and replays from it without re-verifying. `vertep-core`'s
-//! `_event` gains one field for the verified flag; until it exists, [`VerifiedOrigin::apply`]
-//! sets `origin` and `origintype` only.
+//! [`VerifiedOrigin`] with the event and replays from it without re-verifying. The pure core
+//! sees `_event.origin` plus `_event.originverified`, which [`VerifiedOrigin::apply`] sets.
 
 use std::fmt;
 
@@ -60,15 +59,15 @@ impl VerifiedOrigin {
         }
     }
 
-    /// Sets `_event.origin` to the verified sender DID (or clears it) and `_event.origintype`
-    /// to the I/O processor. Nothing from the envelope body reaches these fields.
+    /// Sets `_event.origin` to the verified sender DID (or clears it), `_event.originverified`
+    /// to the verification outcome and `_event.origintype` to the I/O processor. Nothing from
+    /// the envelope body reaches these fields.
     // @tg: implements:: [[openspec:did-identity#Authenticated Event Origin]]
+    // @tg: implements:: [[openspec:did-identity#Unauthenticated Event Marking]]
     pub fn apply(&self, event: &mut Event) {
-        event.origin = if self.verified {
-            self.sender.clone()
-        } else {
-            None
-        };
+        let verified = self.verified && self.sender.is_some();
+        event.origin = if verified { self.sender.clone() } else { None };
+        event.originverified = verified;
         event.origintype = Some(self.io_processor.clone());
     }
 }

@@ -8,7 +8,7 @@ use std::time::Duration;
 use vertep_cluster::runtime::{ClusterConfig, ClusterNode, ClusterStorage, MemoryWire, Wire};
 use vertep_cluster::{
     AuthorityMembership, ClusterMeta, LocalStandby, ManualClock, Membership, MemoryAuthority,
-    NodeId, ShardId, StandbyLink, StandbyReplica, StaticConfig, replica_set,
+    NodeId, ShardId, StandbyLink, StandbyReplica, StaticConfig, replica_set, standbys_of,
 };
 use vertep_core::datamodel::{Event, EventType};
 use vertep_core::ir::Chart;
@@ -75,6 +75,7 @@ pub struct Member {
 
 /// A runtime cluster.
 pub struct Cluster {
+    pub config: ClusterConfig,
     pub meta: ClusterMeta,
     pub clock: ManualClock,
     pub authority: Arc<MemoryAuthority>,
@@ -164,35 +165,48 @@ impl Cluster {
             membership.poll().unwrap();
             let cluster = ClusterNode::new(membership.clone() as Arc<dyn Membership>, config);
             wire.connect(&cluster);
+            // a link from this member to every member's replica of every shard
+            let to: Vec<Vec<Arc<LocalStandby<Arc<MemoryStore>>>>> = ids
+                .iter()
+                .enumerate()
+                .map(|(j, other)| {
+                    (0..shards as usize)
+                        .map(|s| Arc::new(LocalStandby::new(other.clone(), replicas[j][s].clone())))
+                        .collect()
+                })
+                .collect();
+            // the links of the shards it owns from the start
             let mut links: Vec<Vec<Arc<LocalStandby<Arc<MemoryStore>>>>> =
                 vec![Vec::new(); shards as usize];
             for (s, set) in &sets {
                 if set.first() == Some(id) {
                     for standby in &set[1..] {
                         let j = ids.iter().position(|x| x == standby).unwrap();
-                        links[s.index()].push(Arc::new(LocalStandby::new(
-                            standby.clone(),
-                            replicas[j][s.index()].clone(),
-                        )));
+                        links[s.index()].push(to[j][s.index()].clone());
                     }
                 }
             }
             let required = rf.saturating_sub(1) as usize;
-            let by_shard = links.clone();
+            // whenever it gets a new lease on a shard: the shard's current standbys
+            let (current, me, all) = (membership.clone(), id.clone(), ids.clone());
             let storage = Arc::new(
                 ClusterStorage::with_standbys(
                     membership.clone() as Arc<dyn Membership>,
                     stores[i].clone(),
                     move |s| {
-                        by_shard[s.index()]
+                        standbys_of(&current.view(), &me, rf)
                             .iter()
-                            .map(|l| l.clone() as Arc<dyn StandbyLink>)
+                            .map(|n| {
+                                let j = all.iter().position(|x| x == n).unwrap();
+                                to[j][s.index()].clone() as Arc<dyn StandbyLink>
+                            })
                             .collect()
                     },
                     required,
                 )
                 .unwrap(),
             );
+            cluster.keep_outbound(storage.clone() as Arc<dyn Storage>);
             let node = runtime_node(membership.clone(), &cluster, storage.clone());
             members.push(Member {
                 id: id.clone(),
@@ -206,6 +220,7 @@ impl Cluster {
             });
         }
         let mut c = Cluster {
+            config,
             meta: static_config.meta.clone(),
             clock,
             authority,
@@ -303,6 +318,25 @@ impl Cluster {
                 self.members[i].cluster.refresh();
             }
         }
+    }
+
+    /// Restarts member `i` as a new process over the same membership and storage: its
+    /// cluster side and runtime node are dropped (with whatever they held in memory) and built
+    /// again; chart types must be registered again.
+    pub fn restart(&mut self, i: usize) -> Arc<ClusterNode> {
+        let m = &mut self.members[i];
+        m.cluster.stop();
+        let cluster = ClusterNode::new(m.membership.clone() as Arc<dyn Membership>, self.config);
+        self.wire.connect(&cluster);
+        let node = runtime_node(m.membership.clone(), &cluster, m.storage.clone());
+        m.cluster = cluster.clone();
+        m.node = node;
+        let storage = m.storage.clone();
+        cluster.keep_outbound(storage.clone() as Arc<dyn Storage>);
+        cluster.claim(&|s| storage.holds_journal(s));
+        cluster.refresh();
+        cluster.resume_outbound();
+        cluster
     }
 
     /// The wire as a trait object.

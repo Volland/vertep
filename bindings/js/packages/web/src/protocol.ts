@@ -29,12 +29,27 @@ export interface InitOptions {
   build?: BuildRef;
   /** Charts registered before the first scheduling round. */
   charts?: { source: string; format?: string; type?: string }[];
+  /** The WebSocket transport (the credential provider stays on the main thread). */
+  websocket?: WebSocketInit;
+}
+
+/** The WebSocket transport as the worker gets it. */
+export interface WebSocketInit {
+  url: string;
+  node?: string;
+  targets?: string[];
+  hosts?: string[];
+  reconnectMs?: number;
+  /** Whether the main thread has a credential provider to ask (`credential` messages). */
+  credentials: boolean;
 }
 
 /** Main thread to worker. */
 export type ToWorker =
   | { t: "init"; options: InitOptions }
-  | { t: "call"; id: number; op: string; args: unknown };
+  | { t: "call"; id: number; op: string; args: unknown }
+  | { t: "credential"; id: number; ok: true; value: string | null }
+  | { t: "credential"; id: number; ok: false; error: WireError };
 
 /** Worker to main thread. */
 export type FromWorker =
@@ -42,7 +57,8 @@ export type FromWorker =
   | { t: "fatal"; error: WireError }
   | { t: "reply"; id: number; ok: true; value: unknown }
   | { t: "reply"; id: number; ok: false; error: WireError }
-  | { t: "notify"; payload: Notification };
+  | { t: "notify"; payload: Notification }
+  | { t: "credential"; id: number };
 
 /** A notification from the actor system. */
 export type Notification =
@@ -55,7 +71,8 @@ export type Notification =
       event: EventData;
       transitions: TransitionData[];
     }
-  | { kind: "impurity"; address: string; position: number; message: string };
+  | { kind: "impurity"; address: string; position: number; message: string }
+  | { kind: "delivery"; messageId: string; ok: boolean; error?: WireError };
 
 /** A snapshot as the worker sends it. */
 export interface SnapshotData {

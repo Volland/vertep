@@ -380,6 +380,7 @@ fn guard_accepts_only_a_specific_sender() {
         got.last().and_then(|e| e.origin.as_deref()),
         Some(p.a_id.did.as_str())
     );
+    assert!(got.last().is_some_and(|e| e.originverified));
     assert_eq!(
         p.b.node.state(&b).expect("state").configuration,
         vec!["idle"]
@@ -482,6 +483,10 @@ fn replay_after_key_rotation() {
         approve.origin.as_deref(),
         Some(a_did),
         "origin as recorded at receipt"
+    );
+    assert!(
+        approve.originverified,
+        "verified flag as recorded at receipt"
     );
     assert_eq!(approve.origintype.as_deref(), Some(DIDCOMM_PROCESSOR));
 }

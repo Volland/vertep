@@ -790,10 +790,11 @@ def insertSorted (x : Nat) : List Nat → List Nat
 /-- Run the body of transition `t`. -/
 def runTrans (t : Nat) : M cc Unit := liftE cc (execTop cc (cc.tr t).body (cc.tr_locs t))
 
-/-- Appendix D `enterStates` (Rust `enter_states`). -/
-def enterStates (ts : List Nat) : M cc Unit := do
+/-- Appendix D `enterStates` (Rust `enter_states`); `dhist` is the history the transitions'
+domains are computed under (the history before the exit, see `CChart.entrySet`). -/
+def enterStates (dhist : List (Nat × List Nat)) (ts : List Nat) : M cc Unit := do
   let core ← get
-  let some acc := cc.entrySet core.history ts
+  let some acc := cc.entrySet core.history dhist ts
     | throw (.illFormed "entry set recursion exhausted")
   for s in acc.toEnter.mergeSort (· ≤ ·) do
     modify fun core => { core with config := insertSorted s core.config,
@@ -841,9 +842,10 @@ def charge : M cc Bool := do
 def microstep (ev : Option String) (ts : List Nat) : M cc Unit := do
   if !(← charge cc) then return
   record cc ev ts
+  let dhist := (← get).history
   exitStates cc ts
   for t in ts do runTrans cc t
-  enterStates cc ts
+  enterStates cc dhist ts
 
 /-- Rust `start_invokes`: the states entered in this macrostep, in entry order. -/
 def startInvokes : M cc Unit := do
@@ -965,7 +967,7 @@ def runStart (invoker : List (String × Value)) : M cc Unit := do
     | none => liftE cc (queueError cc)
   | none => pure ()
   match (cc.st 0).initial with
-  | some t => enterStates cc [t]
+  | some t => enterStates cc (← get).history [t]
   | none => pure ()
   runMacrostep cc
 

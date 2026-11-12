@@ -76,6 +76,13 @@ pub struct Event {
     pub origin: Option<String>,
     /// `origintype`.
     pub origintype: Option<String>,
+    /// `originverified`: true only when the shell verified the sender's authentication against
+    /// its resolved DID document before the event entered the session, so `origin` is that
+    /// sender's DID. False for every other event, including runtime-assigned origins inside a
+    /// trusted cluster and anonymous senders. Absent in older journals and tapes, where it reads
+    /// as false.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub originverified: bool,
     /// `invokeid`.
     pub invokeid: Option<String>,
     /// `data`.
@@ -90,6 +97,15 @@ impl Event {
             type_,
             ..Event::default()
         }
+    }
+
+    /// This event with `origin` set to a sender DID the shell verified, and the verified flag
+    /// set ([[openspec:did-identity#Authenticated Event Origin]]).
+    // @tg: implements:: [[openspec:did-identity#Authenticated Event Origin]]
+    pub fn with_verified_origin(mut self, sender: impl Into<String>) -> Self {
+        self.origin = Some(sender.into());
+        self.originverified = true;
+        self
     }
 }
 

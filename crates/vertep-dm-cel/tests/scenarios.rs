@@ -154,6 +154,27 @@ fn guard_reads_event_data_and_context() {
     );
 }
 
+// @tg: verifies:: [[openspec:did-identity#Authenticated Event Origin#Guard accepts only a specific sender]] {level: unit}
+#[test]
+fn guard_reads_the_verified_origin() {
+    let guard = "ev.originverified && ev.origin == 'did:key:z6MkApprover'";
+    let mut dm = fresh();
+    let approve = event("approve", Value::Undefined);
+    dm.set_event(&approve.clone().with_verified_origin("did:key:z6MkApprover"));
+    assert!(dm.eval_cond(guard, &none()).unwrap());
+    let mut restored = CelDatamodel::default();
+    restored.restore(&dm.snapshot()).unwrap();
+    assert!(restored.eval_cond(guard, &none()).unwrap());
+    // A claimed but unverified origin, and another verified sender, fail the guard.
+    let mut claimed = approve.clone();
+    claimed.origin = Some("did:key:z6MkApprover".into());
+    dm.set_event(&claimed);
+    assert!(!dm.eval_cond(guard, &none()).unwrap());
+    assert!(dm.eval_cond("ev.originverified == false", &none()).unwrap());
+    dm.set_event(&approve.with_verified_origin("did:key:z6MkOther"));
+    assert!(!dm.eval_cond(guard, &none()).unwrap());
+}
+
 // @tg: verifies:: [[openspec:cel-datamodel#CEL Evaluation Scope#In predicate]] {level: unit}
 #[test]
 fn in_predicate_answers_from_the_active_configuration() {

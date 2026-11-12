@@ -91,14 +91,18 @@ def eventTypeToJson : EventType → Json
 def eventFromJson (j : Json) : R Event := do
   pure { name := ← str j "name", type := ← eventTypeFromJson (← field j "type_"),
          sendid := ← optStr j "sendid", origin := ← optStr j "origin",
-         origintype := ← optStr j "origintype", invokeid := ← optStr j "invokeid",
+         origintype := ← optStr j "origintype",
+         originverified := ← match optField j "originverified" with
+           | some v => v.getBool?
+           | none => pure false,
+         invokeid := ← optStr j "invokeid",
          data := ← valueFromJson (← field j "data") }
 
 def eventToJson (e : Event) : Json :=
   .mkObj [("name", .str e.name), ("type_", eventTypeToJson e.type),
     ("sendid", optJ .str e.sendid), ("origin", optJ .str e.origin),
-    ("origintype", optJ .str e.origintype), ("invokeid", optJ .str e.invokeid),
-    ("data", valueToJson e.data)]
+    ("origintype", optJ .str e.origintype), ("originverified", .bool e.originverified),
+    ("invokeid", optJ .str e.invokeid), ("data", valueToJson e.data)]
 
 def infoFromJson (j : Json) : R SessionInfo := do
   pure { sessionid := ← str j "sessionid", name := ← optStr j "name",

@@ -262,6 +262,32 @@ fn event_fields_are_available() {
     );
 }
 
+// @tg: verifies:: [[openspec:did-identity#Authenticated Event Origin#Guard accepts only a specific sender]] {level: unit}
+#[test]
+fn verified_origin_flag_is_available_and_survives_a_snapshot() {
+    let approver = "did:key:z6MkApprover";
+    let guard = format!("_event.originverified === true && _event.origin === '{approver}'");
+    let mut dm = session();
+    dm.set_event(&Event::named("approve", EventType::External).with_verified_origin(approver));
+    assert_eq!(dm.eval_cond(&guard, &NONE), Ok(true));
+    let mut restored = EcmaDatamodel::new();
+    restored.restore(&dm.snapshot()).unwrap();
+    assert_eq!(restored.eval_cond(&guard, &NONE), Ok(true));
+    // The same DID claimed without verification, and another verified DID, fail the guard.
+    let mut claimed = Event::named("approve", EventType::External);
+    claimed.origin = Some(approver.into());
+    dm.set_event(&claimed);
+    assert_eq!(dm.eval_cond(&guard, &NONE), Ok(false));
+    assert_eq!(
+        dm.eval_cond("_event.originverified === false", &NONE),
+        Ok(true)
+    );
+    dm.set_event(
+        &Event::named("approve", EventType::External).with_verified_origin("did:key:z6MkOther"),
+    );
+    assert_eq!(dm.eval_cond(&guard, &NONE), Ok(false));
+}
+
 // @tg: verifies:: [[openspec:datamodel#System Variables#Assignment to a system variable]] {level: unit}
 #[test]
 fn assignment_to_a_system_variable_fails() {

@@ -10,12 +10,16 @@
  *   for a second holder) before opening the file.
  * - It imports the implementations module and binds its `guards` and `actions` exports as
  *   named functions, which steps call synchronously in this thread.
+ * - With `transports.websocket` it connects the WebSocket Event I/O Processor, asking the main
+ *   thread's credential provider before each connection; a `send` to a server actor replies
+ *   once the server acknowledged it, or fails with `TransportRefused`.
  */
 // @tg: implements:: [[openspec:wasm-bindings#Worker-Hosted Actor System]]
 // @tg: implements:: [[openspec:wasm-bindings#Browser Journal Storage]] {confidence: partial, note: "storage choice, OPFS probe and Web Lock in the worker"}
 // @tg: implements:: [[openspec:wasm-bindings#Bundle Size Budget]] {confidence: partial, note: "the SQLite build is loaded only for journaled stores"}
+// @tg: implements:: [[openspec:wasm-bindings#Server Interop Over WebSocket]] {confidence: partial, note: "credential provider round trip and acknowledged sends"}
 
-import { VertepError, toWire } from "./errors.js";
+import { VertepError, fromWire, toWire } from "./errors.js";
 import type { BuildRef, FromWorker, InitOptions, ToWorker } from "./protocol.js";
 import { type Release, takeStoreLock } from "./locks.js";
 
@@ -24,6 +28,7 @@ interface WasmActorSystem {
   request(to: string, event: string, timeoutMs: number): Promise<string>;
   exportJournal(): Uint8Array;
   onNotify(f: (n: string) => void): void;
+  connect(credentials?: () => Promise<string | null>): void;
   close(): void;
 }
 
@@ -153,6 +158,30 @@ async function main(): Promise<void> {
   const { post, listen } = await port();
   let system: WasmActorSystem | null = null;
   let release: Release | null = null;
+  // sends to server actors waiting for the server's acknowledgement, by message id
+  const deliveries = new Map<string, { resolve: () => void; reject: (e: unknown) => void }[]>();
+  // credential requests to the main thread, by id
+  const credentials = new Map<number, { resolve: (v: string | null) => void; reject: (e: unknown) => void }>();
+  let nextCredential = 1;
+  const askCredential = (): Promise<string | null> =>
+    new Promise((resolve, reject) => {
+      const id = nextCredential++;
+      credentials.set(id, { resolve, reject });
+      post({ t: "credential", id });
+    });
+  const notify = (text: string): void => {
+    const n = JSON.parse(text);
+    if (n.kind === "delivery") {
+      const waiting = deliveries.get(n.messageId) ?? [];
+      deliveries.delete(n.messageId);
+      for (const w of waiting) {
+        if (n.ok) w.resolve();
+        else w.reject(fromWire(n.error));
+      }
+      return;
+    }
+    post({ t: "notify", payload: n });
+  };
   const queue: ToWorker[] = [];
   let starting = true;
 
@@ -184,9 +213,13 @@ async function main(): Promise<void> {
           idleTimeoutMs: o.idleTimeoutMs,
           guards: impl?.guards ?? [],
           actions: impl?.actions ?? [],
+          websocket: o.websocket
+            ? { url: o.websocket.url, node: o.websocket.node, targets: o.websocket.targets, hosts: o.websocket.hosts, reconnectMs: o.websocket.reconnectMs }
+            : undefined,
         };
         system = await glue.ActorSystem.create(JSON.stringify(options), impl?.wrapper ?? null, o.import);
-        system.onNotify((n) => post({ t: "notify", payload: JSON.parse(n) }));
+        system.onNotify(notify);
+        if (o.websocket) system.connect(o.websocket.credentials ? askCredential : undefined);
         // the first command runs the first scheduling round, which fires overdue timers
         for (const c of o.charts ?? []) system.command("register", JSON.stringify(c));
         post({ t: "ready", build: o.build ? "custom" : journaled ? "journal" : "core", version: glue.version() });
@@ -196,6 +229,7 @@ async function main(): Promise<void> {
       }
       return;
     }
+    if (m.t !== "call") return;
     const { id, op, args } = m;
     try {
       if (!system) throw new VertepError("InvalidArgument", "the actor system is not started");
@@ -205,6 +239,17 @@ async function main(): Promise<void> {
         value = JSON.parse(await system.request(a.to, JSON.stringify(a.event), a.timeoutMs));
       } else if (op === "exportJournal") {
         value = system.exportJournal();
+      } else if (op === "send") {
+        const r = JSON.parse(system.command(op, JSON.stringify(args ?? {}))) as { messageId: string; pending?: boolean };
+        if (r.pending) {
+          // a server actor: done once the server acknowledged it
+          await new Promise<void>((resolve, reject) => {
+            const list = deliveries.get(r.messageId) ?? [];
+            list.push({ resolve, reject });
+            deliveries.set(r.messageId, list);
+          });
+        }
+        value = { messageId: r.messageId };
       } else if (op === "close") {
         system.close();
         await release?.();
@@ -220,6 +265,13 @@ async function main(): Promise<void> {
   };
 
   listen((m) => {
+    if (m.t === "credential") {
+      const c = credentials.get(m.id);
+      credentials.delete(m.id);
+      if (c && m.ok) c.resolve(m.value);
+      else if (c && !m.ok) c.reject(fromWire(m.error));
+      return;
+    }
     if (starting && m.t !== "init") {
       queue.push(m);
       return;

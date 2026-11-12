@@ -366,7 +366,7 @@ def project (c : Chart) (base : String) : List Triple :=
     historyDefaultsList k none c.states
 
 /-- The projection as a graph. -/
--- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {confidence: partial, note: "projection mirrored from vertep-rdf; round trip pending"}
+-- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {note: "projection mirrored from vertep-rdf; round trip proven in RoundTrip.Chart"}
 def toRDF (c : Chart) (base : String := placeholderBase) : Graph := Graph.ofList (project c base)
 
 end Vertep.Rdf

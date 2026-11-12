@@ -633,6 +633,8 @@ impl Machine {
     fn origin_event(&self, mut e: Event) -> Event {
         e.origin = Some(self.address.as_str().to_owned());
         e.origintype = Some(SCXML_EVENT_PROCESSOR.to_owned());
+        // A runtime-assigned origin inside the cluster is not a verified sender DID.
+        e.originverified = false;
         e
     }
 }

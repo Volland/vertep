@@ -204,6 +204,19 @@ pub trait Drain {
     ///
     /// A reason the shard could not be drained; the leave stops and the lease stays.
     fn drain_shard(&mut self, shard: ShardId) -> Result<(), String>;
+
+    /// Gives `to` what it needs to take over `shard`, after the drain and before the lease
+    /// moves: where shard journals are local files, ships the shard's journal to `to` and
+    /// verifies that it ends at the same version. Nothing by default (a shared or replicated
+    /// journal needs nothing).
+    ///
+    /// # Errors
+    ///
+    /// A reason the shard could not be shipped; the leave stops and the lease stays.
+    fn ship_shard(&mut self, shard: ShardId, to: &NodeId) -> Result<(), String> {
+        let _ = (shard, to);
+        Ok(())
+    }
 }
 
 /// A membership error outside the lease and join protocols.

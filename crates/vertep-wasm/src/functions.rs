@@ -157,7 +157,8 @@ pub fn json_to_value(j: &J) -> Value {
     }
 }
 
-/// An event as the host sees it: `{name, data, origin, origintype, sendid, invokeid}`.
+/// An event as the host sees it: `{name, data, origin, origintype, sendid, invokeid}`, plus
+/// `originverified: true` when the shell verified the sender DID.
 pub fn event_to_json(e: &Event) -> J {
     let mut o = Map::new();
     o.insert("name".into(), J::String(e.name.clone()));
@@ -171,6 +172,9 @@ pub fn event_to_json(e: &Event) -> J {
         if let Some(v) = v {
             o.insert(k.into(), J::String(v.clone()));
         }
+    }
+    if e.originverified {
+        o.insert("originverified".into(), J::Bool(true));
     }
     J::Object(o)
 }

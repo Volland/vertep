@@ -276,6 +276,10 @@ impl Out<'_> {
         if let Some(x) = &e.origintype {
             self.add(s, vt::ORIGIN_TYPE, str_lit(x));
         }
+        // Written only when set, so journals of events without a verified sender are unchanged.
+        if e.originverified {
+            self.add(s, vt::ORIGIN_VERIFIED, boolean(true));
+        }
         if let Some(x) = &e.invokeid {
             self.add(s, vt::INVOKE_ID, str_lit(x));
         }
@@ -714,6 +718,7 @@ impl Reader<'_> {
             sendid: self.opt_string(s, vt::SEND_ID),
             origin: self.opt_string(s, vt::ORIGIN),
             origintype: self.opt_string(s, vt::ORIGIN_TYPE),
+            originverified: self.opt_bool(s, vt::ORIGIN_VERIFIED),
             invokeid: self.opt_string(s, vt::INVOKE_ID),
             data,
         })
@@ -801,6 +806,31 @@ mod tests {
         };
         assert_eq!(EntryData::from_record(&d.actor, &rec).unwrap(), d);
         assert_eq!(d.annotations().len(), 1);
+    }
+
+    // @tg: verifies:: [[openspec:did-identity#Journaled Verification Outcome#Replay after key rotation]] {level: unit}
+    #[test]
+    fn verified_origin_round_trips_through_the_journal() {
+        let mut d = sample();
+        let EntryBody::Input { input, .. } = &mut d.body else {
+            unreachable!()
+        };
+        input.event = Event::named("go", EventType::External)
+            .with_verified_origin("did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK");
+        let entry = d
+            .to_entry()
+            .stamp(d.actor.node(), Position::new(1))
+            .unwrap();
+        let rec = JournalRecord {
+            position: Position::new(1),
+            entry,
+        };
+        let back = EntryData::from_record(&d.actor, &rec).unwrap();
+        assert_eq!(back, d);
+        let EntryBody::Input { input, .. } = &back.body else {
+            unreachable!()
+        };
+        assert!(input.event.originverified);
     }
 
     #[test]

@@ -226,6 +226,7 @@ theorem mergeSort_unique {α : Type} (le : α → α → Bool)
   · exact hQ
   · exact (List.mergeSort_perm P le).trans hp
 
+-- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {note: "lemma: ordered collections decode in document order"}
 theorem ordered_eq {s : Term} {p : String} {M : List Term}
     (hM : Lk ts s p M) (hnd : M.Nodup) (hiri : ∀ m ∈ M, IsIri m)
     (hord : ∀ j (hj : j < M.length), Lk ts M[j] "order" [intLit j]) :
@@ -551,6 +552,7 @@ theorem toUTF8_toList_inj {s t : String} (h : s.toUTF8.toList = t.toUTF8.toList)
   exact Array.toList_inj.1 h
 
 /-- `percentEncode` is injective, so distinct state identifiers get distinct node IRIs. -/
+-- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {note: "lemma: distinct identifiers get distinct node IRIs"}
 theorem percentEncode_inj {s t : String} (h : percentEncode s = percentEncode t) : s = t := by
   have := congrArg String.toList h
   rw [toList_percentEncode, toList_percentEncode] at this

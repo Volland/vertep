@@ -19,6 +19,8 @@
 //! - [`chart`]: chart versions, the registry, `vt:` extension lowering and migrations.
 //! - [`ontology`]: the runtime ontology module and its SHACL shapes.
 //! - [`placement`]: the hook a cluster uses to place virtual actors and workers on nodes.
+//! - [`websocket`]: the WebSocket Event I/O Processor's frames and links, and its server end
+//!   (feature `websocket`).
 //!
 //! @tg: implements:: [[decisions#SCXML-native actors with vt extensions]]
 //! @tg: implements:: [[decisions#IRI identity and lifecycle classes]]
@@ -44,6 +46,7 @@ pub mod shell;
 pub mod storage;
 pub mod transport;
 pub mod vocab;
+pub mod websocket;
 
 pub use actor::{
     Actor, ActorFactory, ActorFailure, ActorFn, ActorInput, ActorStart, ChartActor, FnActor,

@@ -103,6 +103,17 @@ impl<J: JournalStore, M: Membership + ?Sized> ShardJournal<J, M> {
             epoch: l.epoch,
         })
     }
+
+    /// The fencing scope of the shard: what appends' fencing tokens name.
+    pub fn scope(&self) -> NamedNode {
+        self.meta.shard_scope(self.shard)
+    }
+
+    /// Drops this node's lease on the shard after a replication receiver showed it
+    /// superseded, as a fenced append does: the node stops processing the shard.
+    pub fn superseded(&self) {
+        self.membership.forget(self.shard);
+    }
 }
 
 impl<J: JournalStore, M: Membership + ?Sized> JournalStore for ShardJournal<J, M> {

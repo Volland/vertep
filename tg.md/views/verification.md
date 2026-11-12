@@ -152,11 +152,11 @@ Each milestone adds proof obligations; M0 proves the semantics, M1 the types, M2
 | M0 | Configuration well-formedness | from a legal configuration `step` reaches only legal ones: root active, one child per active compound, all children per active parallel, parents active | `Configuration Well-Formedness Theorem` |
 | M0 | Transition selection | each microstep's set is enabled, conflict-free and optimal per SCXML 3.13 | `Transition Selection Theorem` |
 | M0 | Shapes equivalence | `validate shapes (toRDF c) = conforms` iff `WellFormed c` | `Shapes Equivalence Theorem` |
-| M0 | RDF round trip | `fromRDF (toRDF c) = c` on well-formed charts; equal charts have equal canonical forms | `RDF Round Trip Theorem` |
+| M0 | RDF round trip | `fromRDF (project c base) = .ok (c, base)` on well-formed charts, any base (`Rdf.fromRDF_project`, proven); equal charts have equal canonical forms | `RDF Round Trip Theorem` |
 | M0 | Dynamic type soundness | `step` never requests an undeclared location or data item; named extension point for M1 | `Type Soundness Statement` |
-| M1 | Checker correctness | `check T v = true` iff `HasType v T` | M1 task 9.1 |
-| M1 | SHACL projection agreement | `validate (shapes T) (toRDF v) = conforms` iff `HasType v T`, via `validate_conforms` | M1 task 9.2, `SHACL Projection` |
-| M1 | JSON Schema agreement | for the supported keyword subset | M1 task 9.3, `JSON Schema Projection` |
+| M1 | Checker correctness | `check T v = true` iff `HasType v T`, on every declaration block (`Types.check_iff`, proven) | backlog 4.1, `Type Checker Correctness` |
+| M1 | SHACL projection agreement | `validate (shapes T) (toRDF v) = conforms` iff `HasType v T`, via `validate_conforms` | backlog 4.2, `SHACL Projection` |
+| M1 | JSON Schema agreement | a JSON value validates against the projection iff `HasType v T`, for the emitted keyword subset (`JsonSchema.jsonSchema_agrees`, proven) | backlog 4.3, `JSON Schema Projection Agreement` |
 | M1 | Typed step soundness | well-typed chart, configuration and inputs give well-typed context and output events | M1 design, decision 9 |
 | M2 | Replay determinism | replaying a journal yields the recorded configurations and effects | M2 task 12.2, `Deterministic Replay` |
 | M2 | Dedup idempotence | processing a message id twice equals processing it once | M2 task 12.3, `Message Deduplication` |
@@ -222,7 +222,37 @@ What the models abstract, and what the oracles found:
 - The journal model advances the outbox mark only over delivered sends, as the Transactional Outbox requires. Rust used to advance it after handing sends to the transport and keep a refused send only as an in-memory retry, which a crash would lose; fixed 2026-11-11, the Rust mark now passes only delivered sends (`refused_send_survives_a_crash`).
 - The journal property tests found that two live nodes whose durable mailboxes share one store lose messages: `StoreMailbox` numbered row IRIs by its own sequence, so they collided and acknowledging one message stripped the other's type and recipient. Fixed 2026-11-11 with row IRIs that carry the envelope's digest; `journal_protocol_shared_durable_mailboxes_lose_no_message` runs.
 - The lease oracle needs every grant in the history. The fault-injection harness now records the grants `Membership::tick` makes as well as its own, and its histories replay in strict mode (11,241 decisions agree on five seeds) from the fault-injection test itself.
-- The protocol-model review also found that the Rust type checker did not terminate on `type A = optional<A>` against a non-null value; see [[decisions#Type checking stops on non-contractive recursion]], which the Lean type language (verification backlog 4.1) has to mirror.
+- The protocol-model review also found that the Rust type checker did not terminate on `type A = optional<A>` against a non-null value; see [[decisions#Type checking stops on non-contractive recursion]], which the Lean type language mirrors (see the type language section below).
+
+## Type language
+
+`VertepLean/Types/` mirrors the type language of `vertep-core`: `HasType` is the least relation closed under the typing rules, `check` is the executable checker, and `check_iff` proves them equal on every declaration block.
+
+- describes:: [[decisions#Type checking stops on non-contractive recursion]]
+- describes:: [[decisions#One IR type language]]
+- describes:: [[components#vertep-core]] {note: "types module, mirrored by VertepLean/Types"}
+- describes:: [[components#vertep-conformance]] {note: "types_differential against vertep-types"}
+
+Because `HasType` is a least fixed point, the guarded but non-contractive `type A = optional<A>` has only `null` (and `undefined`) as values. `check` carries the names under expansion at the current value position, cleared on descent into a list item, record field or union payload, and rejects a name that repeats there, as Rust does; it terminates on every block, validated or not, by the measure (value size, declarations not yet expanded here, type size). Completeness cuts loops: the name expansions and present optionals at one position form a chain, and a chain that repeats a name has a shorter one that does not (`Chain.dedup`).
+
+| File | Content | Proven |
+|---|---|---|
+| `Types/Basic.lean` | `Ty`, `Decls`, lexical rules of `int`, `decimal`, `datetime`, `iri`, name resolution | `unexpanded_lt` (termination) |
+| `Types/Check.lean` | `HasType`, `check` | `check_sound`, `Chain.dedup`, `check_iff` |
+| `Types/JsonSchema.lean` | keyword-tree `Schema`, `validate` for the subset, `proj` mirroring `json_schema.rs` | `validate_proj` (`validate` of the projection equals `check` on JSON values), `jsonSchema_agrees` |
+| `Types/Oracle.lean` | `vertep-types --cases CASES.jsonl` | differential: `tests/types_differential.rs`, 4,000 generated blocks, types and values, same verdict |
+
+```mermaid
+flowchart LR
+    HT["HasType<br/>least fixed point"] <-->|check_iff| CK["check<br/>names under expansion"]
+    CK <-->|"validate_proj: JSON values, distinct tags"| JS["validate (proj T)<br/>JSON Schema subset"]
+    CK -->|vertep-types| RS["Rust Declarations::check"]
+```
+
+What the model leaves out, and what remains:
+
+- `pattern` is read as the lexical rule its regular expression encodes; the regular expressions themselves are not proven equal to those rules. `int` is decided on the exact decimal, Rust decides it on the `f64`, so the differential cases stay away from the edges of the signed 64-bit range.
+- The SHACL projection (backlog 4.2), typed step soundness (4.4: the Lean `step` has no expression typer, so the values it assigns come from the untyped answer tape) and certifying typed charts with `vt certify` (4.5: the Lean RDF reader rejects `vt-types` triples) are open.
 
 ## Differential oracle loop
 
@@ -278,6 +308,8 @@ flowchart LR
 ```
 
 Rules SHACL Core cannot state directly, such as a history default transition targeting descendants of the history's parent, are expressed over containment triples the projection materializes (`vt:ancestor`), so no SHACL-SPARQL is needed. If a rule still cannot be expressed, the equivalence proof fails, which keeps the gap visible. The projection uses no blank nodes, so canonicalization stays linear in practice.
+
+The round trip is proven by capture: every node's emission is a sublist of the graph that holds every triple the decoder may read about fragments at or below the node. Fragments below a node start with its fragment and a colon, so siblings never overlap; a state's subtree is the region of its descendants' `s.<id>` fragments, kept apart by unique identifiers; only the chart node is typed `vt:Chart`; and the derived `vt:historyDefault` and `vt:choice` triples are never read (`VertepLean/Rdf/RoundTrip/`, `Rdf.fromRDF_project`).
 
 ## Conformance suite
 

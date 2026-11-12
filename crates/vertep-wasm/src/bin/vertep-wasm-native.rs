@@ -10,6 +10,16 @@
 //! - `vertep-wasm-native gen-diff <n> <seed>`: `n` generated differential cases (chart IR and
 //!   inputs) from the differential test's chart generator.
 //! - `vertep-wasm-native diff < cases.json`: their oracle records, as the Lean oracle gets them.
+//! - `vertep-wasm-native conformance-input`: the committed W3C IRP suite's non-manual variants,
+//!   their documents and the allow-list, as `conformanceRun` in WebAssembly takes them.
+//! - `vertep-wasm-native conformance-native`: the native harness's verdicts on those variants.
+//! - `vertep-wasm-native ws-server`: a native actor system (tokio shell, memory store) with the
+//!   WebSocket endpoint on 127.0.0.1, hosting the chart type
+//!   `https://server.example/charts/server`; it accepts the credential `secret` only. It prints
+//!   `{"port": n}`, then reads one JSON command per line from stdin and prints one JSON line per
+//!   command: a bridge command `{op, args}` (`snapshot`, `journal`, ...), or the controls
+//!   `{"ctl": "hold" | "release" | "dup" | "nodup" | "drop" | "pending"}` (fault injection for
+//!   the end-to-end tests).
 
 use std::io::Read;
 use std::process::ExitCode;
@@ -167,6 +177,113 @@ fn diff() -> Result<String, String> {
     ))
 }
 
+/// The chart of the server actors in `ws-server`: counts `ping`s, remembers the last origin and
+/// origin type, and answers `pong` to the origin; counts `hit`s.
+const SERVER_CHART: &str = r#"<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="s" datamodel="cel">
+  <datamodel><data id="n" expr="0"/><data id="hits" expr="0"/><data id="ot" expr="''"/><data id="from" expr="''"/></datamodel>
+  <state id="s">
+    <transition event="ping">
+      <assign location="ctx.n" expr="ctx.n + 1"/>
+      <assign location="ctx.ot" expr="ev.origintype"/>
+      <assign location="ctx.from" expr="ev.origin"/>
+      <send event="pong" targetexpr="ev.origin"><content expr="{'n': ctx.n}"/></send>
+    </transition>
+    <transition event="hit"><assign location="ctx.hits" expr="ctx.hits + 1"/></transition>
+  </state>
+</scxml>"#;
+
+fn ws_server() -> Result<String, String> {
+    use std::io::{BufRead, Write};
+    use vertep_runtime::websocket::server::{ServerOptions, WebSocketServer};
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    std::thread::spawn(move || {
+        for line in std::io::stdin().lock().lines() {
+            let Ok(line) = line else { break };
+            if tx.send(line).is_err() {
+                break;
+            }
+        }
+    });
+    let local = tokio::task::LocalSet::new();
+    local.block_on(&rt, async move {
+        let opts =
+            SystemOptions::from_json(&json!({ "storage": "memory" })).map_err(|e| e.to_string())?;
+        let store = Store::open(&opts.store, None).map_err(|e| e.to_string())?;
+        let mut system =
+            System::new(&opts, store, Shell::tokio(), None).map_err(|e| e.to_string())?;
+        system
+            .command(
+                "register",
+                &json!({ "source": SERVER_CHART, "type": "https://server.example/charts/server" }),
+            )
+            .map_err(|e| e.to_string())?;
+        let server = WebSocketServer::new(
+            system.handle(),
+            ServerOptions::new("urn:vertep:test-server")
+                .hosts(vec!["https://server.example/".into()])
+                .credentials(|c| match c {
+                    Some("secret") => Ok(()),
+                    _ => Err("unknown credential".into()),
+                }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .map_err(|e| e.to_string())?;
+        let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+        tokio::spawn({
+            let s = server.clone();
+            async move { s.serve(listener).await }
+        });
+        let out = |j: J| {
+            let mut o = std::io::stdout().lock();
+            let _ = writeln!(o, "{j}");
+            let _ = o.flush();
+        };
+        out(json!({ "port": port }));
+        loop {
+            system.pump();
+            let wake = system.handle().wakeup();
+            let wait = match system.next_deadline() {
+                Some(t) => {
+                    let ms = u64::try_from(t - system.handle().now_ms()).unwrap_or(0);
+                    Duration::from_millis(ms.min(1_000))
+                }
+                None => Duration::from_millis(1_000),
+            };
+            tokio::select! {
+                _ = wake => {}
+                _ = tokio::time::sleep(wait) => {}
+                line = rx.recv() => {
+                    let Some(line) = line else { return Ok(String::new()) };
+                    let cmd: J = serde_json::from_str(&line).unwrap_or(J::Null);
+                    let reply = match cmd.get("ctl").and_then(J::as_str) {
+                        Some("hold") => { server.set_hold_acks(true); json!({ "ok": true }) }
+                        Some("release") => { server.set_hold_acks(false); json!({ "ok": true }) }
+                        Some("dup") => { server.set_duplicate(true); json!({ "ok": true }) }
+                        Some("nodup") => { server.set_duplicate(false); json!({ "ok": true }) }
+                        Some("drop") => { server.disconnect_all(); json!({ "ok": true }) }
+                        Some("pending") => json!({ "ok": server.pending() }),
+                        Some(other) => json!({ "err": format!("unknown control {other}") }),
+                        None => {
+                            let op = cmd.get("op").and_then(J::as_str).unwrap_or_default();
+                            let args = cmd.get("args").cloned().unwrap_or(json!({}));
+                            match system.command(op, &args) {
+                                Ok(v) => json!({ "ok": v }),
+                                Err(e) => json!({ "err": e.to_json() }),
+                            }
+                        }
+                    };
+                    out(reply);
+                }
+            }
+        }
+    })
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     let r = match args.get(1).map(String::as_str) {
@@ -177,8 +294,13 @@ fn main() -> ExitCode {
             _ => Err("gen-diff <count> <seed>".into()),
         },
         Some("diff") => diff(),
+        Some("ws-server") => ws_server(),
+        Some("conformance-input") => vertep_wasm::conformance::input()
+            .and_then(|i| serde_json::to_string(&i).map_err(|e| e.to_string())),
+        Some("conformance-native") => vertep_wasm::conformance::native_verdicts()
+            .and_then(|v| serde_json::to_string(&v).map_err(|e| e.to_string())),
         _ => Err(
-            "usage: vertep-wasm-native trace < cases.json | script <script.json> | gen-diff <n> <seed> | diff < cases.json"
+            "usage: vertep-wasm-native trace < cases.json | script <script.json> | gen-diff <n> <seed> | diff < cases.json | conformance-input | conformance-native | ws-server"
                 .into(),
         ),
     };

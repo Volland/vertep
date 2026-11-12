@@ -472,6 +472,69 @@ fn default_transition_when_no_history_recorded() {
     assert_eq!(logs(&o.effects), ids(&["history default"]));
 }
 
+/// Regression (Lean Configuration Well-Formedness proof): a transition from inside a parallel
+/// state with a single region to the parallel state's deep history, taken before any history is
+/// recorded, exits the parallel state (its domain, computed from the default targets, lies above
+/// it) and must enter it again. Recomputing the domain on entry from the history just recorded
+/// gave the region instead, and the parallel state stayed inactive below its active region.
+#[test]
+fn deep_history_of_single_region_parallel_reenters_the_parallel() {
+    let cc = compile(chart(vec![parallel(
+        "p",
+        vec![
+            history("h", HistoryType::Deep, "a"),
+            compound("a", vec![atomic("a1").on(tr("e", "h")), atomic("a2")]),
+        ],
+    )]));
+    let o = run_null(&cc);
+    assert_eq!(active(&cc, &o), ids(&["p", "a", "a1"]));
+    let o = send_null(&cc, o.session, "e");
+    assert_eq!(active(&cc, &o), ids(&["p", "a", "a1"]));
+}
+
+/// Regression (Lean Configuration Well-Formedness proof): the default of `P`'s history targets
+/// `A1`, deep inside region `R1` of the parallel `Q`; the transition `A2 -> h` has domain `A`,
+/// below `P`, so only `A2` is exited. Entering the history's default up to its parent `P`
+/// (Appendix D) entered `Q` again and completed its region `R2` by default, leaving both `B1`
+/// and `B2` active; the entry now stops at the domain.
+#[test]
+fn history_entry_stops_at_the_transition_domain() {
+    let cc = compile(chart(vec![compound(
+        "P",
+        vec![
+            history("h", HistoryType::Deep, "A1"),
+            parallel(
+                "Q",
+                vec![
+                    compound(
+                        "R1",
+                        vec![compound(
+                            "A",
+                            vec![
+                                atomic("A1").on(tr("g", "A2")),
+                                atomic("A2").on(tr("e", "h")),
+                            ],
+                        )],
+                    ),
+                    compound("R2", vec![atomic("B1").on(tr("f", "B2")), atomic("B2")]),
+                ],
+            ),
+        ],
+    )]));
+    let o = run_null(&cc);
+    let o = send_null(&cc, o.session, "f");
+    let o = send_null(&cc, o.session, "g");
+    assert_eq!(
+        active(&cc, &o),
+        ids(&["P", "Q", "R1", "A", "A2", "R2", "B2"])
+    );
+    let o = send_null(&cc, o.session, "e");
+    assert_eq!(
+        active(&cc, &o),
+        ids(&["P", "Q", "R1", "A", "A1", "R2", "B2"])
+    );
+}
+
 // ----- Final States And Done Events ---------------------------------------------------------
 
 // @tg: verifies:: [[openspec:scxml-interpretation#Final States And Done Events#Compound done event]] {level: unit}

@@ -143,3 +143,30 @@ A QUIC peer advertises a maximum number of concurrent bidirectional streams per 
 - constrains:: [[crates/vertep-cluster/src/transport.rs#TransportConfig]] {strength: must, source: "RFC 9000 section 4.6"}
 
 Past the cap, pairs share streams and stay ordered per pair.
+
+## Kubernetes stores leases but does not expire them
+
+A `coordination.k8s.io/v1` `Lease` records a holder, a duration and a renew time, but the API server never expires it; clients decide when a lease has lapsed.
+
+- constrains:: [[decisions#Kubernetes grants expire by observation]] {strength: must, source: "Kubernetes API reference, Lease v1 coordination.k8s.io"}
+- constrains:: [[crates/vertep-cluster/src/external/kubernetes.rs#KubeAuthority]] {strength: must, source: "Kubernetes Lease API"}
+
+Comparing `renewTime` with a local wall clock would make lease safety depend on clock synchronisation.
+
+## etcd lease TTLs are whole seconds
+
+etcd grants leases with a TTL in whole seconds, at least about one and a half election timeouts, and expires them on its own sweep.
+
+- constrains:: [[decisions#etcd expires shard grants and a permanent key holds each shard's epoch]] {strength: must, source: "etcd v3 lease API, minimum TTL from the election timeout"}
+- constrains:: [[crates/vertep-cluster/src/external/etcd.rs#EtcdAuthority]] {strength: must, source: "etcd v3 lease API"}
+
+Lease terms and detection times are rounded up to whole seconds, and tests run etcd with a short election timeout.
+
+## The Docker Desktop kernel has no netem
+
+The linuxkit kernel of Docker Desktop has neither the `netem` queueing discipline nor the iptables `statistic` match, so a container cannot drop a share of its packets.
+
+- constrains:: [[decisions#Container fault injection runs every node as a process]] {strength: should, source: "Docker Desktop linuxkit kernel (tc: RTNETLINK not supported)"}
+
+CI runners on Linux have netem; the harness uses it where it works.
+

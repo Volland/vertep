@@ -114,6 +114,8 @@ terms! {
     ORIGIN = "origin";
     /// `vt:originType`.
     ORIGIN_TYPE = "originType";
+    /// `vt:originVerified`.
+    ORIGIN_VERIFIED = "originVerified";
     /// `vt:payload`.
     PAYLOAD = "payload";
     /// `vt:sendType`.

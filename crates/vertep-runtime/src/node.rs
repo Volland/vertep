@@ -652,6 +652,7 @@ impl NodeHandle {
         let mut ev = event;
         ev.origin = Some(me.as_str().to_owned());
         ev.origintype = Some(SCXML_EVENT_PROCESSOR.to_owned());
+        ev.originverified = false;
         let mut env = Envelope::new(format!("{me}/message"), to, ev);
         env.correlation = Some(format!("{me}/request"));
         if let Err(e) = self.send_envelope(env) {
@@ -2700,6 +2701,7 @@ impl Node {
                             ev.invokeid = Some(invokeid.clone());
                             ev.origin = Some(c.address.as_str().to_owned());
                             ev.origintype = Some(SCXML_EVENT_PROCESSOR.to_owned());
+                            ev.originverified = false;
                             let env = Envelope::new(
                                 format!("{}/{}/done", c.address, c.generation),
                                 &parent,
@@ -2731,6 +2733,7 @@ impl Node {
         let mut ev = o.event;
         ev.origin = Some(child.as_str().to_owned());
         ev.origintype = Some(SCXML_EVENT_PROCESSOR.to_owned());
+        ev.originverified = false;
         let to = match o.target {
             OutTarget::Parent => {
                 ev.invokeid = Some(invokeid.to_owned());
@@ -2921,6 +2924,7 @@ impl Node {
                 let mut ev = o.event;
                 ev.origin = Some(c.address.as_str().to_owned());
                 ev.origintype = Some(SCXML_EVENT_PROCESSOR.to_owned());
+                ev.originverified = false;
                 let to = match o.target {
                     OutTarget::Origin => c.origin.as_deref().and_then(|x| Address::parse(x).ok()),
                     OutTarget::Address(a) => Some(a),

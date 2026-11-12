@@ -260,7 +260,7 @@ def closedWorld (g : Graph) (c : Chart) (base : String) : Bool :=
 
 /-- Reconstruction (Rust `reconstruct`, after validation): decode, then require the graph to
 contain the whole projection of what was decoded. -/
--- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {confidence: partial, note: "round trip checked on the IRP corpus, not proven"}
+-- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {note: "the round trip is proven: fromRDF_project"}
 def fromRDF (ts : List Triple) : D (Chart × String) := do
   let (c, base) ← decode ts
   if closedWorld (Graph.ofList ts) c base then pure (c, base)
@@ -268,7 +268,7 @@ def fromRDF (ts : List Triple) : D (Chart × String) := do
 
 /-- **Reconstruction is sound for the projection**: whatever `fromRDF` returns, the graph
 contains its whole projection. -/
--- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {confidence: partial, note: "soundness of reconstruction; the round-trip identity is pending"}
+-- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {note: "soundness of reconstruction; the identity is fromRDF_project"}
 theorem fromRDF_sound (ts : List Triple) (c : Chart) (base : String)
     (h : fromRDF ts = .ok (c, base)) : ∀ t ∈ project c base, t ∈ Graph.ofList ts := by
   unfold fromRDF at h

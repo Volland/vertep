@@ -1,112 +1,90 @@
-//! External lease authorities: how cluster members and shard leases map onto an etcd key space
-//! and onto Kubernetes `Lease` objects.
+//! External lease authorities: etcd (feature `etcd`) and the Kubernetes Lease API (feature
+//! `kubernetes`) as the authority for members and shard leases.
 //!
-//! Only the mapping is here. There is no live etcd or Kubernetes client yet; tests run the
-//! external membership against [`crate::MemoryAuthority`], which follows the same rules (the
-//! external service alone grants, renews and expires leases; when it is unreachable nothing is
-//! granted or renewed and holders stop at their local deadline).
+//! Each is an [`Authority`](crate::Authority), so a node's membership is
+//! [`ExternalMembership`](crate::ExternalMembership) over it, exactly like the static
+//! membership over its hosted authority; the runtime cannot tell them apart. The external
+//! service alone admits members, grants, renews and expires leases; when it is unreachable
+//! every call fails with `Unavailable`, nothing is granted or renewed, and holders stop at
+//! their local deadline (request time + term − safety margin on their own clock).
+//!
+//! - [`etcd::EtcdAuthority`]: the etcd v3 JSON gateway. Shard leases are keys attached to etcd
+//!   leases whose TTL is the lease term, so etcd itself expires them; grants and handovers are
+//!   transactions comparing `mod_revision`s, and a permanent per-shard epoch key makes every
+//!   grant's epoch strictly greater than the last. Members are keys attached to two etcd
+//!   leases (suspicion time and failure time): the node's heartbeat keeps them alive.
+//! - [`kubernetes::KubeAuthority`]: `coordination.k8s.io/v1` `Lease` objects, one per shard and
+//!   one per member, updated only with their `resourceVersion` (optimistic concurrency).
+//!   `leaseTransitions` is the epoch. Kubernetes does not expire leases itself, so a node takes
+//!   a shard held by another only after it has seen the holder's record unchanged for a whole
+//!   lease term on its own clock (as client-go leader election does), and marks a member
+//!   suspect or failed after seeing its heartbeat unchanged for the suspicion or failure time.
+//!
+//! [`MemoryAuthority`](crate::MemoryAuthority) remains the in-memory stand-in with the same
+//! rules, for deterministic tests.
 
-use core::fmt;
+use std::collections::BTreeMap;
+use std::time::Duration;
 
-use crate::meta::{ClusterMeta, NodeId};
+use crate::meta::{ClusterId, NodeId};
 use crate::placement::ShardId;
+use crate::view::{Member, MemberStatus, ShardOwner, View};
 
-/// A shard lease as stored in the external service.
-#[derive(Clone, Debug, PartialEq, Eq)]
-// @tg: implements:: [[openspec:cluster-membership#External Membership]] {confidence: partial}
-pub struct LeaseRecord {
-    /// The holder.
-    pub owner: NodeId,
-    /// The fencing epoch: the etcd revision of the grant, or the Kubernetes `leaseTransitions`
-    /// count, both strictly increasing per shard.
-    pub epoch: u64,
-    /// The lease term in milliseconds (etcd lease TTL, Kubernetes `leaseDurationSeconds`).
-    pub term_ms: u64,
-}
+mod http;
 
-/// Why a stored lease record cannot be read.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct RecordError(pub String);
-
-impl fmt::Display for RecordError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "malformed lease record: {}", self.0)
-    }
-}
-
-impl std::error::Error for RecordError {}
-
-impl LeaseRecord {
-    /// The record as the value stored under the shard's key: `owner;epoch;term_ms`.
-    pub fn encode(&self) -> String {
-        format!("{};{};{}", self.owner, self.epoch, self.term_ms)
-    }
-
-    /// The record in `value`.
-    ///
-    /// # Errors
-    ///
-    /// [`RecordError`] for anything [`LeaseRecord::encode`] does not produce.
-    pub fn decode(value: &str) -> Result<Self, RecordError> {
-        let mut it = value.split(';');
-        let (Some(o), Some(e), Some(t), None) = (it.next(), it.next(), it.next(), it.next()) else {
-            return Err(RecordError(value.to_owned()));
-        };
-        Ok(LeaseRecord {
-            owner: NodeId::new(o).map_err(|e| RecordError(e.to_string()))?,
-            epoch: e.parse().map_err(|_| RecordError(format!("epoch {e}")))?,
-            term_ms: t.parse().map_err(|_| RecordError(format!("term {t}")))?,
-        })
-    }
-}
-
-/// The etcd key space of a cluster.
 #[cfg(feature = "etcd")]
-pub mod etcd {
-    use super::*;
+pub mod etcd;
 
-    /// The prefix of every key of the cluster: `/vertep/<cluster>/`.
-    pub fn prefix(meta: &ClusterMeta) -> String {
-        format!("/vertep/{}/", meta.cluster)
-    }
+#[cfg(feature = "kubernetes")]
+pub mod kubernetes;
 
-    /// The key of a member, attached to the member's etcd lease (its heartbeat).
-    pub fn member_key(meta: &ClusterMeta, node: &NodeId) -> String {
-        format!("{}members/{node}", prefix(meta))
-    }
-
-    /// The key of a shard's lease record, attached to the holder's etcd lease, written only by
-    /// a transaction comparing the key's `mod_revision`.
-    pub fn shard_key(meta: &ClusterMeta, shard: ShardId) -> String {
-        format!(
-            "{}shards/{}-of-{}",
-            prefix(meta),
-            shard.get(),
-            meta.shard_count
-        )
-    }
+/// Whole seconds covering `d`, at least one: etcd lease TTLs and Kubernetes
+/// `leaseDurationSeconds` are seconds.
+pub(crate) fn ceil_secs(d: Duration) -> u64 {
+    let s = d.as_secs() + u64::from(d.subsec_nanos() > 0);
+    s.max(1)
 }
 
-/// The Kubernetes `Lease` objects of a cluster.
-#[cfg(feature = "kubernetes")]
-pub mod kubernetes {
-    use super::*;
+type Snapshot = (
+    BTreeMap<NodeId, (String, MemberStatus)>,
+    BTreeMap<ShardId, ShardOwner>,
+);
 
-    /// The name of a shard's `Lease` object: `vertep-<cluster>-shard-<s>-of-<n>`. Its
-    /// `holderIdentity` is the node, `leaseTransitions` the epoch, and updates are guarded by
-    /// the object's `resourceVersion`.
-    pub fn lease_name(meta: &ClusterMeta, shard: ShardId) -> String {
-        format!(
-            "vertep-{}-shard-{}-of-{}",
-            meta.cluster,
-            shard.get(),
-            meta.shard_count
-        )
-    }
+/// The views one client of an external authority publishes: a new version whenever members,
+/// statuses or owners change, taken from the service's revision so that nodes reading the
+/// same state agree, and never lower than the last one.
+#[derive(Debug, Default)]
+pub(crate) struct Publisher {
+    last: Option<Snapshot>,
+    version: u64,
+}
 
-    /// The name of a member's heartbeat `Lease` object: `vertep-<cluster>-member-<node>`.
-    pub fn member_lease_name(meta: &ClusterMeta, node: &NodeId) -> String {
-        format!("vertep-{}-member-{node}", meta.cluster)
+impl Publisher {
+    /// The view of `snapshot`, read from the service at `revision`.
+    pub fn view(&mut self, cluster: &ClusterId, snapshot: Snapshot, revision: u64) -> View {
+        if self.last.as_ref() != Some(&snapshot) {
+            self.version = revision.max(self.version + 1);
+            self.last = Some(snapshot.clone());
+        }
+        let (members, owners) = snapshot;
+        View {
+            cluster: cluster.clone(),
+            version: self.version,
+            members: members
+                .into_iter()
+                .map(|(id, (endpoint, status))| {
+                    (
+                        id.clone(),
+                        Member {
+                            id,
+                            endpoint,
+                            status,
+                        },
+                    )
+                })
+                .collect(),
+            owners,
+        }
     }
 }
 
@@ -115,13 +93,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lease_record_round_trip() {
-        let r = LeaseRecord {
-            owner: NodeId::new("n1").unwrap(),
-            epoch: 42,
-            term_ms: 10_000,
-        };
-        assert_eq!(LeaseRecord::decode(&r.encode()).unwrap(), r);
-        assert!(LeaseRecord::decode("n1;x;1").is_err());
+    fn whole_seconds_round_up() {
+        assert_eq!(ceil_secs(Duration::from_millis(1)), 1);
+        assert_eq!(ceil_secs(Duration::from_secs(2)), 2);
+        assert_eq!(ceil_secs(Duration::from_millis(2_500)), 3);
+        assert_eq!(ceil_secs(Duration::ZERO), 1);
+    }
+
+    #[test]
+    fn versions_rise_only_on_change() {
+        let c = ClusterId::new("c").unwrap();
+        let mut p = Publisher::default();
+        let empty: Snapshot = (BTreeMap::new(), BTreeMap::new());
+        assert_eq!(p.view(&c, empty.clone(), 5).version, 5);
+        assert_eq!(
+            p.view(&c, empty.clone(), 9).version,
+            5,
+            "same state, same version"
+        );
+        let mut one = empty.clone();
+        one.0.insert(
+            NodeId::new("n").unwrap(),
+            ("e".into(), MemberStatus::Active),
+        );
+        assert_eq!(p.view(&c, one.clone(), 3).version, 6, "never lower");
+        assert_eq!(p.view(&c, empty, 20).version, 20);
     }
 }

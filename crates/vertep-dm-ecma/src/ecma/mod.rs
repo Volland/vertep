@@ -470,6 +470,7 @@ impl Session {
             ("sendid".into(), opt_string(event.sendid.as_ref())),
             ("origin".into(), opt_string(event.origin.as_ref())),
             ("origintype".into(), opt_string(event.origintype.as_ref())),
+            ("originverified".into(), Value::Bool(event.originverified)),
             ("invokeid".into(), opt_string(event.invokeid.as_ref())),
             ("data".into(), event.data.clone()),
         ]);
@@ -791,7 +792,7 @@ impl Session {
                 .into());
         };
         let event = self.event.as_ref().map_or(Value::Undefined, |e| {
-            Value::Object(vec![
+            let mut fields = vec![
                 ("name".into(), Value::String(e.name.clone())),
                 (
                     "type".into(),
@@ -802,7 +803,12 @@ impl Session {
                 ("origintype".into(), opt_string(e.origintype.as_ref())),
                 ("invokeid".into(), opt_string(e.invokeid.as_ref())),
                 ("data".into(), e.data.clone()),
-            ])
+            ];
+            // Only when set, so snapshots of events without a verified sender are unchanged.
+            if e.originverified {
+                fields.push(("originverified".into(), Value::Bool(true)));
+            }
+            Value::Object(fields)
         });
         let mut out = vec![
             ("format".into(), Value::String(SNAPSHOT_FORMAT.into())),
@@ -884,6 +890,7 @@ impl Session {
                 sendid: event.opt_string("sendid")?,
                 origin: event.opt_string("origin")?,
                 origintype: event.opt_string("origintype")?,
+                originverified: matches!(event.field("originverified"), Some(Value::Bool(true))),
                 invokeid: event.opt_string("invokeid")?,
                 data: event.field("data").cloned().unwrap_or_default(),
             })?;

@@ -339,21 +339,42 @@ pub struct EntryPlan {
     pub default_history_content: Vec<(StateIdx, TransIdx)>,
 }
 
-/// `computeEntrySet`.
+/// The domain of every transition in `ts`, in order, under the history recorded so far.
+pub fn transition_domains(
+    chart: &CompiledChart,
+    history: &History,
+    ts: &[TransIdx],
+) -> Vec<Option<StateIdx>> {
+    ts.iter()
+        .map(|&t| transition_domain(chart, history, t))
+        .collect()
+}
+
+/// `computeEntrySet`. `domains` are the transitions' domains as [`compute_exit_set`] saw them,
+/// before `exitStates` recorded history (see [`transition_domains`]): Appendix D recomputes
+/// them here from the history just recorded, which can move a domain below a state the exit
+/// left (a deep history of a parallel state with one region), and that state was then never
+/// entered again.
 // @tg: implements:: [[openspec:scxml-interpretation#History Restoration]]
-pub fn compute_entry_set(chart: &CompiledChart, history: &History, ts: &[TransIdx]) -> EntryPlan {
+pub fn compute_entry_set(
+    chart: &CompiledChart,
+    history: &History,
+    ts: &[TransIdx],
+    domains: &[Option<StateIdx>],
+) -> EntryPlan {
     let mut p = EntryPlan {
         states: chart.empty_set(),
         default_entry: chart.empty_set(),
         default_history_content: Vec::new(),
     };
-    for &t in ts {
+    for (i, &t) in ts.iter().enumerate() {
+        let ancestor = domains.get(i).copied().flatten();
+        let floor = ancestor.unwrap_or(ROOT);
         for &s in &chart.transition(t).targets {
-            add_descendants(chart, history, s, &mut p, chart.len());
+            add_descendants(chart, history, s, &mut p, chart.len(), floor);
         }
-        let ancestor = transition_domain(chart, history, t);
         for s in effective_targets(chart, history, t) {
-            add_ancestors(chart, history, s, ancestor, &mut p, chart.len());
+            add_ancestors(chart, history, s, ancestor, &mut p, chart.len(), floor);
         }
     }
     p
@@ -361,24 +382,36 @@ pub fn compute_entry_set(chart: &CompiledChart, history: &History, ts: &[TransId
 
 /// `addDescendantStatesToEnter`. `fuel` bounds the history default transitions followed (see
 /// [`effective_targets_within`]); every other recursion goes strictly deeper in the tree.
+///
+/// `floor` is the domain of the transition being entered. A history state restores its
+/// states with their ancestors up to its parent, or up to `floor` when the domain lies below
+/// the parent: the exit left everything above the domain active, and Appendix D's
+/// `addAncestorStatesToEnter(s, parent)` entered those states again, completing their parallel
+/// ancestors' other regions by default next to the regions still active.
 fn add_descendants(
     chart: &CompiledChart,
     history: &History,
     state: StateIdx,
     p: &mut EntryPlan,
     fuel: usize,
+    floor: StateIdx,
 ) {
     let st = chart.state(state);
     if matches!(st.kind, StateKind::History(_)) {
         let parent = st.parent.unwrap_or(ROOT);
+        let stop = if chart.is_descendant(floor, parent) {
+            floor
+        } else {
+            parent
+        };
         match history.get(state) {
             Some(v) => {
                 let v = v.to_vec();
                 for &s in &v {
-                    add_descendants(chart, history, s, p, fuel);
+                    add_descendants(chart, history, s, p, fuel, floor);
                 }
                 for &s in &v {
-                    add_ancestors(chart, history, s, Some(parent), p, fuel);
+                    add_ancestors(chart, history, s, Some(stop), p, fuel, floor);
                 }
             }
             None => {
@@ -388,10 +421,10 @@ fn add_descendants(
                     p.default_history_content.retain(|(par, _)| *par != parent);
                     p.default_history_content.push((parent, dt));
                     for &s in &chart.transition(dt).targets {
-                        add_descendants(chart, history, s, p, fuel - 1);
+                        add_descendants(chart, history, s, p, fuel - 1, floor);
                     }
                     for &s in &chart.transition(dt).targets {
-                        add_ancestors(chart, history, s, Some(parent), p, fuel - 1);
+                        add_ancestors(chart, history, s, Some(stop), p, fuel - 1, floor);
                     }
                 }
             }
@@ -404,17 +437,17 @@ fn add_descendants(
             p.default_entry.insert(state);
             if let Some(it) = st.initial {
                 for &s in &chart.transition(it).targets {
-                    add_descendants(chart, history, s, p, fuel);
+                    add_descendants(chart, history, s, p, fuel, floor);
                 }
                 for &s in &chart.transition(it).targets {
-                    add_ancestors(chart, history, s, Some(state), p, fuel);
+                    add_ancestors(chart, history, s, Some(state), p, fuel, floor);
                 }
             }
         }
         StateKind::Parallel => {
             for &child in &st.children {
                 if !p.states.any_in_range(child + 1, chart.state(child).last) {
-                    add_descendants(chart, history, child, p, fuel);
+                    add_descendants(chart, history, child, p, fuel, floor);
                 }
             }
         }
@@ -429,6 +462,7 @@ fn add_ancestors(
     ancestor: Option<StateIdx>,
     p: &mut EntryPlan,
     fuel: usize,
+    floor: StateIdx,
 ) {
     for anc in proper_ancestors(chart, state, ancestor) {
         if anc == ROOT {
@@ -438,7 +472,7 @@ fn add_ancestors(
         if chart.state(anc).kind == StateKind::Parallel {
             for &child in &chart.state(anc).children {
                 if !p.states.any_in_range(child + 1, chart.state(child).last) {
-                    add_descendants(chart, history, child, p, fuel);
+                    add_descendants(chart, history, child, p, fuel, floor);
                 }
             }
         }

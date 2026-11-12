@@ -84,6 +84,8 @@ structure Event where
   sendid : Option String := none
   origin : Option String := none
   origintype : Option String := none
+  /-- True only when the shell verified the sender DID in `origin` (Rust `originverified`). -/
+  originverified : Bool := false
   invokeid : Option String := none
   data : Value := .undefined
   deriving Repr, BEq, Inhabited

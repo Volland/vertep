@@ -107,8 +107,13 @@ jobs:
           build: true
           test: false
       - uses: Swatinem/rust-cache@v2
-      # `differential`: the histories must replay through the Lean lease model (m4-cluster 6.5)
-      - run: cargo test -p vertep-cluster --release --features differential --test faults --test simulation --test runtime
+      # `differential`: the histories must replay through the Lean lease model (m4-cluster 6.5).
+      # The fault matrix: static, external stand-in, gossip, etcd and Kubernetes membership, each
+      # with a shared journal and replication factors 1 and 3; etcd and k3s run in containers,
+      # and `containers` runs every node as a container process (m4-cluster 6.1, 6.3).
+      - run: cargo test -p vertep-cluster --release --features differential,etcd,kubernetes --test faults --test simulation --test runtime --test external --test containers -- --test-threads 2
+        env:
+          VERTEP_CONTAINER_TESTS: require
       - uses: actions/upload-artifact@v4
         with:
           name: cluster-histories

@@ -12,9 +12,10 @@ authors.workspace = true
 default = ["gossip", "quic", "runtime"]
 # SWIM gossip membership, sans-IO, with an in-process simulated network.
 gossip = []
-# The etcd and Kubernetes Lease authorities: record layouts only, no live client yet.
-etcd = []
-kubernetes = []
+# The etcd (v3 JSON gateway over HTTP) and Kubernetes (`coordination.k8s.io/v1` Lease API over
+# HTTPS) lease authorities, with a small blocking HTTP/1.1 client of their own.
+etcd = ["dep:serde_json", "dep:base64"]
+kubernetes = ["dep:serde_json", "dep:base64", "dep:rustls"]
 # The QUIC cluster transport with mutual TLS.
 quic = ["dep:quinn", "dep:rustls", "dep:rustls-webpki", "dep:rcgen", "dep:tokio"]
 # The cluster inside the actor runtime: placement, sharded fenced storage, the cluster Event
@@ -26,6 +27,14 @@ tiramemsu = ["dep:vertep-tiramemsu"]
 testkit = []
 # Tests require the Lean lease oracle (`vertep-lease`) instead of skipping when it is not built.
 differential = []
+# The `vertep-fault-node` executable: one cluster node of the container fault-injection harness
+# (`tests/containers.rs`), on etcd or Kubernetes membership.
+fault-node = ["etcd", "kubernetes"]
+
+[[bin]]
+name = "vertep-fault-node"
+path = "src/bin/fault_node.rs"
+required-features = ["fault-node"]
 
 [dependencies]
 vertep-store = { workspace = true }
@@ -33,6 +42,7 @@ vertep-runtime = { workspace = true, optional = true }
 vertep-tiramemsu = { workspace = true, optional = true }
 vertep-core = { workspace = true, optional = true, features = ["std", "serde"] }
 serde_json = { version = "1", optional = true }
+base64 = { version = "0.22", optional = true }
 quinn = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
 rustls-webpki = { workspace = true, optional = true }

@@ -15,7 +15,6 @@ use crate::functions::{ActionOutcome, Implementations};
 use crate::shell::{TimeoutSleep, browser_shell};
 use crate::store::{StorageKind, Store};
 use crate::system::{System, SystemOptions, event_from_json};
-use crate::trace::{TraceCase, trace_all};
 
 fn thrown(e: &ApiError) -> JsError {
     JsError::new(&format!("vertep:{}", e.to_json()))
@@ -101,6 +100,7 @@ pub struct ActorSystem {
     notify: Rc<RefCell<Option<js_sys::Function>>>,
     closed: Rc<Cell<bool>>,
     kick: futures::channel::mpsc::UnboundedSender<()>,
+    connection: RefCell<Option<crate::ws::Connection>>,
 }
 
 fn flush(system: &mut System, notify: &RefCell<Option<js_sys::Function>>) {
@@ -190,6 +190,7 @@ impl ActorSystem {
             notify: Rc::new(RefCell::new(None)),
             closed: Rc::new(Cell::new(false)),
             kick,
+            connection: RefCell::new(None),
         };
         drive(s.inner.clone(), s.notify.clone(), s.closed.clone(), kicks);
         Ok(s)
@@ -244,8 +245,26 @@ impl ActorSystem {
         self.inner.borrow().store().export().map_err(|e| thrown(&e))
     }
 
+    /// Connects the WebSocket transport the options configured (`transports.websocket`):
+    /// `credentials` is the application's provider, a function returning a credential or a
+    /// Promise of one, asked before every connection. Does nothing without the transport.
+    pub fn connect(&self, credentials: Option<js_sys::Function>) {
+        let Some((link, options)) = self.inner.borrow().websocket() else {
+            return;
+        };
+        if self.connection.borrow().is_some() {
+            return;
+        }
+        let handle = self.inner.borrow().handle();
+        let c = crate::ws::connect(link, handle, options, credentials, self.kick.clone());
+        *self.connection.borrow_mut() = Some(c);
+    }
+
     /// Stops the driver; the store is released when the system is dropped.
     pub fn close(&self) {
+        if let Some(c) = self.connection.borrow_mut().take() {
+            c.close();
+        }
         self.closed.set(true);
         let _ = self.kick.unbounded_send(());
         self.inner.borrow().handle().shutdown();
@@ -292,9 +311,11 @@ async fn install_opfs(_opts: &SystemOptions) -> Result<(), JsError> {
 }
 
 /// Steps chart cases with the pure core (`null` and `cel` datamodels) and returns the traces as
-/// JSON text, for comparison with the native build.
+/// JSON text, for comparison with the native build (feature `trace`: test builds only).
+#[cfg(feature = "trace")]
 #[wasm_bindgen(js_name = traceCases)]
 pub fn trace_cases(cases: String) -> Result<String, JsError> {
+    use crate::trace::{TraceCase, trace_all};
     install_panic_hook();
     let cases: Vec<TraceCase> =
         serde_json::from_str(&cases).map_err(|e| thrown(&ApiError::arg(format!("cases: {e}"))))?;
@@ -304,7 +325,8 @@ pub fn trace_cases(cases: String) -> Result<String, JsError> {
 
 /// Runs generated differential cases (`[{chart, inputs}]`, the chart as IR JSON) exactly as
 /// the native Rust-versus-Lean differential test does, and returns their oracle records as
-/// JSON text.
+/// JSON text (feature `trace`: test builds only).
+#[cfg(feature = "trace")]
 #[wasm_bindgen(js_name = differentialRecords)]
 pub fn differential_records(cases: String) -> Result<String, JsError> {
     install_panic_hook();
@@ -312,6 +334,19 @@ pub fn differential_records(cases: String) -> Result<String, JsError> {
         serde_json::from_str(&cases).map_err(|e| thrown(&ApiError::arg(format!("cases: {e}"))))?;
     let registry = crate::functions::Datamodels::new(std::sync::Arc::new(Default::default()));
     Ok(crate::trace::diff_all(&cases, &registry))
+}
+
+/// Runs the W3C IRP conformance variants of `input` (`{cases, files}`, see
+/// `crate::conformance::Input`) from in-memory documents and returns their verdicts as JSON
+/// text (feature `conformance`: test builds only).
+#[cfg(feature = "conformance")]
+#[wasm_bindgen(js_name = conformanceRun)]
+pub fn conformance_run(input: String) -> Result<String, JsError> {
+    install_panic_hook();
+    let input: crate::conformance::Input =
+        serde_json::from_str(&input).map_err(|e| thrown(&ApiError::arg(format!("input: {e}"))))?;
+    serde_json::to_string(&crate::conformance::run(&input))
+        .map_err(|e| thrown(&ApiError::arg(e.to_string())))
 }
 
 /// The crate version the package was built from.

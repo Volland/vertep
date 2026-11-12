@@ -59,6 +59,7 @@ pub fn event_type(data: CelType) -> CelType {
             ("sendid", opt_s()),
             ("origin", opt_s()),
             ("origintype", opt_s()),
+            ("originverified", CelType::Bool),
             ("invokeid", opt_s()),
             ("data", data),
         ],

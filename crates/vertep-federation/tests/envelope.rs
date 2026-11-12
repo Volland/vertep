@@ -168,6 +168,10 @@ fn anonymous_message_allowed_is_delivered_unverified() {
     };
     let admitted = admit(&policy, &msg, &Untyped, Timestamp::from_secs(0)).expect("delivered");
     assert!(!admitted.origin.verified, "marked unverified for guards");
+    assert!(
+        !admitted.event.originverified,
+        "_event marks the origin unverified"
+    );
     assert_eq!(
         admitted.event.origin, None,
         "no sender DID in _event.origin"

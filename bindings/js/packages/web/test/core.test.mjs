@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { COUNTER, CONFLICT, ORDER, loadBuild, nativeBin } from "./helpers.mjs";
+import { COUNTER, CONFLICT, ORDER, loadBuild, loadTestBuild, nativeBin } from "./helpers.mjs";
 
 const HISTORY = `<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="on" datamodel="cel">
   <datamodel><data id="log" expr="[]"/></datamodel>
@@ -40,9 +40,10 @@ const CASES = [
 
 // @tg: verifies:: [[openspec:wasm-bindings#Core Builds For WebAssembly Unchanged#Native and WebAssembly steps agree]] {level: integration}
 test("native and WebAssembly steps agree", async () => {
-  const core = await loadBuild("core");
+  // the test build: the same core and datamodels as the published builds, plus `traceCases`
+  const build = await loadTestBuild();
   const input = JSON.stringify(CASES);
-  const wasm = core.traceCases(input);
+  const wasm = build.traceCases(input);
   const nat = execFileSync(nativeBin, ["trace"], { input, encoding: "utf8" }).trimEnd();
   const traces = JSON.parse(wasm);
   for (const t of traces) {
@@ -59,6 +60,14 @@ test("the core build for wasm32 loads and runs", async () => {
   const core = await loadBuild("core");
   assert.equal(core.version(), "0.1.0");
   assert.equal(core.hasJournal(), false);
-  const [t] = JSON.parse(core.traceCases(JSON.stringify([CASES[0]])));
-  assert.deepEqual(t.steps.at(-1).configuration, ["shipped"]);
+  assert.equal(typeof core.traceCases, "undefined", "test-only exports stay out of the published build");
+  const system = await core.ActorSystem.create(JSON.stringify({ storage: "memory" }), null);
+  try {
+    const run = (op, args) => JSON.parse(system.command(op, JSON.stringify(args)));
+    const { address } = run("spawn", { source: ORDER, key: "o1" });
+    run("send", { to: address, event: { type: "pay" } });
+    assert.deepEqual(run("snapshot", { address }).configuration, ["paid"]);
+  } finally {
+    system.close();
+  }
 });

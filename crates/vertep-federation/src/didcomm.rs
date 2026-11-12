@@ -213,6 +213,18 @@ pub struct Outgoing {
     pub message: String,
 }
 
+/// A decrypted DIDComm plaintext message.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Plaintext {
+    /// The message.
+    pub message: Value,
+    /// Its bytes as decrypted, with the payload's member order intact.
+    pub bytes: Vec<u8>,
+    /// The sender DID and the key id that authenticated it, for an authcrypted message; `None`
+    /// for an anoncrypted one.
+    pub sender: Option<(Did, String)>,
+}
+
 /// One actor's DIDComm side: its identity and key manager.
 // @tg: implements:: [[openspec:relay-mailboxes#DIDComm Forward Routing]]
 pub struct DidCommAgent {
@@ -367,6 +379,24 @@ impl DidCommAgent {
         })
     }
 
+    /// Authcrypts the plaintext DIDComm message `message` to every key-agreement key of `to`.
+    /// Protocol messages (mediator coordination, pickup) go through here.
+    ///
+    /// # Errors
+    ///
+    /// [`DidCommError`] when `to` has no key-agreement key or sealing fails.
+    pub fn seal_message(&self, message: &Value, to: &DidDocument) -> Result<String, DidCommError> {
+        let keys = agreement_keys(to);
+        if keys.is_empty() {
+            return Err(DidCommError::NoKey(format!(
+                "{}: no keyAgreement key",
+                to.id
+            )));
+        }
+        let bytes = serde_json::to_vec(message).map_err(|e| DidCommError::Seal(e.to_string()))?;
+        self.authcrypt(&bytes, &keys)
+    }
+
     /// Opens a JWE addressed to one of this actor's key-agreement keys (the current one, or a
     /// retired one within its grace period at `now`). Authcrypted senders are authenticated
     /// against their DID document from `resolver`; anoncrypted messages have no verified origin.
@@ -381,6 +411,74 @@ impl DidCommAgent {
         resolver: &dyn DidResolver,
         now: Timestamp,
     ) -> Result<DidCommReceived, DidCommError> {
+        let Plaintext {
+            message: msg,
+            bytes: plaintext,
+            sender,
+        } = self.decrypt(jwe, resolver, now)?;
+        match msg.get("type").and_then(Value::as_str) {
+            Some(FORWARD_MESSAGE_TYPE) => {
+                let next = msg
+                    .pointer("/body/next")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| DidCommError::Malformed("forward without next".into()))?
+                    .to_owned();
+                let inner = msg
+                    .pointer("/attachments/0/data/json")
+                    .ok_or_else(|| DidCommError::Malformed("forward without attachment".into()))?;
+                Ok(DidCommReceived::Forward {
+                    next,
+                    message: inner.to_string(),
+                })
+            }
+            Some(DIDCOMM_EVENT_TYPE) => {
+                let envelope = serde_json::from_slice::<IncomingEvent>(&plaintext)
+                    .map_err(|e| DidCommError::Malformed(e.to_string()))?
+                    .body;
+                RelayEnvelope::from_bytes(&envelope.to_bytes())
+                    .map_err(|e| DidCommError::Malformed(e.to_string()))?;
+                let origin = match sender {
+                    Some((did, skid)) => {
+                        // DIDComm requires `from` to name the DID of the sender key.
+                        if msg.get("from").and_then(Value::as_str) != Some(did.as_str()) {
+                            return Err(DidCommError::ForgedOrigin {
+                                claimed: msg
+                                    .get("from")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default()
+                                    .to_owned(),
+                                reason: format!("from does not match sender key {skid}"),
+                            });
+                        }
+                        VerifiedOrigin::verified(did.as_str(), skid, DIDCOMM_PROCESSOR)
+                    }
+                    // An anonymous message's `from`, if any, is a claim nobody verified.
+                    None => VerifiedOrigin::anonymous(DIDCOMM_PROCESSOR),
+                };
+                Ok(DidCommReceived::Event(Box::new(OpenedMessage {
+                    envelope,
+                    origin,
+                })))
+            }
+            other => Err(DidCommError::Malformed(format!(
+                "unsupported message type {other:?}"
+            ))),
+        }
+    }
+
+    /// Decrypts a JWE addressed to one of this actor's key-agreement keys and authenticates an
+    /// authcrypted sender against its resolved DID document. Returns the plaintext message,
+    /// whatever its type.
+    ///
+    /// # Errors
+    ///
+    /// [`DidCommError`] naming why the message cannot be opened.
+    pub fn decrypt(
+        &self,
+        jwe: &str,
+        resolver: &dyn DidResolver,
+        now: Timestamp,
+    ) -> Result<Plaintext, DidCommError> {
         let jwe: Jwe =
             serde_json::from_str(jwe).map_err(|e| DidCommError::Malformed(e.to_string()))?;
         let header = ProtectedHeader::from_base64url(&jwe.protected)
@@ -507,56 +605,13 @@ impl DidCommAgent {
         let plaintext =
             content_encryption::decrypt(&ciphertext, cek, &iv, jwe.protected.as_bytes(), &tag)
                 .map_err(|e| undecryptable(e.to_string()))?;
-        let msg: Value = serde_json::from_slice(&plaintext)
+        let message: Value = serde_json::from_slice(&plaintext)
             .map_err(|e| DidCommError::Malformed(e.to_string()))?;
-        match msg.get("type").and_then(Value::as_str) {
-            Some(FORWARD_MESSAGE_TYPE) => {
-                let next = msg
-                    .pointer("/body/next")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| DidCommError::Malformed("forward without next".into()))?
-                    .to_owned();
-                let inner = msg
-                    .pointer("/attachments/0/data/json")
-                    .ok_or_else(|| DidCommError::Malformed("forward without attachment".into()))?;
-                Ok(DidCommReceived::Forward {
-                    next,
-                    message: inner.to_string(),
-                })
-            }
-            Some(DIDCOMM_EVENT_TYPE) => {
-                let envelope = serde_json::from_slice::<IncomingEvent>(&plaintext)
-                    .map_err(|e| DidCommError::Malformed(e.to_string()))?
-                    .body;
-                RelayEnvelope::from_bytes(&envelope.to_bytes())
-                    .map_err(|e| DidCommError::Malformed(e.to_string()))?;
-                let origin = match sender {
-                    Some((did, skid)) => {
-                        // DIDComm requires `from` to name the DID of the sender key.
-                        if msg.get("from").and_then(Value::as_str) != Some(did.as_str()) {
-                            return Err(DidCommError::ForgedOrigin {
-                                claimed: msg
-                                    .get("from")
-                                    .and_then(Value::as_str)
-                                    .unwrap_or_default()
-                                    .to_owned(),
-                                reason: format!("from does not match sender key {skid}"),
-                            });
-                        }
-                        VerifiedOrigin::verified(did.as_str(), skid, DIDCOMM_PROCESSOR)
-                    }
-                    // An anonymous message's `from`, if any, is a claim nobody verified.
-                    None => VerifiedOrigin::anonymous(DIDCOMM_PROCESSOR),
-                };
-                Ok(DidCommReceived::Event(Box::new(OpenedMessage {
-                    envelope,
-                    origin,
-                })))
-            }
-            other => Err(DidCommError::Malformed(format!(
-                "unsupported message type {other:?}"
-            ))),
-        }
+        Ok(Plaintext {
+            message,
+            bytes: plaintext,
+            sender,
+        })
     }
 }
 

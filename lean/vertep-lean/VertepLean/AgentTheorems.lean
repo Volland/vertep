@@ -267,6 +267,7 @@ theorem decide_answers (s : AState κ) (corr : Nat) (e : String) (p : π) :
     · exact List.mem_cons_self
 
 /-- **Exactly once.** Delivering the same decision twice equals delivering it once. -/
+-- @tg: implements:: [[openspec:deciders#Decisions Are Journaled Inputs]]
 theorem decision_once {s : AState κ} (h : Reachable C s) (corr : Nat) (e : String) (p : π) :
     stepA C (stepA C s (.decision corr e p)).1 (.decision corr e p) =
       (remember (stepA C s (.decision corr e p)).1, .none) := by
@@ -315,6 +316,7 @@ theorem foldl_effective_mem (ds : List (Option Grant)) (a : Option Grant) (g : G
 
 /-- **Intersection.** A target is in the effective grant at the end of an invoke chain exactly
 when every grant declared along the chain allows it. -/
+-- @tg: implements:: [[openspec:llm-actors#Capability Grants]]
 theorem chainGrant_mem (ds : List (Option Grant)) (g : Grant) (h : chainGrant ds = some g)
     (t : String) : t ∈ g ↔ ∀ d ∈ ds, ∀ g', d = some g' → t ∈ g' := by
   rw [foldl_effective_mem ds none g h t]; simp
@@ -364,6 +366,7 @@ theorem ungranted_not_delivered (g : Grant) (outs : List Out) (t : String) (ht :
   · rw [he] at h'; cases h'
 
 /-- **Granted sends are delivered.** -/
+-- @tg: implements:: [[openspec:llm-actors#Capability Grants]]
 theorem granted_delivered (g : Grant) (outs : List Out) (o : Out) (ho : o ∈ outs)
     (hg : ∀ t, o.target.name = some t → t ∈ g) : o ∈ filter g outs := by
   unfold filter

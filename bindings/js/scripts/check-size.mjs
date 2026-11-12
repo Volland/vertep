@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The bundle size budget of @vertep/web, measured on the built artifacts with gzip -9:
-//   storage-free  core WebAssembly + its glue + the client and worker JavaScript   <= 600 KB
+//   storage-free  core WebAssembly + its glue + the client and worker JavaScript   <= 1200 KB
 //   journal       journal WebAssembly + its glue + the client and worker JavaScript <= 2.5 MB
 // Exits 1 and reports the size and the budget when a build exceeds its budget. KB = 1000 bytes.
 // VERTEP_BUDGET_CORE_KB and VERTEP_BUDGET_JOURNAL_KB override the budgets (tests).
@@ -13,7 +13,7 @@ import { gzipSync } from "node:zlib";
 const web = fileURLToPath(new URL("../packages/web/", import.meta.url));
 
 export const BUDGETS = {
-  core: Number(process.env.VERTEP_BUDGET_CORE_KB ?? 600) * 1000,
+  core: Number(process.env.VERTEP_BUDGET_CORE_KB ?? 1200) * 1000,
   journal: Number(process.env.VERTEP_BUDGET_JOURNAL_KB ?? 2500) * 1000,
 };
 

@@ -6,15 +6,14 @@ import VertepLean.Rdf.Reconstruct
 Proven: reconstruction is sound for the projection (`Rdf.fromRDF_sound`, in
 `VertepLean.Rdf.Reconstruct`), and the canonical form and version IRI are functions of the chart
 (`canonical_determined`, `version_determined`). The round-trip identity
-`fromRDF (project c base) = .ok (c, base)` on well-formed charts is not proven; its statement is
-in `Pending/RoundTrip.lean` and the IRP corpus checks it (see the final report and
-`VertepTests/Rdf.lean`).
+`fromRDF (project c base) = .ok (c, base)` on well-formed charts is `Rdf.fromRDF_project`, in
+`VertepLean.Rdf.RoundTrip.Chart`.
 -/
 
 namespace Vertep.Rdf
 
 /-- **Canonical form determined by the chart.** Equal charts have equal canonical N-Quads. -/
--- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {confidence: partial, note: "canonical form and soundness proven; round trip pending"}
+-- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {note: "canonical form determined; the round trip is fromRDF_project"}
 theorem canonical_determined (c₁ c₂ : Chart) (h : c₁ = c₂) :
     canonicalNQuads c₁ = canonicalNQuads c₂ := by subst h; rfl
 

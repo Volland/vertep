@@ -282,6 +282,13 @@ pub fn diff_records(case: &DiffCase, registry: &dyn DatamodelRegistry) -> DiffRu
             break;
         }
         let kind = match gi {
+            // As in `vertep_conformance::differential::rust_records`: every third event arrives
+            // from a verified sender DID (the records must stay identical).
+            DiffInput::Event(n) if i % 3 == 2 => InputKind::Event(
+                Event::named(n.clone(), EventType::External).with_verified_origin(
+                    "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+                ),
+            ),
             DiffInput::Event(n) => InputKind::Event(Event::named(n.clone(), EventType::External)),
             DiffInput::Cancel => InputKind::Cancel,
         };

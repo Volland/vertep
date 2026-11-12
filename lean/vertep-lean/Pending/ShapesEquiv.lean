@@ -15,8 +15,9 @@ IRP charts the shapes verdict equals `checkWF`. It is slow (about a minute per s
 ## Missing pieces for the proof
 * The shapes as a Lean term with a proof that `Rdf.chartShapes = .ok shapes` (evaluating the
   Turtle parser and the shapes reader in the kernel, or a hand transcription proven equal).
-* The RDF round-trip lemmas of `Pending/RoundTrip.lean` (the value nodes of every path on
-  `toRDF c` are those of the IR).
+* Path lemmas on `toRDF c` (the value nodes of every shape path are those of the IR); the
+  capture and lookup lemmas behind `Rdf.fromRDF_project` (`VertepLean/Rdf/RoundTrip/`) give
+  them for the decoder's own paths.
 * One lemma per shape tying its `DataConforms` condition on `toRDF c` to the `WellFormed` rule it
   encodes; the derived triples (`vt:ancestor`, `vt:scope`, `vt:choice`, `vt:historyDefault`)
   need lemmas tying them to `descIds`, `targetPosition` and `historyDefaultEdges`.

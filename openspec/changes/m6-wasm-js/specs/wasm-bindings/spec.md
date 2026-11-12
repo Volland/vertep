@@ -196,10 +196,10 @@ The project SHALL publish the JavaScript packages to npm as ES modules with bund
 - **THEN** its version equals the workspace crate version, and the release fails otherwise
 
 ### Requirement: Bundle Size Budget
-The main package's WebAssembly and JavaScript SHALL stay within a size budget checked in CI: at most 600 KB gzip-compressed without journal storage, and at most 2.5 MB gzip-compressed with the tiramemsu journal. A release MUST fail when a budget is exceeded.
+The main package's WebAssembly and JavaScript SHALL stay within a size budget checked in CI: at most 1.2 MB gzip-compressed without journal storage, and at most 2.5 MB gzip-compressed with the tiramemsu journal. A release MUST fail when a budget is exceeded.
 
 #### Scenario: Budget exceeded fails CI
-- **WHEN** a change makes the gzip-compressed main package without storage larger than 600 KB
+- **WHEN** a change makes the gzip-compressed main package without storage larger than 1.2 MB
 - **THEN** the CI size check fails and reports the size and the budget
 
 #### Scenario: Storage-free build excludes SQLite

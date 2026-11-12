@@ -1,5 +1,6 @@
 // Shared fixtures and helpers of the @vertep/web tests (run with `npm test` after `npm run build`).
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { createInterface } from "node:readline";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,6 +33,33 @@ export async function loadBuild(kind) {
   const glue = await import(new URL(`../wasm/${kind}/vertep_wasm.js`, import.meta.url).href);
   await glue.default({ module_or_path: readFileSync(new URL(`../wasm/${kind}/vertep_wasm_bg.wasm`, import.meta.url)) });
   return glue;
+}
+
+/**
+ * Loads the test build (`.native/wasm-test`: every datamodel plus the test-only exports
+ * `traceCases`, `differentialRecords` and `conformanceRun`, which the published builds leave
+ * out) in this thread.
+ */
+export async function loadTestBuild() {
+  const dir = new URL("../../../.native/wasm-test/", import.meta.url);
+  const glue = await import(new URL("vertep_wasm.js", dir).href);
+  await glue.default({ module_or_path: readFileSync(new URL("vertep_wasm_bg.wasm", dir)) });
+  return glue;
+}
+
+/**
+ * The W3C IRP gate on a run's verdicts: an allow-listed variant that passes, or a mandatory
+ * variant that fails without an allow-list entry, fails the run (as the native gate does).
+ */
+export function gateFailures(input, verdicts) {
+  const allowed = new Set(input.allow.map(([t, d]) => `${t}/${d}`));
+  const classes = new Map(input.cases.map((c) => [`${c.test}/${c.datamodel}`, c.classification]));
+  return verdicts
+    .filter((v) => {
+      const k = `${v.test}/${v.datamodel}`;
+      return v.verdict === "pass" ? allowed.has(k) : !allowed.has(k) && classes.get(k) === "mandatory";
+    })
+    .map((v) => `${v.test}/${v.datamodel}: ${v.verdict === "pass" ? "unexpected pass" : `unexpected failure (${v.reason})`}`);
 }
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -97,4 +125,47 @@ export const RUST_CHART = `<scxml xmlns="http://www.w3.org/2005/07/scxml" versio
   </state>
   <state id="paid"><transition event="receipt" target="done"/></state>
   <final id="done"/>
+</scxml>`;
+
+/**
+ * Starts the native WebSocket server of the end-to-end tests (`vertep-wasm-native ws-server`):
+ * a native actor system hosting `SERVER_TYPE` that accepts the credential `secret` only.
+ * `cmd({op, args})` runs a bridge command on it, `ctl(name)` a fault control (`hold`,
+ * `release`, `dup`, `nodup`, `drop`, `pending`); both resolve with the reply's `ok` value.
+ */
+export async function startWsServer() {
+  const proc = spawn(nativeBin, ["ws-server"], { stdio: ["pipe", "pipe", "inherit"] });
+  const lines = createInterface({ input: proc.stdout });
+  const waiting = [];
+  lines.on("line", (l) => waiting.shift()?.(JSON.parse(l)));
+  const next = () => new Promise((r) => waiting.push(r));
+  const { port } = await next();
+  const send = async (o) => {
+    const reply = next();
+    proc.stdin.write(`${JSON.stringify(o)}\n`);
+    const r = await reply;
+    if ("err" in r) throw new Error(JSON.stringify(r.err));
+    return r.ok;
+  };
+  return {
+    port,
+    url: `ws://127.0.0.1:${port}/vertep`,
+    cmd: (op, args = {}) => send({ op, args }),
+    ctl: (name) => send({ ctl: name }),
+    close: () => proc.kill(),
+  };
+}
+
+export const SERVER_TYPE = "https://server.example/charts/server";
+export const SERVER_ACTOR = `${SERVER_TYPE}/s1`;
+export const WS_PROCESSOR = "https://w3id.org/vertep/vt#WebSocketEventProcessor";
+export const CLIENT_TYPE = "https://client.example/charts/client";
+
+/** A browser-side chart: `go` sends `ping` to the server actor, `pong` replies are counted. */
+export const CLIENT = `<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="c" datamodel="cel">
+  <datamodel><data id="n" expr="0"/><data id="ot" expr="''"/></datamodel>
+  <state id="c">
+    <transition event="go"><send type="websocket" event="ping" target="${SERVER_ACTOR}"/></transition>
+    <transition event="pong"><assign location="ctx.n" expr="ctx.n + 1"/><assign location="ctx.ot" expr="ev.origintype"/></transition>
+  </state>
 </scxml>`;

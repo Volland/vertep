@@ -82,6 +82,7 @@ def observe (s : Sys σ ι ε) : Obs σ ι ε :=
 
 /-- **The oracle accepts the model.** Every reachable state whose recorded sends were all
 delivered (`outbox_complete` reaches one from any state) is admissible. -/
+-- @tg: implements:: [[openspec:event-journal#Deterministic Replay]] {note: "the test oracle accepts every reachable state of the model"}
 theorem reachable_admissible [DecidableEq ι] {s : Sys σ ι ε} (h : Reachable M s)
     (hd : ∀ x ∈ recorded s.store.journal, x ∈ s.store.delivered) :
     Admissible M (observe s) := by

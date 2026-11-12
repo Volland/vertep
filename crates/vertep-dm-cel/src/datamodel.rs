@@ -349,6 +349,7 @@ impl CelDatamodel {
         m.insert(Key::str("sendid"), opt(&e.sendid));
         m.insert(Key::str("origin"), opt(&e.origin));
         m.insert(Key::str("origintype"), opt(&e.origintype));
+        m.insert(Key::str("originverified"), CelValue::Bool(e.originverified));
         m.insert(Key::str("invokeid"), opt(&e.invokeid));
         m.insert(Key::str("data"), data);
         CelValue::Map(Arc::new(m))

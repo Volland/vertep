@@ -12,6 +12,9 @@ authors.workspace = true
 default = []
 # `Storage` for the tiramemsu backend.
 tiramemsu = ["dep:vertep-tiramemsu"]
+# The server end of the WebSocket Event I/O Processor (`websocket::server`, on tokio and
+# tokio-tungstenite). The frames and the link state are always built: the browser shell uses them.
+websocket = ["dep:tokio-tungstenite", "tokio/net", "tokio/macros"]
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std", "serde"] }
@@ -25,6 +28,7 @@ serde_json = "1"
 sha2 = "0.10"
 tokio = { workspace = true, features = ["sync", "time", "rt"] }
 futures = { workspace = true }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"], optional = true }
 
 [dev-dependencies]
 vertep-runtime = { path = ".", features = ["tiramemsu"] }
@@ -35,6 +39,8 @@ vertep-store = { workspace = true, features = ["testkit"] }
 tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
 tempfile = "3"
 futures = { workspace = true }
+# The client side of the WebSocket endpoint tests.
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect"] }
 
 [lints]
 workspace = true

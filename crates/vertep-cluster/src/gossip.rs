@@ -276,11 +276,26 @@ pub struct GossipNode {
     pending: BTreeMap<u64, Pending>,
     results: BTreeMap<ShardId, Result<Lease, LeaseError>>,
     leaving: Option<BTreeSet<ShardId>>,
+    /// The member each shard was shipped to when the leave began: it gets the handover.
+    successors: BTreeMap<ShardId, NodeId>,
     left: bool,
+    /// The low bits of every epoch this node grants as leader: from its identifier and its
+    /// instance, so leaders differ, and so do two starts of one node.
+    tag: u16,
+    /// The highest epoch this node has granted or learned per shard, kept across its terms
+    /// as leader so a later term never grants an epoch again.
+    highest: BTreeMap<ShardId, u64>,
 }
 
-fn tag_of(id: &NodeId) -> u16 {
-    let h = crate::meta::HashVersion::Fnv1a64.hash64(id.as_str().as_bytes());
+/// The epoch tag of node `id` in its start number `instance` (0 for the first start keeps the
+/// tag of the identifier alone).
+fn tag_of(id: &NodeId, instance: u64) -> u16 {
+    let mut bytes = id.as_str().as_bytes().to_vec();
+    if instance != 0 {
+        bytes.push(0);
+        bytes.extend_from_slice(&instance.to_be_bytes());
+    }
+    let h = crate::meta::HashVersion::Fnv1a64.hash64(&bytes);
     ((h & 0x7fff) as u16) | 1
 }
 
@@ -334,10 +349,23 @@ impl GossipNode {
             pending: BTreeMap::new(),
             results: BTreeMap::new(),
             leaving: None,
+            successors: BTreeMap::new(),
             left: false,
+            tag: 0,
+            highest: BTreeMap::new(),
         };
+        node.tag = tag_of(&node.id, 0);
         node.changed();
         node
+    }
+
+    /// This node as start number `instance` of its identifier: a number that differs between
+    /// successive starts of the node (a boot counter, the start time, a random number). A
+    /// restarted node has forgotten the epochs it granted as leader; its new tag keeps it from
+    /// granting one of them again.
+    pub fn with_instance(mut self, instance: u64) -> Self {
+        self.tag = tag_of(&self.id, instance);
+        self
     }
 
     /// Starts a new cluster with this node as its only member.
@@ -476,16 +504,30 @@ impl GossipNode {
                 let now = self.clock.now();
                 let lease = self.config.lease;
                 let mut table = LeaseTable::new(self.meta.shard_count, lease)
-                    .with_policy(EpochPolicy::Tagged(tag_of(&self.id)));
+                    .with_policy(EpochPolicy::Tagged(self.tag));
                 let until = now.after(lease.duration);
                 for (s, o) in &self.owners {
                     table.seed(*s, &o.node, o.epoch, until);
+                }
+                for (s, e) in &self.highest {
+                    table.note_epoch(*s, *e);
                 }
                 // a predecessor may have granted leases this node never heard of
                 table.block_new_grants_until(until);
                 self.leader = Some(Leader { table });
             }
-            (false, true) => self.leader = None,
+            (false, true) => {
+                // keep what this term granted for the next one
+                if let Some(l) = self.leader.take() {
+                    for s in self.meta.shard_count.shards() {
+                        let e = l.table.highest_epoch(s);
+                        if e > 0 {
+                            let h = self.highest.entry(s).or_default();
+                            *h = (*h).max(e);
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -1069,7 +1111,11 @@ impl GossipNode {
             if others.is_empty() {
                 continue;
             }
-            let to = others[shard.index() % others.len()].clone();
+            // the member the shard was shipped to, while it is active
+            let to = match self.successors.get(&shard) {
+                Some(n) if others.contains(n) => n.clone(),
+                _ => others[shard.index() % others.len()].clone(),
+            };
             if self.leader.is_some() {
                 if self.lead_local(LeaseOp::Handover(lease, to)).is_ok() {
                     self.held.forget(shard);
@@ -1084,8 +1130,9 @@ impl GossipNode {
     }
 
     /// Starts a graceful leave: marks this node draining, drains every held shard through
-    /// `drain`, and hands each to another active member; once all are handed over (on later
-    /// ticks) the node announces that it left.
+    /// `drain` and ships it to another active member ([`Drain::ship_shard`]), and hands each
+    /// to that member; once all are handed over (on later ticks) the node announces that it
+    /// left.
     ///
     /// # Errors
     ///
@@ -1101,8 +1148,19 @@ impl GossipNode {
         self.enqueue(draining);
         self.changed();
         let shards: BTreeSet<ShardId> = self.held.all().map(|l| l.shard).collect();
+        let others: Vec<NodeId> = self
+            .peers
+            .iter()
+            .filter(|(id, p)| **id != self.id && p.status == MemberStatus::Active)
+            .map(|(id, _)| id.clone())
+            .collect();
         for s in &shards {
             drain.drain_shard(*s)?;
+            if !others.is_empty() {
+                let to = others[s.index() % others.len()].clone();
+                drain.ship_shard(*s, &to)?;
+                self.successors.insert(*s, to);
+            }
         }
         self.leaving = Some(shards);
         self.continue_leave();
@@ -1289,6 +1347,8 @@ impl Membership for GossipMembership {
 struct SimNode {
     handle: GossipMembership,
     clock: ManualClock,
+    /// How fast the node's clock runs, in percent of the network's time.
+    rate: u64,
 }
 
 #[derive(Debug)]
@@ -1350,6 +1410,17 @@ impl SimNetwork {
         endpoint: &str,
         config: GossipConfig,
     ) -> GossipMembership {
+        self.add_instance(meta, id, endpoint, config, 0)
+    }
+
+    fn add_instance(
+        &mut self,
+        meta: &ClusterMeta,
+        id: NodeId,
+        endpoint: &str,
+        config: GossipConfig,
+        instance: u64,
+    ) -> GossipMembership {
         let clock = ManualClock::at(self.now.0);
         let node = GossipNode::new(
             meta.clone(),
@@ -1357,7 +1428,8 @@ impl SimNetwork {
             endpoint,
             config,
             Arc::new(clock.clone()),
-        );
+        )
+        .with_instance(instance);
         let handle = GossipMembership::new(node);
         self.endpoints.insert(endpoint.to_owned(), id.clone());
         self.nodes.insert(
@@ -1365,6 +1437,7 @@ impl SimNetwork {
             SimNode {
                 handle: handle.clone(),
                 clock,
+                rate: 100,
             },
         );
         handle
@@ -1391,6 +1464,41 @@ impl SimNetwork {
                     }
                 }
             }
+        }
+    }
+
+    /// Restores every link of `id`, leaving other cuts in place.
+    pub fn reconnect(&mut self, id: &NodeId) {
+        self.cut.retain(|(a, b)| a != id && b != id);
+    }
+
+    /// Restarts crashed node `id` as a fresh process with no state: a new node at the same
+    /// endpoint and a new instance number, which must join again (through `seed`).
+    pub fn restart(
+        &mut self,
+        meta: &ClusterMeta,
+        id: &NodeId,
+        config: GossipConfig,
+        seed: &str,
+    ) -> Option<GossipMembership> {
+        let endpoint = self.nodes.get(id)?.handle.node().endpoint().to_owned();
+        let rate = self.nodes.get(id).map_or(100, |n| n.rate);
+        self.crashed.remove(id);
+        self.paused.remove(id);
+        self.in_flight.retain(|m| &m.to != id && &m.from != id);
+        // a new start of the node: its instance is the time it starts
+        let h = self.add_instance(meta, id.clone(), &endpoint, config, self.now.0.max(1));
+        if let Some(n) = self.nodes.get_mut(id) {
+            n.rate = rate;
+        }
+        h.node().join(seed);
+        Some(h)
+    }
+
+    /// Runs `id`'s clock at `percent` of the network's speed (clock skew that grows).
+    pub fn set_rate(&mut self, id: &NodeId, percent: u64) {
+        if let Some(n) = self.nodes.get_mut(id) {
+            n.rate = percent;
         }
     }
 
@@ -1464,7 +1572,7 @@ impl SimNetwork {
             let step_ms = duration_ms(self.step);
             for (id, n) in &self.nodes {
                 if !self.paused.contains(id) && !self.crashed.contains(id) {
-                    n.clock.advance_ms(step_ms);
+                    n.clock.advance_ms(step_ms * n.rate / 100);
                 }
             }
             // deliver what is due, in send order

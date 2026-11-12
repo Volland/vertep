@@ -171,6 +171,7 @@ fn verified_sender_from_a_did_peer() {
     let mut ev = opened.envelope.to_event();
     opened.origin.apply(&mut ev);
     assert_eq!(ev.origin.as_deref(), Some(a.identity().did.as_str()));
+    assert!(ev.originverified, "_event marks the origin as verified");
 }
 
 // @tg: verifies:: [[openspec:did-identity#Authenticated Event Origin#Forged origin claim]] {level: integration}

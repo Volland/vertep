@@ -62,6 +62,7 @@ The `no_std` heart: the chart IR, the type language, the `Datamodel` trait and t
 - realizes:: [[decisions#SCXML semantics are normative]]
 - realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the core half"}
 - realizes:: [[decisions#Type checking stops on non-contractive recursion]] {confidence: full}
+- realizes:: [[decisions#Verified origin flag in the event]] {note: "Event::originverified, set only by the federation shell"}
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
 Implemented 2026-11-11: `validate`, `order`, `compile` (states numbered in document order, root 0, an in-crate bitset), the pure Appendix D `kernel`, `session::{start, step}` with effects, the `null` datamodel and registry, and the `tape`/`trace` exchange format for the Lean oracle, following [[decisions#Appendix D readings in the Rust core]].
@@ -250,11 +251,16 @@ The tokio shell: actors and lifecycle classes, mailboxes, transports, the direct
 - realizes:: [[decisions#Event-sourced actors]]
 - realizes:: [[decisions#Non-blocking request and deferred events]]
 - realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the shell half"}
+- realizes:: [[decisions#WebSocket is a transport and an Event I/O Processor]] {confidence: partial, note: "the frames, the link and the server end"}
+- realizes:: [[decisions#WebSocket sends stay owed until the peer acknowledges them]]
+- provides:: [[capabilities#WASM bindings]] {confidence: partial, note: "the server end of the WebSocket Event I/O Processor"}
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
 Implemented 2026-11-11: a `Node` per [[decisions#A node runs its actors on one thread]] with virtual, invoked and stateless actors, an RDF journal with message dedup, a transactional outbox, snapshots and deterministic replay that detects divergence; pluggable mailboxes (memory, store) and transports (local SCXML processor); `vt:request`, `vt:defer` and unhandled-event policies; durable timers and reminders; checked migrations and forks; the runtime ontology module with SHACL shapes. 128 tests run on a virtual clock. Known limits: dedup scans the whole journal, nested invokes inside invoked children are not supported, and the store mailbox acknowledges in a separate write.
 
 Fixed 2026-11-11 after the Lean journal model's findings: store-mailbox row IRIs are `<address>/mailbox/<seq>-<digest of the envelope>`, so mailboxes of two nodes sharing a store no longer overwrite each other's rows; and the outbox mark (`vt:dispatchedThrough`) moves only over entries whose sends were all delivered, never backwards, so a send a transport refused is owed until a retry delivers it and is dispatched again after a crash. A retry keeps the send's original transport.
+
+Added 2026-11-11 for M6: `websocket` holds the WebSocket Event I/O Processor's frames, the per-peer `Link`, the `LinkMailbox` and `ClientResolver`, and the `WebSocketTransport`. The browser shell uses them. The server end, `websocket::server::WebSocketServer` on tokio-tungstenite, is behind the `websocket` feature, so the default build does not grow. It checks the credential in `hello` and routes server sends to client actors by learned origin or announced prefix. It also has fault injection for tests: held acknowledgements, duplicated frames and forced disconnects.
 
 ## vertep-agent
 
@@ -288,7 +294,7 @@ Known cost: `enabled_events` restores a probe datamodel from the actor's snapsho
 
 Trusted clusters: the `Membership` trait and its implementations, shard leases and placement, the QUIC transport and worker pools.
 
-- provides:: [[capabilities#Cluster membership]] {confidence: partial, note: "etcd and Kubernetes Lease authorities are an in-memory stand-in with their record layouts; no live client yet"}
+- provides:: [[capabilities#Cluster membership]] {confidence: full, note: "static, gossip, etcd (feature etcd) and Kubernetes Lease (feature kubernetes) memberships"}
 - provides:: [[capabilities#Shard placement]] {confidence: full}
 - provides:: [[capabilities#Cluster transport]] {confidence: full}
 - provides:: [[capabilities#Worker pools]] {confidence: full}
@@ -304,9 +310,13 @@ Trusted clusters: the `Membership` trait and its implementations, shard leases a
 - realizes:: [[decisions#Rebalancing moves the fewest shards and resharding is offline]]
 - realizes:: [[decisions#Workers are pooled, not sharded]]
 - realizes:: [[decisions#Local shard journals shipped on move]]
+- realizes:: [[decisions#External authorities over etcd and the Kubernetes Lease API]]
+- realizes:: [[decisions#A new owner replicates to the shard's current standbys]]
+- realizes:: [[decisions#Frames to other nodes are kept until settled]]
+- realizes:: [[decisions#Container fault injection runs every node as a process]]
 - scheduled_in:: [[roadmap#M4 Cluster]]
 
-Status: in progress. Membership (static, gossip, external stand-in), leases with fencing epochs, placement, fenced shard storage, standby replication, rebalancing, offline resharding, the QUIC transport, the runtime integration (`ClusterNode` as placement, `ClusterStorage`, the cluster Event I/O Processor) and worker pools are implemented and tested. Open: live etcd and Kubernetes clients, container-based fault injection and its nightly matrix. The fault-injection test replays every history through the Lean lease model in strict mode (m4-cluster 6.5, 2026-11-11), recording the grants `Membership::tick` makes as well as the harness's own.
+Status: in progress. Membership (static, gossip, and etcd and Kubernetes Lease authorities over their real APIs), leases with fencing epochs, placement, fenced shard storage, standby replication, rebalancing, offline resharding, the QUIC transport, the runtime integration (`ClusterNode` as placement, `ClusterStorage`, the cluster Event I/O Processor) and worker pools are implemented and tested. The external memberships pass the shared membership kit and the external scenarios against etcd and k3s in containers (`VERTEP_CONTAINER_TESTS=1`). Fault injection runs in process over static, the external stand-in, gossip, etcd and Kubernetes memberships, each with a shared journal and with replication factors 1 and 3, and in containers with every node a process; every history replays through the Lean lease model in strict mode. That matrix found and fixed a gossip leader reusing an epoch after a restart, standbys raising fences without storing entries, and owners writing their own copy before checking the quorum. Since 2026-11-11 a leaving node ships each shard before the handover, a new owner replicates to the shard's current standbys, and kept outbound frames survive a sender's restart. Open: journal shipping over the wire between nodes (the shipping hook takes any copy; tests ship between stores).
 
 ## vertep-federation
 
@@ -324,9 +334,10 @@ Trust-boundary actors: DID identities and resolution, authenticated senders, gra
 - realizes:: [[decisions#DID resolution is a directory chosen by address scheme]]
 - realizes:: [[decisions#Method resolvers behind one trait]]
 - realizes:: [[decisions#Keys stay behind a key manager]]
-- realizes:: [[decisions#Verification outcome is journaled with the input]] {confidence: partial, note: "the flag is origin presence until vertep-core has the field"}
-- realizes:: [[decisions#Verified origin carried by origin presence]]
+- realizes:: [[decisions#Verification outcome is journaled with the input]] {confidence: full}
+- realizes:: [[decisions#Verified origin flag in the event]] {note: "VerifiedOrigin::apply sets _event.originverified"}
 - realizes:: [[decisions#DIDComm mailboxes acknowledge after the append]]
+- realizes:: [[decisions#Remote mediators through Pickup 3.0]] {note: "pickup::MediatorClient, checked against the Identus mediator"}
 - realizes:: [[decisions#TSP direct when reachable, routed otherwise]]
 - realizes:: [[decisions#Protocol-neutral event envelope]]
 - realizes:: [[decisions#Transport selection follows the DID document]]
@@ -357,10 +368,19 @@ The WebAssembly build of the core and a browser shell with a TypeScript API and 
 - realizes:: [[decisions#Browser storage is explicit, exclusive and native-format]]
 - realizes:: [[decisions#TypeScript is one more projection of the type language]] {note: "the projection lives in vertep-rdf, the command in vertep-cli"}
 - realizes:: [[decisions#JavaScript ergonomics follow XState and semantics follow SCXML]]
-- realizes:: [[decisions#Separate packages keep the bundle budget]] {confidence: partial, note: "the core build exceeds its 600 KB budget"}
+- realizes:: [[decisions#Separate packages keep the bundle budget]] {note: "core 1,159.7 KB gzip within the 1.2 MB budget"}
+- realizes:: [[decisions#WebSocket is a transport and an Event I/O Processor]] {confidence: partial, note: "the browser and Node.js end"}
+- realizes:: [[decisions#WebSocket sends stay owed until the peer acknowledges them]]
+- realizes:: [[decisions#Test-only WebAssembly exports live in a test build]]
+- uses:: [[components#vertep-conformance]] {kind: optional, note: "feature conformance: the IRP suite runner of the test build"}
 - scheduled_in:: [[roadmap#M6 WASM and JS]]
 
-Implemented 2026-11-11: the crate (`System` and its JSON command bridge, the browser shell, explicit storage on `tm-wasm`, JavaScript implementations bound by IRI, step and differential traces, the native helper `vertep-wasm-native`) and the npm workspace `bindings/js` with `@vertep/web` (client, worker entry, core and journal builds) and `@vertep/dm-ecma`. Built by `bindings/js/scripts/build.sh` with the `wasm-bindgen` CLI pinned to the crate; tested natively, in Node.js worker threads and in headless Chrome (OPFS). Open: the WebSocket transport, the W3C suite runner in WebAssembly, the core build's size budget, publishing.
+Implemented 2026-11-11: the crate (`System` and its JSON command bridge, the browser shell, explicit storage on `tm-wasm`, JavaScript implementations bound by IRI, step and differential traces, the native helper `vertep-wasm-native`) and the npm workspace `bindings/js` with `@vertep/web` (client, worker entry, core and journal builds) and `@vertep/dm-ecma`. Built by `bindings/js/scripts/build.sh` with the `wasm-bindgen` CLI pinned to the crate; tested natively, in Node.js worker threads and in headless Chrome (OPFS). Added the same day: the WebSocket Event I/O Processor and the W3C IRP suite in WebAssembly.
+
+- The WebSocket end is `ws` on the platform `WebSocket`, with the `transports.websocket` option and a credential provider on the main thread. It is tested end to end against the native server in `vertep-wasm-native ws-server`, in Node.js and in headless Chrome, across forced disconnects.
+- The IRP suite runs from in-memory documents in the test build. Its verdicts equal the native harness's on all 386 non-manual variants, in Node.js and headless Chrome.
+
+Open: publishing. A smaller storage-free build (the original 600 KB target) needs a non-SPARQL `GraphStore` read path and is follow-up work.
 
 ## vertep-cli
 

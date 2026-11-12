@@ -250,7 +250,8 @@ fn count(node: &Node, a: &Address) -> usize {
 // @tg: verifies:: [[openspec:shard-placement#Journal Replication To Standbys#Failover to a standby]] {level: integration}
 #[tokio::test(flavor = "current_thread")]
 async fn failover_to_a_standby() {
-    let mut c = Cluster::replicated(3, 8, 3);
+    // four members: after the owner fails, three are left to hold the shard's three copies
+    let mut c = Cluster::replicated(4, 8, 3);
     c.register("counter", &scxml("ecmascript", "s", COUNTER));
     let x = c.actor_on("counter", 0, "x");
     let shard = c.shard(&x);
@@ -272,7 +273,7 @@ async fn failover_to_a_standby() {
 
     // the owner fails; after its lease expires a standby takes the shard at a higher epoch
     c.wire.set_down(&c.members[0].id, true);
-    c.advance_only(Duration::from_secs(15), &[1, 2]);
+    c.advance_only(Duration::from_secs(15), &[1, 2, 3]);
     let taker = (1..3)
         .find(|&i| {
             let storage = c.members[i].storage.clone();
@@ -289,12 +290,29 @@ async fn failover_to_a_standby() {
         m.membership.poll().unwrap();
         m.cluster.refresh();
     }
+    for m in &c.members[3..] {
+        m.membership.poll().unwrap();
+        m.cluster.refresh();
+    }
     let other = if taker == 1 { 2 } else { 1 };
     c.members[other].node.send(&x, ev("inc")).unwrap();
     assert!(
         c.until(T, |c| count(&c.members[taker].node, &x) == 4).await,
         "the actor resumed from its three acknowledged entries"
     );
+    // the new owner replicates to the shard's current standbys, the member that replaces the
+    // failed one included (it receives the whole journal)
+    let copies = (1..4)
+        .filter(|&i| i != taker)
+        .filter(|&i| {
+            c.members[i].stores[shard.index()]
+                .head(x.node())
+                .unwrap()
+                .get()
+                == 4
+        })
+        .count();
+    assert_eq!(copies, 2, "the fourth entry is on two standbys");
 }
 
 // @tg: verifies:: [[openspec:shard-placement#Journal Replication To Standbys#No standby with replication factor one]] {level: integration}
@@ -652,6 +670,59 @@ async fn idempotent_worker_is_retried() {
     assert_eq!(hung.load(Ordering::SeqCst), 1);
 }
 
+/// The caller chart with a request timeout of `timeout`.
+fn quick_caller_chart(timeout: &str) -> vertep_core::ir::Chart {
+    let w = worker_addr();
+    scxml(
+        "null",
+        "idle",
+        &format!(
+            r#"<state id="idle"><transition event="ask" target="asking"/></state>
+               <state id="asking"><vt:request target="{w}" event="work" timeout="{timeout}" reply="done" ontimeout="timedout"/>
+                 <transition event="error.communication" target="failed"/></state>
+               <state id="done"/><state id="timedout"/><state id="failed"/>"#
+        ),
+    )
+}
+
+// @tg: verifies:: [[openspec:worker-pools#Worker Concurrency Limits#Limit reached]] {level: integration}
+#[tokio::test(flavor = "current_thread")]
+async fn a_timed_out_request_frees_its_worker_capacity() {
+    let config = ClusterConfig {
+        delivery_deadline: Duration::from_millis(300),
+        retry_backoff: Duration::from_millis(50),
+        ..ClusterConfig::default()
+    };
+    let mut c = Cluster::with_config(2, 8, config);
+    let calls = Arc::new(AtomicUsize::new(0));
+    // one activation with one request at a time
+    workers(&mut c, ask_type(), &[(1, echo("n1", calls.clone()))]);
+    c.register("quick", &quick_caller_chart("500ms"));
+    // the worker's reply to p is lost for good: the link back is cut past the delivery deadline
+    c.wire.set_cut(&c.members[1].id, &c.members[0].id, true);
+    let p = c.actor_on("quick", 0, "p");
+    c.members[0].node.send(&p, ev("ask")).unwrap();
+    assert!(
+        c.until(T, |c| configuration(&mut c.members[0].node, &p)
+            == ["timedout"])
+            .await,
+        "the caller's request timed out"
+    );
+    c.run_for(Duration::from_millis(500)).await;
+    c.wire.set_cut(&c.members[1].id, &c.members[0].id, false);
+    // the timeout freed the activation's capacity (the reply that would have freed it never
+    // comes): the next request is served
+    let q = c.actor_on("quick", 0, "q");
+    c.members[0].node.send(&q, ev("ask")).unwrap();
+    assert!(
+        c.until(T, |c| configuration(&mut c.members[0].node, &q) == ["done"])
+            .await,
+        "the next request got the activation"
+    );
+    // two work requests (the third input was the error about its own undeliverable reply)
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn a_full_pool_queue_refuses_at_once() {
     let mut c = Cluster::new(2, 8);
@@ -721,6 +792,77 @@ async fn fenced_frames_land_in_the_runtime_dead_letter_graph() {
     assert_eq!(dead[0].reason, "fenced");
     assert_eq!(dead[0].event, "inc");
     assert_eq!(dead[0].sender.as_deref(), Some(sender.as_str()));
+}
+
+// @tg: verifies:: [[openspec:cluster-membership#Graceful Leave With Drain#Leaving node hands over its shards]] {level: integration}
+#[tokio::test(flavor = "current_thread")]
+async fn a_leaving_node_ships_its_shard_journals() {
+    use vertep_cluster::runtime::NodeDrain;
+    let mut c = Cluster::new(3, 8);
+    c.register("counter", &scxml("ecmascript", "s", COUNTER));
+    let x = c.actor_on("counter", 1, "x");
+    let shard = c.shard(&x);
+    for _ in 0..3 {
+        c.members[0].node.send(&x, ev("inc")).unwrap();
+    }
+    assert!(c.until(T, |c| count(&c.members[1].node, &x) == 3).await);
+    // n1 leaves: each shard's local journal goes to its successor before the lease does
+    let stores: Vec<Vec<Arc<MemoryStore>>> = c.members.iter().map(|m| m.stores.clone()).collect();
+    let ids: Vec<NodeId> = c.members.iter().map(|m| m.id.clone()).collect();
+    let membership = c.members[1].membership.clone();
+    let meta = c.meta.clone();
+    let mut drain = NodeDrain::new(&mut c.members[1].node, meta).with_shipping(|s, to| {
+        let j = ids.iter().position(|n| n == to).unwrap();
+        vertep_cluster::ship_journal(stores[1][s.index()].as_ref(), stores[j][s.index()].as_ref())
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    });
+    membership.leave(&mut drain).unwrap();
+    drop(drain);
+    c.wire.set_down(&c.members[1].id, true);
+    c.advance_only(Duration::from_millis(100), &[0, 2]);
+    for m in [0, 2] {
+        c.members[m].cluster.refresh();
+    }
+    let to = c
+        .members
+        .iter()
+        .position(|m| m.membership.held(shard).is_some())
+        .expect("a successor holds the shard");
+    assert_ne!(to, 1);
+    c.members[0].node.send(&x, ev("inc")).unwrap();
+    assert!(
+        c.until(T, |c| count(&c.members[to].node, &x) == 4).await,
+        "the actor resumed on its successor from its three entries"
+    );
+}
+
+// @tg: verifies:: [[openspec:cluster-transport#At-Least-Once Delivery With Deduplication#Lost acknowledgement causes a duplicate that is discarded]] {level: integration}
+#[tokio::test(flavor = "current_thread")]
+async fn a_restarted_sender_sends_again_what_was_not_acknowledged() {
+    let mut c = Cluster::new(2, 8);
+    let chart = scxml("ecmascript", "s", COUNTER);
+    c.register("counter", &chart);
+    let x = c.actor_on("counter", 1, "x");
+    // frames from n0 to n1 are lost: the message is handed off, never acknowledged
+    c.wire.set_cut(&c.members[0].id, &c.members[1].id, true);
+    c.members[0].node.send(&x, ev("inc")).unwrap();
+    c.run_for(Duration::from_millis(100)).await;
+    // n0 crashes before the acknowledgement and starts again over its storage
+    c.restart(0);
+    c.members[0]
+        .node
+        .register_type(&ty("counter"), chart)
+        .unwrap();
+    c.run_for(Duration::from_millis(300)).await;
+    assert_eq!(count(&c.members[1].node, &x), 0, "still cut off");
+    c.wire.set_cut(&c.members[0].id, &c.members[1].id, false);
+    assert!(
+        c.until(T, |c| count(&c.members[1].node, &x) == 1).await,
+        "the message reached its actor after the sender's restart"
+    );
+    c.run_for(Duration::from_millis(200)).await;
+    assert_eq!(count(&c.members[1].node, &x), 1, "once");
 }
 
 #[tokio::test(flavor = "current_thread")]
