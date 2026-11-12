@@ -1,0 +1,20 @@
+[   0s] (start)  -> operating light red crossing walk
+          schedule tick in 30s
+[  30s] tick     -> operating light green crossing dont_walk
+          schedule tick in 25s
+[  40s] button   -> operating light yellow crossing dont_walk
+          cancel light-timer
+          schedule tick in 5s
+[  45s] tick     -> operating light red crossing walk
+          schedule tick in 30s
+[  50s] fault    -> flashing
+          cancel light-timer
+[  60s] reset    -> operating light red crossing walk
+          schedule tick in 30s
+[  90s] tick     -> operating light green crossing dont_walk
+          schedule tick in 25s
+[ 115s] tick     -> operating light yellow crossing dont_walk
+          schedule tick in 5s
+[ 120s] tick     -> operating light red crossing walk
+          schedule tick in 30s
+stopped at 120s; still pending: tick due at 150s

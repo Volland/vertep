@@ -27,6 +27,7 @@ flowchart TD
     dmrust["vertep-dm-rust"]
     core["vertep-core (no_std)"]
     conf["vertep-conformance (dev)"]
+    examples["vertep-examples (examples)"]
     lean["vertep-lean (Lean 4)"]
 
     facade --> agent & cluster & fed & runtime & macros & tira
@@ -48,6 +49,7 @@ flowchart TD
     dmrust --> core
     conf --> core & scxml & ecma
     conf -. differential oracle .-> lean
+    examples -.-> facade & cel & dmrust & cli & wasm
 ```
 
 ## vertep-core
@@ -407,3 +409,26 @@ The facade crate an application depends on, re-exporting the other crates behind
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
 Implemented 2026-11-11: re-exports core, store and RDF, plus runtime, tiramemsu and SCXML behind default features and ECMAScript on request; `examples/quickstart.rs` runs one virtual actor with a delayed send and a time-travel query.
+
+## vertep-examples
+
+Runnable examples for newcomers and the documentation site, one binary per example with its charts, and tests that hold every example to its recorded output.
+
+- uses:: [[components#vertep]] {kind: required, note: "the facade with the agent feature: core, SCXML, runtime, tiramemsu, agents"}
+- uses:: [[components#vertep-dm-cel]] {kind: required, note: "the facade does not re-export the CEL datamodel"}
+- uses:: [[components#vertep-dm-rust]] {kind: required, note: "statechart! and the rust datamodel"}
+- uses:: [[components#vertep-cli]] {kind: dev, note: "the vt commands as a library, to check their recorded outputs"}
+- uses:: [[components#vertep-yaml]] {kind: dev, note: "runs the typed-order chart"}
+- uses:: [[components#vertep-wasm]] {kind: optional, note: "browser-js runs the built @vertep/web package in Node.js"}
+- scheduled_in:: [[roadmap#M6 WASM and JS]] {note: "written after M6; the examples cover M0 to M6"}
+
+Added 2026-11-12 under `examples/` (package `vertep-examples`, not published), indexed by `examples/README.md`:
+
+- `traffic-light`: an SCXML chart with a parallel state, eventless `In()` transitions and delayed sends with cancel, driven by a minimal host over the pure `session::start`/`step`; plus `vt validate`, `vt hash` and `vt convert` to YAML and Turtle, which keep the chart version.
+- `typed-order`: a typed YAML chart on CEL with `vt typecheck`, `vt schema`, `vt gen ts` and an ill-typed variant.
+- `rust-macro`: `statechart!` on the `rust` datamodel with guard and action functions and the generated `Machine`.
+- `durable-actor`: a virtual actor on a tiramemsu store that outlives its node; replay on reopen and a durable timer that fires in the second process.
+- `decider-agent`: two `vt:decide` states answered by a scripted `Decider`, journaled, then replayed by a host with no decider bound.
+- `browser-js`: `@vertep/web` from Node.js: spawn from SCXML text, send, subscribe, read the journal, time travel.
+
+`tests/run_examples.rs` runs every binary and compares its standard output with `expected-output.txt`; `tests/vt_commands.rs` does the same for the `vt` outputs under each example's `vt/` directory (`VERTEP_BLESS=1` re-records). The Node.js example is checked when its `node_modules` link to the built package exists.

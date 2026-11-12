@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The goat does not choose the play — Vertep</title>
+<meta name="description" content="Deterministic agents: put the language model at a choice point in a statechart, let it pick only among enabled events, journal every answer, and replay any run without a model.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="index.html" aria-current="page">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+  <header class="article-head">
+    <p class="kicker">Article the second</p>
+    <h1>The goat does not choose the play</h1>
+    <p class="byline">On deterministic agents, and where a language model belongs in a program</p>
+  </header>
+
+  <p>The goat is the liveliest figure in the Ukrainian vertep procession. She dances, she falls down, she is mourned and comes back to life, and the crowd loves her for it. But she does not choose the play. The play is old and known, and the goat's wildness happens inside it, at the moments the play leaves open for her.</p>
+
+  <p>That is a good picture of how a language model should sit inside a program. It is the liveliest part, and it should have room to be clever. But it should not be the program.</p>
+
+  <h2>The loop that is the program</h2>
+
+  <p>The common way to build an "agent" is a loop. Put the goal and the history into a prompt. Ask the model what to do. If it names a tool, call the tool, append the result and ask again. Stop when the model says it is done.</p>
+
+  <p>This works in a demo, and it has four problems in production.</p>
+
+  <ul>
+    <li><strong>The state is a transcript.</strong> Where is the process now? Somewhere in a growing prompt. What may it do next? Whatever the model says. Nothing outside the model knows what is allowed.</li>
+    <li><strong>It cannot be replayed.</strong> Run it again and the model answers differently. A failure in production cannot be reproduced, only described.</li>
+    <li><strong>Its side effects have no bound.</strong> A prompt injection in a retrieved document can ask for any tool with any arguments, and the loop will try.</li>
+    <li><strong>It has no clock.</strong> What if the model hangs, or loops for ever? What if a person must approve a step and goes home for the weekend?</li>
+  </ul>
+
+  <p>Each of these can be patched. The patches end up building a state machine, one <code>if</code> at a time, without its diagram and without its guarantees.</p>
+
+  <h2>Put the model at a choice point</h2>
+
+  <p>Vertep starts from the other end. The program is a statechart. Most of its transitions are ordinary: an event arrives, a guard is checked, the chart moves. At some states, though, the chart cannot decide alone. Should this ticket be answered, escalated, or researched further? Those states are marked <code>vt:decide</code>, and they name a <em>decider</em>.</p>
+
+<pre data-lang="SCXML"><code>&lt;state id="decide" vt:decide="llm/claude" vt:fallback="human/support" vt:deadline="30s"
+       vt:maxDecisions="10" vt:candidates="call_tool finish escalate"&gt;
+  &lt;transition event="call_tool" target="tooling"&gt;...&lt;/transition&gt;
+  &lt;transition event="finish" target="done"&gt;...&lt;/transition&gt;
+  &lt;transition event="escalate" target="human"/&gt;
+  &lt;transition event="vt.agent.budget-exhausted" target="budget_out"/&gt;
+  &lt;transition event="error.decide.invalid" target="decide"/&gt;
+  &lt;transition event="vt.decide.refused" target="human"/&gt;
+&lt;/state&gt;</code></pre>
+
+  <p>A decider may be a guard, a language model, a person, or another actor. They all share one contract, and it is a narrow one. A decider is shown a set of candidate events, and it may return one of them, with a payload. That is all it can do. The invariant behind it fits in one line:</p>
+
+  <blockquote>A decider only proposes events. The chart validates and decides.</blockquote>
+
+  <h2>Four steps, every time</h2>
+
+  <figure class="plate">
+    <div class="plate-inner">
+      <svg viewBox="0 0 560 250" width="560" role="img" aria-labelledby="p2t">
+        <title id="p2t">Offer, decide, return, validate: the pure core offers candidates, the shell asks the decider, the answer comes back through the mailbox and the journal, and the core accepts it only if it was offered</title>
+        <defs>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+          <pattern id="h2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".3"/></pattern>
+        </defs>
+        <rect x="8" y="8" width="250" height="234" style="fill:url(#h2);stroke:var(--ink)" stroke-width="1.5" stroke-dasharray="6 5"/>
+        <rect x="302" y="8" width="250" height="234" style="fill:none;stroke:var(--ink)" stroke-width="1.5" stroke-dasharray="6 5"/>
+        <g font-family="IM Fell English SC, Georgia, serif" font-size="15" style="fill:var(--ink-2)" text-anchor="middle">
+          <text x="133" y="232">trusted · pure · replayable</text>
+          <text x="427" y="232">untrusted · slow · may be wrong</text>
+        </g>
+        <g font-family="IM Fell English SC, Georgia, serif" font-size="16" style="fill:var(--ink)" text-anchor="middle">
+          <rect x="34" y="28" width="198" height="50" style="fill:var(--orange);stroke:var(--ink)" stroke-width="2.5"/>
+          <text x="133" y="50" style="fill:var(--on-orange)">1 · Offer</text>
+          <text x="133" y="68" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--on-orange)">enabled events → candidates</text>
+          <rect x="328" y="28" width="198" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+          <text x="427" y="50">2 · Decide</text>
+          <text x="427" y="68" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--ink-2)">LLM · person · guard · actor</text>
+          <rect x="328" y="118" width="198" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+          <text x="427" y="140">3 · Return</text>
+          <text x="427" y="158" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--ink-2)">vt.decision → mailbox</text>
+          <rect x="34" y="118" width="198" height="50" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2.5"/>
+          <text x="133" y="140" style="fill:var(--paper)">4 · Validate</text>
+          <text x="133" y="158" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--paper)">journal, then accept or reject</text>
+        </g>
+        <g fill="none" style="stroke:var(--ink)" stroke-width="2" marker-end="url(#a2)">
+          <path d="M232 53 H324"/>
+          <path d="M427 78 V114"/>
+          <path d="M328 143 H236"/>
+        </g>
+        <g font-family="JetBrains Mono, monospace" font-size="11" style="fill:var(--ink-2)">
+          <text x="246" y="46">OfferDecision</text>
+          <text x="250" y="136">journaled</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Plate I. <b>The decide cycle.</b> The model lives on the right; every effect it has passes through the left.</figcaption>
+  </figure>
+
+  <ol>
+    <li><strong>Offer.</strong> When the chart enters a decide state, the pure core computes which events would actually be enabled now, restricted to the declared candidates. It emits an <code>OfferDecision</code> effect with a correlation id taken from the journal position, so a replay produces the same id.</li>
+    <li><strong>Decide.</strong> The shell asks the decider, asynchronously. The actor does not block. It stays in an ordinary state and keeps handling other events.</li>
+    <li><strong>Return.</strong> The answer comes back as an event, <code>vt.decision</code>, through the mailbox. It is appended to the journal, deduplicated by correlation id, and only then processed.</li>
+    <li><strong>Validate.</strong> The answer is accepted only if its correlation id names the open offer, its event was a candidate, its payload matches the candidate's schema, and the transition it would take is still the one that was enabled when the offer was made. Then the event is raised and normal SCXML selection takes the transition. Otherwise the chart gets <code>error.decide.invalid</code> with a reason such as <code>not-a-candidate</code>, <code>payload-schema</code>, <code>stale</code> or <code>not-enabled</code>.</li>
+  </ol>
+
+  <p>The model never touches the chart's data, never calls a tool directly and never picks a transition the chart did not offer. If it answers with something else, that is an event the chart handles like any other error. In the support agent above, the chart simply asks again.</p>
+
+  <h2>What this buys</h2>
+
+  <table>
+    <thead><tr><th>Problem with the loop</th><th>What the chart does instead</th></tr></thead>
+    <tbody>
+      <tr><td>The state is a transcript</td><td>The state is a configuration of named states. What may happen next is written in the chart.</td></tr>
+      <tr><td>It cannot be replayed</td><td>Decisions and model results are journaled <em>before</em> they are processed. Replay feeds them back and never calls a model.</td></tr>
+      <tr><td>Side effects have no bound</td><td>Only offered candidates are accepted. Tools are actors, and an invoking state grants its child the tools it may use; the send path enforces the intersection of grants.</td></tr>
+      <tr><td>It has no clock</td><td><code>vt:deadline</code> is a durable timer journaled with the offer. When it fires, <code>vt:fallback</code> hands the choice to another decider, perhaps a person. <code>vt:maxDecisions</code> ends runaway loops with an event.</td></tr>
+    </tbody>
+  </table>
+
+  <p>None of these depends on the model behaving well. A prompt injection can make a model choose badly, but only among the moves the chart offered at that moment. If a move is dangerous, the chart can route it to a human decider, and that too is a transition you can read.</p>
+
+  <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+  <h2>The journal is the run</h2>
+
+  <p>Everything nondeterministic enters a Vertep actor as a journaled input: the offer, the decision with its annotations, the model's result with its prompt hash, usage and model name, the tool's reply, the timer that fired. Large prompts and results are stored once by content hash.</p>
+
+  <p>So an agent run is not a log <em>about</em> the run. It <em>is</em> the run. Replay it with no model, no network and no API key, and the chart passes through exactly the same states. A bug report becomes a journal you can step through.</p>
+
+  <p>It also makes a new kind of question easy to ask. <em>What if the model had escalated instead of answering?</em> Fork the journal at the position of the offer, supply a different decision, and run the branch. The original history is not edited. The fork is a new actor with a new past.</p>
+
+  <h2>Loops, plans and the proof</h2>
+
+  <p>A ReAct-style agent, one that reasons, calls tools and reasons again, is not a special feature in Vertep. It is a chart: a decide state whose candidates are tool calls, a finish event and an escalation, with an iteration limit and a budget guard. The support agent in <code>crates/vertep-agent/examples/support-agent.scxml</code> is exactly that, in about sixty lines.</p>
+
+  <p>Sometimes a model should do more than pick a move. It might lay out a whole plan. Vertep lets it, in the same spirit. A plan is a chart fragment the model writes. It is parsed and validated, restricted to the CEL datamodel and to granted functions, given its own content-addressed version, and run only as a bounded, sandboxed child of the state that asked for it. The plan may be wild, but it runs on a stage of its own and only within the parent's grants.</p>
+
+  <p>Finally, the guarantee is not only tested. The Lean model of Vertep includes <code>enabled_events</code>, the offer, the validation guard and the grant intersection, and it proves <em>decider safety</em>: whatever any decider returns, including an adversarial one, the transition taken was enabled when it was offered. It also proves that no actor sends outside its effective grant, and that a run replays without its deciders.</p>
+
+  <h2>What it costs</h2>
+
+  <p>Every decision is written to storage before it is used, which adds a write to the path of every choice. You have to design the chart: name the states, decide what is a candidate, think about deadlines and fallbacks. And the model cannot invent an action the chart did not foresee. If it should be able to, the chart must say so, perhaps with a plan state.</p>
+
+  <p>That last cost is the point. An agent that can do anything cannot be trusted with anything. An agent that can do any of the things its chart offers, at the moments the chart offers them, with every choice written down, can be given real work. The goat dances as wildly as she likes. The play stays the play.</p>
+
+  <nav class="pager" aria-label="Articles">
+    <a href="statecharts.html">← The shape of behaviour</a>
+    <a href="../docs/agents.html">Agents in the docs →</a>
+  </nav>
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

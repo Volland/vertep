@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Datamodels and types — Vertep docs</title>
+<meta name="description" content="The null, ECMAScript, CEL and Rust datamodels, the Vertep type language, the type checker, and the projections of types to Rust, TypeScript, JSON Schema, SHACL and CEL.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html" aria-current="page">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Charts</p>
+    <h1>Datamodels and types</h1>
+    <p class="lede">A chart's datamodel decides what its conditions, assignments and data look like. Its types say what each event carries and what the context holds. This page covers the four datamodels, the type language, the type checker and the projections of types to Rust, TypeScript, JSON Schema, SHACL and CEL.</p>
+
+    <h2 id="datamodels">Four datamodels</h2>
+    <p>All executable content goes through one <code>Datamodel</code> trait in <code>vertep-core</code>: initialize data, evaluate a condition, evaluate a value, assign, run a script, iterate, snapshot and restore. A chart names its datamodel, and the host creates it from a registry by that name. A chart whose datamodel is not registered is refused.</p>
+    <table>
+      <thead><tr><th>Datamodel</th><th>Crate</th><th>Expressions</th><th>Typical use</th><th>How it stays deterministic</th></tr></thead>
+      <tbody>
+        <tr><td><code>null</code></td><td><code>vertep-core</code></td><td>none; conditions may only be <code>In('state')</code></td><td>protocol and lifecycle charts; the SCXML default</td><td>it has no data</td></tr>
+        <tr><td><code>ecmascript</code></td><td><code>vertep-dm-ecma</code> (boa engine)</td><td>JavaScript, W3C SCXML B.2</td><td>imported SCXML, the W3C conformance suite</td><td><code>Math.random</code> is seeded and <code>Date</code> reads the time carried by the input</td></tr>
+        <tr><td><code>cel</code></td><td><code>vertep-dm-cel</code></td><td>CEL, over <code>ctx</code>, <code>ev</code> and <code>session</code></td><td>YAML charts (the YAML default), charts written by LLMs</td><td>the language has no effects, no clock and no randomness; maps are ordered; decimals are exact</td></tr>
+        <tr><td><code>rust</code></td><td><code>vertep-dm-rust</code></td><td>Rust functions bound by IRI</td><td><code>statechart!</code> and <code>include_chart!</code> charts</td><td>guards get <code>&amp;Ctx</code> only, so they cannot change the context; the rest is a contract on your code</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="choosing">Which one to use</h3>
+    <ul>
+      <li><strong>No data at all:</strong> <code>null</code>. <code>examples/traffic-light/traffic-light.scxml</code> runs a two-region traffic light on it, with <code>In()</code> conditions only.</li>
+      <li><strong>An existing SCXML chart</strong>, or one that must also run in another SCXML engine: <code>ecmascript</code>.</li>
+      <li><strong>A chart written in YAML</strong>, or written by anyone you do not fully trust, including a language model: <code>cel</code>. It cannot cause side effects, always terminates, and is type-checked before the chart runs.</li>
+      <li><strong>A chart compiled into a Rust program</strong>, where guards and actions are Rust functions: <code>rust</code>.</li>
+    </ul>
+
+    <h3 id="null">null</h3>
+    <p>The <code>null</code> datamodel (W3C SCXML B.1) holds no data. <code>In()</code> is the only condition it accepts. Any other condition, any <code>&lt;assign&gt;</code>, any <code>&lt;script&gt;</code> and any value expression is an evaluation error and queues <code>error.execution</code>. Its snapshot is the empty value.</p>
+
+    <h3 id="ecmascript">ecmascript</h3>
+    <p><code>vertep-dm-ecma</code> implements W3C SCXML B.2 on the boa engine, behind the cargo feature <code>ecmascript</code> (on by default). Without the feature the crate registers no datamodel, and charts that need it are refused. Data items are variables of one global scope per session. Inline content that <code>JSON.parse</code> accepts becomes that value; anything else becomes a string. Conditions run against a read-only view of the session scope, so a condition that tries to assign fails. System variables are frozen. <code>Math.random()</code> is seeded from the input, and the current date is the timestamp journaled with the event, never the wall clock.</p>
+    <p>In the browser the same datamodel ships as a separate package, <code>@vertep/dm-ecma</code>; see <a href="browser.html">Browser and JavaScript</a>.</p>
+
+    <h3 id="cel">cel</h3>
+    <p><code>vertep-dm-cel</code> is Vertep's own CEL interpreter. No existing Rust CEL implementation had exact decimals, evaluation limits and a defined map order together with <code>no_std</code>, so it was written for this. It is <code>no_std</code> with <code>alloc</code> and uses integer arithmetic for decimals, timestamps and durations.</p>
+    <p>Expressions see:</p>
+    <table>
+      <thead><tr><th>Name</th><th>What</th></tr></thead>
+      <tbody>
+        <tr><td><code>ctx</code></td><td>the chart's context (its data items)</td></tr>
+        <tr><td><code>ev</code></td><td>the current event, with <code>name</code>, <code>type</code>, <code>sendid</code>, <code>origin</code>, <code>origintype</code>, <code>invokeid</code> and <code>data</code></td></tr>
+        <tr><td><code>session</code></td><td><code>id</code> and <code>name</code></td></tr>
+        <tr><td><code>In("state")</code></td><td>true when the state is active</td></tr>
+      </tbody>
+    </table>
+    <p>There is no <code>now()</code> and no random function, so an expression that calls one fails type checking. The only state change a CEL datamodel makes is an <code>&lt;assign&gt;</code> of an expression's value to a location; a failed assignment leaves the location unchanged and raises <code>error.execution</code>. Every evaluation is bounded by limits, and exceeding one raises <code>error.execution</code> naming the limit. The defaults, from <code>Limits::default()</code> in <code>crates/vertep-dm-cel/src/error.rs</code>:</p>
+    <table>
+      <thead><tr><th>Limit</th><th>Default</th></tr></thead>
+      <tbody>
+        <tr><td><code>max_steps</code>, evaluation steps for one expression</td><td>100,000</td></tr>
+        <tr><td><code>max_value_size</code>, the largest value produced or stored</td><td>1 MiB (<code>1 &lt;&lt; 20</code>)</td></tr>
+        <tr><td><code>max_depth</code>, expression nesting</td><td>64</td></tr>
+        <tr><td><code>max_expr_len</code>, expression source length in bytes</td><td>64 KiB (<code>1 &lt;&lt; 16</code>)</td></tr>
+        <tr><td><code>max_value_depth</code>, nesting of lists and maps in a value</td><td>128</td></tr>
+      </tbody>
+    </table>
+    <p>For charts from untrusted authors, load with <code>Policy::CelOnly</code> (<code>vertep_dm_cel::Policy</code>). It rejects a chart that names another datamodel, that contains <code>&lt;script&gt;</code>, or that references a registered Rust guard or action (<code>vt:guard/…</code>, <code>vt:action/…</code>). Plan charts, on <a href="agents.html">Agents and deciders</a>, type-check their CEL expressions under this policy.</p>
+
+    <h3 id="rust">rust</h3>
+    <p>On the <code>rust</code> datamodel the context is a Rust struct (the generated <code>Ctx</code>), and guards and actions are Rust functions registered by IRI. A guard is <code>fn(&amp;Ctx, &amp;P) -&gt; bool</code>: no mutable context and no emitter. An action is <code>fn(&amp;mut Ctx, &amp;P, &amp;mut Emit)</code>, <code>fn(&amp;mut Ctx, &amp;P)</code> or <code>fn(&amp;mut Ctx, &amp;P) -&gt; Vec&lt;E&gt;</code>. Its only effects are context changes and emitted events, which become <code>&lt;raise&gt;</code> and <code>&lt;send&gt;</code> in the step. The registry rejects duplicate IRIs, and a chart whose IRIs are not all registered cannot start. Because the registry works by IRI, a chart loaded from RDF at run time can bind to compiled functions too. How the IRIs appear in the IR is shown on <a href="charts.html#same-chart">Writing charts</a>.</p>
+
+    <h3 id="shared-rules">Rules every datamodel follows</h3>
+    <ul>
+      <li><strong>System variables</strong> <code>_event</code>, <code>_sessionid</code>, <code>_name</code> and <code>_ioprocessors</code> are read-only. Assigning to one is an error.</li>
+      <li><strong>Guards are pure.</strong> A condition that tries to change data is an error, is treated as false, and queues <code>error.execution</code>.</li>
+      <li><strong>Errors are events.</strong> A failed expression becomes <code>error.execution</code> on the internal queue; it never panics.</li>
+      <li><strong>Binding</strong> follows SCXML 5.3. Under early binding (the default) all data is initialized at session start. Under late binding a state's data gets its initial value when the state is first entered.</li>
+      <li><strong>Determinism.</strong> The same datamodel state and the same input give the same result. Time and randomness come only from the input the host supplies, which the runtime journals.</li>
+      <li><strong>Snapshots.</strong> Every datamodel serializes its full state to a datamodel-independent value and restores from it, and restoring then continuing gives the same results as never stopping.</li>
+    </ul>
+
+    <h2 id="language">The type language</h2>
+    <p>One algebraic type language describes event payloads and context in every surface. Typing is opt-in per chart. A chart without type declarations is untyped: every payload and context value has the dynamic type <code>value</code>, the checker reports nothing, and the chart runs as plain SCXML would.</p>
+    <table>
+      <thead><tr><th>Type</th><th>Values</th></tr></thead>
+      <tbody>
+        <tr><td><code>bool</code></td><td><code>true</code>, <code>false</code></td></tr>
+        <tr><td><code>int</code></td><td>signed 64-bit integers</td></tr>
+        <tr><td><code>decimal</code></td><td>arbitrary-precision decimals</td></tr>
+        <tr><td><code>string</code></td><td>Unicode strings</td></tr>
+        <tr><td><code>datetime</code></td><td>RFC 3339 instants with an explicit offset</td></tr>
+        <tr><td><code>iri</code></td><td>absolute IRIs (RFC 3987)</td></tr>
+        <tr><td><code>{ id: string, total: decimal }</code></td><td>records: exactly the declared fields</td></tr>
+        <tr><td><code>Card { last4: string } | Cash</code></td><td>tagged unions; each variant may carry a payload</td></tr>
+        <tr><td><code>list&lt;T&gt;</code>, <code>optional&lt;T&gt;</code></td><td>homogeneous lists; a value or absence</td></tr>
+        <tr><td><code>Order</code></td><td>a named type</td></tr>
+        <tr><td><code>value</code></td><td>anything; the type of untyped data</td></tr>
+      </tbody>
+    </table>
+    <p>The textual syntax, used in <code>vt:type</code> attributes, the <code>vt:types</code> block and YAML strings, from <code>crates/vertep-core/src/types/syntax.rs</code>:</p>
+<pre data-lang="Grammar"><code>//! type      := '|' variant ('|' variant)*          a union, leading bar allowed
+//!            | variant ('|' variant)+              a union
+//!            | tag atom                            a one-variant union with payload
+//!            | atom
+//! variant   := tag atom?                           tag is an identifier or a "quoted string"
+//! atom      := bool | int | decimal | string | datetime | iri | value
+//!            | list '&lt;' type '&gt;' | optional '&lt;' type '&gt;'
+//!            | '{' (name ':' type (',' name ':' type)* ','?)? '}'
+//!            | '(' type ')'
+//!            | Name                                a named type
+//! decls     := (('type' Name '=' type | 'event' event-name (':' type)?) ';')*</code></pre>
+    <p>A few rules worth knowing:</p>
+    <ul>
+      <li><strong>Named types are content-addressed.</strong> A named type's IRI is a hash of its canonical definition, such as <code>urn:vertep:type:sha256:…</code>. Identical definitions share an IRI; field order does not matter; any change gives a new IRI. The chart version covers its types, so changing a payload type is a new chart version.</li>
+      <li><strong>Recursion</strong> must go through a <code>list</code> or an <code>optional</code>. An unguarded self-reference is an error.</li>
+      <li><strong>Records are closed.</strong> A missing required field and an unknown extra field are both errors. An absent <code>optional</code> field reads as absent, not as an empty value.</li>
+      <li><strong>The dynamic boundary.</strong> A typed value can always go where <code>value</code> is expected. A <code>value</code> goes where a static type is expected only through a checked conversion, which raises <code>error.execution</code> on a mismatch.</li>
+      <li><strong>System events are typed.</strong> <code>error.*</code> carries <code>{ kind: string, message: string }</code>; <code>done.state.*</code> and <code>done.invoke.*</code> carry <code>value</code>. A descriptor that matches several typed events sees the union of their payload types.</li>
+    </ul>
+
+    <h2 id="writing-types">Writing types in a chart</h2>
+    <p>Here is one small typed chart, a counter, on CEL in YAML. <code>types</code> names record and union types, <code>events</code> gives each event its payload type (<code>null</code> for none), and <code>context</code> gives each data item a type and an initial value:</p>
+<pre data-lang="YAML"><code>vertep: 1
+name: counter
+datamodel: cel
+types:
+  Add: { by: int }
+events: { add: Add, reset: null }
+context:
+  count: { type: int, init: "0" }
+initial: counting
+states:
+  counting:
+    on:
+      add:
+        - cond: "ev.data.by &gt; 0"
+          actions: [ { assign: { location: ctx.count, expr: "ctx.count + ev.data.by" } } ]
+      reset:
+        - actions: [ { assign: { location: ctx.count, expr: "0" } } ]</code></pre>
+    <p>In SCXML the same declarations go in a <code>vt:types</code> element, and <code>vt:type</code> annotates a <code>&lt;data&gt;</code> item (or a <code>&lt;send&gt;</code> payload, or a <code>&lt;param&gt;</code>). This version uses the <code>ecmascript</code> datamodel, so its expressions read <code>_event.data</code> instead of <code>ev.data</code>:</p>
+<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" name="counter" datamodel="ecmascript" initial="counting"&gt;
+  &lt;vt:types&gt;
+    type Add = { by: int };
+    event add: Add;
+    event reset;
+  &lt;/vt:types&gt;
+  &lt;datamodel&gt;
+    &lt;data id="count" expr="0" vt:type="int"/&gt;
+  &lt;/datamodel&gt;
+  &lt;state id="counting"&gt;
+    &lt;transition event="add" cond="_event.data.by &amp;gt; 0"&gt;
+      &lt;assign location="count" expr="count + _event.data.by"/&gt;
+    &lt;/transition&gt;
+    &lt;transition event="reset"&gt;
+      &lt;assign location="count" expr="0"/&gt;
+    &lt;/transition&gt;
+  &lt;/state&gt;
+&lt;/scxml&gt;</code></pre>
+    <p>An SCXML processor that ignores the <code>vt:</code> namespace runs this document untyped. The two files differ in datamodel, so they are two charts with two versions:</p>
+<pre class="output" data-lang="Output"><code>$ vt hash counter.yaml
+urn:vertep:chart:sha256:4ee7f3aad3f8bf39adb28adb68271c58a9460efbe090d6549a0e1eca8f954076
+$ vt hash counter.scxml
+urn:vertep:chart:sha256:6e1b433eed539ee7ff42ee23c1ee4e96592232e12e4688c248b2a0538464c2d2</code></pre>
+    <p>In <code>statechart!</code>, types go in <code>types { … }</code>, <code>context { name: type = literal }</code> and <code>events { name: Type }</code>; see <a href="charts.html#macro">the macro</a>. The type annotations survive every surface: converting a typed chart from YAML to SCXML to RDF and back gives the same types and the same version IRI.</p>
+
+    <h2 id="checking">Type checking</h2>
+    <p>One checker in <code>vertep-core</code> (<code>check_chart</code>) serves the macros, the loaders, <code>vt</code> and the runtime. Before a typed chart can be instantiated, it checks event payloads, context declarations, <code>&lt;data&gt;</code> initializers, <code>&lt;send&gt;</code> payloads, parameters, guards and assignments against the declared types. A chart with type errors is not instantiated. For <code>cel</code> and <code>rust</code> charts the checker knows the <code>ctx</code> and <code>ev</code> roots and types expressions over them; for other datamodels it types literals only.</p>
+<pre class="output" data-lang="Output"><code>$ vt typecheck counter.yaml
+counter.yaml: ok: 1 named types, 2 typed events, 1 context fields</code></pre>
+    <p>If the <code>reset</code> transition assigns <code>true</code> to the <code>int</code> field <code>ctx.count</code>, the error names the line, the column and the path in the document, and the command exits 1:</p>
+<pre class="output" data-lang="Output"><code>$ vt typecheck assign-bool.yaml; echo "exit $?"
+assign-bool.yaml:17:22: states.counting.on.reset[0].actions[0]: state "counting", transition 1 (on reset), action 0: the value assigned to `ctx.count` has type bool, expected int
+exit 1</code></pre>
+    <p>The CEL expressions themselves are checked against the chart's CEL type environment. A guard must have type <code>bool</code>, and a field must exist on the record it is read from:</p>
+<pre class="output" data-lang="Output"><code>$ vt typecheck guard-int.yaml
+guard-int.yaml: state `counting` › transition 1 › cond: a guard must have type bool, but `ctx.count + 1` has type int
+guard-int.yaml: 1 type error
+$ vt typecheck no-field.yaml
+no-field.yaml: state `counting` › transition 1 › cond: no field `amount` in Add in `ev.data.amount &gt; 0`
+no-field.yaml: 1 type error</code></pre>
+    <div class="nb warn"><p>In <code>vt typecheck</code> the CEL expression check runs only after the declarations and assignments pass, so a chart with both kinds of error shows the second kind after you fix the first. CEL diagnostics name the state and transition but carry no line and column, and they count transitions from 1 where the other diagnostics count from 0.</p></div>
+    <p>An unknown type name gets a suggestion:</p>
+<pre class="output" data-lang="Output"><code>$ vt typecheck counter-typo.scxml
+counter-typo.scxml:9:5: vt:type on &lt;data id="count"&gt;: unknown type `Add2`; did you mean `Add`?</code></pre>
+    <p>A larger example is <code>examples/typed-order/</code>: <code>order.yaml</code> is well typed, and <code>order-ill-typed.yaml</code> assigns a string to a decimal on purpose.</p>
+<pre class="output" data-lang="Output"><code>$ vt typecheck order-ill-typed.yaml
+order-ill-typed.yaml:44:19: states.shopping.states.cart.on.add[0].actions[1]: state "cart", transition 0 (on add), action 1: the value assigned to `ctx.total` has type string, expected decimal
+$ vt typecheck order.yaml
+order.yaml: ok: 3 named types, 6 typed events, 3 context fields</code></pre>
+    <p>In the macro the checker runs at compile time, and the generated Rust types catch the rest: <code>Event::Pay { amount: "ten" }</code> does not compile, because <code>amount</code> is a <code>Decimal</code> (<code>crates/vertep-dm-rust/tests/ui/wrong_payload.stderr</code>).</p>
+
+    <h2 id="projections">Projections</h2>
+    <p>Each type projects to the forms the rest of the system needs. JSON Schema describes LLM structured output and tool arguments; SHACL validates journal values in RDF; the CEL environment type-checks CEL expressions; Rust and TypeScript give typed APIs.</p>
+
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 520 250" width="520" role="img" aria-labelledby="types-proj-t">
+          <title id="types-proj-t">One IR type projects to Rust, TypeScript, JSON Schema, SHACL and the CEL type environment; the checker accepts a value exactly when the JSON Schema and SHACL projections accept its canonical encoding</title>
+          <defs>
+            <marker id="types-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+            <pattern id="types-ph" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+          </defs>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="16" style="fill:var(--ink)">
+            <rect x="20" y="95" width="130" height="60" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <rect x="20" y="95" width="130" height="60" fill="url(#types-ph)"/>
+            <text x="85" y="122" text-anchor="middle" style="fill:var(--on-orange)">IR type</text>
+            <text x="85" y="142" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--on-orange)">vertep-core</text>
+            <rect x="300" y="10" width="200" height="38" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="400" y="34" text-anchor="middle">Rust · macros</text>
+            <rect x="300" y="58" width="200" height="38" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="400" y="82" text-anchor="middle">TypeScript · vt gen ts</text>
+            <rect x="300" y="106" width="200" height="38" style="fill:var(--paper);stroke:var(--ink);stroke-width:4"/>
+            <text x="400" y="130" text-anchor="middle">JSON Schema 2020-12</text>
+            <rect x="300" y="154" width="200" height="38" style="fill:var(--paper);stroke:var(--ink);stroke-width:4"/>
+            <text x="400" y="178" text-anchor="middle">SHACL Core</text>
+            <rect x="300" y="202" width="200" height="38" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="400" y="226" text-anchor="middle">CEL type environment</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2.2" marker-end="url(#types-arr)">
+            <path d="M150 110 C220 100 230 35 296 29"/>
+            <path d="M150 118 C220 110 240 80 296 77"/>
+            <path d="M150 125 H296"/>
+            <path d="M150 132 C220 140 240 170 296 173"/>
+            <path d="M150 140 C220 150 230 215 296 221"/>
+          </g>
+          <text x="180" y="245" font-family="JetBrains Mono, monospace" font-size="11" style="fill:var(--ink-2)">heavy frame: agreement with the checker tested</text>
+        </svg>
+      </div>
+      <figcaption>Plate I. <b>One type, five readings.</b> A value checks against the type exactly when the projection accepts its canonical encoding.</figcaption>
+    </figure>
+
+    <table>
+      <thead><tr><th>Type</th><th>Rust</th><th>TypeScript</th><th>JSON Schema</th><th>CEL</th></tr></thead>
+      <tbody>
+        <tr><td><code>bool</code></td><td><code>bool</code></td><td><code>boolean</code></td><td><code>boolean</code></td><td><code>bool</code></td></tr>
+        <tr><td><code>int</code></td><td><code>i64</code></td><td><code>number</code></td><td><code>integer</code> in the i64 range</td><td><code>int</code></td></tr>
+        <tr><td><code>decimal</code></td><td><code>vertep_dm_rust::Decimal</code></td><td><code>number | string</code></td><td>number, or a decimal string</td><td><code>decimal</code></td></tr>
+        <tr><td><code>string</code></td><td><code>String</code></td><td><code>string</code></td><td><code>string</code></td><td><code>string</code></td></tr>
+        <tr><td><code>datetime</code></td><td><code>vertep_dm_rust::Datetime</code></td><td><code>string</code></td><td>string</td><td><code>google.protobuf.Timestamp</code></td></tr>
+        <tr><td><code>iri</code></td><td><code>vertep_dm_rust::Iri</code></td><td><code>string</code></td><td>string</td><td><code>string</code></td></tr>
+        <tr><td>record</td><td>struct</td><td>object type</td><td>closed object</td><td>closed message type</td></tr>
+        <tr><td>union</td><td>enum</td><td><code>{ tag: "A"; value: T } | { tag: "B" }</code></td><td><code>anyOf</code> of tag objects</td><td>message with <code>tag</code> and <code>value</code></td></tr>
+        <tr><td><code>list&lt;T&gt;</code></td><td><code>Vec&lt;T&gt;</code></td><td><code>T[]</code></td><td>array</td><td><code>list(T)</code></td></tr>
+        <tr><td><code>optional&lt;T&gt;</code></td><td><code>Option&lt;T&gt;</code></td><td><code>T | null</code>, optional field</td><td><code>null</code> or <code>T</code>, not required</td><td>optional</td></tr>
+        <tr><td><code>value</code></td><td><code>vertep_dm_rust::Value</code></td><td><code>JsonValue</code></td><td>any</td><td><code>dyn</code></td></tr>
+      </tbody>
+    </table>
+    <p>All of them agree on one canonical encoding of values (<code>crates/vertep-core/src/types/check.rs</code>): a decimal is a string such as <code>"12.50"</code> (a number is accepted on input); a datetime is an RFC 3339 string, encoded in UTC with a <code>Z</code>; a record has exactly its declared fields, absent optional fields omitted; a tagged union is <code>{"tag": …, "value": …}</code>, without <code>value</code> for a variant with no payload.</p>
+
+    <h3 id="vt-schema"><code>vt schema</code></h3>
+    <p><code>vt schema --format jsonschema|shacl|cel|rust &lt;chart&gt;</code> prints a projection. The CEL environment of the counter:</p>
+<pre class="output" data-lang="Output"><code>$ vt schema --format cel counter.yaml
+ctx.count: int
+ev.data[add]: Add
+ev.data[reset]: null_type</code></pre>
+    <p>JSON Schema: one document for the context and one per event payload.</p>
+<pre class="output" data-lang="Output"><code>$ vt schema --format jsonschema counter.yaml
+{
+  "context": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "count": {
+        "exclusiveMaximum": 9223372036854775808,
+        "minimum": -9223372036854775808,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "count"
+    ],
+    "type": "object"
+  },
+  "events": {
+    "add": {
+      "$defs": {
+        "Add": {
+          "additionalProperties": false,
+          "properties": {
+            "by": {
+              "exclusiveMaximum": 9223372036854775808,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "by"
+          ],
+          "title": "Add",
+          "type": "object"
+        }
+      },
+      "$ref": "#/$defs/Add",
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "reset": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "null"
+    }
+  }
+}</code></pre>
+    <p>SHACL, in Turtle. Shapes for named types sit under the type's own IRI, so any graph can find them by type. Shapes for the context and events sit under the chart version:</p>
+<pre class="output" data-lang="Output"><code>$ vt schema --format shacl counter.yaml
+@prefix c: &lt;urn:vertep:chart:sha256:4ee7f3aad3f8bf39adb28adb68271c58a9460efbe090d6549a0e1eca8f954076#&gt; .
+@prefix rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt; .
+@prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; .
+@prefix sh: &lt;http://www.w3.org/ns/shacl#&gt; .
+@prefix vt: &lt;https://w3id.org/vertep/vt#&gt; .
+c:context.f.count.t a sh:NodeShape ;
+	sh:datatype xsd:long .
+c:context.f.count a sh:PropertyShape ;
+	sh:maxCount 1 ;
+	sh:minCount 1 ;
+	sh:node c:context.f.count.t ;
+	sh:path &lt;https://w3id.org/vertep/field#count&gt; .
+c:context a sh:NodeShape ;
+	sh:closed true ;
+	sh:nodeKind sh:BlankNode ;
+	sh:property c:context.f.count .
+c:event.add a sh:NodeShape ;
+	sh:node &lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411&gt; .
+&lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411#s.f.by.t&gt; a sh:NodeShape ;
+	sh:datatype xsd:long .
+&lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411#s.f.by&gt; a sh:PropertyShape ;
+	sh:maxCount 1 ;
+	sh:minCount 1 ;
+	sh:node &lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411#s.f.by.t&gt; ;
+	sh:path &lt;https://w3id.org/vertep/field#by&gt; .
+&lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411#t.f.by&gt; a vt:TypeField ;
+	vt:fieldName "by" ;
+	vt:fieldType vt:IntType .
+&lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411#t&gt; a vt:RecordType ;
+	vt:typeField &lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411#t.f.by&gt; .
+&lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411&gt; a sh:NodeShape , vt:NamedType ;
+	sh:closed true ;
+	sh:nodeKind sh:BlankNode ;
+	sh:property &lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411#s.f.by&gt; ;
+	vt:definition &lt;urn:vertep:type:sha256:04cc38e2c0e46abd032d0b88badf9887bc3bc9e04fda108ed58c2729bb422411#t&gt; ;
+	vt:typeName "Add" .</code></pre>
+    <p>The Rust projection is not printed. It is generated at compile time by the macros:</p>
+<pre class="output" data-lang="Output"><code>$ vt schema --format rust counter.yaml
+counter.yaml: the Rust projection is generated at compile time by the statechart! and include_chart! macros (vertep-macros); use include_chart!("counter.yaml") to get the typed Rust API</code></pre>
+    <p>The test <code>union_projects_to_an_enum</code> in <code>crates/vertep-dm-rust/tests/rust_projection.rs</code> shows the Rust side: a union becomes an enum you can match exhaustively, records become structs, recursion through an optional is boxed.</p>
+<pre data-lang="Rust"><code>statechart! {
+    #[allow(unhandled_events, unreachable_states)]
+    name: types_demo,
+    types {
+        Payment = Card { last4: string } | Cash,
+        Line = { sku: string, qty: int, price: decimal, note: optional&lt;string&gt; },
+        Order = {
+            id: iri,
+            at: datetime,
+            lines: list&lt;Line&gt;,
+            payment: Payment,
+            paid: bool,
+            extra: value,
+            parent: optional&lt;Order&gt;,
+            "unit price": optional&lt;Money&gt;,
+            type: optional&lt;string&gt;,
+        },
+        Tree = Leaf | Node { children: list&lt;Tree&gt; } | Labeled string,
+        Money = decimal,
+    }
+    events { place: Order }
+    initial open;
+    state open { on place =&gt; open; }
+}
+
+fn label(p: &amp;Payment) -&gt; String {
+    // Exhaustive: the enum has exactly these two variants.
+    match p {
+        Payment::Card { last4 } =&gt; format!("card {last4}"),
+        Payment::Cash =&gt; "cash".to_string(),
+    }
+}</code></pre>
+
+    <h3 id="vt-gen-ts"><code>vt gen ts</code></h3>
+    <p><code>vt gen ts &lt;chart&gt; [--name N]</code> prints a TypeScript module for <code>@vertep/web</code>: the event union, the context interface, the union of state ids, the chart spec with its source and version, and a typed constructor for the chart's virtual actor. Scalar rules TypeScript cannot state (the integer range, the decimal, date-time and IRI patterns) are checked when the event reaches the chart.</p>
+<pre class="output" data-lang="Output"><code>$ vt gen ts counter.yaml
+// Generated by `vt gen ts` from chart urn:vertep:chart:sha256:4ee7f3aad3f8bf39adb28adb68271c58a9460efbe090d6549a0e1eca8f954076. Do not edit.
+import type { ActorRef, ActorSystem, ChartSpec, JsonValue } from "@vertep/web";
+
+export type Add = { by: number };
+
+export type CounterEvent =
+  | { type: "add" } &amp; Add
+  | { type: "reset" };
+export interface CounterContext {
+  count: number;
+}
+export type CounterStateId = "counting";
+
+/** The chart, typed: pass it to `spawn` or `virtual`. */
+export const counterChart: ChartSpec&lt;CounterEvent, CounterContext, CounterStateId&gt; = {
+  source: "vertep: 1\nname: counter\ndatamodel: cel\ntypes:\n  Add: { by: int }\nevents: { add: Add, reset: null }\ncontext:\n  count: { type: int, init: \"0\" }\ninitial: counting\nstates:\n  counting:\n    on:\n      add:\n        - cond: \"ev.data.by &gt; 0\"\n          actions: [ { assign: { location: ctx.count, expr: \"ctx.count + ev.data.by\" } } ]\n      reset:\n        - actions: [ { assign: { location: ctx.count, expr: \"0\" } } ]\n",
+  format: "yaml",
+  type: "urn:vertep:chart:sha256:4ee7f3aad3f8bf39adb28adb68271c58a9460efbe090d6549a0e1eca8f954076",
+};
+
+/** The virtual actor of this chart with `key`, typed. */
+export function createCounterActor(system: ActorSystem, key: string): ActorRef&lt;CounterEvent, CounterContext, CounterStateId&gt; {
+  return system.virtual(counterChart, key);
+}</code></pre>
+    <p>How to use the generated module is on <a href="browser.html">Browser and JavaScript</a>.</p>
+
+    <h3 id="agreement">How far the projections are checked</h3>
+    <p>For a projection <code>P</code>, the property is <code>check(T, v) = P.accepts(P(T), encode(v))</code>: the checker accepts a value exactly when the projection accepts its canonical encoding.</p>
+    <ul>
+      <li><strong>JSON Schema:</strong> tested on generated values and near misses (the property test <code>checker_json_schema_and_shacl_agree</code> in <code>crates/vertep-rdf/tests/types.rs</code>), and proven in Lean as <code>JsonSchema.jsonSchema_agrees</code>, for JSON values and for type blocks whose unions have distinct tags. The <code>pattern</code> keyword is read as the lexical rule its regular expression encodes; that the regular expression and the rule agree is not proven.</li>
+      <li><strong>SHACL:</strong> tested by the same property test. The Lean proof of agreement is still open.</li>
+      <li><strong>Type soundness of <code>step</code></strong> (a well-typed chart only ever writes well-typed values) is not proven yet, and <code>vt certify</code> does not yet accept typed charts.</li>
+    </ul>
+    <p>The open items are tracked in <code>openspec/changes/verification-backlog/tasks.md</code> and described on <a href="verification.html">Verification</a>.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="charts.html">← Writing charts</a>
+      <a href="runtime.html">The actor runtime →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

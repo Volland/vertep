@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The vt command — Vertep docs</title>
+<meta name="description" content="Every subcommand of vt, the Vertep command line: typecheck, schema, validate, hash, convert, gen ts, certify and cluster reshard, with their flags, exit codes and real runs on real charts.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html" aria-current="page">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Reference</p>
+    <h1>The vt command</h1>
+    <p class="lede"><code>vt</code> checks, hashes, converts and certifies charts, generates TypeScript for the browser, and reshards a stopped cluster. This page lists every subcommand with its real help text and a real run on a chart from the repository.</p>
+
+    <p>All outputs on this page come from the <code>vt</code> binary built from the current sources. Commands are run from the repository root unless the text says otherwise. Very long outputs are trimmed, and each trim is marked.</p>
+
+    <h2 id="install">Getting vt</h2>
+    <p><code>vt</code> is the binary of the <code>vertep-cli</code> crate (<code>crates/vertep-cli</code>). It is not published to crates.io yet, so you build it from a checkout:</p>
+
+<pre data-lang="Shell"><code>cargo build --release -p vertep-cli
+./target/release/vt --version</code></pre>
+
+<pre class="output" data-lang="Output"><code>vt 0.1.0</code></pre>
+
+    <p>You can also run it through Cargo without building a release binary: <code>cargo run -p vertep-cli -- validate &lt;chart&gt;</code>. Or install it into <code>~/.cargo/bin</code> with <code>cargo install --path crates/vertep-cli</code>. The examples below write <code>vt</code> for whichever you use.</p>
+
+<pre data-lang="Shell"><code>vt --help</code></pre>
+
+<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert and certify
+
+Usage: vt &lt;COMMAND&gt;
+
+Commands:
+  typecheck  Type-check a chart and report every error with its location
+  schema     Print a projection of the chart's types
+  validate   Check well-formedness and SHACL conformance
+  hash       Print the chart version IRI
+  convert    Convert a chart to another surface, refusing lossy conversions
+  certify    Run the Lean checker and print the certificate
+  gen        Generate code from a chart
+  cluster    Cluster operations
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version</code></pre>
+
+    <table>
+      <thead><tr><th>Command</th><th>What it does</th><th>Section</th></tr></thead>
+      <tbody>
+        <tr><td><code>vt typecheck &lt;chart&gt;</code></td><td>Runs the type checker and prints every error with its location.</td><td><a href="#typecheck">typecheck</a></td></tr>
+        <tr><td><code>vt schema &lt;chart&gt; --format …</code></td><td>Prints the chart's types as JSON Schema, SHACL or a CEL type environment.</td><td><a href="#schema">schema</a></td></tr>
+        <tr><td><code>vt validate &lt;chart&gt;</code></td><td>Checks well-formedness and the SHACL chart shapes.</td><td><a href="#validate">validate</a></td></tr>
+        <tr><td><code>vt hash &lt;chart&gt;</code></td><td>Prints the chart version IRI.</td><td><a href="#hash">hash</a></td></tr>
+        <tr><td><code>vt convert &lt;chart&gt; --to …</code></td><td>Converts between SCXML, YAML and RDF, and refuses when something would be lost.</td><td><a href="#convert">convert</a></td></tr>
+        <tr><td><code>vt gen ts &lt;chart&gt;</code></td><td>Prints a typed TypeScript module for <code>@vertep/web</code>.</td><td><a href="#gen-ts">gen ts</a></td></tr>
+        <tr><td><code>vt certify &lt;chart&gt;</code></td><td>Runs the Lean-compiled checker and prints its certificate.</td><td><a href="#certify">certify</a></td></tr>
+        <tr><td><code>vt cluster reshard &lt;dir&gt; &lt;out&gt;</code></td><td>Doubles the shard count of a stopped cluster.</td><td><a href="#reshard">cluster reshard</a></td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="reading">How vt reads a chart</h2>
+    <p>Every subcommand that takes a chart accepts any surface. <code>vt</code> picks the reader from the file extension. When the extension is unknown it looks at the content: XML that contains <code>&lt;scxml</code> is SCXML, a line starting with <code>vertep:</code> is YAML, a document starting with <code>@prefix</code> or <code>PREFIX</code> is read as TriG, and anything else as N-Quads. The rules live in <code>crates/vertep-cli/src/surface.rs</code>.</p>
+
+    <table>
+      <thead><tr><th>Extension</th><th>Surface</th></tr></thead>
+      <tbody>
+        <tr><td><code>.scxml</code>, <code>.xml</code></td><td>SCXML 1.0 with the <code>vt:</code> extensions</td></tr>
+        <tr><td><code>.yaml</code>, <code>.yml</code></td><td>The YAML chart format</td></tr>
+        <tr><td><code>.ttl</code></td><td>RDF 1.2 Turtle</td></tr>
+        <tr><td><code>.trig</code></td><td>RDF 1.2 TriG</td></tr>
+        <tr><td><code>.nq</code></td><td>RDF 1.2 N-Quads</td></tr>
+        <tr><td><code>.nt</code></td><td>RDF 1.2 N-Triples (read only; <code>convert</code> does not write it)</td></tr>
+      </tbody>
+    </table>
+
+    <p>Every command uses the same three exit codes, so scripts and CI jobs can tell a bad chart from a bad invocation:</p>
+
+    <table>
+      <thead><tr><th>Exit code</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>0</code></td><td>Success.</td></tr>
+        <tr><td><code>1</code></td><td>The chart fails the command: a type error, an ill-formed chart, a lossy conversion, a refused certificate, live leases.</td></tr>
+        <tr><td><code>2</code></td><td>Usage or I/O error: a missing flag, a file that cannot be read or written.</td></tr>
+      </tbody>
+    </table>
+
+<pre data-lang="Shell"><code>vt hash no-such-chart.scxml; echo "exit $?"
+vt schema examples/typed-order/order.yaml; echo "exit $?"</code></pre>
+
+<pre class="output" data-lang="Output"><code>no-such-chart.scxml: cannot read: No such file or directory (os error 2)
+exit 2
+error: the following required arguments were not provided:
+  --format &lt;FORMAT&gt;
+
+Usage: vt schema --format &lt;FORMAT&gt; &lt;CHART&gt;
+
+For more information, try '--help'.
+exit 2</code></pre>
+
+    <p>Errors go to standard error, results to standard output. A diagnostic that has a position is written <code>file:line:column: message</code>, the form editors and CI annotations understand.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <h2 id="typecheck">vt typecheck</h2>
+
+<pre class="output" data-lang="vt typecheck --help"><code>Type-check a chart and report every error with its location
+
+Usage: vt typecheck &lt;CHART&gt;
+
+Arguments:
+  &lt;CHART&gt;  The chart file
+
+Options:
+  -h, --help  Print help</code></pre>
+
+    <p><code>typecheck</code> runs the core type checker with the typer of the chart's datamodel. For a CEL chart it then also checks every CEL expression against the type environment built from the chart's declarations. On success it counts what it checked. A chart that declares no types is reported as <code>untyped</code>, which is not an error.</p>
+
+    <p><code>examples/typed-order/order.yaml</code> is a typed order chart on the CEL datamodel, with three named types, six typed events and three context fields:</p>
+
+<pre data-lang="Shell"><code>vt typecheck examples/typed-order/order.yaml
+vt typecheck crates/vertep-dm-rust/tests/charts/order.scxml
+vt typecheck crates/vertep-agent/examples/support-agent.scxml</code></pre>
+
+<pre class="output" data-lang="Output"><code>examples/typed-order/order.yaml: ok: 3 named types, 6 typed events, 3 context fields
+crates/vertep-dm-rust/tests/charts/order.scxml: ok: 2 named types, 5 typed events, 2 context fields
+crates/vertep-agent/examples/support-agent.scxml: ok: untyped</code></pre>
+
+    <p><code>examples/typed-order/order-ill-typed.yaml</code> is the same chart with one deliberate mistake: the <code>add</code> transition assigns the item's <code>sku</code>, a string, to <code>ctx.total</code>, a decimal.</p>
+
+<pre data-lang="YAML"><code>      cart:
+        on:
+          add:
+            - cond: "ev.data.qty &gt; 0"
+              actions:
+                - assign: { location: ctx.items, expr: "ctx.items + [ev.data]" }
+                - assign: { location: ctx.total, expr: "ev.data.sku" }</code></pre>
+
+<pre data-lang="Shell"><code>vt typecheck examples/typed-order/order-ill-typed.yaml; echo "exit $?"</code></pre>
+
+<pre class="output" data-lang="Output"><code>examples/typed-order/order-ill-typed.yaml:44:19: states.shopping.states.cart.on.add[0].actions[1]: state "cart", transition 0 (on add), action 1: the value assigned to `ctx.total` has type string, expected decimal
+exit 1</code></pre>
+
+    <p>For YAML the error carries two locations: the line and column in the file, and the path through the document (<code>states.shopping.states.cart.on.add[0].actions[1]</code>). Then comes the location in chart terms: state, transition, action.</p>
+
+    <p>The same chart converted to SCXML (see <a href="#convert">convert</a>; conversion only checks structure, so an ill-typed chart converts) reports the error at the <code>&lt;assign&gt;</code> element, followed by a count:</p>
+
+<pre data-lang="Shell"><code>vt convert examples/typed-order/order-ill-typed.yaml --to scxml -o ill.scxml
+vt typecheck ill.scxml; echo "exit $?"</code></pre>
+
+<pre class="output" data-lang="Output"><code>ill.scxml:23:9: state "cart", transition 0 (on add), action 1: the value assigned to `ctx.total` has type string, expected decimal
+ill.scxml: 1 type error
+exit 1</code></pre>
+
+    <p>The type language itself, and which datamodels have a typer, are described in <a href="types.html">Datamodels and types</a>.</p>
+
+    <h2 id="schema">vt schema</h2>
+
+<pre class="output" data-lang="vt schema --help"><code>Print a projection of the chart's types
+
+Usage: vt schema --format &lt;FORMAT&gt; &lt;CHART&gt;
+
+Arguments:
+  &lt;CHART&gt;  The chart file
+
+Options:
+      --format &lt;FORMAT&gt;  The projection [possible values: rust, jsonschema, shacl, cel]
+  -h, --help             Print help</code></pre>
+
+    <p><code>schema</code> type-checks the chart first and prints nothing if that fails (exit 1). Then it prints one projection of the chart's types:</p>
+
+    <table>
+      <thead><tr><th><code>--format</code></th><th>Output</th></tr></thead>
+      <tbody>
+        <tr><td><code>cel</code></td><td>The CEL type environment: the type of each <code>ctx.</code> field and of <code>ev.data</code> for each event.</td></tr>
+        <tr><td><code>jsonschema</code></td><td>One JSON object with a JSON Schema 2020-12 document for the context and one per event payload.</td></tr>
+        <tr><td><code>shacl</code></td><td>SHACL Core shapes in Turtle: a node shape per named type at its type IRI, the context shape at <code>&lt;version&gt;#context</code> and each typed event's payload shape at <code>&lt;version&gt;#event.&lt;name&gt;</code>.</td></tr>
+        <tr><td><code>rust</code></td><td>Not printed by <code>vt</code>. It exits 2 and points to the <code>include_chart!</code> macro, which generates the Rust types at compile time.</td></tr>
+      </tbody>
+    </table>
+
+    <p>The examples use <code>crates/vertep-dm-rust/tests/charts/order.scxml</code>, a typed chart whose types are declared in a <code>vt:types</code> block:</p>
+
+<pre data-lang="SCXML"><code>&lt;vt:types xmlns:vt="https://w3id.org/vertep/vt#"&gt;type Pay = { amount: decimal };
+type Approval = { by: iri };
+event start;
+event pay: Pay;
+event authorized;
+event approve: Approval;
+event cancel;
+&lt;/vt:types&gt;
+&lt;datamodel&gt;
+  &lt;data id="total" expr="0" vt:type="decimal"/&gt;
+  &lt;data id="limit" expr="100" vt:type="decimal"/&gt;
+&lt;/datamodel&gt;</code></pre>
+
+<pre data-lang="Shell"><code>vt schema crates/vertep-dm-rust/tests/charts/order.scxml --format cel</code></pre>
+
+<pre class="output" data-lang="Output"><code>ctx.total: decimal
+ctx.limit: decimal
+ev.data[start]: null_type
+ev.data[pay]: Pay
+ev.data[authorized]: null_type
+ev.data[approve]: Approval
+ev.data[cancel]: null_type</code></pre>
+
+<pre data-lang="Shell"><code>vt schema crates/vertep-dm-rust/tests/charts/order.scxml --format jsonschema</code></pre>
+
+<pre class="output" data-lang="Output (trimmed)"><code>{
+  "context": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "limit": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string"
+          }
+        ]
+      },
+      "total": { … same as limit … }
+    },
+    "required": [
+      "total",
+      "limit"
+    ],
+    "type": "object"
+  },
+  "events": {
+    "approve": {
+      "$defs": {
+        "Approval": {
+          "additionalProperties": false,
+          "properties": {
+            "by": {
+              "pattern": "^[A-Za-z][A-Za-z0-9+.\\-]*:(?:[^\\x00-\\x20\\x7F&lt;&gt;\"{}|\\\\^`%]|%[0-9A-Fa-f]{2})*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "by"
+          ],
+          "title": "Approval",
+          "type": "object"
+        }
+      },
+      "$ref": "#/$defs/Approval",
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "authorized": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "null"
+    },
+    …
+  }
+}</code></pre>
+
+    <p>A <code>decimal</code> accepts a JSON number or a string of decimal digits. An <code>iri</code> is a string with an IRI pattern. Records are closed (<code>"additionalProperties": false</code>).</p>
+
+<pre data-lang="Shell"><code>vt schema crates/vertep-dm-rust/tests/charts/order.scxml --format shacl</code></pre>
+
+<pre class="output" data-lang="Output (trimmed)"><code>@prefix c: &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#&gt; .
+@prefix rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt; .
+@prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; .
+@prefix sh: &lt;http://www.w3.org/ns/shacl#&gt; .
+@prefix vt: &lt;https://w3id.org/vertep/vt#&gt; .
+…
+c:context.f.limit a sh:PropertyShape ;
+	sh:maxCount 1 ;
+	sh:minCount 1 ;
+	sh:node c:context.f.limit.t ;
+	sh:path &lt;https://w3id.org/vertep/field#limit&gt; .
+…
+c:context a sh:NodeShape ;
+	sh:closed true ;
+	sh:nodeKind sh:BlankNode ;
+	sh:property c:context.f.limit , c:context.f.total .
+c:event.approve a sh:NodeShape ;
+	sh:node &lt;urn:vertep:type:sha256:78b8b5724ef01cf7b643dc932acb99c0504f0928315f6e79cc6c0e966ce37d24&gt; .
+c:event.pay a sh:NodeShape ;
+	sh:node &lt;urn:vertep:type:sha256:41b1c80782c0edf4c066dd3ac0c6235285690642f6ec20b1bb77e8e7e1bd632f&gt; .
+…
+&lt;urn:vertep:type:sha256:78b8b5724ef01cf7b643dc932acb99c0504f0928315f6e79cc6c0e966ce37d24&gt; a sh:NodeShape , vt:NamedType ;
+	sh:closed true ;
+	sh:nodeKind sh:BlankNode ;
+	sh:property &lt;urn:vertep:type:sha256:78b8b5724ef01cf7b643dc932acb99c0504f0928315f6e79cc6c0e966ce37d24#s.f.by&gt; ;
+	vt:definition &lt;urn:vertep:type:sha256:78b8b5724ef01cf7b643dc932acb99c0504f0928315f6e79cc6c0e966ce37d24#t&gt; ;
+	vt:typeName "Approval" .</code></pre>
+
+    <p>Named types get content-addressed IRIs (<code>urn:vertep:type:sha256:…</code>), so two charts that declare the same <code>Approval</code> type share its shape. The context and event shapes hang off the chart version IRI.</p>
+
+<pre data-lang="Shell"><code>vt schema crates/vertep-dm-rust/tests/charts/order.scxml --format rust; echo "exit $?"</code></pre>
+
+<pre class="output" data-lang="Output"><code>crates/vertep-dm-rust/tests/charts/order.scxml: the Rust projection is generated at compile time by the statechart! and include_chart! macros (vertep-macros); use include_chart!("crates/vertep-dm-rust/tests/charts/order.scxml") to get the typed Rust API
+exit 2</code></pre>
+
+    <h2 id="validate">vt validate</h2>
+
+<pre class="output" data-lang="vt validate --help"><code>Check well-formedness and SHACL conformance
+
+Usage: vt validate &lt;CHART&gt;
+
+Arguments:
+  &lt;CHART&gt;  The chart file
+
+Options:
+  -h, --help  Print help</code></pre>
+
+    <p><code>validate</code> checks the chart's structure, not its types. It runs three checks and reports everything it finds:</p>
+    <ol>
+      <li>the core well-formedness rules (unique ids, valid targets and initial states, legal attribute combinations, and so on);</li>
+      <li>the SHACL chart shapes, run against the chart's RDF projection;</li>
+      <li>that the type shapes embedded in the projection parse as SHACL.</li>
+    </ol>
+    <p>On success it prints the chart version IRI.</p>
+
+<pre data-lang="Shell"><code>vt validate crates/vertep-agent/examples/support-agent.scxml
+vt validate examples/traffic-light/traffic-light.scxml</code></pre>
+
+<pre class="output" data-lang="Output"><code>crates/vertep-agent/examples/support-agent.scxml: ok: urn:vertep:chart:sha256:b0b8e9574ca25b8572269bf25a2d4e199f7db5dc6b47bd0574a9d662ec2d2462
+examples/traffic-light/traffic-light.scxml: ok: urn:vertep:chart:sha256:46431c540d155bee9016c61ee7a8f734890a92342ed9f91188aea25a602f5731</code></pre>
+
+    <p>The SCXML reader's test corpus has a chart that uses every SCXML element, <code>crates/vertep-scxml/tests/corpus/all_elements.scxml</code>. One of its <code>&lt;invoke&gt;</code> elements has both <code>namelist</code> and a <code>&lt;param&gt;</code> child, which SCXML forbids:</p>
+
+<pre data-lang="SCXML"><code>&lt;invoke type="scxml" id="child" autoforward="true" namelist="counter"&gt;
+  &lt;param name="a" expr="1"/&gt;
+  …
+&lt;/invoke&gt;</code></pre>
+
+<pre data-lang="Shell"><code>vt validate crates/vertep-scxml/tests/corpus/all_elements.scxml; echo "exit $?"</code></pre>
+
+<pre class="output" data-lang="Output"><code>crates/vertep-scxml/tests/corpus/all_elements.scxml:62:9: ConflictingAttributes { element: "invoke", attributes: "param, namelist" } at Invoke { state: "r2", index: 0 }
+crates/vertep-scxml/tests/corpus/all_elements.scxml: shapes: &lt;urn:vertep:chart:sha256:949a45ea97433907f548d026509517254b3a25aab6edf582ff3e3e725d7b6504#s.r2:inv0&gt; = &lt;urn:vertep:chart:sha256:949a45ea97433907f548d026509517254b3a25aab6edf582ff3e3e725d7b6504#s.r2:inv0&gt;: invoke has conflicting attributes (AndConstraintComponent)
+exit 1</code></pre>
+
+    <p>The same rule is broken twice: once by the Rust well-formedness check, with the element's line and column, and once by the SHACL shapes, with the IRI of the offending node in the projection. The two checks are meant to agree; that agreement is the "shapes equivalence" property described in <a href="verification.html">Verification</a>.</p>
+
+    <p>A duplicate state id is caught when the chart is read, before any other check. This two-line chart was written for this page:</p>
+
+<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="a"&gt;
+  &lt;state id="a"&gt;&lt;transition event="go" target="b"/&gt;&lt;/state&gt;
+  &lt;state id="a"/&gt;
+  &lt;final id="b"/&gt;
+&lt;/scxml&gt;</code></pre>
+
+<pre class="output" data-lang="Output"><code>$ vt validate dup.scxml; echo "exit $?"
+dup.scxml:3:3: state id `a` is already declared at 2:3
+exit 1</code></pre>
+
+    <div class="nb"><p><code>validate</code> passes <code>examples/typed-order/order-ill-typed.yaml</code>: the chart is well-formed, it is only ill-typed. Run <code>vt typecheck</code> as well when a chart declares types.</p></div>
+
+    <h2 id="hash">vt hash</h2>
+
+<pre class="output" data-lang="vt hash --help"><code>Print the chart version IRI
+
+Usage: vt hash &lt;CHART&gt;
+
+Arguments:
+  &lt;CHART&gt;  The chart file
+
+Options:
+  -h, --help  Print help</code></pre>
+
+    <p><code>hash</code> prints the chart version IRI: <code>urn:vertep:chart:sha256:</code> followed by the SHA-256 of the RDFC-1.0 canonical form of the chart's RDF projection. The projection is built from the IR, not from the source text, so the same chart written in SCXML and in YAML has the same version. <code>crates/vertep-dm-rust/tests/charts/</code> holds the order chart in both surfaces:</p>
+
+<pre data-lang="Shell"><code>vt hash crates/vertep-dm-rust/tests/charts/order.yaml
+vt hash crates/vertep-dm-rust/tests/charts/order.scxml</code></pre>
+
+<pre class="output" data-lang="Output"><code>urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e
+urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e</code></pre>
+
+    <p>Comments, formatting and attribute order do not change the version. Any change to states, transitions, executable content or declared types does. The runtime records this IRI in every journal entry, so a replay can find the exact chart that produced it. See <a href="rdf.html">RDF and versions</a>.</p>
+
+    <h2 id="convert">vt convert</h2>
+
+<pre class="output" data-lang="vt convert --help"><code>Convert a chart to another surface, refusing lossy conversions
+
+Usage: vt convert [OPTIONS] --to &lt;TO&gt; &lt;INPUT&gt;
+
+Arguments:
+  &lt;INPUT&gt;  The chart file
+
+Options:
+      --to &lt;TO&gt;          The target surface [possible values: scxml, yaml, turtle, trig, nquads]
+  -o, --output &lt;OUTPUT&gt;  Write here instead of standard output
+  -h, --help             Print help</code></pre>
+
+    <p><code>convert</code> reads a chart in any surface and writes it in another. It reads structure only, without the type checker, so you can convert a chart that does not type-check yet. The traffic light in <code>examples/traffic-light/traffic-light.scxml</code>, as YAML:</p>
+
+<pre data-lang="Shell"><code>vt convert examples/traffic-light/traffic-light.scxml --to yaml</code></pre>
+
+<pre class="output" data-lang="Output (trimmed)"><code>vertep: 1
+name: traffic-light
+datamodel: "null"
+initial: operating
+states:
+  operating:
+    type: parallel
+    on:
+      fault: flashing
+    states:
+      light:
+        initial: red
+        states:
+          red:
+            entry:
+              - send:
+                  event: tick
+                  id: light-timer
+                  delay: "30s"
+            exit:
+              - cancel:
+                  sendid: light-timer
+            on:
+              tick: green
+          …
+      crossing:
+        initial: dont_walk
+        states:
+          dont_walk:
+            always:
+              cond: "In('red')"
+              target: walk
+          walk:
+            always:
+              cond: "In('green')"
+              target: dont_walk
+  flashing:
+    on:
+      reset: operating</code></pre>
+
+    <p>The RDF targets print the chart's projection, the same graph <code>vt hash</code> hashes. Every node IRI is minted under the chart version (<code>c:</code> below), so the projection has no blank nodes:</p>
+
+<pre data-lang="Shell"><code>vt convert examples/traffic-light/traffic-light.scxml --to turtle</code></pre>
+
+<pre class="output" data-lang="Output (first lines of 272)"><code>@prefix c: &lt;urn:vertep:chart:sha256:46431c540d155bee9016c61ee7a8f734890a92342ed9f91188aea25a602f5731#&gt; .
+@prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; .
+@prefix vt: &lt;https://w3id.org/vertep/vt#&gt; .
+c:chart:ia0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.operating .
+c:chart:ia:sel:chart vt:choice c:s.operating .
+c:chart:ia:sel:s.operating vt:choice c:chart:ia0 .
+c:chart a vt:Chart ;
+	vt:binding "early" ;
+	vt:bindingExplicit false ;
+	vt:child c:s.flashing , c:s.operating ;
+	vt:datamodel "null" ;
+	vt:datamodelExplicit true ;
+	vt:initial c:chart:ia0 ;
+	vt:name "traffic-light" .
+…</code></pre>
+
+    <p><code>--to trig</code> and <code>--to nquads</code> write the same graph inside the named graph whose name is the version IRI. Conversions go both ways. Here the typed YAML order goes to Turtle, then from Turtle to SCXML, and all three files hash to the same version (run in a scratch directory):</p>
+
+<pre data-lang="Shell"><code>vt convert examples/typed-order/order.yaml --to turtle -o order.ttl
+vt convert order.ttl --to scxml -o order.scxml
+vt hash examples/typed-order/order.yaml
+vt hash order.ttl
+vt hash order.scxml</code></pre>
+
+<pre class="output" data-lang="Output"><code>urn:vertep:chart:sha256:ae074948acdd6ec8df8096c10dabea5b2dad1cd94faab314727f02dffb78c6c1
+urn:vertep:chart:sha256:ae074948acdd6ec8df8096c10dabea5b2dad1cd94faab314727f02dffb78c6c1
+urn:vertep:chart:sha256:ae074948acdd6ec8df8096c10dabea5b2dad1cd94faab314727f02dffb78c6c1</code></pre>
+
+    <p>In the SCXML written from YAML, the declared types become a <code>vt:types</code> block and <code>vt:type</code> attributes on <code>&lt;data&gt;</code>:</p>
+
+<pre data-lang="SCXML (head of order.scxml)"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#" version="1.0" name="order" datamodel="cel" initial="shopping"&gt;
+  &lt;vt:types xmlns:vt="https://w3id.org/vertep/vt#"&gt;type Item = { sku: string, qty: int, price: decimal };
+type Pay = { amount: decimal, method: Card { last4: string } | Invoice };
+type Ship = { carrier: string, tracking: optional&amp;lt;string&amp;gt; };
+event add: Item;
+…
+&lt;/vt:types&gt;
+  &lt;datamodel&gt;
+    &lt;data id="items" expr="[]" vt:type="list&amp;lt;Item&amp;gt;"/&gt;
+    &lt;data id="total" expr="0" vt:type="decimal"/&gt;
+    &lt;data id="limit" expr="500" vt:type="decimal"/&gt;
+  &lt;/datamodel&gt;</code></pre>
+
+    <h3 id="lossy">Lossy conversions are refused</h3>
+    <p><code>convert</code> writes nothing when the output would not carry everything the input says. It lists each loss and exits 1. Losses come from two places:</p>
+    <ul>
+      <li><strong>Reading.</strong> The SCXML reader records what it drops: an attribute SCXML does not define, an extension on an element that has no extension slot, ambiguous inline content. Foreign-namespace extensions are kept as opaque nodes, so they are not losses. Comments, whitespace and the XML declaration are formatting and are not reported.</li>
+      <li><strong>Writing.</strong> The SCXML writer reports text XML 1.0 cannot carry and extension names that are not XML names. The YAML writer reads its own output back and refuses if the result is not the same chart.</li>
+    </ul>
+    <p>This chart, written for this page, has an attribute SCXML does not define:</p>
+
+<pre data-lang="SCXML (lossy.scxml)"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="a" colour="red"&gt;
+  &lt;state id="a"&gt;
+    &lt;transition event="go" target="b"/&gt;
+  &lt;/state&gt;
+  &lt;final id="b"/&gt;
+&lt;/scxml&gt;</code></pre>
+
+<pre data-lang="Shell"><code>vt convert lossy.scxml --to yaml; echo "exit $?"</code></pre>
+
+<pre class="output" data-lang="Output"><code>lossy.scxml: refusing to convert scxml to yaml: it would lose:
+  - lossy.scxml:1:1: attribute `colour` is not defined on &lt;scxml&gt;
+exit 1</code></pre>
+
+    <p>The refusal applies to every target, <code>--to scxml</code> included, because the attribute is already gone once the chart is read.</p>
+
+    <h2 id="gen-ts">vt gen ts</h2>
+
+<pre class="output" data-lang="vt gen --help"><code>Generate code from a chart
+
+Usage: vt gen &lt;COMMAND&gt;
+
+Commands:
+  ts    The TypeScript module for @vertep/web: events, context, state ids and a typed actor
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help</code></pre>
+
+<pre class="output" data-lang="vt gen ts --help"><code>The TypeScript module for @vertep/web: events, context, state ids and a typed actor
+
+Usage: vt gen ts [OPTIONS] &lt;CHART&gt;
+
+Arguments:
+  &lt;CHART&gt;  The chart file
+
+Options:
+      --name &lt;NAME&gt;  The prefix of the generated names (default: the chart name or file stem)
+  -h, --help         Print help</code></pre>
+
+    <p><code>gen ts</code> type-checks the chart and prints a TypeScript module for <a href="browser.html"><code>@vertep/web</code></a>. The module holds an event union, a context interface, a union of state ids, the chart itself as a typed <code>ChartSpec</code> (its source text, format and version IRI), and a <code>create&lt;Name&gt;Actor</code> function. The name prefix is the chart's <code>name</code>, else the file stem, in PascalCase.</p>
+
+<pre data-lang="Shell"><code>vt gen ts crates/vertep-dm-rust/tests/charts/order.scxml &gt; order.ts</code></pre>
+
+<pre class="output" data-lang="order.ts (source string trimmed)"><code>// Generated by `vt gen ts` from chart urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e. Do not edit.
+import type { ActorRef, ActorSystem, ChartSpec, JsonValue } from "@vertep/web";
+
+export type Pay = { amount: number | string };
+export type Approval = { by: string };
+
+export type OrderEvent =
+  | { type: "start" }
+  | { type: "pay" } &amp; Pay
+  | { type: "authorized" }
+  | { type: "approve" } &amp; Approval
+  | { type: "cancel" };
+export interface OrderContext {
+  total: number | string;
+  limit: number | string;
+}
+export type OrderStateId = "idle" | "checkout" | "cart" | "payment" | "review" | "paid" | "cancelled";
+
+/** The chart, typed: pass it to `spawn` or `virtual`. */
+export const orderChart: ChartSpec&lt;OrderEvent, OrderContext, OrderStateId&gt; = {
+  source: "&lt;?xml version=\"1.0\" encoding=\"UTF-8\"?&gt;\n&lt;scxml xmlns=…",
+  format: "scxml",
+  type: "urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e",
+};
+
+/** The virtual actor of this chart with `key`, typed. */
+export function createOrderActor(system: ActorSystem, key: string): ActorRef&lt;OrderEvent, OrderContext, OrderStateId&gt; {
+  return system.virtual(orderChart, key);
+}</code></pre>
+
+    <p>An untyped chart still gets state ids, but events and context fall back to JSON values. <code>--name</code> sets the prefix:</p>
+
+<pre data-lang="Shell"><code>vt gen ts crates/vertep-agent/examples/support-agent.scxml --name Support</code></pre>
+
+<pre class="output" data-lang="Output (source string omitted)"><code>// Generated by `vt gen ts` from chart urn:vertep:chart:sha256:b0b8e9574ca25b8572269bf25a2d4e199f7db5dc6b47bd0574a9d662ec2d2462. Do not edit.
+import type { ActorRef, ActorSystem, ChartSpec, JsonValue } from "@vertep/web";
+
+export type SupportEvent = { type: string; [field: string]: JsonValue };
+export type SupportContext = JsonValue;
+export type SupportStateId = "idle" | "triaging" | "decide" | "tooling" | "human" | "done" | "budget_out";
+
+/** The chart, typed: pass it to `spawn` or `virtual`. */
+export const supportChart: ChartSpec&lt;SupportEvent, SupportContext, SupportStateId&gt; = {
+  format: "scxml",
+  type: "urn:vertep:chart:sha256:b0b8e9574ca25b8572269bf25a2d4e199f7db5dc6b47bd0574a9d662ec2d2462",
+};
+
+/** The virtual actor of this chart with `key`, typed. */
+export function createSupportActor(system: ActorSystem, key: string): ActorRef&lt;SupportEvent, SupportContext, SupportStateId&gt; {
+  return system.virtual(supportChart, key);
+}</code></pre>
+
+    <h2 id="certify">vt certify</h2>
+
+<pre class="output" data-lang="vt certify --help"><code>Run the Lean checker and print the certificate
+
+Usage: vt certify &lt;CHART&gt;
+
+Arguments:
+  &lt;CHART&gt;  The chart file
+
+Options:
+  -h, --help  Print help</code></pre>
+
+    <p><code>certify</code> asks the Lean model, not the Rust code, whether a chart is well-formed. <code>vt</code> projects the chart to RDF, writes the canonical N-Quads to a temporary file, and runs the Lean-compiled checker as <code>vt-certify --chart &lt;file.nq&gt;</code>. The checker reads the graph with its own RDF reader, recomputes the chart version, decides the Lean <code>WellFormed</code> predicate and, when it holds, prints a certificate as N-Triples.</p>
+
+    <p>The checker is a separate program. <code>vt</code> looks for it in the <code>VT_CERTIFY</code> environment variable first, then as <code>vt-certify</code> on <code>PATH</code>. Building it needs the Lean toolchain (install <a href="https://github.com/leanprover/elan">elan</a>; the version is pinned in <code>lean/vertep-lean/lean-toolchain</code>). Without it, <code>certify</code> says how to build it:</p>
+
+<pre data-lang="Shell"><code>vt certify examples/traffic-light/traffic-light.scxml; echo "exit $?"</code></pre>
+
+<pre class="output" data-lang="Output"><code>vt certify: the Lean checker `vt-certify` is not installed.
+Build it from the Lean model and put it on PATH, or point VT_CERTIFY at it:
+  cd lean/vertep-lean &amp;&amp; lake build &amp;&amp; export VT_CERTIFY=$PWD/.lake/build/bin/vt-certify
+No certificate was produced.
+exit 1</code></pre>
+
+    <p>With the checker built:</p>
+
+<pre data-lang="Shell"><code>export VT_CERTIFY=$PWD/lean/vertep-lean/.lake/build/bin/vt-certify
+vt certify examples/traffic-light/traffic-light.scxml</code></pre>
+
+<pre class="output" data-lang="Output"><code>&lt;urn:vertep:chart:sha256:46431c540d155bee9016c61ee7a8f734890a92342ed9f91188aea25a602f5731&gt; &lt;https://w3id.org/vertep/vt#certifiedBy&gt; &lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;https://w3id.org/vertep/vt#Certificate&gt; .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.checkWF_iff" .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.violations_eq_nil_iff" .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.Rdf.fromRDF_sound" .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.step_deterministic" .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.transition_selection" .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.step_requests_declared" .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;https://w3id.org/vertep/vt#leanToolchain&gt; "leanprover/lean4:v4.35.0" .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;https://w3id.org/vertep/vt#leanRdfRevision&gt; "b407b97424150fec25a1ade514c71ea7abc61b42" .
+&lt;urn:vertep:cert:sha256:f9ce05505e1b9b6783c7566d05cc8cabf7140e680d99da4025cc884aeb18a632&gt; &lt;https://w3id.org/vertep/vt#checkerHash&gt; "sha256:0d7f7bd4fcd09ba11157f1090afff34b79f9d86ab0f3b6443454eb9c309d988d" .</code></pre>
+
+    <p>The certificate hangs off the chart version IRI with <code>vt:certifiedBy</code>. It names the theorems it relies on, the Lean toolchain, the LeanRDF revision and the hash of the checker binary, so anyone can rebuild the same checker and check the claim. Because certificates sit outside the chart's projection, attaching one never changes the chart's version.</p>
+
+    <p>The checker's exit codes follow <code>vt</code>'s: 1 when the chart is not well-formed, 2 when the graph is not the projection of a chart.</p>
+
+<pre data-lang="Shell"><code>vt certify crates/vertep-scxml/tests/corpus/all_elements.scxml; echo "exit $?"</code></pre>
+
+<pre class="output" data-lang="Output"><code>&lt;urn:vertep:chart:sha256:949a45ea97433907f548d026509517254b3a25aab6edf582ff3e3e725d7b6504&gt; is not well-formed; violated rules: state rules (r2)
+exit 1</code></pre>
+
+    <div class="nb warn"><p><code>vt certify</code> does not yet certify charts that declare types. The Rust chart version of a typed chart hashes the chart's projection together with its type triples (<code>vt:declaresType</code>, the type definitions and their shapes; all ground, with no blank nodes), while the Lean checker hashes the chart projection without them. So the checker computes a different version and rejects the graph:</p>
+<pre class="output" data-lang="Output"><code>$ vt certify crates/vertep-dm-rust/tests/charts/order.scxml; echo "exit $?"
+not the projection of a chart: node IRIs are minted under &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e&gt;, but the chart's version is &lt;urn:vertep:chart:sha256:8d33f0f736000680efb507f4a4377197d0fb155ead5cd5fd4e46692f8f372e01&gt;
+exit 2</code></pre>
+    <p>This is task 4.5 of the verification backlog (<code>openspec/changes/verification-backlog/tasks.md</code>). Untyped charts, such as the traffic light and <code>support-agent.scxml</code>, certify.</p></div>
+
+    <h2 id="reshard">vt cluster reshard</h2>
+
+<pre class="output" data-lang="vt cluster --help"><code>Cluster operations
+
+Usage: vt cluster &lt;COMMAND&gt;
+
+Commands:
+  reshard  Double the shard count of a stopped cluster (offline)
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help</code></pre>
+
+<pre class="output" data-lang="vt cluster reshard --help"><code>Double the shard count of a stopped cluster (offline)
+
+Usage: vt cluster reshard &lt;DIR&gt; &lt;OUT&gt;
+
+Arguments:
+  &lt;DIR&gt;  The cluster data directory: `cluster.meta`, the shard files and `leases`
+  &lt;OUT&gt;  Where to write the resharded files and metadata
+
+Options:
+  -h, --help  Print help</code></pre>
+
+    <p>A cluster places actors by hashing their IRI to one of a fixed number of shards (see <a href="distribution.html">Cluster and federation</a>). Changing that number moves actors between shards, so it is done offline, and only by doubling. <code>reshard</code> reads <code>DIR</code>:</p>
+    <ul>
+      <li><code>cluster.meta</code>: <code>key = value</code> lines for <code>cluster</code>, <code>shard_count</code>, <code>hash_version</code> and <code>replication_factor</code>;</li>
+      <li>the tiramemsu shard files, named <code>shard-0000-of-0004.db</code> and so on;</li>
+      <li><code>leases</code>: the leases still live, one <code>&lt;node&gt; &lt;shard&gt; &lt;epoch&gt;</code> line each, dumped from the lease authority before you start. An absent or empty file means no node holds a lease.</li>
+    </ul>
+    <p>It refuses while any lease is live and names the nodes that hold them. Otherwise it writes twice as many shard files and the new metadata to <code>OUT</code>, copies every actor's journal to the shard its IRI now hashes to, and checks each copied journal against the original. Your original files stay where they are, so rolling back means keeping <code>DIR</code>.</p>
+
+    <p>The run below uses a four-shard cluster directory made for this page, with no actors in it, and a <code>leases</code> file left over from two running nodes:</p>
+
+<pre data-lang="Shell"><code>cat data/cluster.meta
+cat data/leases
+vt cluster reshard data data-8; echo "exit $?"</code></pre>
+
+<pre class="output" data-lang="Output"><code>cluster = prod
+shard_count = 4
+hash_version = 1
+replication_factor = 1
+node-b 1 7
+node-a 0 3
+resharding refused: the cluster is running, nodes node-a, node-b still hold shard leases
+exit 1</code></pre>
+
+    <p>Nothing is written to <code>data-8</code>. Once the nodes are stopped and the lease dump is empty:</p>
+
+<pre data-lang="Shell"><code>rm data/leases
+vt cluster reshard data data-8; echo "exit $?"
+ls data-8
+cat data-8/cluster.meta</code></pre>
+
+<pre class="output" data-lang="Output"><code>resharded 4 to 8 shards: 0 actors, 0 entries copied to data-8
+exit 0
+cluster.meta
+shard-0000-of-0008.db
+shard-0001-of-0008.db
+shard-0002-of-0008.db
+shard-0003-of-0008.db
+shard-0004-of-0008.db
+shard-0005-of-0008.db
+shard-0006-of-0008.db
+shard-0007-of-0008.db
+cluster = prod
+shard_count = 8
+hash_version = 1
+replication_factor = 1</code></pre>
+
+    <p>The end-to-end test <code>crates/vertep-cli/tests/reshard.rs</code> runs the same command on a cluster of 40 actors and checks that each one's journal is in the shard it hashes to after doubling.</p>
+
+    <div class="nb warn"><p>The shard files are opened before they are copied. If <code>DIR</code> is missing some of them, <code>reshard</code> creates them empty in <code>DIR</code>, as it did in the run above. The existing files are not modified.</p></div>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <h2 id="library">vt as a library</h2>
+    <p>Every subcommand is also a function in the <code>vertep_cli::commands</code> module, which returns an <code>Outcome</code> holding standard output, standard error and the exit code. The runnable examples use it to compare recorded command output with the real one, so documented output that drifts fails the build. See the <a href="../examples/index.html">examples</a>.</p>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="verification.html">← Verification</a>
+      <a href="../examples/index.html">Examples →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

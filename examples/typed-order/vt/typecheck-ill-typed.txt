@@ -1,0 +1,1 @@
+examples/typed-order/order-ill-typed.yaml:44:19: states.shopping.states.cart.on.add[0].actions[1]: state "cart", transition 0 (on add), action 1: the value assigned to `ctx.total` has type string, expected decimal

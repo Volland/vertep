@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verification — Vertep docs</title>
+<meta name="description" content="How Vertep checks itself: a Lean 4 model with pinned theorems, Rust traces replayed by the Lean oracle, the W3C SCXML IRP suite with an allow-list, vt certify, and the proofs still open.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html" aria-current="page">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Reference</p>
+    <h1>Verification</h1>
+    <p class="lede">The Rust code is fast and untrusted. A small Lean 4 model carries the proofs, runs as an oracle on the same inputs as Rust, and must produce the same traces. This page lists what is proven, what is still open, and how to run every check yourself.</p>
+
+    <h2 id="trust">Where the trust sits</h2>
+    <p>The theorems are about the Lean model, not about the Rust code. The bridge between the two is <em>trace equality</em>: Rust runs a chart, records what it did, and the Lean <code>step</code> replays the same chart and inputs and must produce exactly the same configurations, effects and datamodel requests. Nothing is extracted from Lean into Rust.</p>
+    <ul>
+      <li>A bug in Rust shows up as a trace difference or a failed W3C test, never as a wrong theorem.</li>
+      <li>A bug in the Lean model shows up as a failed proof, or as a trace difference that is then settled against the W3C text.</li>
+      <li>The proofs quantify over every datamodel answer, so they hold for every datamodel. They do not prove ECMAScript, CEL or any other expression engine correct.</li>
+    </ul>
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 640 270" width="640" role="img" aria-labelledby="verification-loop-t">
+          <title id="verification-loop-t">Generated charts and IRP tests run on the Rust core, which writes a trace and an answer tape; the chart crosses to Lean as N-Quads; the Lean oracle replays it with the tape; the two traces must be identical, and a difference is shrunk and stored as a regression</title>
+          <defs>
+            <marker id="verification-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+            <pattern id="verification-ph" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+          </defs>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="15" style="fill:var(--ink)">
+            <rect x="10" y="30" width="140" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2"/>
+            <text x="80" y="52" text-anchor="middle">generated</text>
+            <text x="80" y="70" text-anchor="middle">charts</text>
+            <rect x="10" y="150" width="140" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2"/>
+            <text x="80" y="172" text-anchor="middle">W3C IRP</text>
+            <text x="80" y="190" text-anchor="middle">tests</text>
+            <rect x="200" y="30" width="150" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="275" y="60" text-anchor="middle">Rust core</text>
+            <rect x="200" y="150" width="150" height="50" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <rect x="200" y="150" width="150" height="50" fill="url(#verification-ph)"/>
+            <text x="275" y="180" text-anchor="middle" style="fill:var(--on-orange)">Lean oracle</text>
+            <rect x="400" y="90" width="110" height="50" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2"/>
+            <text x="455" y="120" text-anchor="middle" style="fill:var(--paper)">same trace?</text>
+            <rect x="540" y="30" width="90" height="44" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2"/>
+            <text x="585" y="57" text-anchor="middle">pass</text>
+            <rect x="540" y="160" width="90" height="62" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2"/>
+            <text x="585" y="185" text-anchor="middle">shrink,</text>
+            <text x="585" y="205" text-anchor="middle">keep</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2" marker-end="url(#verification-arr)">
+            <path d="M150 55 H196"/>
+            <path d="M150 175 C170 120 180 80 196 66"/>
+            <path d="M150 175 H196"/>
+            <path d="M150 55 C170 110 180 150 196 164" stroke-dasharray="5 4"/>
+            <path d="M275 80 V146" stroke-dasharray="5 4"/>
+            <path d="M350 55 C380 60 390 85 398 100"/>
+            <path d="M350 175 C380 170 390 145 398 130"/>
+            <path d="M510 105 C525 90 530 70 538 60"/>
+            <path d="M510 125 C525 140 530 160 538 175"/>
+          </g>
+          <g font-family="JetBrains Mono, monospace" font-size="10.5" style="fill:var(--ink-2)">
+            <text x="284" y="108">answer tape</text>
+            <text x="284" y="122">+ N-Quads</text>
+            <text x="364" y="52">trace</text>
+            <text x="364" y="188">trace</text>
+            <text x="528" y="100">yes</text>
+            <text x="530" y="140">no</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Plate. <b>The differential loop.</b> Rust finds the answers, Lean checks them.</figcaption>
+    </figure>
+
+    <h2 id="lean">The Lean package</h2>
+    <p>The model lives in <code>lean/vertep-lean</code>, a Lake package pinned to <code>leanprover/lean4:v4.35.0</code> (in <code>lean-toolchain</code>). It depends on LeanRDF, pinned to commit <code>b407b97424150fec25a1ade514c71ea7abc61b42</code>, for the RDF 1.2 data model and its SHACL Core validator. The library is compiled with <code>warningAsError</code>, so a <code>sorry</code> fails the build.</p>
+    <p>It contains the chart IR, a <code>WellFormed</code> predicate with a decision procedure proven correct, the executable <code>step</code> of W3C SCXML Appendix D, the RDF projection and its decoder, the type language, and three protocol models (journal, agent, lease). Next to the library, <code>lakefile.lean</code> builds seven executables:</p>
+    <table>
+      <thead><tr><th>Executable</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td><code>vertep-oracle</code></td><td>Replays a chart (as N-Quads) with Rust's recorded inputs and answer tape and writes or compares traces</td></tr>
+        <tr><td><code>vt-certify</code></td><td>The checker behind <code>vt certify</code></td></tr>
+        <tr><td><code>vertep-journal</code></td><td>Judges observations of the Rust journal protocol against the journal model</td></tr>
+        <tr><td><code>vertep-decide</code></td><td>Judges decision outcomes of the Rust agent machine against the agent model</td></tr>
+        <tr><td><code>vertep-lease</code></td><td>Replays cluster fault-injection histories against the lease model</td></tr>
+        <tr><td><code>vertep-types</code></td><td>Checks values against types, to compare with the Rust value checker</td></tr>
+        <tr><td><code>vertep-shapes</code></td><td>Runs LeanRDF's SHACL validator with the chart shapes on N-Quads files, an empirical check of the shapes</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="tape">The datamodel as an answer tape</h3>
+    <p>Lean cannot run ECMAScript. So during a Rust run every datamodel request (evaluate this condition, assign this location) and its answer is written to a tape. In the oracle the Lean <code>step</code> must issue exactly the same requests in the same order, and it takes the answers from the tape. A request that differs is a trace difference. For the <code>null</code> datamodel, Lean evaluates <code>In()</code> itself and needs no tape.</p>
+
+    <h2 id="proven">What is proven</h2>
+    <p><code>lean/vertep-lean/VertepTests/Axioms.lean</code> pins the axioms of 78 main theorems. At build time it collects the axioms each one depends on and fails if anything other than <code>propext</code>, <code>Classical.choice</code> and <code>Quot.sound</code> appears. A <code>sorry</code> shows up as the axiom <code>sorryAx</code>, so it fails there too; the file even proves that the gate rejects a deliberate <code>sorry</code>. The main results, grouped:</p>
+    <table>
+      <thead><tr><th>Area</th><th>Theorems</th><th>In words</th></tr></thead>
+      <tbody>
+        <tr><td>Well-formedness</td><td><code>checkWF_iff</code>, <code>violations_eq_nil_iff</code></td><td>The executable check decides <code>WellFormed</code> exactly, and it reports no violated rule exactly when the chart is well-formed.</td></tr>
+        <tr><td>Determinism</td><td><code>step_deterministic</code>, <code>step_deterministic_out</code>, <code>start_deterministic</code></td><td>Equal session, input and answer tape give equal results.</td></tr>
+        <tr><td>Transition selection</td><td><code>transition_selection</code>, <code>select_spec</code>, <code>Select.selected_enabled</code>, <code>…_conflictFree</code>, <code>…_optimal</code>, <code>…_nodup</code></td><td>In every microstep the selected set is enabled, conflict-free and optimal in the sense of SCXML 3.13.</td></tr>
+        <tr><td>Legal configurations</td><td><code>configuration_wellformedness</code>, <code>compound_exclusivity</code>, <code>parallel_completeness</code>, with <code>compile_cwf</code>, <code>exit_legal</code>, <code>entry_legal</code>, <code>Config.reachable_inv</code> and others</td><td>For every well-formed chart, every running session reachable by <code>start</code> and <code>step</code> has a legal configuration (SCXML 3.11): no active compound state has two active children, an active parallel state has all its children active.</td></tr>
+        <tr><td>Declared locations</td><td><code>step_requests_declared</code>, <code>start_requests_declared</code>, <code>dynamic_typed_soundness</code></td><td><code>step</code> never asks the datamodel about an undeclared location or data item.</td></tr>
+        <tr><td>RDF</td><td><code>Rdf.fromRDF_project</code>, <code>Rdf.fromRDF_sound</code>, <code>Rdf.canonical_determined</code>, <code>Rdf.version_determined</code>, and the <code>Rdf.RT.*</code> lemmas</td><td>Decoding the projection of a well-formed chart gives back the same chart, under any base IRI; the decoded chart's projection is in the graph; equal charts have equal canonical forms and versions.</td></tr>
+        <tr><td>Certificates</td><td><code>Certify.check_certified_wellFormed</code></td><td>When the checker certifies a chart, that chart is well-formed.</td></tr>
+        <tr><td>Journal protocol</td><td><code>Journal.replay_determinism</code>, <code>replay_no_divergence</code>, <code>replay_equals_live</code>, <code>turn_idempotent</code>, <code>accepted_once</code>, <code>outbox_safe</code>, <code>outbox_complete</code>, <code>no_message_lost</code>, <code>cas_single</code>, <code>turn_cas_exclusive</code>, <code>accepts_iff</code>, <code>reachable_admissible</code></td><td>Over any interleaving of crashes, redeliveries and concurrent activations: replay reproduces each entry, a message id is processed once, every recorded send is dispatched and no unrecorded one is, and of two appends at one position at most one succeeds.</td></tr>
+        <tr><td>Agents</td><td><code>Agent.decider_safety</code>, <code>stale_not_taken</code>, <code>unknown_not_taken</code>, <code>decision_dedup</code>, <code>decision_once</code>, <code>replay_live</code>, <code>chainGrant_mem</code>, <code>grants_do_not_escalate</code>, <code>grant_enforced</code>, <code>ungranted_not_delivered</code>, <code>granted_delivered</code></td><td>A transition taken because of a decision was enabled when it was offered; stale or unknown decisions are never taken; grants never widen down a chain of invocations, and a send outside the grants is not delivered.</td></tr>
+        <tr><td>Leases</td><td><code>Lease.grant_unique</code>, <code>accepted_granted</code>, <code>one_writer_per_epoch</code>, <code>journal_epochs_ordered</code>, <code>shard_epochs_ordered</code>, <code>message_once</code>, <code>stale_append_fenced</code>, <code>frames_ordered</code>, <code>stale_frame_dropped</code></td><td>Per shard and epoch at most one writer's appends are accepted; a writer with a stale epoch is fenced off.</td></tr>
+        <tr><td>Types</td><td><code>Types.check_iff</code>, <code>check_sound</code>, <code>Chain.dedup</code>, <code>JsonSchema.validate_proj</code>, <code>JsonSchema.jsonSchema_agrees</code></td><td>The type checker decides the typing relation exactly, on every declaration block; the JSON Schema projection accepts a JSON value exactly when it has the type.</td></tr>
+      </tbody>
+    </table>
+    <p>The statement of the configuration theorem, from <code>VertepLean/Config/Theorem.lean</code>:</p>
+<pre data-lang="Lean"><code>def ConfigurationWellFormedness : Prop :=
+  ∀ c : Chart, WellFormed c → ∀ cc, compile c = .ok cc →
+    ∀ s, Reachable cc s → s.terminated = false → Legal cc s.config
+
+theorem configuration_wellformedness : ConfigurationWellFormedness :=
+  configuration_wellformedness_of compile_cwf entry_legal</code></pre>
+    <p>Proving it was not a formality. The attempt found three bugs in the W3C Appendix D entry algorithm as both cores implemented it, each producing an illegal configuration from a valid chart with history states. All three are fixed in Rust and Lean, with regression tests on both sides. The Rust property test <code>crates/vertep-conformance/tests/config_legality.rs</code> never generated those shapes, which is why the proof, not the test, found them. The protocol models found two more bugs in the Rust runtime (an outbox mark that passed refused sends, and colliding mailbox row IRIs when two nodes share a store), also fixed.</p>
+    <div class="nb"><p>Some limits are deliberate. The type theorems read a <code>pattern</code> as the lexical rule its regular expression encodes; the regular expressions themselves are not proven equal to those rules. Lean decides <code>int</code> on the exact decimal while Rust decides it on an <code>f64</code>, so differential cases stay away from the edges of the signed 64-bit range.</p></div>
+
+    <h2 id="open">What is still open</h2>
+    <p>The open items are tracked in <code>openspec/changes/verification-backlog/tasks.md</code>. As that file stands:</p>
+    <table>
+      <thead><tr><th>Task</th><th>Statement</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>2.3 Shapes equivalence</td><td>the chart shapes accept the projection of <code>c</code> exactly when <code>WellFormed c</code></td><td>Not started as a proof. The statement is in <code>lean/vertep-lean/Pending/ShapesEquiv.lean</code>, outside the library. <code>vertep-shapes</code> checks the agreement empirically, at about a minute per small chart.</td></tr>
+        <tr><td>4.2 SHACL projection of types</td><td>a value's RDF encoding conforms to its type's generated shape exactly when it has the type</td><td>Not started. Needs the value encoding and the generated shapes as LeanRDF terms.</td></tr>
+        <tr><td>4.4 Type soundness of <code>step</code></td><td>a well-typed chart, configuration and input give a well-typed datamodel and well-typed output events</td><td>Not started. The Lean <code>step</code> has no expression typer; the values it writes come from the untyped answer tape.</td></tr>
+        <tr><td>4.5 <code>vt certify</code> for typed charts</td><td>certify charts with a <code>vt:types</code> block</td><td>Partial. The type checker is already compared with Rust (<code>vertep-types</code>); the Lean side does not yet hash a chart together with its type triples, so a typed chart is refused (see below).</td></tr>
+        <tr><td>2.4, 4.6 Annotations and axioms</td><td>every theorem traced and its axioms pinned</td><td>Partial; waits on the theorems above.</td></tr>
+      </tbody>
+    </table>
+    <p>Until 2.3 is proven, the Rust SHACL validator, the Rust IR validator and the Lean <code>WellFormed</code> agree because they are tested against each other, not because a theorem says so.</p>
+
+    <h2 id="differential">Differential testing</h2>
+    <p>Charts cross to Lean as N-Quads of their RDF projection, decoded by the same <code>fromRDF</code> that the round-trip theorem covers, so every differential run also exercises the projection. The Rust side records one JSON Lines record per macrostep: configuration, effects and datamodel requests. Sources of cases:</p>
+    <ul>
+      <li><strong>Generated charts.</strong> <code>vertep-testkit</code> generates well-formed charts and input sequences (<code>crates/vertep-conformance/src/differential.rs</code>). A disagreement is shrunk by proptest to a minimal chart and inputs and stored in <code>crates/vertep-conformance/regressions/</code>, which every run replays.</li>
+      <li><strong>The IRP suite.</strong> Every runnable W3C test runs on Rust with its answer tape recorded; the oracle must give the same trace and verdict.</li>
+      <li><strong>Validator against checker.</strong> Generated charts, and the same charts broken by one targeted mutation per validation rule, go to both the Rust validator and <code>vt-certify</code> (<code>tests/certify.rs</code>).</li>
+      <li><strong>Protocols.</strong> <code>tests/journal_protocol.rs</code> drives two nodes sharing one journal store through crashes, redeliveries and concurrent activations and hands the observation to <code>vertep-journal</code>. <code>tests/decide_differential.rs</code> feeds adversarial decisions (stale and forged correlation ids, unknown or unoffered events, bad payloads) to the agent machine and has <code>vertep-decide</code> judge the outcomes. The cluster fault-injection test in <code>crates/vertep-cluster/tests/faults.rs</code> replays its history through <code>vertep-lease</code>.</li>
+      <li><strong>Types.</strong> <code>tests/types_differential.rs</code> checks 4,000 generated declaration blocks, types and values with Rust and with <code>vertep-types</code>.</li>
+    </ul>
+    <p>The full differential runs are <code>#[ignore]</code>d in normal test runs and need the Lean executables built. Small smoke samples run with the ordinary tests and skip with a message when the Lean build is missing. Two excerpts from a run of the full set:</p>
+<pre data-lang="Shell"><code>cargo test -p vertep-conformance --release --features differential -- --ignored differential</code></pre>
+<pre class="output" data-lang="Output (excerpt)"><code>     Running tests/differential.rs (target/release/deps/differential-ef2090d5e7034e1f)
+
+running 1 test
+test differential_generated_charts_agree_with_lean has been running for over 60 seconds
+test differential_generated_charts_agree_with_lean ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 67.89s
+...
+     Running tests/lean.rs (target/release/deps/lean-dc4822d7c4aeae49)
+
+running 1 test
+test differential_irp_suite_on_lean ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 1.90s</code></pre>
+    <p><code>VT_DIFF_CASES</code> sets the number of generated cases, and <code>VT_CERTIFY_CHARTS</code> the size of the certify sample.</p>
+
+    <h2 id="irp">The W3C IRP conformance suite</h2>
+    <p>The W3C SCXML 1.0 Implementation Report Plan tests are committed under <code>crates/vertep-conformance/suite/</code>, copied from a pinned revision and transformed with pinned XSLT (<code>confEcma.xsl</code>, <code>confCel.xsl</code>); <code>suite/SOURCE</code> records where they came from and <code>suite/SHA256SUMS</code> pins the files, which the gate checks before it runs. Tests run in an in-memory host with several sessions, the SCXML Event I/O Processor and a virtual clock: no real time, no network.</p>
+    <p>The CEL datamodel runs the same suite through <code>confCel.xsl</code> variants of every datamodel-neutral template. Tests that have no CEL variant are listed with a reason in <code>suite/cel/EXCLUDED.tsv</code>.</p>
+    <h3 id="allow">The allow-list</h3>
+    <p>Expected failures are listed in <code>crates/vertep-conformance/allow-list.toml</code>, each with the test, the datamodel and a reason. Three rules keep it honest: an allow-listed test that <em>passes</em> fails the run (so stale entries get removed), an entry without a reason is rejected, and an entry naming a test the suite does not have is rejected. Today it has 45 entries, all for optional ECMAScript tests:</p>
+    <table>
+      <thead><tr><th>Entries</th><th>Reason</th></tr></thead>
+      <tbody>
+        <tr><td>30</td><td>The test uses the <code>xpath</code> datamodel, which Vertep does not implement.</td></tr>
+        <tr><td>12</td><td>The test needs the Basic HTTP Event I/O Processor; the test host has no network.</td></tr>
+        <tr><td>2</td><td>XML DOM values in the ECMAScript datamodel.</td></tr>
+        <tr><td>1</td><td>Test 444 changes the datamodel inside a condition; Vertep evaluates conditions against a read-only scope by design (guard purity).</td></tr>
+      </tbody>
+    </table>
+<pre data-lang="Shell"><code>cargo test -p vertep-conformance --release --test conformance -- --nocapture conformance</code></pre>
+<pre class="output" data-lang="Output (first lines)"><code>running 1 test
+SCXML IRP conformance (rust)
+  mandatory/cel          155 variants: 155 passed,   0 failed,   0 allow-listed,  0 unexpected passes,  0 not run
+  mandatory/ecmascript   158 variants: 158 passed,   0 failed,   0 allow-listed,  0 unexpected passes,  0 not run
+  mandatory/null           1 variants:   1 passed,   0 failed,   0 allow-listed,  0 unexpected passes,  0 not run
+  manual/cel               6 variants:   0 passed,   0 failed,   0 allow-listed,  0 unexpected passes,  6 not run
+  manual/ecmascript        9 variants:   0 passed,   0 failed,   0 allow-listed,  0 unexpected passes,  9 not run
+  optional/cel             9 variants:   2 passed,   7 failed,   0 allow-listed,  0 unexpected passes,  0 not run
+  optional/ecmascript     63 variants:  18 passed,   0 failed,  45 allow-listed,  0 unexpected passes,  0 not run
+gate: OK (every mandatory test passes or is allow-listed)
+optional failures (not gating):</code></pre>
+    <p>Every mandatory variant passes. Optional tests are reported but do not gate the build. The run writes <code>target/conformance-report.json</code> with the verdict and reason for every test. To look at a single test, run the <code>irp</code> example, which prints the verdict, the host log and the macrostep trace:</p>
+<pre data-lang="Shell"><code>cargo run -p vertep-conformance --release --example irp -- 144</code></pre>
+<pre class="output" data-lang="Output (path shortened)"><code>== 144/ecmascript: Pass
+-- …/crates/vertep-conformance/suite/ecmascript/144/test144.scxml
+   log vt0 Some("Outcome") Some(String("pass"))
+   [0] start
+      Some("foo") [TransitionRef { source: "s0", index: 0 }]
+      Some("bar") [TransitionRef { source: "s1", index: 0 }]
+      config []
+      effect Log { label: Some("Outcome"), value: Some(String("pass")) }
+      effect SessionDone { data: Undefined, cancelled: false }</code></pre>
+    <p>Pass a datamodel after the test number (<code>-- 144 null</code>) for another variant. The same suite also runs in WebAssembly through <code>vertep-wasm</code>'s <code>conformance</code> feature.</p>
+
+    <h2 id="certify">vt certify</h2>
+    <p><code>vt certify</code> asks the Lean model about one chart. It projects the chart to N-Quads and runs the Lean-compiled checker <code>vt-certify</code> on them. The checker decodes the graph with <code>fromRDF</code>, decides <code>WellFormed</code>, recomputes the version IRI from the canonical N-Quads and, if the chart is well-formed, prints a certificate as N-Triples. <code>vt</code> finds the checker through the <code>VT_CERTIFY</code> environment variable or as <code>vt-certify</code> on <code>PATH</code>.</p>
+<pre data-lang="Shell"><code>cd lean/vertep-lean &amp;&amp; lake build &amp;&amp; export VT_CERTIFY=$PWD/.lake/build/bin/vt-certify
+vt certify crates/vertep-scxml/tests/corpus/irp_style.scxml</code></pre>
+<pre class="output" data-lang="Output"><code>&lt;urn:vertep:chart:sha256:ecbe14970fe047ee3144793bdf6f44dfafda66df4ee4d6e7d516d8274dc97390&gt; &lt;https://w3id.org/vertep/vt#certifiedBy&gt; &lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;https://w3id.org/vertep/vt#Certificate&gt; .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.checkWF_iff" .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.violations_eq_nil_iff" .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.Rdf.fromRDF_sound" .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.step_deterministic" .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.transition_selection" .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.step_requests_declared" .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;https://w3id.org/vertep/vt#leanToolchain&gt; "leanprover/lean4:v4.35.0" .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;https://w3id.org/vertep/vt#leanRdfRevision&gt; "b407b97424150fec25a1ade514c71ea7abc61b42" .
+&lt;urn:vertep:cert:sha256:f5925f214474c6aec41628f097652e5c3a31c53ffef8ec27bf99b4eb6441cf1f&gt; &lt;https://w3id.org/vertep/vt#checkerHash&gt; "sha256:0d7f7bd4fcd09ba11157f1090afff34b79f9d86ab0f3b6443454eb9c309d988d" .</code></pre>
+    <p>The certificate names the theorems it relies on, the Lean toolchain, the LeanRDF revision and the SHA-256 of the checker binary. Its own IRI is a hash of its content, so certifying the same chart with the same checker gives the same certificate. <code>vt certify</code> prints the certificate; storing it next to the chart in a graph store is up to you.</p>
+    <table>
+      <thead><tr><th>Exit status</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>Certificate printed</td></tr>
+        <tr><td>1</td><td>The chart is not well-formed (violated rules on standard error), or the checker is not installed</td></tr>
+        <tr><td>2</td><td>The graph is not the projection of a chart, or its node IRIs are minted under another chart's version</td></tr>
+      </tbody>
+    </table>
+    <p>Without the checker, <code>vt</code> says how to build it:</p>
+<pre class="output" data-lang="Output"><code>vt certify: the Lean checker `vt-certify` is not installed.
+Build it from the Lean model and put it on PATH, or point VT_CERTIFY at it:
+  cd lean/vertep-lean &amp;&amp; lake build &amp;&amp; export VT_CERTIFY=$PWD/.lake/build/bin/vt-certify
+No certificate was produced.</code></pre>
+    <div class="nb warn"><p>Typed charts cannot be certified yet (backlog 4.5). The Rust version hash covers the chart's type triples (<code>vt:declaresType</code>, the type definitions and their shapes), and the Lean checker hashes the chart without them, so the two versions differ and the checker exits with status 2. The type triples are ground, with no blank nodes, so the fix is to read them on the Lean side; no blank-node canonicalization is needed.</p>
+<pre class="output" data-lang="Output"><code>$ vt certify order.scxml      # crates/vertep-dm-rust/tests/charts/order.scxml
+not the projection of a chart: node IRIs are minted under &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e&gt;, but the chart's version is &lt;urn:vertep:chart:sha256:8d33f0f736000680efb507f4a4377197d0fb155ead5cd5fd4e46692f8f372e01&gt;</code></pre></div>
+
+    <h2 id="run">Running the checks</h2>
+    <p>You need the Rust toolchain from <code>rust-toolchain.toml</code> for everything, and elan (which installs the pinned Lean toolchain) for the Lean steps.</p>
+    <table>
+      <thead><tr><th>Check</th><th>Command</th></tr></thead>
+      <tbody>
+        <tr><td>Lean build, source scan, axiom pinning</td><td><code>lean/vertep-lean/scripts/check.sh</code></td></tr>
+        <tr><td>W3C IRP gate (ECMAScript, CEL, null)</td><td><code>cargo test -p vertep-conformance --release --test conformance -- --nocapture conformance</code></td></tr>
+        <tr><td>Full Rust-against-Lean differential runs</td><td><code>cargo test -p vertep-conformance --release --features differential -- --ignored differential</code></td></tr>
+        <tr><td>All conformance tests with smoke samples</td><td><code>cargo test -p vertep-conformance --release</code></td></tr>
+        <tr><td>One IRP test with its trace</td><td><code>cargo run -p vertep-conformance --release --example irp -- &lt;test&gt; [null|cel]</code></td></tr>
+        <tr><td>Certify one chart</td><td><code>vt certify &lt;chart&gt;</code></td></tr>
+      </tbody>
+    </table>
+    <p><code>scripts/check.sh</code> is the Lean CI gate. It builds the library with warnings as errors, scans the sources for <code>sorry</code>, <code>admit</code>, <code>axiom</code>, <code>unsafe</code>, <code>implemented_by</code> and <code>extern</code>, builds the seven executables and the tests, and prints the axioms of every main theorem:</p>
+<pre data-lang="Shell"><code>lean/vertep-lean/scripts/check.sh</code></pre>
+<pre class="output" data-lang="Output (excerpt)"><code>== lake build VertepLean (warnings are errors)
+...
+== source scan
+== lake build vertep-oracle vt-certify vertep-shapes vertep-journal vertep-lease vertep-decide vertep-types
+...
+== lake build VertepTests (axioms pinned)
+...
+== #print axioms of the main theorems
+'Vertep.checkWF_iff' depends on axioms: [propext, Quot.sound]
+'Vertep.execOkB_iff' depends on axioms: [propext, Quot.sound]
+'Vertep.step_deterministic' depends on axioms: [propext, Classical.choice, Quot.sound]
+...
+'Vertep.configuration_wellformedness' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Vertep.compound_exclusivity' depends on axioms: [propext, Classical.choice, Quot.sound]
+'Vertep.parallel_completeness' depends on axioms: [propext, Classical.choice, Quot.sound]
+OK: no sorry, only propext, Classical.choice and Quot.sound</code></pre>
+    <p>The first run downloads LeanRDF and builds everything, which takes a while; later runs reuse the build.</p>
+    <p>Under the <code>differential</code> feature a missing Lean build is an error rather than a skip, so build the Lean executables first.</p>
+
+    <h2 id="later">What comes later</h2>
+    <p>Proving the Rust code itself is deferred. The pure <code>step</code> kernel is kept in a style that Aeneas can translate to Lean (no async, no trait objects inside the kernel, no interior mutability, simple loops). When that work starts, a proof that the translated kernel refines the Lean <code>step</code> can replace the oracle for the kernel; the oracle stays for the shell, the datamodels and the stores.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="rdf.html">← RDF and versions</a>
+      <a href="cli.html">The vt command →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

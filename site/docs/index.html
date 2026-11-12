@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started — Vertep docs</title>
+<meta name="description" content="What Vertep is, what you need to build it, and a first chart taken from SCXML source to a durable actor with a journal you can query.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html" aria-current="page">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Begin</p>
+    <h1>Getting started</h1>
+    <p class="lede">What Vertep is, what you need on your machine, how to build it from source, and one small chart taken all the way from an SCXML file to a durable actor whose past you can query.</p>
+
+    <h2 id="what">What Vertep is</h2>
+    <p>Vertep is a Rust workspace for W3C SCXML statecharts. You write a chart in SCXML, in YAML or with a Rust macro. Vertep runs it as an <strong>actor</strong>: a long-lived process with an IRI address that handles one event at a time and writes every event it accepts to a <strong>journal</strong> before it acts on it. Because the journal is complete, the actor can be stopped, moved and replayed, and its state can be read back as it was at any earlier moment.</p>
+    <p>The same chart also projects to RDF. Its version is the hash of its canonical RDF form, so a journal always records exactly which chart produced it. A chart can mark a state as a choice point (<code>vt:decide</code>); there a guard, a person or a language model picks the next event, but only from the events the chart enables in that state. Actors run on one node, in a cluster, across trust boundaries with DIDs, or in the browser through WebAssembly. A Lean model of the semantics checks the Rust core trace by trace.</p>
+
+    <table>
+      <thead><tr><th>Layer</th><th>Crates</th></tr></thead>
+      <tbody>
+        <tr><td>Core (<code>no_std</code>, pure)</td><td><code>vertep-core</code>: chart IR, validation, type checker, <code>step</code></td></tr>
+        <tr><td>Surfaces, datamodels, RDF</td><td><code>vertep-scxml</code>, <code>vertep-yaml</code>, <code>vertep-macros</code>, <code>vertep-dm-ecma</code>, <code>vertep-dm-cel</code>, <code>vertep-dm-rust</code>, <code>vertep-rdf</code></td></tr>
+        <tr><td>Storage</td><td><code>vertep-store</code>, <code>vertep-tiramemsu</code> (default), <code>vertep-oxigraph</code></td></tr>
+        <tr><td>Runtime shell</td><td><code>vertep-runtime</code> on tokio</td></tr>
+        <tr><td>Agents</td><td><code>vertep-agent</code></td></tr>
+        <tr><td>Distribution</td><td><code>vertep-cluster</code>, <code>vertep-federation</code></td></tr>
+        <tr><td>Bindings and tools</td><td><code>vertep-wasm</code>, <code>vertep-cli</code> (the <code>vt</code> command), the <code>vertep</code> facade; npm packages <code>@vertep/web</code> and <code>@vertep/dm-ecma</code> under <code>bindings/js</code></td></tr>
+        <tr><td>Formal model</td><td><code>lean/vertep-lean</code> (Lean 4)</td></tr>
+      </tbody>
+    </table>
+    <p>Most applications depend on one crate, the facade <code>vertep</code>, and turn on what they need with cargo features: <code>runtime</code>, <code>tiramemsu</code> and <code>scxml</code> are on by default; <code>ecmascript</code>, <code>agent</code>, <code>cluster</code> and <code>federation</code> are opt-in (see <code>crates/vertep/Cargo.toml</code>).</p>
+
+    <h2 id="prerequisites">Prerequisites</h2>
+    <table>
+      <thead><tr><th>Tool</th><th>Version</th><th>Needed for</th></tr></thead>
+      <tbody>
+        <tr><td>Rust (via <code>rustup</code>)</td><td>1.95.0, pinned in <code>rust-toolchain.toml</code></td><td>Everything. Edition 2024; <code>rust-version = "1.95"</code>.</td></tr>
+        <tr><td>Lean 4 (via <code>elan</code>)</td><td><code>leanprover/lean4:v4.35.0</code>, pinned in <code>lean/vertep-lean/lean-toolchain</code></td><td>Only the proofs, the differential oracle and <code>vt certify</code>.</td></tr>
+        <tr><td>Node.js</td><td>22 or later (<code>engines</code> in <code>bindings/js/package.json</code>)</td><td>Only the JavaScript packages.</td></tr>
+        <tr><td><code>wasm-bindgen</code> CLI</td><td>0.2.128, the exact version <code>crates/vertep-wasm/Cargo.toml</code> pins</td><td>Only building the WebAssembly for the JavaScript packages.</td></tr>
+      </tbody>
+    </table>
+    <p>With <code>rustup</code> installed you do not pick the Rust version yourself: the first <code>cargo</code> command inside the repository installs the toolchain named in <code>rust-toolchain.toml</code>, together with <code>rustfmt</code>, <code>clippy</code> and the <code>wasm32-unknown-unknown</code> and <code>thumbv7em-none-eabihf</code> targets. The embedded target is there because the core is <code>no_std</code>: CI runs <code>cargo build -p vertep-core --no-default-features --target thumbv7em-none-eabihf</code> to show it needs no standard library.</p>
+
+    <h2 id="build">Building from source</h2>
+    <div class="nb warn"><p>Vertep is not published yet. There are no crates on crates.io and no packages on npm. Build from a checkout of the repository and depend on it by path.</p></div>
+<pre data-lang="Shell"><code>git clone https://github.com/Volland/vertep.git
+cd vertep
+cargo build --workspace          # every crate and the examples
+cargo test --workspace           # what CI runs on every push
+cargo build --release -p vertep-cli
+./target/release/vt --help</code></pre>
+<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert and certify
+
+Usage: vt &lt;COMMAND&gt;
+
+Commands:
+  typecheck  Type-check a chart and report every error with its location
+  schema     Print a projection of the chart's types
+  validate   Check well-formedness and SHACL conformance
+  hash       Print the chart version IRI
+  convert    Convert a chart to another surface, refusing lossy conversions
+  certify    Run the Lean checker and print the certificate
+  gen        Generate code from a chart
+  cluster    Cluster operations
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version</code></pre>
+    <p>The JavaScript packages and the Lean model build separately. See <a href="browser.html#build">Browser and JavaScript</a> for <code>npm run build</code> in <code>bindings/js</code>, and <a href="verification.html">Verification</a> for <code>lean/vertep-lean/scripts/check.sh</code>.</p>
+
+    <h2 id="first-chart">A first chart, end to end</h2>
+    <p>The chart below is an order. It waits in <code>open</code>; the event <code>pay</code> moves it to <code>paid</code> and schedules a <code>ship</code> event 200 ms later; <code>ship</code> moves it to <code>shipped</code>. It comes from <code>crates/vertep/examples/quickstart.rs</code>, the facade's own example. Save it as <code>order.scxml</code>.</p>
+<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="open"&gt;
+  &lt;state id="open"&gt;
+    &lt;transition event="pay" target="paid"&gt;&lt;send event="ship" delay="200ms"/&gt;&lt;/transition&gt;
+  &lt;/state&gt;
+  &lt;state id="paid"&gt;&lt;transition event="ship" target="shipped"/&gt;&lt;/state&gt;
+  &lt;state id="shipped"/&gt;
+&lt;/scxml&gt;</code></pre>
+
+    <h3 id="check">1. Check it and name its version</h3>
+    <p><code>vt validate</code> reads the chart, checks that it is well formed and that its RDF projection conforms to the SHACL shapes, and prints the chart's version IRI. <code>vt hash</code> prints only the IRI.</p>
+<pre data-lang="Shell"><code>vt validate order.scxml
+vt hash order.scxml</code></pre>
+<pre class="output" data-lang="Output"><code>order.scxml: ok: urn:vertep:chart:sha256:6b74f6c5d780053619e9d360bbd73331f41fd52709d0bb7f5310d175b1272b08
+urn:vertep:chart:sha256:6b74f6c5d780053619e9d360bbd73331f41fd52709d0bb7f5310d175b1272b08</code></pre>
+    <p>The IRI is the SHA-256 of the chart's canonical RDF (RDFC-1.0). It does not depend on whitespace, attribute order or which surface you wrote the chart in. <a href="rdf.html">RDF and versions</a> explains how it is computed.</p>
+
+    <h3 id="convert">2. See it in another surface</h3>
+    <p>Every surface lowers to the same IR, so <code>vt convert</code> can write the chart back out as YAML, or as Turtle, TriG or N-Quads. It refuses a conversion that would lose information.</p>
+<pre data-lang="Shell"><code>vt convert order.scxml --to yaml</code></pre>
+<pre class="output" data-lang="Output"><code>vertep: 1
+name: null
+datamodel:
+  value: "null"
+  implicit: true
+initial: open
+states:
+  open:
+    on:
+      pay:
+        target: paid
+        actions:
+          - send:
+              event: ship
+              delay: "200ms"
+  paid:
+    on:
+      ship: shipped
+  shipped: {}</code></pre>
+    <p>The chart names no datamodel, so it gets the <code>null</code> datamodel, and the YAML records that this was implicit. That keeps the round trip exact, and keeps the version hash the same.</p>
+
+    <h3 id="run">3. Run it as a durable actor</h3>
+    <p>The quickstart program registers the chart as an actor type, sends <code>pay</code> to the actor with key <code>42</code>, lets the node run for 400 ms, and then reads the actor's state, its journal, and its past. These are the central lines; the full file is <code>crates/vertep/examples/quickstart.rs</code>.</p>
+<pre data-lang="Rust"><code>use vertep::prelude::*;
+
+const ORDER_TYPE: &amp;str = "https://example.org/charts/order";
+
+let backend = Arc::new(TiramemsuBackend::open(&amp;dir, 1)?);
+let mut node = Node::builder(backend.clone(), Shell::tokio()).build();
+let chart = vertep::scxml::read_str(ORDER).map_err(|e| format!("{e:?}"))?.chart;
+let version = node.register_type(ORDER_TYPE, chart)?;
+println!("chart version {}", version.as_str());
+
+// A virtual actor exists for every key: no create call, the first message activates it.
+let order = Address::virtual_actor(ORDER_TYPE, "42")?;
+node.send(&amp;order, Event::named("pay", EventType::External))?;
+
+// ... run the node for 400 ms inside a tokio LocalSet, then shut it down ...
+
+let now = node.state(&amp;order)?;                 // the current configuration
+for e in node.journal(&amp;order)? { /* ... */ }   // every accepted input, in order
+let then = node.state_at(&amp;order, 1)?;          // the state after entry 1, by replay
+
+// tiramemsu never deletes, so every past transaction can be queried with SPARQL:
+let shard = backend.shard_for(order.node());
+shard.view_as_of(t).query(&amp;query)?;</code></pre>
+<pre data-lang="Shell"><code>cargo run -p vertep --example quickstart</code></pre>
+<pre class="output" data-lang="Output"><code>chart version urn:vertep:chart:sha256:6b74f6c5d780053619e9d360bbd73331f41fd52709d0bb7f5310d175b1272b08
+now: ["shipped"] after 2 entries
+  entry 1: pay (timers scheduled: 1)
+  entry 2: ship (timers scheduled: 0)
+as of entry 1: ["paid"]
+  tiramemsu tx 2: in ["paid"]
+  tiramemsu tx 3: in ["paid"]
+  tiramemsu tx 4: in ["paid"]
+  tiramemsu tx 5: in ["shipped"]
+  tiramemsu tx 6: in ["shipped"]</code></pre>
+    <p>Read the output from the top:</p>
+    <ul>
+      <li>The runtime computes the same version IRI that <code>vt hash</code> printed. Every journal segment records it, so a replay always uses the chart that wrote the entries.</li>
+      <li>Nothing created actor <code>42</code>. It is a <em>virtual actor</em>: it exists for every key, and the first message activated it.</li>
+      <li>The journal has two entries. Entry 1 is <code>pay</code>, and it recorded one timer: the delayed <code>ship</code>. That timer is durable. Had the process stopped within those 200 ms, the next activation would have found it in the journal and fired it.</li>
+      <li>Entry 2 is <code>ship</code>. The timer came back as an ordinary input and was journaled like any other event.</li>
+      <li><code>state_at(&amp;order, 1)</code> rebuilt the state after entry 1 by replaying the journal up to that point, without touching the live actor.</li>
+      <li>The last lines ask tiramemsu, the default store, what its current-state graph said after each of its transactions. The store commits more transactions than there are journal entries, so one state shows up in several of them. This is time travel without replay.</li>
+    </ul>
+
+    <h3 id="own-project">4. Use it from your own crate</h3>
+    <p>Until the crates are published, point a path dependency at your checkout. The quickstart needs tokio with a current-thread runtime, because a node runs all its actors on one thread (some datamodels are not <code>Send</code>).</p>
+<pre data-lang="TOML"><code>[dependencies]
+vertep = { path = "../vertep/crates/vertep" }   # default features: runtime, tiramemsu, scxml
+tokio = { version = "1.54", features = ["rt", "macros", "time"] }</code></pre>
+    <p>Add <code>features = ["agent"]</code>, <code>["ecmascript"]</code>, <code>["cluster"]</code> or <code>["federation"]</code> to the <code>vertep</code> line as you need them.</p>
+
+    <h2 id="next">Where to go next</h2>
+    <p>The <a href="../examples/index.html">examples</a> are complete programs you can run, each checked against its recorded output: a traffic light on the pure core, a chart written with the Rust macro, a durable actor, a decider agent and a typed order. The docs pages go in this order:</p>
+    <div class="cards">
+      <a class="card" href="concepts.html"><div class="card-head"><span class="num">I</span><h3>Concepts</h3></div><div class="card-body"><p>Configuration, macrostep, effects, actor, journal, versions, deciders, and the one rule that makes replay work.</p><span class="more">Read →</span></div></a>
+      <a class="card" href="charts.html"><div class="card-head"><span class="num">II</span><h3>Writing charts</h3></div><div class="card-body"><p>SCXML with <code>vt:</code> extensions, YAML and the <code>statechart!</code> macro, and what validation reports.</p><span class="more">Read →</span></div></a>
+      <a class="card" href="runtime.html"><div class="card-head"><span class="num">III</span><h3>The actor runtime</h3></div><div class="card-body"><p>Lifecycle classes, mailboxes, the journal, storage, durable timers, time travel and migrations.</p><span class="more">Read →</span></div></a>
+      <a class="card" href="agents.html"><div class="card-head"><span class="num">IV</span><h3>Agents and deciders</h3></div><div class="card-body"><p>Choice points, LLM actors, tools with capability grants, and replay without the model.</p><span class="more">Read →</span></div></a>
+    </div>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="../index.html">← Home</a>
+      <a href="concepts.html">Concepts →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

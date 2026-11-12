@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  An order actor on the CEL datamodel with a durable payment timeout.
+
+  `add` counts items, `checkout` moves to `awaiting_payment`, whose entry schedules
+  `payment.timeout` 15 minutes (900 s) later. The runtime writes that delayed send to the
+  journal as a durable timer, so it still fires if the process stops and a new one opens the
+  same store. Paying in time cancels it.
+
+  Illustrates the actor-model, event-journal and durable-timers capabilities.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="cel"
+       name="order" initial="cart">
+  <datamodel>
+    <data id="items" expr="0"/>
+  </datamodel>
+
+  <state id="cart">
+    <transition event="add"><assign location="items" expr="ctx.items + 1"/></transition>
+    <transition event="checkout" cond="ctx.items > 0" target="awaiting_payment"/>
+  </state>
+
+  <state id="awaiting_payment">
+    <onentry><send id="payment-timer" event="payment.timeout" delay="900s"/></onentry>
+    <transition event="pay" target="paid"><cancel sendid="payment-timer"/></transition>
+    <transition event="payment.timeout" target="expired"/>
+  </state>
+
+  <!-- Plain states, not <final>: a top-level final state ends the session, and an ended
+       session has an empty configuration. These keep the outcome visible. -->
+  <state id="paid"/>
+  <state id="expired"/>
+</scxml>

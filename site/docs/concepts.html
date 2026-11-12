@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concepts — Vertep docs</title>
+<meta name="description" content="The ideas Vertep is built from: charts and their IR, configurations, macrosteps, the pure step function and its effects, actors, mailboxes, the journal, virtual actors, chart versions, deciders and the determinism rule.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html" aria-current="page">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Begin</p>
+    <h1>Concepts</h1>
+    <p class="lede">The handful of ideas everything else in Vertep is built from, in the order they depend on each other: the chart, how it runs, how an actor wraps it, and the one rule that makes every run replayable.</p>
+
+    <h2 id="chart">Chart</h2>
+    <p>A <strong>chart</strong> is a W3C SCXML statechart: a tree of states with transitions between them. A state is <em>atomic</em> (no children), <em>compound</em> (exactly one child active at a time), <em>parallel</em> (all children active together), <em>final</em>, or a <em>history</em> pseudo-state that remembers which children were active. Transitions fire on events, may have a condition, and carry executable content: <code>raise</code>, <code>send</code>, <code>cancel</code>, <code>assign</code>, <code>log</code>, <code>script</code>, <code>if</code>, <code>foreach</code>. A state can also run an <code>&lt;invoke&gt;</code>, a child process that lives exactly as long as the state is active.</p>
+    <p>Vertep implements the SCXML algorithm in full and treats it as the normative behaviour of every chart. Where it adds something, it does so through <code>vt:</code> attributes and elements in its own namespace, so a chart without them is plain SCXML.</p>
+
+    <h2 id="ir">IR</h2>
+    <p>You can write a chart in SCXML, in YAML or with the <code>statechart!</code> macro (<a href="charts.html">Writing charts</a>). Each surface lowers to one typed <strong>intermediate representation</strong>, the <code>Chart</code> type in <code>vertep-core</code> (<code>crates/vertep-core/src/ir.rs</code>). The IR is the hub: conversion between surfaces, the RDF projection, hashing, type checking and execution all work on it and on nothing else.</p>
+    <p>The IR keeps document order as data, because SCXML resolves conflicts by document order. It keeps unknown <code>vt:</code> and foreign elements as extension nodes rather than dropping them. Before a chart can run it is validated, and every well-formedness error is reported at once: unknown targets, duplicate ids, a parallel state with an <code>initial</code>, history in the wrong place, and so on. Validation produces a <code>CompiledChart</code>, which holds derived tables (state indices, ancestors, transition domains). A compiled chart is always rebuilt from the IR and never stored.</p>
+
+    <h2 id="configuration">Configuration</h2>
+    <p>The <strong>configuration</strong> is the set of states that are active right now. If an atomic state is active, so are all its ancestors; a compound state has exactly one active child; a parallel state has all of them. In the traffic light from <code>examples/traffic-light/traffic-light.scxml</code>, the parallel state <code>operating</code> runs a <code>light</code> region and a <code>crossing</code> region side by side, so one configuration is:</p>
+<pre class="output" data-lang="Output"><code>operating light green crossing dont_walk</code></pre>
+    <p>That a configuration is always legal in this sense is one of the theorems of the Lean model (<a href="verification.html">Verification</a>).</p>
+
+    <h2 id="macrostep">Macrostep and microstep</h2>
+    <p>A chart takes one external event at a time and runs it to completion. That unit of work is a <strong>macrostep</strong>. Inside it, the interpreter takes <strong>microsteps</strong>: each one selects the set of enabled transitions, exits the states they leave, runs the transitions' content and enters the target states. After the transitions for the event itself, the macrostep keeps going while eventless transitions are enabled or events that the chart raised are waiting on the internal queue. When neither is left, the configuration is stable and the macrostep ends.</p>
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 560 210" width="560" role="img" aria-labelledby="concepts-ms-t">
+          <title id="concepts-ms-t">The traffic light's start macrostep: entering the initial states red and dont_walk, then an eventless transition from dont_walk to walk because In red holds, then a stable configuration</title>
+          <defs>
+            <marker id="concepts-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+            <pattern id="concepts-ph" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+          </defs>
+          <rect x="6" y="14" width="548" height="150" style="fill:none;stroke:var(--ink)" stroke-width="1.5" stroke-dasharray="6 5"/>
+          <text x="280" y="190" text-anchor="middle" font-family="IM Fell English SC, Georgia, serif" font-size="15" style="fill:var(--ink-2)">one macrostep, run to completion</text>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="16" style="fill:var(--ink)">
+            <rect x="22" y="44" width="150" height="92" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="97" y="70" text-anchor="middle">microstep 1</text>
+            <text x="97" y="96" text-anchor="middle" font-size="12" font-family="JetBrains Mono, monospace">enter initial</text>
+            <text x="97" y="116" text-anchor="middle" font-size="12" font-family="JetBrains Mono, monospace">red, dont_walk</text>
+            <rect x="205" y="44" width="150" height="92" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <rect x="205" y="44" width="150" height="92" fill="url(#concepts-ph)"/>
+            <text x="280" y="70" text-anchor="middle">microstep 2</text>
+            <text x="280" y="96" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace">eventless In('red')</text>
+            <text x="280" y="116" text-anchor="middle" font-size="12" font-family="JetBrains Mono, monospace">dont_walk → walk</text>
+            <rect x="388" y="44" width="150" height="92" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <text x="463" y="70" text-anchor="middle" style="fill:var(--on-orange)">stable</text>
+            <text x="463" y="96" text-anchor="middle" font-size="12" font-family="JetBrains Mono, monospace" style="fill:var(--on-orange)">red, walk</text>
+            <text x="463" y="116" text-anchor="middle" font-size="12" font-family="JetBrains Mono, monospace" style="fill:var(--on-orange)">effects returned</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2.2" marker-end="url(#concepts-arr)">
+            <path d="M172 90 H201"/>
+            <path d="M355 90 H384"/>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Plate I. <b>Two microsteps, one macrostep.</b> The outside world sees only the stable result.</figcaption>
+    </figure>
+    <p>You can watch this in the traffic light. At start the crossing enters <code>dont_walk</code>, but its eventless transition <code>cond="In('red')"</code> is already enabled, so the same macrostep moves it on to <code>walk</code>. The first line of <code>cargo run -p vertep-examples --bin traffic-light</code> shows only the stable result:</p>
+<pre class="output" data-lang="Output"><code>[   0s] (start)  -&gt; operating light red crossing walk
+          schedule tick in 30s</code></pre>
+    <p>A chart whose eventless transitions never settle would loop forever. To stop that, a macrostep has a microstep budget, 10,000 by default (<code>DEFAULT_MICROSTEP_BUDGET</code> in <code>crates/vertep-core/src/session.rs</code>); a macrostep that exceeds it is cut off and reported as an error.</p>
+
+    <h2 id="step">step, a pure function</h2>
+    <p>The interpreter is two functions in <code>vertep_core::session</code>. <code>start</code> runs the first macrostep; <code>step</code> runs every later one.</p>
+<pre data-lang="Rust"><code>pub fn start(chart: &amp;CompiledChart, input: StartInput, dm: &amp;mut dyn Datamodel)
+    -&gt; Result&lt;Outcome, StartError&gt;;
+
+pub fn step(chart: &amp;CompiledChart, session: Session, input: Input, dm: &amp;mut dyn Datamodel)
+    -&gt; Result&lt;Outcome, StepError&gt;;
+
+pub struct Outcome {
+    pub session: Session,        // the session after the macrostep
+    pub effects: Vec&lt;Effect&gt;,    // in the order they were produced
+    pub trace: MacrostepTrace,   // the macrostep record
+}
+
+pub struct Environment {
+    pub now_ms: i64,             // current time, as recorded in the input
+    pub seed: u64,               // seed for the datamodel's random numbers
+}</code></pre>
+    <p>The session (configuration, history, internal queue, active invocations) is a value that goes in and comes back out. The datamodel, which holds the chart's variables, is passed by mutable reference, because embedded engines such as the ECMAScript one are mutable objects. "Pure" therefore means: equal sessions, equal inputs and equal datamodel states give equal results. <code>step</code> does no I/O, never reads a clock and never draws a random number of its own. The current time and the random seed arrive inside the input, in its <code>Environment</code>.</p>
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 560 250" width="560" role="img" aria-labelledby="concepts-step-t">
+          <title id="concepts-step-t">The step function takes a session, an input carrying an event, the time and a seed, and the datamodel, and returns a new session and a list of effects</title>
+          <defs>
+            <marker id="concepts-arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+          </defs>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="16" style="fill:var(--ink)">
+            <rect x="14" y="20" width="160" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="94" y="50" text-anchor="middle">session</text>
+            <rect x="14" y="96" width="160" height="62" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="94" y="122" text-anchor="middle">input</text>
+            <text x="94" y="144" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace">event · now_ms · seed</text>
+            <rect x="14" y="184" width="160" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="94" y="214" text-anchor="middle">datamodel</text>
+            <rect x="222" y="86" width="120" height="82" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <text x="282" y="124" text-anchor="middle" style="fill:var(--on-orange)">step</text>
+            <text x="282" y="146" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--on-orange)">no I/O, no clock</text>
+            <rect x="388" y="44" width="160" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="468" y="74" text-anchor="middle">session′</text>
+            <rect x="388" y="150" width="160" height="62" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="468" y="176" text-anchor="middle" style="fill:var(--paper)">effects</text>
+            <text x="468" y="198" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono, monospace" style="fill:var(--paper)">Send · Cancel · Invoke …</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2.2" marker-end="url(#concepts-arr2)">
+            <path d="M174 45 C200 45 205 90 219 104"/>
+            <path d="M174 127 H218"/>
+            <path d="M174 209 C200 209 205 165 219 152"/>
+            <path d="M342 112 C366 100 370 75 385 70"/>
+            <path d="M342 142 C366 155 370 178 385 181"/>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Plate II. <b>The seam between core and shell.</b> Time and chance come in through the input.</figcaption>
+    </figure>
+
+    <h2 id="effects">Effects</h2>
+    <p>Whatever a chart wants from the outside world, <code>step</code> returns as an <strong>effect</strong> instead of doing it. The host carries the effects out. The variants of <code>vertep_core::session::Effect</code> are:</p>
+    <table>
+      <thead><tr><th>Effect</th><th>Produced by</th><th>The host should</th></tr></thead>
+      <tbody>
+        <tr><td><code>Send</code></td><td><code>&lt;send&gt;</code></td><td>deliver the event to its target, after <code>delay_ms</code> if there is one</td></tr>
+        <tr><td><code>Cancel</code></td><td><code>&lt;cancel&gt;</code></td><td>drop a pending delayed send by its send id</td></tr>
+        <tr><td><code>Invoke</code></td><td>entering a state with <code>&lt;invoke&gt;</code></td><td>start the child</td></tr>
+        <tr><td><code>CancelInvoke</code></td><td>exiting that state</td><td>stop the child and deliver nothing more from it</td></tr>
+        <tr><td><code>Forward</code></td><td><code>autoforward="true"</code></td><td>pass the external event on to the child</td></tr>
+        <tr><td><code>Log</code></td><td><code>&lt;log&gt;</code></td><td>record the label and value</td></tr>
+        <tr><td><code>SessionDone</code></td><td>a top-level final state, or a cancel request</td><td>report completion with the done data</td></tr>
+      </tbody>
+    </table>
+    <p>Because every interaction is an effect, one kernel runs unchanged under three hosts: the small loop in the traffic-light example, the actor runtime, and the Lean oracle that replays its traces. Errors are not exceptions either: a failed expression becomes an <code>error.execution</code> event on the internal queue, and the chart can handle it like any other event.</p>
+
+    <h2 id="actor">Actor</h2>
+    <p>An <strong>actor</strong> is anything that takes events one at a time and produces events. Its contract in <code>vertep-runtime</code> (<code>crates/vertep-runtime/src/actor.rs</code>) is small:</p>
+<pre data-lang="Rust"><code>pub trait Actor {
+    /// The actor's address.
+    fn address(&amp;self) -&gt; &amp;Address;
+    /// Handles one input.
+    fn turn(&amp;mut self, input: ActorInput) -&gt; Turn;
+}</code></pre>
+    <p>A running chart is the main kind of actor, and for a chart one <strong>turn</strong> is exactly one macrostep. Functions, tools and LLM adapters are actors too, which is why any of them can be the target of a <code>&lt;send&gt;</code>. A turn that fails leaves the journal unchanged and touches no other actor.</p>
+
+    <h2 id="mailbox">Mailbox</h2>
+    <p>Events for an actor wait in a <strong>mailbox</strong>, a durable inbox that outlives any one activation of the actor. A mailbox can be an in-process queue, a queue kept in the store, or a DIDComm or TSP mediator for actors on the far side of a trust boundary. Vertep keeps three things apart: the <em>identity</em> of an actor (its IRI), its <em>mailbox</em> (where messages wait), and the <em>transport</em> (how a message travels to the mailbox). Swapping one does not change the others. Relays deliver at least once, so each message has an id, and the actor drops one it has already journaled.</p>
+
+    <h2 id="journal">Journal</h2>
+    <p>Each durable actor has a <strong>journal</strong>: the ordered list of every input it accepted. The order of work in a turn is fixed:</p>
+    <ol>
+      <li>Take the next message from the mailbox. If its id is already in the journal, acknowledge it and drop it.</li>
+      <li>Run <code>step</code> on it.</li>
+      <li><strong>Append</strong> one entry to the journal: the input, the chart version, and the sends and timers the step produced. The append is a compare-and-set on the expected position, so if two activations of one actor ever race, the second append fails and that activation steps down.</li>
+      <li>Only after the append commits, dispatch the sends and arm the timers (the <em>transactional outbox</em>).</li>
+    </ol>
+    <p>The append is the commit point. Before it nothing is visible; after it every recorded send is dispatched at least once, even across a crash, because a new activation re-reads the outbox. Delivery is at least once and processing is effectively once. The journal is the only source of truth: state is whatever replaying the journal produces, and snapshots only make activation faster.</p>
+
+    <h2 id="virtual-actors">Virtual actors and IRI addresses</h2>
+    <p>Every actor has exactly one absolute IRI as its address. The IRI is also the RDF subject of its state and journal. Actors come in three lifecycle classes:</p>
+    <table>
+      <thead><tr><th></th><th>Virtual actor</th><th>Invoked actor</th><th>Stateless worker</th></tr></thead>
+      <tbody>
+        <tr><td>Address</td><td>chart type IRI + <code>/</code> + key</td><td>parent IRI + <code>/invoke/</code> + invoke id</td><td>pool address</td></tr>
+        <tr><td>Exists</td><td>always, logically</td><td>while the invoking state is active</td><td>while the pool is configured</td></tr>
+        <tr><td>Persistence</td><td>its own journal and snapshots</td><td>through the parent's journal</td><td>none; the caller journals results</td></tr>
+        <tr><td>Reached by</td><td><code>&lt;send&gt;</code>, <code>vt:request</code></td><td>the parent; <code>#_parent</code> back</td><td><code>&lt;send&gt;</code>, <code>vt:request</code></td></tr>
+        <tr><td>Activations</td><td>at most one per node; one per cluster through shard leases</td><td>one</td><td>many per address</td></tr>
+      </tbody>
+    </table>
+    <p>A <strong>virtual actor</strong>, in the style of Orleans, exists for every key. You never create one: <code>Address::virtual_actor("https://example.org/charts/order", "42")</code> names <code>https://example.org/charts/order/42</code>, and the first message to it activates it from its snapshot and journal. When it is idle it is deactivated, and a due timer activates it again. A virtual actor cannot be started by <code>&lt;invoke&gt;</code>, because no single state owns its lifetime; leaving a state must never kill an actor others share.</p>
+
+    <h2 id="versions">Chart versions</h2>
+    <p>A <strong>chart version</strong> is an IRI of the form <code>urn:vertep:chart:sha256:&lt;hex&gt;</code>: the SHA-256 of the chart's RDF projection after RDFC-1.0 canonicalization. Two charts that differ only in layout, attribute order or surface have the same version; any change in behaviour gives a new one. Every journal segment records the version that wrote it, and an actor stays on its version until it reaches a final state. Moving a running actor to a new version is an explicit <strong>migration</strong>, itself written to the journal. Replaying an old journal against the latest chart would break determinism, so Vertep never does it. See <a href="rdf.html">RDF and versions</a> and <a href="runtime.html">The actor runtime</a>.</p>
+
+    <h2 id="deciders">Deciders</h2>
+    <p>A state marked <code>vt:decide</code> is a choice point. On entry, the core computes which events would be enabled there and offers them to a <strong>decider</strong>: guards, an LLM, a person, or another actor. The answer comes back as an event, <code>vt.decision</code>, is journaled like any other input, and is accepted only if it names one of the events offered. <code>vt.decide.none</code> is always a legal answer. A decider can choose among the chart's transitions; it can never add one. Because the decision is in the journal, a replay reproduces the run without calling the decider again. See <a href="agents.html">Agents and deciders</a>.</p>
+
+    <h2 id="determinism">The determinism rule</h2>
+    <p>Everything above rests on one rule:</p>
+    <blockquote>Anything nondeterministic — time, randomness, model output, the network — enters the core only as a journaled input.</blockquote>
+    <p>In practice:</p>
+    <ul>
+      <li><strong>Time</strong> is the timestamp the shell records with the input. A chart that reads the time gets that value, both the first time and on replay. Timer due times are computed from it too.</li>
+      <li><strong>Randomness</strong> comes from the seed in the input's <code>Environment</code>. In the runtime the seed is derived from the journal entry's IRI, so a replay draws the same numbers.</li>
+      <li><strong>Model output, tool results and replies</strong> reach an actor only as input events journaled with their full content, so a replay never repeats the call.</li>
+      <li><strong>Guards</strong> may not change the datamodel; the datamodel enforces that.</li>
+    </ul>
+    <p>Hold to the rule and the journal is the whole truth of an actor. Replay it and you get the same configurations, on a server, in a browser, or in the Lean model.</p>
+
+    <h2 id="glossary">Glossary</h2>
+    <table>
+      <thead><tr><th>Term</th><th>Meaning in Vertep</th></tr></thead>
+      <tbody>
+        <tr><td>Chart</td><td>An SCXML statechart, written in any surface.</td></tr>
+        <tr><td>IR</td><td>The typed in-memory form of a chart that every surface lowers to (<code>vertep_core::ir::Chart</code>).</td></tr>
+        <tr><td>Compiled chart</td><td>A validated chart with derived tables, ready to run; rebuilt from the IR, never serialized.</td></tr>
+        <tr><td>Configuration</td><td>The set of active states.</td></tr>
+        <tr><td>Macrostep</td><td>The processing of one external event, run to a stable configuration.</td></tr>
+        <tr><td>Microstep</td><td>One selection of enabled transitions, with their exits, content and entries.</td></tr>
+        <tr><td>Session</td><td>The value <code>step</code> takes and returns: configuration, history, internal queue, invocations.</td></tr>
+        <tr><td>Datamodel</td><td>The language of the chart's data and expressions: <code>null</code>, <code>ecmascript</code>, <code>cel</code> or <code>rust</code>.</td></tr>
+        <tr><td>Effect</td><td>An interaction with the outside that <code>step</code> returns instead of performing.</td></tr>
+        <tr><td>Actor</td><td>Anything that takes events one at a time and produces events; a running chart is one.</td></tr>
+        <tr><td>Turn</td><td>One input handled by an actor; for a chart, one macrostep.</td></tr>
+        <tr><td>Virtual actor</td><td>An actor with a durable IRI identity that always exists logically, is activated on its first message and deactivated when idle, and keeps its state in a journal.</td></tr>
+        <tr><td>Invoked actor</td><td>A child actor started by <code>&lt;invoke&gt;</code>, addressed by its parent IRI plus invoke id, and cancelled when the invoking state exits.</td></tr>
+        <tr><td>Stateless worker</td><td>A pooled actor with many activations per address and no journal, used for LLM calls, tools and heavy computation; its results are journaled by the caller.</td></tr>
+        <tr><td>Mailbox</td><td>A durable inbox for one or more actors that outlives activations: a local queue, a store-backed queue, or a DIDComm or TSP mediator.</td></tr>
+        <tr><td>Journal</td><td>The ordered record of every input an actor accepted, appended before the input's effects are carried out.</td></tr>
+        <tr><td>Outbox</td><td>The sends and timers of a journal entry, dispatched only after the entry commits.</td></tr>
+        <tr><td>Chart version</td><td><code>urn:vertep:chart:sha256:&lt;hex&gt;</code>, the hash of the chart's canonical RDF.</td></tr>
+        <tr><td>Migration</td><td>A journaled move of a running actor from one chart version to another.</td></tr>
+        <tr><td>Decider</td><td>The pluggable chooser behind a <code>vt:decide</code> state: guards, an LLM, a human or another actor, which may only pick one of the currently enabled events.</td></tr>
+        <tr><td>Shard</td><td>The unit of placement in a cluster: the set of actors whose IRI hashes to it, leased to one node and stored in one journal file.</td></tr>
+      </tbody>
+    </table>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="index.html">← Getting started</a>
+      <a href="charts.html">Writing charts →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

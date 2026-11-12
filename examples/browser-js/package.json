@@ -1,0 +1,18 @@
+{
+  "name": "vertep-example-browser-js",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A Vertep actor system in Node.js through @vertep/web: the same worker-hosted WebAssembly build a browser loads",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "node main.mjs",
+    "test": "node main.mjs | diff -u expected-output.txt -"
+  },
+  "dependencies": {
+    "@vertep/web": "file:../../bindings/js/packages/web"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

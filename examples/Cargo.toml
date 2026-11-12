@@ -1,0 +1,49 @@
+[package]
+name = "vertep-examples"
+description = "Runnable examples for Vertep: one binary per example, each checked against its recorded output"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+# One binary per example. Run one with `cargo run -p vertep-examples --bin <name>`.
+# tests/run_examples.rs runs every binary and compares its output with the recorded
+# `expected-output.txt` next to it, so an example that drifts fails the build.
+
+[[bin]]
+name = "traffic-light"
+path = "traffic-light/main.rs"
+
+[[bin]]
+name = "rust-macro"
+path = "rust-macro/main.rs"
+
+[[bin]]
+name = "durable-actor"
+path = "durable-actor/main.rs"
+
+[[bin]]
+name = "decider-agent"
+path = "decider-agent/main.rs"
+
+[dependencies]
+# The facade: core, SCXML, the actor runtime and tiramemsu by default; agents on request.
+vertep = { path = "../crates/vertep", features = ["agent"] }
+# The CEL datamodel (the facade does not re-export it).
+vertep-dm-cel = { workspace = true }
+# The `rust` datamodel and the `statechart!` macro (re-exported by this crate).
+vertep-dm-rust = { workspace = true }
+# JSON payloads for the agent example.
+serde_json = "1"
+
+[dev-dependencies]
+# The `vt` commands as a library, to check the recorded command outputs.
+vertep-cli = { path = "../crates/vertep-cli" }
+# Reads the typed-order YAML chart to run it.
+vertep-yaml = { workspace = true }
+
+[lints]
+workspace = true

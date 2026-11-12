@@ -1106,3 +1106,11 @@ Recording is opt-in, so `start` and hosts pay nothing. Only the core is recorded
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary}
 
 Each observation line carries the candidate's JSON Schema and the payload. The port covers the keywords of the type system's JSON Schema projection except `pattern`, which it reports as an input error, so the generated payload types avoid `decimal`, `datetime` and `iri`. Whether selection still takes the offered transition remains an answer from the Rust run.
+
+## Documentation site is plain static HTML
+
+The website in `site/` is hand-written HTML with one stylesheet and SVG marks: no generator, no scripts, relative links only, so it opens from `file://` and hosts on any static server.
+
+- motivated_by:: [[glossary#Vertep]] {weight: secondary, since: "2026-11-12", note: "the Alatyr star and the vertep goat are its marks"}
+
+The look is woodcut gravure in three inks, black, white and orange, with paper and ink swapped in dark mode; the tokens and components are in `site/assets/css/vertep.css`. Code on the pages is taken from files in the repository, and command output is pasted from real runs, so a page that disagrees with the code is a bug in the page. The example pages are written by `site/tools/sync-examples.py` from the sources and recorded outputs that `cargo test -p vertep-examples` checks; the pages are committed, so viewing the site still needs no build.

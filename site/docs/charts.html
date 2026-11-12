@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing charts — Vertep docs</title>
+<meta name="description" content="How to write Vertep charts in SCXML, YAML and the statechart! macro, how they lower to one IR, and what validation reports.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html" aria-current="page">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Charts</p>
+    <h1>Writing charts</h1>
+    <p class="lede">A chart can be written as an SCXML document, a YAML document or Rust tokens in the <code>statechart!</code> macro. All three are read into the same chart IR, checked by the same validator and hashed to the same version. This page shows each surface, the same chart in all three, and the errors you get when a chart is wrong.</p>
+
+    <h2 id="surfaces">Several surfaces, one IR</h2>
+    <p>The chart IR in <code>vertep-core</code> is the canonical chart: a tree of states with transitions, executable content, invokes and data, kept in document order. SCXML gives transition priority by document order, so the IR keeps that order as data. Every surface lowers to this IR, and every tool after that (the validator, the type checker, <code>step</code>, the RDF projection, the hash) works on the IR alone. So a chart behaves the same however it was written.</p>
+
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 540 300" width="540" role="img" aria-labelledby="charts-hub-t">
+          <title id="charts-hub-t">SCXML, YAML, the statechart! macro and include_chart! all lower to one chart IR; from the IR come the compiled chart, the RDF graph and the chart version IRI</title>
+          <defs>
+            <marker id="charts-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+            <pattern id="charts-ph" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+          </defs>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="16" style="fill:var(--ink)">
+            <rect x="10" y="20" width="140" height="46" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="80" y="49" text-anchor="middle">SCXML</text>
+            <rect x="10" y="88" width="140" height="46" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="80" y="117" text-anchor="middle">YAML</text>
+            <rect x="10" y="156" width="140" height="46" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="80" y="185" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="13">statechart!</text>
+            <rect x="10" y="224" width="140" height="46" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="80" y="253" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="13">include_chart!</text>
+            <rect x="215" y="105" width="120" height="80" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <rect x="215" y="105" width="120" height="80" fill="url(#charts-ph)"/>
+            <text x="275" y="140" text-anchor="middle" style="fill:var(--on-orange)">Chart IR</text>
+            <text x="275" y="162" text-anchor="middle" font-size="12" font-family="JetBrains Mono, monospace" style="fill:var(--on-orange)">vertep-core</text>
+            <rect x="395" y="30" width="135" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="462" y="52" text-anchor="middle">Compiled</text>
+            <text x="462" y="70" text-anchor="middle" font-size="12" font-family="JetBrains Mono, monospace">validate, step</text>
+            <rect x="395" y="120" width="135" height="50" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="462" y="142" text-anchor="middle">RDF graph</text>
+            <text x="462" y="160" text-anchor="middle" font-size="12" font-family="JetBrains Mono, monospace">vertep-rdf</text>
+            <rect x="395" y="210" width="135" height="50" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="462" y="232" text-anchor="middle" style="fill:var(--paper)">Version IRI</text>
+            <text x="462" y="250" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--paper)">sha256 of RDFC-1.0</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2.2" marker-end="url(#charts-arr)">
+            <path d="M150 43 C190 50 195 105 212 120"/>
+            <path d="M150 111 C180 115 190 130 212 138"/>
+            <path d="M150 179 C180 175 190 162 212 156"/>
+            <path d="M150 247 C190 240 195 185 212 172"/>
+            <path d="M335 125 C365 100 370 65 392 57"/>
+            <path d="M335 145 H392"/>
+            <path d="M462 170 V206"/>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Plate I. <b>Four ways in, one IR.</b> The version is the hash of the IR's canonical RDF form, not of the source text.</figcaption>
+    </figure>
+
+    <table>
+      <thead><tr><th>Surface</th><th>Reader and writer</th><th>Default datamodel</th><th>Round trip</th></tr></thead>
+      <tbody>
+        <tr><td>SCXML 1.0 with <code>vt:</code> extensions</td><td><code>vertep-scxml</code> (<code>read</code>, <code>write</code>)</td><td><code>null</code>, as SCXML says</td><td><code>read(write(c)) == c</code> for every chart the writer can represent</td></tr>
+        <tr><td>YAML 1.2</td><td><code>vertep-yaml</code> (<code>read</code>, <code>write</code>)</td><td><code>cel</code></td><td><code>read(write(c)) == c</code> for every chart with unique state ids</td></tr>
+        <tr><td><code>statechart!</code></td><td><code>vertep-macros</code>, re-exported by <code>vertep-dm-rust</code></td><td><code>rust</code> (the only one it accepts)</td><td>lowers to the IR at compile time</td></tr>
+        <tr><td><code>include_chart!</code></td><td>the SCXML and YAML readers, run inside the macro</td><td>must be <code>rust</code></td><td>same typed API as <code>statechart!</code></td></tr>
+        <tr><td>RDF (Turtle, TriG, N-Quads, N-Triples)</td><td><code>vertep-rdf</code></td><td>from the chart</td><td>see <a href="rdf.html">RDF and versions</a></td></tr>
+      </tbody>
+    </table>
+    <p>The <code>vt</code> command reads any of these files and picks the surface from the extension: <code>.scxml</code> or <code>.xml</code>, <code>.yaml</code> or <code>.yml</code>, <code>.ttl</code>, <code>.trig</code>, <code>.nq</code>, <code>.nt</code>. The commands are listed on <a href="cli.html">The vt command</a>.</p>
+
+    <h2 id="scxml">SCXML</h2>
+    <p>Vertep reads standard SCXML 1.0 documents and runs them with the W3C SCXML interpretation algorithm, checked against the W3C conformance suite (see <a href="verification.html">Verification</a>). Here is a small chart on the <code>null</code> datamodel, which has no data and accepts only <code>In()</code> conditions. Save it as <code>door.scxml</code>:</p>
+<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="door" initial="closed"&gt;
+  &lt;state id="closed"&gt;
+    &lt;transition event="open" target="opened"/&gt;
+    &lt;transition event="lock" target="locked"/&gt;
+  &lt;/state&gt;
+  &lt;state id="opened"&gt;
+    &lt;transition event="close" target="closed"/&gt;
+  &lt;/state&gt;
+  &lt;state id="locked"&gt;
+    &lt;transition event="unlock" target="closed"/&gt;
+  &lt;/state&gt;
+&lt;/scxml&gt;</code></pre>
+    <p>Check it, then convert it to YAML:</p>
+<pre class="output" data-lang="Output"><code>$ vt validate door.scxml
+door.scxml: ok: urn:vertep:chart:sha256:1dc511b5d015deca8f320c136c262267c95b7e2cba6f76173318ded0951f63cd
+$ vt convert --to yaml door.scxml
+vertep: 1
+name: door
+datamodel:
+  value: "null"
+  implicit: true
+initial: closed
+states:
+  closed:
+    on:
+      open: opened
+      lock: locked
+  opened:
+    on:
+      close: closed
+  locked:
+    on:
+      unlock: closed</code></pre>
+    <p>The YAML spells the datamodel as <code>{ value: "null", implicit: true }</code>. The SCXML document did not name a datamodel, and YAML's default is <code>cel</code>, not <code>null</code>. The <code>implicit</code> flag records that the source said nothing, so converting back gives the same document and the same IR. Both files hash to the same version:</p>
+<pre class="output" data-lang="Output"><code>$ vt convert --to yaml door.scxml -o door.yaml
+$ vt hash door.scxml
+urn:vertep:chart:sha256:1dc511b5d015deca8f320c136c262267c95b7e2cba6f76173318ded0951f63cd
+$ vt hash door.yaml
+urn:vertep:chart:sha256:1dc511b5d015deca8f320c136c262267c95b7e2cba6f76173318ded0951f63cd</code></pre>
+
+    <h3 id="scxml-rust">Reading SCXML from Rust</h3>
+    <p>The <code>vertep</code> facade re-exports the reader as <code>vertep::scxml</code>. <code>CompiledChart::new</code> runs the well-formedness validator and builds the tables <code>step</code> needs. From <code>examples/traffic-light/main.rs</code>:</p>
+<pre data-lang="Rust"><code>fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+    // 1. Read the SCXML document into the chart IR, then validate and compile it.
+    let parsed = vertep::scxml::read_str(CHART)?;
+    let chart = CompiledChart::new(parsed.chart).map_err(|v| format!("invalid chart: {v:?}"))?;
+
+    // 2. Start a session. The chart names the `null` datamodel (no data, only `In()` guards).
+    let mut dm = NullDatamodel::new();
+    let mut timers: Vec&lt;Timer&gt; = Vec::new();
+    let mut now_ms = 0;
+    let start = StartInput {
+        info: SessionInfo {
+            sessionid: "light-1".into(),
+            ..SessionInfo::default()
+        },
+        ..StartInput::default()
+    };
+    let outcome = session::start(&amp;chart, start, &amp;mut dm).map_err(|e| format!("{e:?}"))?;</code></pre>
+    <p><code>read_str</code> uses default options, which accept only the <code>null</code> datamodel. For other datamodels pass a <code>DatamodelSet</code>, for example <code>vertep_scxml::ReadOptions::default().with_datamodels(&amp;vertep_scxml::AnyDatamodel)</code>, as <code>crates/vertep-dm-rust/tests/rust_dsl.rs</code> does. A <code>src</code> attribute on <code>&lt;script&gt;</code>, <code>&lt;data&gt;</code>, <code>&lt;content&gt;</code> or <code>&lt;invoke&gt;</code> is read only through a <code>SourceResolver</code> you supply; with none, every <code>src</code> is an error. The reader does no I/O of its own.</p>
+
+    <h3 id="loss">What SCXML loses, and the loss report</h3>
+    <p>Reading returns the chart and a <code>LossReport</code>: everything the IR does not keep. Some losses are formatting (comments, processing instructions, the XML declaration, whitespace). Others are content: an unknown unprefixed attribute, an extension on an element that has no slot for one, a resolved <code>src</code> that was inlined. <code>ReadOptions::strict(true)</code> turns a non-empty report into an error. <code>vt convert</code> refuses a conversion that would lose content, and writes nothing:</p>
+<pre class="output" data-lang="Output"><code>$ vt convert --to yaml lossy.scxml
+lossy.scxml: refusing to convert scxml to yaml: it would lose:
+  - lossy.scxml:2:3: attribute `color` is not defined on &lt;state&gt;</code></pre>
+    <p>A chart with only formatting losses converts. <code>examples/traffic-light/traffic-light.scxml</code> has comments and converts to YAML without complaint.</p>
+
+    <h3 id="vt-namespace">The <code>vt:</code> extension namespace</h3>
+    <p>Vertep features ride in the namespace <code>https://w3id.org/vertep/vt#</code>, usually bound to the prefix <code>vt</code>. A <code>vt:</code> attribute or element becomes an extension node on its owner in the IR; it is not dropped. Elements in any other foreign namespace are kept the same way and listed in the loss report. A document with <code>vt:</code> extensions is still SCXML, so another SCXML processor can run it and ignore them. The extensions in use today, and where each is explained:</p>
+    <table>
+      <thead><tr><th>Extension</th><th>Where</th><th>What it does</th><th>Read by</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;vt:types&gt;</code></td><td>child of <code>&lt;scxml&gt;</code></td><td>declares named types and event payload types</td><td><a href="types.html">types</a></td></tr>
+        <tr><td><code>vt:type</code></td><td><code>&lt;data&gt;</code>, <code>&lt;send&gt;</code>, <code>&lt;param&gt;</code></td><td>the type of a data item, a send payload or a parameter</td><td><a href="types.html">types</a></td></tr>
+        <tr><td><code>vt:defer="order.*"</code></td><td>state</td><td>matching external events wait in the mailbox while the state is active</td><td><a href="runtime.html">runtime</a></td></tr>
+        <tr><td><code>vt:unhandled</code></td><td><code>&lt;scxml&gt;</code></td><td><code>discard</code>, <code>dead-letter</code> or <code>error</code> for events no transition takes</td><td><a href="runtime.html">runtime</a></td></tr>
+        <tr><td><code>vt:restart</code>, <code>vt:restart-limit</code>, <code>vt:restart-window</code>, <code>vt:restart-backoff</code></td><td><code>&lt;invoke&gt;</code></td><td>restart policy (<code>on-failure</code>, <code>always</code>) for an invoked actor</td><td><a href="runtime.html">runtime</a></td></tr>
+        <tr><td><code>&lt;vt:request&gt;</code></td><td>state</td><td>request and reply with a timeout, lowered to a send, a waiting substate and two transitions</td><td><a href="runtime.html">runtime</a></td></tr>
+        <tr><td><code>&lt;vt:reminder&gt;</code>, <code>&lt;vt:migrate&gt;</code></td><td>executable content</td><td>a durable periodic reminder; a request to migrate to another chart version</td><td><a href="runtime.html">runtime</a></td></tr>
+        <tr><td><code>vt:decide</code> and <code>vt:candidates</code>, <code>vt:fallback</code>, <code>vt:deadline</code>, <code>vt:maxDecisions</code></td><td>state</td><td>a choice point where a decider picks one enabled event</td><td><a href="agents.html">agents</a></td></tr>
+        <tr><td><code>&lt;invoke type="vt:llm"&gt;</code>, <code>&lt;vt:grant&gt;</code>, <code>&lt;vt:call&gt;</code></td><td>invoke, state, executable content</td><td>LLM actors, capability grants, plan-chart calls</td><td><a href="agents.html">agents</a></td></tr>
+      </tbody>
+    </table>
+    <p>The runtime lowers <code>&lt;vt:request&gt;</code>, <code>&lt;vt:reminder&gt;</code> and <code>&lt;vt:migrate&gt;</code> into plain SCXML before compiling (see <code>crates/vertep-runtime/src/chart.rs</code>). The chart version is computed on the chart as written, before that lowering.</p>
+
+    <h2 id="yaml">YAML</h2>
+    <p>The YAML surface is a thin mirror of the IR. States are keyed by id under <code>states</code>, and key order is document order. A document starts with <code>vertep: 1</code> (the format version, required) and <code>name</code>. The reader is built on a YAML 1.2 parser that keeps key order and reports a line and column for every node. YAML 1.1 parsers were rejected because they read <code>on</code> as the boolean <code>true</code>, and <code>on</code> is the key of every state's transitions.</p>
+    <p>This is <code>examples/typed-order/order.yaml</code>, a typed chart on the CEL datamodel:</p>
+<pre data-lang="YAML"><code># A typed order chart in YAML on the CEL datamodel.
+#
+# `types` names record and union types, `events` gives every event its payload type and
+# `context` gives every data item a type and an initial value. Guards and assignments are CEL
+# expressions: `ctx` is the context, `ev.data` the event payload. `vt typecheck` checks every
+# expression against these declarations before the chart ever runs.
+#
+# Illustrates the type-system capability (named types, typed events and context, Command Line
+# Type Tools), yaml-format and cel-datamodel.
+vertep: 1
+name: order
+datamodel: cel
+types:
+  Item: { sku: string, qty: int, price: decimal }
+  Pay: { amount: decimal, method: { oneOf: { Card: { last4: string }, Invoice: null } } }
+  Ship: { carrier: string, tracking: "optional&lt;string&gt;" }
+events:
+  add: Item
+  checkout: null
+  pay: Pay
+  approve: null
+  ship: Ship
+  cancel: null
+context:
+  items: { type: "list&lt;Item&gt;", init: "[]" }
+  total: { type: decimal, init: "0" }
+  limit: { type: decimal, init: "500" }
+initial: shopping
+states:
+  shopping:
+    on: { cancel: cancelled }
+    initial: cart
+    states:
+      cart:
+        on:
+          add:
+            - cond: "ev.data.qty &gt; 0"
+              actions:
+                - assign: { location: ctx.items, expr: "ctx.items + [ev.data]" }
+                - assign: { location: ctx.total, expr: "ctx.total + ev.data.price * decimal(ev.data.qty)" }
+          checkout:
+            - { cond: "size(ctx.items) &gt; 0", target: payment }
+      payment:
+        on:
+          pay:
+            - { cond: "ev.data.amount &lt; ctx.total", target: payment }
+            - { cond: "ctx.total &gt; ctx.limit", target: review }
+            - { target: fulfilment }
+      review:
+        on: { approve: fulfilment }
+  fulfilment:
+    on: { ship: shipped }
+  shipped: { type: final }
+  cancelled: { type: final }</code></pre>
+    <p>The keys a state takes, from <code>crates/vertep-yaml/src/lib.rs</code>:</p>
+    <table>
+      <thead><tr><th>Key</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>type</code></td><td><code>parallel</code>, <code>final</code> or <code>history</code> (with <code>history: shallow|deep</code>); absent means a plain state</td></tr>
+        <tr><td><code>initial</code></td><td>a child id, or a list of ids</td></tr>
+        <tr><td><code>on</code></td><td>event name to transition. A transition is a target string, a list of targets, or a mapping with <code>target</code>, <code>cond</code>, <code>type</code> and <code>actions</code>. A list of mappings is several transitions, in order.</td></tr>
+        <tr><td><code>always</code></td><td>eventless transitions, in the same forms</td></tr>
+        <tr><td><code>entry</code>, <code>exit</code></td><td>executable content</td></tr>
+        <tr><td><code>invoke</code>, <code>context</code>, <code>donedata</code>, <code>states</code></td><td>invokes, state-local data, done data, children</td></tr>
+      </tbody>
+    </table>
+    <p>Executable content is a list of mappings, each with exactly one key: <code>assign</code>, <code>raise</code>, <code>send</code>, <code>log</code>, <code>if</code>, <code>foreach</code>, <code>cancel</code>, <code>script</code>, <code>call</code> (a <code>vt:call</code> element) or <code>extension</code> (any other extension element). At the top level, <code>types</code>, <code>events</code> and <code>context</code> carry the types; <a href="types.html">Datamodels and types</a> covers them.</p>
+    <div class="nb"><p>Quote <code>"null"</code> when you mean the null datamodel. Unquoted, YAML reads it as a null value:</p>
+<pre class="output" data-lang="Output"><code>$ vt validate dn.yaml
+dn.yaml:3:12: datamodel: expected a string, found null</code></pre></div>
+    <p>The writer is canonical and byte-stable. Spellings such as <code>implicit: true</code>, <code>generated: true</code> on generated state ids, a <code>transitions</code> list that keeps an order <code>on</code> grouping would change, and <code>extensions</code> lists on every node exist so that no IR distinction is lost.</p>
+
+    <h2 id="macro">The <code>statechart!</code> macro</h2>
+    <p><code>statechart!</code> writes a chart in Rust tokens on the <code>rust</code> datamodel. Guards and actions are ordinary Rust functions, bound by name. The macro runs inside the compiler: it lowers the tokens to the IR, runs the same well-formedness validator and type checker the runtime uses, reports unreachable states and unhandled events, and generates a typed API. Every finding is a compile error or warning at the offending tokens. The macros are re-exported by <code>vertep-dm-rust</code>, so a crate needs only that dependency.</p>
+    <p>This is <code>examples/rust-macro/main.rs</code>, a turnstile:</p>
+<pre data-lang="Rust"><code>use vertep_dm_rust::{MachineError, statechart};
+
+statechart! {
+    name: turnstile,
+    types { Coin = { cents: int } }
+    context { credit: int = 0, price: int = 50, passes: int = 0 }
+    events { coin: Coin, push, shutdown }
+
+    initial service;
+    state service {
+        initial locked;
+        on shutdown =&gt; off;
+        state locked {
+            // Targetless: stay locked and count the coin.
+            on coin / add_credit;
+            // Eventless: unlock as soon as there is enough credit.
+            always if paid =&gt; unlocked;
+        }
+        state unlocked {
+            on coin / add_credit;
+            on push =&gt; locked / let_through;
+        }
+    }
+    final off;
+}
+
+/// Guard: guards get the context and the payload read-only, and return a bool.
+fn paid(ctx: &amp;Ctx, _: &amp;()) -&gt; bool {
+    ctx.credit &gt;= ctx.price
+}
+
+/// Action: actions may change the context; `Emit` would let them raise or send events.
+fn add_credit(ctx: &amp;mut Ctx, coin: &amp;Coin, _: &amp;mut Emit) {
+    ctx.credit += coin.cents;
+}
+
+/// Action without an emitter: the shorter signature is accepted too.
+fn let_through(ctx: &amp;mut Ctx, _: &amp;()) {
+    ctx.credit -= ctx.price;
+    ctx.passes += 1;
+}
+
+fn main() -&gt; Result&lt;(), MachineError&gt; {
+    println!("chart version {}", *VERSION);
+
+    // `Machine::start` runs the start macrostep; the effects (none here) are returned.
+    let (mut m, _effects) = Machine::start("turnstile-1")?;
+    show("(start)", &amp;m);
+
+    let script = [
+        Event::Coin { cents: 20 },
+        Event::Push, // nothing happens: the turnstile is locked
+        Event::Coin { cents: 50 },
+        Event::Push,
+        Event::Push,
+        Event::Shutdown,
+    ];
+    for event in script {
+        let label = format!("{event:?}");
+        m.send(event)?;
+        show(&amp;label, &amp;m);
+    }
+    assert!(m.is_terminated(), "`off` is a top-level final state");
+    Ok(())
+}</code></pre>
+<pre class="output" data-lang="Output"><code>$ cargo run -p vertep-examples --bin rust-macro
+chart version urn:vertep:chart:sha256:0b1614ef361262f9f6fec5189fa5834756f37808a3a466f81a9f83d6ed20e868
+(start)                -&gt; [Service, Locked]    credit=0   passes=0
+Coin { cents: 20 }     -&gt; [Service, Locked]    credit=20  passes=0
+Push                   -&gt; [Service, Locked]    credit=20  passes=0
+Coin { cents: 50 }     -&gt; [Service, Unlocked]  credit=70  passes=0
+Push                   -&gt; [Service, Locked]    credit=20  passes=1
+Push                   -&gt; [Service, Locked]    credit=20  passes=1
+Shutdown               -&gt; []                   credit=20  passes=1</code></pre>
+
+    <h3 id="macro-grammar">The grammar</h3>
+    <p>The full grammar is at the top of <code>crates/vertep-macros/src/parse.rs</code>. In short:</p>
+    <table>
+      <thead><tr><th>Item</th><th>Form</th></tr></thead>
+      <tbody>
+        <tr><td>chart header</td><td><code>name: order,</code> (required) · <code>datamodel: rust,</code> · <code>binding: early|late,</code></td></tr>
+        <tr><td>lint attributes</td><td><code>#[deny(unreachable_states)]</code>, <code>#[allow(unhandled_events)]</code> (both warn by default)</td></tr>
+        <tr><td>declarations</td><td><code>types { Pay = { amount: decimal } }</code> · <code>context { total: decimal = 0 }</code> · <code>events { start, pay: Pay }</code></td></tr>
+        <tr><td>states</td><td><code>state s;</code> · <code>state s { … }</code> · <code>parallel p { … }</code> · <code>final f;</code> · <code>history h deep =&gt; t;</code></td></tr>
+        <tr><td>state body</td><td><code>initial a;</code> · <code>data { … }</code> · <code>entry a, b;</code> · <code>exit a;</code> · <code>invoke "type" src "…" id "…" autoforward;</code></td></tr>
+        <tr><td>transitions</td><td><code>on pay if positive =&gt; payment / record_total;</code> · <code>always if ready =&gt; running;</code> · targetless <code>on coin / add_credit;</code> · <code>internal</code> or <code>external</code> before <code>/</code></td></tr>
+        <tr><td>guards</td><td><code>if name</code>, <code>if !name</code>, <code>if In(state)</code></td></tr>
+        <tr><td>actions</td><td>a function name · <code>raise e</code> · <code>send e to "…" after "…" type "…" id "…"</code> · <code>log "…"</code> · <code>cancel "…"</code></td></tr>
+      </tbody>
+    </table>
+    <p>A guard has the signature <code>fn(&amp;Ctx, &amp;P) -&gt; bool</code>, where <code>P</code> is the event's payload type (<code>()</code> for none). It gets no mutable context and no emitter, so it cannot change anything. An action is <code>fn(&amp;mut Ctx, &amp;P, &amp;mut Emit)</code>, <code>fn(&amp;mut Ctx, &amp;P)</code> or <code>fn(&amp;mut Ctx, &amp;P) -&gt; Vec&lt;E&gt;</code>; its only effects are context changes and emitted events. A function with the wrong signature is a type error at the guard's or action's name.</p>
+    <p>The macro generates, next to the chart: <code>Ctx</code> (the context struct), <code>Event</code> (one variant per event, carrying its payload fields), <code>State</code> (one variant per state, with <code>parent()</code>, <code>children()</code> and <code>contains()</code>), a struct per named type, <code>CHART</code> (the IR), <code>VERSION</code> (the chart version IRI), <code>NAME</code>, <code>bind()</code> (a registry of the chart's functions) and <code>Machine</code>, a typed session with <code>start</code>, <code>send</code>, <code>active</code>, <code>is_in</code>, <code>context</code> and <code>is_terminated</code>.</p>
+
+    <h3 id="include-chart"><code>include_chart!</code></h3>
+    <p><code>include_chart!("tests/charts/order.scxml")</code> reads an SCXML (<code>.scxml</code>, <code>.xml</code>) or YAML (<code>.yaml</code>, <code>.yml</code>) file at compile time, relative to the crate's <code>CARGO_MANIFEST_DIR</code>, and generates the same API as <code>statechart!</code>. The crate is rebuilt when the file changes. The file must use the <code>rust</code> datamodel. Charts on other datamodels are loaded at run time with their readers instead.</p>
+
+    <h2 id="same-chart">One chart in three surfaces</h2>
+    <p>The test <code>order_chart_is_the_same_from_every_surface</code> in <code>crates/vertep-dm-rust/tests/rust_dsl.rs</code> writes one order chart three times, and asserts that all three give the same IR, the same API and the same version IRI, and run the same. In the macro:</p>
+<pre data-lang="Rust"><code>statechart! {
+    name: order,
+    datamodel: rust,
+    types {
+        Pay = { amount: decimal },
+        Approval = { by: iri },
+    }
+    context { total: decimal = 0, limit: decimal = 100 }
+    events { start, pay: Pay, authorized, approve: Approval, cancel }
+
+    initial idle;
+    state idle { on start =&gt; checkout; }
+    state checkout {
+        initial cart;
+        on cancel =&gt; cancelled;
+        state cart {
+            on pay if positive =&gt; payment / record_total;
+        }
+        state payment {
+            on authorized if over_limit =&gt; review;
+            on authorized =&gt; paid;
+        }
+        state review { on approve =&gt; paid; }
+    }
+    final paid;
+    final cancelled;
+}</code></pre>
+    <p>With these functions, shared by all three:</p>
+<pre data-lang="Rust"><code>pub fn positive(_: &amp;Ctx, ev: &amp;Pay) -&gt; bool {
+    ev.amount &gt; Decimal::ZERO
+}
+pub fn over_limit(ctx: &amp;Ctx, _: &amp;()) -&gt; bool {
+    ctx.total &gt; ctx.limit
+}
+pub fn record_total(ctx: &amp;mut Ctx, ev: &amp;Pay, _: &amp;mut Emit) {
+    ctx.total = ev.amount;
+}</code></pre>
+    <p>In YAML, <code>crates/vertep-dm-rust/tests/charts/order.yaml</code>:</p>
+<pre data-lang="YAML"><code>vertep: 1
+name: order
+datamodel: rust
+types:
+  Pay:
+    amount: decimal
+  Approval:
+    by: iri
+events:
+  start: null
+  pay: Pay
+  authorized: null
+  approve: Approval
+  cancel: null
+context:
+  total:
+    type: decimal
+    init: "0"
+  limit:
+    type: decimal
+    init: "100"
+initial: idle
+states:
+  idle:
+    on:
+      start: checkout
+  checkout:
+    initial: cart
+    on:
+      cancel: cancelled
+    states:
+      cart:
+        on:
+          pay:
+            cond: "vt:guard/order/positive"
+            target: payment
+            actions:
+              - foreach:
+                  array: "vt:action/order/record_total"
+                  item: _vt_emit
+                  do:
+                    - send:
+                        eventexpr: _vt_emit.event
+                        targetexpr: _vt_emit.target
+                        typeexpr: _vt_emit.type
+                        delayexpr: _vt_emit.delay
+                        content:
+                          expr: _vt_emit.data
+      payment:
+        on:
+          authorized:
+            - cond: "vt:guard/order/over_limit"
+              target: review
+            - target: paid
+      review:
+        on:
+          approve: paid
+  paid:
+    type: final
+  cancelled:
+    type: final</code></pre>
+    <p>In SCXML, <code>crates/vertep-dm-rust/tests/charts/order.scxml</code>:</p>
+<pre data-lang="SCXML"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#" version="1.0" name="order" datamodel="rust" initial="idle"&gt;
+  &lt;vt:types xmlns:vt="https://w3id.org/vertep/vt#"&gt;type Pay = { amount: decimal };
+type Approval = { by: iri };
+event start;
+event pay: Pay;
+event authorized;
+event approve: Approval;
+event cancel;
+&lt;/vt:types&gt;
+  &lt;datamodel&gt;
+    &lt;data id="total" expr="0" vt:type="decimal"/&gt;
+    &lt;data id="limit" expr="100" vt:type="decimal"/&gt;
+  &lt;/datamodel&gt;
+  &lt;state id="idle"&gt;
+    &lt;transition event="start" target="checkout"/&gt;
+  &lt;/state&gt;
+  &lt;state id="checkout" initial="cart"&gt;
+    &lt;transition event="cancel" target="cancelled"/&gt;
+    &lt;state id="cart"&gt;
+      &lt;transition event="pay" cond="vt:guard/order/positive" target="payment"&gt;
+        &lt;foreach array="vt:action/order/record_total" item="_vt_emit"&gt;
+          &lt;send eventexpr="_vt_emit.event" targetexpr="_vt_emit.target" typeexpr="_vt_emit.type" delayexpr="_vt_emit.delay"&gt;
+            &lt;content expr="_vt_emit.data"/&gt;
+          &lt;/send&gt;
+        &lt;/foreach&gt;
+      &lt;/transition&gt;
+    &lt;/state&gt;
+    &lt;state id="payment"&gt;
+      &lt;transition event="authorized" cond="vt:guard/order/over_limit" target="review"/&gt;
+      &lt;transition event="authorized" target="paid"/&gt;
+    &lt;/state&gt;
+    &lt;state id="review"&gt;
+      &lt;transition event="approve" target="paid"/&gt;
+    &lt;/state&gt;
+  &lt;/state&gt;
+  &lt;final id="paid"/&gt;
+  &lt;final id="cancelled"/&gt;
+&lt;/scxml&gt;</code></pre>
+    <p>The SCXML and YAML show how the <code>rust</code> datamodel appears in the IR. A guard is a <code>cond</code> holding an IRI, <code>vt:guard/&lt;chart&gt;/&lt;function&gt;</code>. An action is a <code>&lt;foreach&gt;</code> whose <code>array</code> is the action's IRI, <code>vt:action/&lt;chart&gt;/&lt;function&gt;</code>. Evaluating the array runs the action, which may change the context, and yields the events it emitted; the body sends each one. This keeps every effect of an action visible in the IR and in the step output, without any change to the interpreter. The rules are in <code>crates/vertep-dm-rust/src/lowering.rs</code>.</p>
+<pre class="output" data-lang="Output"><code>$ vt hash order.scxml
+urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e
+$ vt hash order.yaml
+urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e</code></pre>
+    <p>The macro's <code>VERSION</code> constant is the same IRI; the test checks it.</p>
+    <div class="nb"><p>The datamodel is part of the chart, so it is part of the version. The same states written once with CEL expressions and once with Rust functions are two charts with two versions.</p></div>
+
+    <h2 id="validation">Validation and well-formedness</h2>
+    <p>A chart passes several checks before it can run. All of them report every error they find, with a location, instead of stopping at the first.</p>
+    <table>
+      <thead><tr><th>Check</th><th>Where</th><th>Finds</th></tr></thead>
+      <tbody>
+        <tr><td>Reading</td><td><code>vertep-scxml</code>, <code>vertep-yaml</code>, the macro parser</td><td>syntax, unknown elements and keys, missing or exclusive attributes, duplicate state ids, unknown targets</td></tr>
+        <tr><td>Well-formedness</td><td><code>vertep_core::validate</code>, run by <code>CompiledChart::new</code></td><td>the structural rules of SCXML (table below)</td></tr>
+        <tr><td>SHACL shapes</td><td><code>vertep-rdf</code>, run by <code>vt validate</code></td><td>the same rules, stated over the RDF projection</td></tr>
+        <tr><td>Types</td><td><code>vertep_core::types::check_chart</code>, run by <code>vt typecheck</code>, the loaders and the macro</td><td>payload, context and expression types (<a href="types.html#checking">see types</a>)</td></tr>
+      </tbody>
+    </table>
+    <p>A typo and a duplicate id, in SCXML:</p>
+<pre class="output" data-lang="Output"><code>$ vt validate door-typo.scxml; echo "exit $?"
+door-typo.scxml:3:5: transition target names unknown state `opend`
+door-typo.scxml:5:3: state id `closed` is already declared at 2:3
+exit 1</code></pre>
+    <p>The same typo in YAML. The YAML reader gives the dotted path of the node and suggests the closest state id:</p>
+<pre class="output" data-lang="Output"><code>$ vt validate door-typo.yaml
+door-typo.yaml:8:13: states.closed.on.open.target: unknown target `opend`; did you mean `opened`?</code></pre>
+    <p>Structural errors come from the core validator, and <code>vt validate</code> also checks the chart's RDF projection against the SHACL shapes. This chart puts only a history state in <code>closed</code>, a transition in a final state, and <code>&lt;donedata&gt;</code> in a state that is not final:</p>
+<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="door" initial="closed"&gt;
+  &lt;state id="closed"&gt;
+    &lt;history id="h"/&gt;
+    &lt;transition event="open" target="opened"/&gt;
+  &lt;/state&gt;
+  &lt;final id="opened"&gt;
+    &lt;transition event="close" target="closed"/&gt;
+  &lt;/final&gt;
+  &lt;state id="x"&gt;&lt;donedata&gt;&lt;content expr="1"/&gt;&lt;/donedata&gt;&lt;state id="y"/&gt;&lt;/state&gt;
+&lt;/scxml&gt;</code></pre>
+<pre class="output" data-lang="Output"><code>$ vt validate door-shapes.scxml
+door-shapes.scxml:2:3: StateHistoryOnly at State { id: "closed" }
+door-shapes.scxml:6:3: FinalContent { what: "transitions" } at State { id: "opened" }
+door-shapes.scxml:9:3: DoneDataOutsideFinal at State { id: "x" }
+door-shapes.scxml: shapes: &lt;urn:vertep:chart:sha256:dcf27340493a3568d3813f8b980134e8e4475d58cbc59e85e9da0c3be3a3c807#s.opened&gt; (vt:child|vt:transition|vt:invoke|vt:data|vt:initial|vt:initialElement): a final state has only onentry, onexit and donedata (MaxCountConstraintComponent)
+door-shapes.scxml: shapes: &lt;urn:vertep:chart:sha256:dcf27340493a3568d3813f8b980134e8e4475d58cbc59e85e9da0c3be3a3c807#s.closed&gt; = &lt;urn:vertep:chart:sha256:dcf27340493a3568d3813f8b980134e8e4475d58cbc59e85e9da0c3be3a3c807#s.closed&gt;: a state's children cannot all be history states (OrConstraintComponent)
+door-shapes.scxml: shapes: &lt;urn:vertep:chart:sha256:dcf27340493a3568d3813f8b980134e8e4475d58cbc59e85e9da0c3be3a3c807#s.x&gt; vt:donedata: donedata belongs to final states (MaxCountConstraintComponent)</code></pre>
+    <div class="nb warn"><p><code>vt validate</code> prints core violations by their internal names (<code>StateHistoryOnly</code>, <code>FinalContent</code>), not as sentences. The table below says what each name means.</p></div>
+    <table>
+      <thead><tr><th>Violation</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>EmptyChart</code></td><td>the chart has no states</td></tr>
+        <tr><td><code>DuplicateStateId</code>, <code>DuplicateDataId</code></td><td>two states, or two data items, share an id</td></tr>
+        <tr><td><code>UnknownTarget</code></td><td>a target names no state</td></tr>
+        <tr><td><code>IllegalInitialTarget</code></td><td>an initial target is not a proper descendant of its state</td></tr>
+        <tr><td><code>InitialAttributeAndElement</code>, <code>InitialOnNonCompound</code>, <code>IllegalInitialTransition</code></td><td>both an <code>initial</code> attribute and element; an initial on a state without children; an <code>&lt;initial&gt;</code> transition with an event, a condition or no target</td></tr>
+        <tr><td><code>HistoryAtRoot</code>, <code>HistoryContent</code>, <code>HistoryTransitionCount</code>, <code>IllegalHistoryTransition</code>, <code>IllegalHistoryTarget</code>, <code>HistoryDefaultCycle</code></td><td>misplaced history states, history states with content or several transitions, a default transition that leaves the parent or loops back</td></tr>
+        <tr><td><code>FinalContent</code>, <code>DoneDataOutsideFinal</code></td><td>a final state with anything but <code>onentry</code>, <code>onexit</code> and <code>donedata</code>; <code>donedata</code> outside a final state</td></tr>
+        <tr><td><code>ParallelHistoryOnly</code>, <code>StateHistoryOnly</code></td><td>a state whose only children are history states</td></tr>
+        <tr><td><code>IllegalTargetSet</code></td><td>the targets of one transition cannot be active together</td></tr>
+        <tr><td><code>ConflictingAttributes</code></td><td>attributes or children that exclude each other, or a missing required one</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="macro-errors">Errors from the macro</h3>
+    <p>In the macro, the same checks become compiler errors at the right span. These are the recorded outputs of the compile-fail tests in <code>crates/vertep-dm-rust/tests/ui/</code>. A misspelled target:</p>
+<pre data-lang="Rust"><code>statechart! {
+    name: order,
+    events { pay }
+    initial cart;
+    state cart { on pay =&gt; paymnt; }
+    state payment;
+}</code></pre>
+<pre class="output" data-lang="Output"><code>error: unknown target state `paymnt`; did you mean `payment`?
+ --&gt; tests/ui/unknown_target.rs:7:28
+  |
+7 |     state cart { on pay =&gt; paymnt; }
+  |                            ^^^^^^</code></pre>
+    <p>An event declared under <code>#[deny(unhandled_events)]</code> that no transition handles:</p>
+<pre class="output" data-lang="Output"><code>error: event `refund` is declared but no transition handles it
+ --&gt; tests/ui/unhandled_event.rs:6:19
+  |
+6 |     events { pay, refund }
+  |                   ^^^^^^</code></pre>
+    <p>A guard that asks for <code>&amp;mut Ctx</code>, which guards may not have:</p>
+<pre class="output" data-lang="Output"><code>error[E0631]: type mismatch in function arguments
+  --&gt; tests/ui/guard_mut_ctx.rs:8:28
+   |
+ 8 |     state open { on pay if counted =&gt; paid; }
+   |                            ^^^^^^^ expected due to this
+...
+12 | fn counted(ctx: &amp;mut Ctx, _: &amp;()) -&gt; bool {
+   | ----------------------------------------- found signature defined here
+   |
+   = note: expected function signature `for&lt;'a, 'b&gt; fn(&amp;'a Ctx, &amp;'b ()) -&gt; _`
+              found function signature `fn(&amp;mut Ctx, &amp;()) -&gt; _`
+   = note: required for `for&lt;'a, 'b&gt; fn(&amp;'a mut Ctx, &amp;'b ()) -&gt; bool {counted}` to implement `GuardFn&lt;Ctx, ()&gt;`
+note: required by a bound in `Registry::&lt;C&gt;::guard`
+  --&gt; src/registry.rs
+   |
+   |     pub fn guard&lt;P, F&gt;(&amp;mut self, iri: &amp;str, f: F) -&gt; Result&lt;&amp;mut Self, RegistryError&gt;
+   |            ----- required by a bound in this associated function
+...
+   |         F: GuardFn&lt;C, P&gt;,
+   |            ^^^^^^^^^^^^^ required by this bound in `Registry::&lt;C&gt;::guard`
+help: consider wrapping the function in a closure
+   |
+ 8 |     state open { on pay if |arg0: &amp;Ctx, arg1: &amp;()| counted(&amp;mut *arg0, arg1) =&gt; paid; }
+   |                            +++++++++++++++++++++++        ++++++++++++++++++</code></pre>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="concepts.html">← Concepts</a>
+      <a href="types.html">Datamodels and types →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

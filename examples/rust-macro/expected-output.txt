@@ -1,0 +1,8 @@
+chart version urn:vertep:chart:sha256:0b1614ef361262f9f6fec5189fa5834756f37808a3a466f81a9f83d6ed20e868
+(start)                -> [Service, Locked]    credit=0   passes=0
+Coin { cents: 20 }     -> [Service, Locked]    credit=20  passes=0
+Push                   -> [Service, Locked]    credit=20  passes=0
+Coin { cents: 50 }     -> [Service, Unlocked]  credit=70  passes=0
+Push                   -> [Service, Locked]    credit=20  passes=1
+Push                   -> [Service, Locked]    credit=20  passes=1
+Shutdown               -> []                   credit=20  passes=1

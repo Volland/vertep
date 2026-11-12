@@ -43,3 +43,10 @@ The pluggable chooser behind a `vt:decide` state: guards, an LLM, a human or ano
 The unit of placement in a cluster: the set of actors whose IRI hashes to it, leased to one node and stored in one journal file.
 
 - defines:: [[decisions#Shard-based placement]]
+
+## Vertep
+
+The travelling puppet theatre of Ukrainian Christmas, whose puppets move only along slots cut in the stage floor; the project's name and its picture of a chart: a decider picks a slot, it never cuts one.
+
+- defines:: [[decisions#Deciders at choice points]] {note: "the puppeteer chooses among the slots the stage offers"}
+- defines:: [[decisions#Documentation site is plain static HTML]] {note: "the site's marks are the vertep star and goat"}

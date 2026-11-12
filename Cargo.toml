@@ -21,6 +21,7 @@ members = [
     "crates/vertep-federation",
     "crates/vertep-agent",
     "crates/vertep-wasm",
+    "examples",
 ]
 
 [workspace.package]

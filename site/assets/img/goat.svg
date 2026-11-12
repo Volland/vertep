@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-labelledby="t">
+  <title id="t">The vertep goat</title>
+  <!-- Koza, the goat of the Ukrainian vertep, cut as a woodblock: ink shapes, paper hatching,
+       an orange eye and the festive ribbon with bells. -->
+  <defs>
+    <clipPath id="goat-head">
+      <path d="M58 194 C60 162 64 136 72 112 C76 92 84 74 98 64 C110 57 124 60 133 71 L163 116 C169 125 171 133 165 138 C159 142 151 142 145 142 C143 153 142 167 139 182 C132 169 127 157 125 149 C121 151 117 153 113 157 C111 169 111 181 113 194 Z"/>
+    </clipPath>
+    <clipPath id="goat-horn-front"><path d="M99 67 C93 38 72 15 34 13 C58 28 75 48 85 76 Z"/></clipPath>
+    <clipPath id="goat-horn-back"><path d="M113 63 C114 34 98 11 66 3 C86 21 97 42 100 66 Z"/></clipPath>
+  </defs>
+
+  <!-- back horn -->
+  <path d="M113 63 C114 34 98 11 66 3 C86 21 97 42 100 66 Z" fill="#17120f"/>
+  <g clip-path="url(#goat-horn-back)" stroke="#fbf6ec" stroke-width="2" stroke-linecap="round">
+    <path d="M90 22 L104 18 M95 32 L110 29 M98 43 L113 41 M100 54 L114 53"/>
+  </g>
+  <!-- front horn -->
+  <path d="M99 67 C93 38 72 15 34 13 C58 28 75 48 85 76 Z" fill="#17120f"/>
+  <g clip-path="url(#goat-horn-front)" stroke="#fbf6ec" stroke-width="2" stroke-linecap="round">
+    <path d="M52 14 L48 26 M63 17 L58 30 M73 22 L66 36 M82 29 L74 44 M89 39 L80 53 M94 50 L84 63"/>
+  </g>
+
+  <!-- ear -->
+  <path d="M92 90 C72 84 50 90 36 104 C56 109 78 104 96 98 Z" fill="#17120f"/>
+  <path d="M86 94 C70 93 56 97 46 103" fill="none" stroke="#fbf6ec" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- head and neck -->
+  <path d="M58 194 C60 162 64 136 72 112 C76 92 84 74 98 64 C110 57 124 60 133 71 L163 116 C169 125 171 133 165 138 C159 142 151 142 145 142 C143 153 142 167 139 182 C132 169 127 157 125 149 C121 151 117 153 113 157 C111 169 111 181 113 194 Z" fill="#17120f"/>
+
+  <!-- engraved hatching on the neck and cheek -->
+  <g clip-path="url(#goat-head)" stroke="#fbf6ec" stroke-width="1.6" stroke-linecap="round" fill="none">
+    <path d="M60 150 C70 146 82 146 92 150"/>
+    <path d="M60 160 C72 155 86 155 98 160"/>
+    <path d="M59 170 C72 165 88 165 102 170"/>
+    <path d="M58 180 C72 175 90 175 106 180"/>
+    <path d="M66 134 C74 131 82 131 88 134"/>
+    <path d="M70 122 C76 119 82 119 86 121"/>
+    <path d="M104 106 C112 112 122 114 132 112"/>
+    <path d="M110 118 C118 123 128 125 138 122"/>
+    <path d="M135 82 L158 117"/>
+    <!-- beard -->
+    <path d="M131 150 L136 172 M137 147 L139 166"/>
+  </g>
+  <!-- nostril and mouth -->
+  <path d="M157 122 C160 121 163 123 163 126" fill="none" stroke="#fbf6ec" stroke-width="2" stroke-linecap="round"/>
+  <path d="M148 136 C153 134 158 134 162 136" fill="none" stroke="#fbf6ec" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- eye: orange, with the goat's bar pupil -->
+  <path d="M108 90 C113 83 123 82 129 89 C123 95 113 95 108 90 Z" fill="#e8641c" stroke="#fbf6ec" stroke-width="1.5"/>
+  <rect x="113" y="87.6" width="11" height="3.2" rx="1.6" fill="#17120f"/>
+
+  <!-- the vertep ribbon with bells -->
+  <path d="M56 168 C76 177 98 177 118 167 L119 180 C98 190 76 190 55 181 Z" fill="#e8641c" stroke="#17120f" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M60 174 C78 182 98 182 116 173" fill="none" stroke="#17120f" stroke-width="1.4" stroke-dasharray="3 3"/>
+  <g fill="#e8641c" stroke="#17120f" stroke-width="2.4">
+    <circle cx="72" cy="190" r="5.5"/><circle cx="88" cy="193" r="5.5"/><circle cx="104" cy="189" r="5.5"/>
+  </g>
+  <g fill="#17120f"><circle cx="72" cy="192" r="1.4"/><circle cx="88" cy="195" r="1.4"/><circle cx="104" cy="191" r="1.4"/></g>
+</svg>

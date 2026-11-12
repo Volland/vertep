@@ -1,0 +1,224 @@
+{
+  "context": {
+    "$defs": {
+      "Item": {
+        "additionalProperties": false,
+        "properties": {
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+                "type": "string"
+              }
+            ]
+          },
+          "qty": {
+            "exclusiveMaximum": 9223372036854775808,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "sku": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku",
+          "qty",
+          "price"
+        ],
+        "title": "Item",
+        "type": "object"
+      }
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "items": {
+        "items": {
+          "$ref": "#/$defs/Item"
+        },
+        "type": "array"
+      },
+      "limit": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string"
+          }
+        ]
+      },
+      "total": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "required": [
+      "items",
+      "total",
+      "limit"
+    ],
+    "type": "object"
+  },
+  "events": {
+    "add": {
+      "$defs": {
+        "Item": {
+          "additionalProperties": false,
+          "properties": {
+            "price": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+                  "type": "string"
+                }
+              ]
+            },
+            "qty": {
+              "exclusiveMaximum": 9223372036854775808,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            },
+            "sku": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sku",
+            "qty",
+            "price"
+          ],
+          "title": "Item",
+          "type": "object"
+        }
+      },
+      "$ref": "#/$defs/Item",
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "approve": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "null"
+    },
+    "cancel": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "null"
+    },
+    "checkout": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "null"
+    },
+    "pay": {
+      "$defs": {
+        "Pay": {
+          "additionalProperties": false,
+          "properties": {
+            "amount": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "tag": {
+                      "const": "Card"
+                    },
+                    "value": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "last4": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "last4"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "tag",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "tag": {
+                      "const": "Invoice"
+                    }
+                  },
+                  "required": [
+                    "tag"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "required": [
+            "amount",
+            "method"
+          ],
+          "title": "Pay",
+          "type": "object"
+        }
+      },
+      "$ref": "#/$defs/Pay",
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "ship": {
+      "$defs": {
+        "Ship": {
+          "additionalProperties": false,
+          "properties": {
+            "carrier": {
+              "type": "string"
+            },
+            "tracking": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "required": [
+            "carrier"
+          ],
+          "title": "Ship",
+          "type": "object"
+        }
+      },
+      "$ref": "#/$defs/Ship",
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  }
+}

@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RDF and versions — Vertep docs</title>
+<meta name="description" content="How Vertep projects charts, types and journals to RDF 1.2, validates them with SHACL, names each chart by the hash of its canonical form, and answers SPARQL queries as of any moment.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html" aria-current="page">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Reference</p>
+    <h1>RDF and versions</h1>
+    <p class="lede">Every chart has an exact RDF 1.2 form, checked by SHACL shapes. Its version is the hash of that form, and actor journals are RDF too, so you can ask SPARQL what an actor believed at any past moment.</p>
+
+    <h2 id="why">The IR is the hub, RDF is a projection</h2>
+    <p>SCXML, YAML and the <code>statechart!</code> macro all lower to one chart IR in <code>vertep-core</code>. The runtime executes the IR. RDF is a <em>lossless projection</em> of it: <code>vertep-rdf</code> writes the IR as a graph and can rebuild exactly the same IR from that graph. The runtime never executes RDF.</p>
+    <p>Two consequences follow. The graph must carry enough to rebuild the IR, down to the order of transitions. And because RDF is open-world (a graph that is missing a triple is not wrong by itself), SHACL shapes, not the ontology, say what a valid chart graph is. Reconstruction runs the shapes first and refuses any graph that does not conform.</p>
+
+    <h2 id="modules">The vt: ontology modules</h2>
+    <p>The ontology is split into modules. Each one is its own Turtle file, and a chart that uses only plain SCXML needs only the chart module. All modules are plain OWL/RDFS files with no imports.</p>
+    <table>
+      <thead><tr><th>Module</th><th>Prefix and namespace</th><th>File</th><th>What it describes</th></tr></thead>
+      <tbody>
+        <tr><td>Chart</td><td><code>vt:</code> <code>https://w3id.org/vertep/vt#</code></td><td><code>crates/vertep-rdf/ontology/vt-chart.ttl</code></td><td>One class per IR node kind and one property per IR attribute or containment</td></tr>
+        <tr><td>Types</td><td><code>vt:</code> (same namespace)</td><td><code>crates/vertep-rdf/ontology/vt-types.ttl</code></td><td>Named types, records, tagged unions, lists, optional values, primitives</td></tr>
+        <tr><td>Runtime</td><td><code>vt:</code> (same namespace)</td><td><code>crates/vertep-rdf/ontology/vt-runtime.ttl</code></td><td>Actors, mailboxes, journal entries, snapshots, timers, migrations, dead letters</td></tr>
+        <tr><td>Agent</td><td><code>vt-agent:</code> <code>https://w3id.org/vertep/agent#</code></td><td><code>crates/vertep-rdf/ontology/vt-agent.ttl</code></td><td>Deciders, decisions, LLM calls, tools, tool calls, grants, plans</td></tr>
+        <tr><td>Verification</td><td><code>vt:</code> (same namespace)</td><td><code>crates/vertep-rdf/ontology/vt-verification.ttl</code></td><td>Certificates issued by <code>vt certify</code></td></tr>
+        <tr><td>Identity</td><td><code>vt-id:</code> <code>https://w3id.org/vertep/vt-id#</code></td><td><code>crates/vertep-federation/ontology/vt-id.ttl</code></td><td>DID actors, verification methods, services, DID-scoped grants, relay envelopes</td></tr>
+      </tbody>
+    </table>
+    <p>Shapes live next to them: <code>crates/vertep-rdf/shapes/vt-chart-shapes.ttl</code>, <code>crates/vertep-rdf/shapes/vt-agent-shapes.ttl</code>, <code>crates/vertep-runtime/shapes/vt-runtime-shapes.ttl</code> and <code>crates/vertep-federation/shapes/vt-id-shapes.ttl</code>. Shapes for a chart's own types are generated per type (see <a href="#types">typed charts</a> below).</p>
+    <p>The runtime, agent and identity modules are aligned with PROV-O and DID Core by plain <code>rdfs:subClassOf</code> and <code>rdfs:subPropertyOf</code> triples. No Vertep query uses a PROV-O or DID Core term, and no reasoner runs. A store with RDFS inference can answer PROV-O queries over the same data; <code>vertep-agent</code> also writes the PROV-O view of its records directly, so PROV queries work there without inference.</p>
+
+    <h2 id="projection">The projection</h2>
+    <p><code>vt convert --to turtle</code> prints a chart's projection. Here it is for the typed order chart in <code>crates/vertep-dm-rust/tests/charts/order.scxml</code>. The full output is 262 lines; the excerpt below keeps the prefixes, the chart node, the state <code>idle</code> and its one transition, in the order <code>vt</code> wrote them.</p>
+<pre data-lang="Shell"><code>vt convert --to turtle crates/vertep-dm-rust/tests/charts/order.scxml</code></pre>
+<pre class="output" data-lang="Output (trimmed)"><code>@prefix c: &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#&gt; .
+@prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; .
+@prefix vt: &lt;https://w3id.org/vertep/vt#&gt; .
+
+c:chart a vt:Chart ;
+	vt:binding "early" ;
+	vt:bindingExplicit false ;
+	vt:child c:s.cancelled , c:s.checkout , c:s.idle , c:s.paid ;
+	vt:data c:chart:d0 , c:chart:d1 ;
+	vt:datamodel "rust" ;
+	vt:datamodelExplicit true ;
+	vt:declaresType &lt;urn:vertep:type:sha256:41b1c80782c0edf4c066dd3ac0c6235285690642f6ec20b1bb77e8e7e1bd632f&gt; , &lt;urn:vertep:type:sha256:78b8b5724ef01cf7b643dc932acb99c0504f0928315f6e79cc6c0e966ce37d24&gt; ;
+	vt:extension c:chart:x0 ;
+	vt:initial c:chart:ia0 ;
+	vt:name "order" .
+
+c:s.idle:t0:ev0 a vt:Token ;
+	vt:order 0 ;
+	vt:value "start" .
+c:s.idle:t0:sel:chart vt:choice c:s.checkout .
+c:s.idle:t0:sel:s.checkout vt:choice c:s.idle:t0:tg0 .
+c:s.idle:t0:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.checkout .
+c:s.idle:t0 a vt:Transition ;
+	vt:event c:s.idle:t0:ev0 ;
+	vt:order 0 ;
+	vt:source c:s.idle ;
+	vt:target c:s.idle:t0:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.idle a vt:State , vt:StateNode ;
+	vt:ancestor c:chart ;
+	vt:id "idle" ;
+	vt:idGenerated false ;
+	vt:order 0 ;
+	vt:transition c:s.idle:t0 .</code></pre>
+    <p>The rules behind this output (spec <code>openspec/specs/chart-rdf/spec.md</code>, code <code>crates/vertep-rdf/src/project.rs</code>):</p>
+    <ul>
+      <li><strong>No blank nodes.</strong> Every node gets an IRI, <code>&lt;version&gt;#&lt;fragment&gt;</code>. The chart node is <code>#chart</code>, a state is <code>#s.</code> plus its percent-encoded id, and every other node is its owner's fragment, a colon and a step naming its role and position: <code>t0</code> is the first transition, <code>ev0</code> its first event descriptor, <code>tg0</code> its first target, <code>en0</code> the first <code>&lt;onentry&gt;</code>, <code>a0</code> the first action, <code>d0</code> the first data item, and so on. Projecting the same chart twice gives identical graphs.</li>
+      <li><strong>Node IRIs live under the version.</strong> Two versions of a chart that both contain state <code>idle</code> have two different IRIs for it, so facts about one version can never be confused with another.</li>
+      <li><strong>Order is explicit.</strong> SCXML document order decides transition priority and entry order, and RDF graphs are sets. Every ordered member carries an integer <code>vt:order</code>. RDF collections are not used for this.</li>
+      <li><strong>Expressions are typed literals.</strong> A condition is a literal whose datatype names the datamodel: <code>"Var1 == 0"^^vt:ecmascriptExpr</code>, or <code>"vt:guard/order/positive"^^vt:rustExpr</code> above. The same text under two datamodels is two different values.</li>
+      <li><strong>Extensions are kept.</strong> Foreign attributes and elements, such as the <code>vt:types</code> block, become <code>vt:ExtensionNode</code>s, so they survive a trip through RDF.</li>
+      <li><strong>Some triples are derived.</strong> <code>vt:ancestor</code>, <code>vt:source</code>, <code>vt:scope</code>, the selection nodes with <code>vt:choice</code> (the <code>…:sel:…</code> subjects above) and <code>vt:historyDefault</code> are written only so that the shapes can state whole-chart rules in SHACL Core. Reconstruction ignores them.</li>
+    </ul>
+
+    <h3 id="types">Typed charts</h3>
+    <p>A chart with a <code>vt:types</code> block (see <a href="types.html">Datamodels and types</a>) also projects its named types. The chart node links each one with <code>vt:declaresType</code>. A type's IRI is <code>urn:vertep:type:sha256:&lt;hex&gt;</code>, the hash of its own canonical definition, so the same type has the same IRI in every chart. The node under that IRI is both the type's definition (<code>vt:RecordType</code>, <code>vt:typeField</code>, …) and the SHACL node shape a value of the type must satisfy. In the order chart, the shape for <code>Pay</code> is closed, requires exactly one <code>amount</code>, and accepts an <code>xsd:long</code>, an <code>xsd:decimal</code> or a decimal-looking string. Type nodes are minted at <code>&lt;type IRI&gt;#&lt;path&gt;</code>, so they carry no blank nodes either: <code>vt convert --to nquads</code> on this chart writes 281 quads and not one blank node. The shapes do say <code>sh:nodeKind sh:BlankNode</code>, but that constrains <em>values</em>: for SHACL validation a record value is encoded as a blank node with one triple per field, and the shape checks that encoding, not the chart graph.</p>
+
+    <h2 id="shacl">SHACL shapes and reconstruction</h2>
+    <p>The chart shapes are the normative definition of a valid chart graph. Here is one of them, from <code>crates/vertep-rdf/shapes/vt-chart-shapes.ttl</code> (the first two property constraints of <code>vt:TransitionShape</code>):</p>
+<pre data-lang="Turtle"><code>vt:TransitionShape
+    a sh:NodeShape ;
+    sh:targetClass vt:Transition ;
+    sh:node vt:OrderedShape ;
+    sh:property [
+        sh:path vt:source ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:class vt:StateNode ;
+        sh:message "a transition has exactly one source state" ;
+    ] ;
+    sh:property [
+        sh:path [ sh:alternativePath (
+            [ sh:inversePath vt:transition ]
+            ( [ sh:inversePath vt:initialTransition ] [ sh:inversePath vt:initialElement ] )
+        ) ] ;
+        sh:equals vt:source ;
+    ] ;</code></pre>
+    <p>To see a shape at work, take the Turtle above, delete the single line <code>vt:source c:s.idle ;</code> from the transition, and validate it. <code>vt validate</code> reads RDF as well as SCXML and YAML:</p>
+<pre data-lang="Shell"><code>vt validate order-broken.ttl</code></pre>
+<pre class="output" data-lang="Output"><code>order-broken.ttl: graph does not conform to the chart shapes: 2 violation(s):
+  &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#s.idle:t0&gt; (^vt:transition|(^vt:initialTransition/^vt:initialElement)) = &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#s.idle&gt;: value not also a value of &lt;https://w3id.org/vertep/vt#source&gt; (EqualsConstraintComponent)
+  &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#s.idle:t0&gt; vt:source: a transition has exactly one source state (MinCountConstraintComponent)</code></pre>
+    <p>The command exits with status 1. Each violation names the focus node, the path and the constraint component, so a report points at the triple to fix.</p>
+    <p>A few rules cannot be written in SHACL Core and are checked by reconstruction instead: the <code>vt:order</code> values of a list are exactly 0 to n−1, expression datatypes match the chart's datamodel, a graph holds one chart, and the derived triples agree with a fresh projection. Triples that are not part of the projection, such as your own comments on a state, are ignored by reconstruction and by hashing.</p>
+    <p>The same shapes are transcribed into the Lean model, and a theorem tying them to the Lean <code>WellFormed</code> predicate is planned but not yet proven; see <a href="verification.html#open">Verification</a>.</p>
+
+    <h2 id="versions">Content-addressed versions</h2>
+    <p>A chart's version IRI is <code>urn:vertep:chart:sha256:</code> followed by the lowercase hex SHA-256 of the RDFC-1.0 canonical N-Quads of its projection. The steps, from <code>crates/vertep-rdf/src/hash.rs</code> and <code>iri.rs</code>:</p>
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 640 250" width="640" role="img" aria-labelledby="rdf-hash-t">
+          <title id="rdf-hash-t">Three surfaces lower to one IR; the IR is projected under a placeholder base, canonicalized with RDFC-1.0, hashed with SHA-256, and the graph is rebased onto the resulting version IRI</title>
+          <defs>
+            <marker id="rdf-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+            <pattern id="rdf-ph" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+          </defs>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="15" style="fill:var(--ink)">
+            <rect x="10" y="20" width="110" height="38" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2"/>
+            <text x="65" y="44" text-anchor="middle">SCXML</text>
+            <rect x="10" y="76" width="110" height="38" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2"/>
+            <text x="65" y="100" text-anchor="middle">YAML</text>
+            <rect x="10" y="132" width="110" height="38" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2"/>
+            <text x="65" y="156" text-anchor="middle">statechart!</text>
+            <rect x="160" y="70" width="90" height="50" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <text x="205" y="100" text-anchor="middle" style="fill:var(--on-orange)">IR</text>
+            <rect x="290" y="20" width="150" height="56" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="365" y="44" text-anchor="middle">project</text>
+            <text x="365" y="64" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" style="fill:var(--ink-2)">urn:vertep:chart:self#…</text>
+            <rect x="290" y="110" width="150" height="46" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <rect x="290" y="110" width="150" height="46" fill="url(#rdf-ph)"/>
+            <text x="365" y="139" text-anchor="middle">RDFC-1.0</text>
+            <rect x="290" y="186" width="150" height="46" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="365" y="215" text-anchor="middle">SHA-256</text>
+            <rect x="480" y="186" width="150" height="46" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="555" y="207" text-anchor="middle" style="fill:var(--paper)">version IRI</text>
+            <text x="555" y="223" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9.5" style="fill:var(--paper)">urn:vertep:chart:sha256:…</text>
+            <rect x="480" y="20" width="150" height="56" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="555" y="44" text-anchor="middle">published graph</text>
+            <text x="555" y="64" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" style="fill:var(--ink-2)">&lt;version&gt;#…</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2" marker-end="url(#rdf-arr)">
+            <path d="M120 39 C140 45 145 70 158 85"/>
+            <path d="M120 95 H156"/>
+            <path d="M120 151 C140 145 145 120 158 107"/>
+            <path d="M250 90 C268 80 272 60 286 52"/>
+            <path d="M365 76 V106"/>
+            <path d="M365 156 V182"/>
+            <path d="M440 209 H476"/>
+            <path d="M555 186 V80"/>
+            <path d="M440 48 H476" stroke-dasharray="5 4"/>
+          </g>
+          <g font-family="JetBrains Mono, monospace" font-size="10.5" style="fill:var(--ink-2)">
+            <text x="562" y="140">rebase</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Plate. <b>Naming a chart by its content.</b> Hash under a fixed base, then rebase onto the hash.</figcaption>
+    </figure>
+    <ol>
+      <li>Project the chart with every node IRI minted under the fixed placeholder base <code>urn:vertep:chart:self</code>.</li>
+      <li>Write that graph as RDFC-1.0 canonical N-Quads. The projection has no blank nodes, so canonicalization only sorts.</li>
+      <li>Take the SHA-256 of those bytes. The version IRI is the prefix plus the 64 hex digits.</li>
+      <li>Publish the graph rebased from the placeholder onto the version IRI.</li>
+    </ol>
+    <p>The placeholder breaks a circle: node IRIs live under the version IRI, and the version IRI is the hash of a graph containing them. To check a published graph, rebase it back onto the placeholder and hash again; <code>graph_version</code> does this after validating and reconstructing the graph.</p>
+    <p>Because the hash covers the projection and nothing else, formatting, comments and the surface a chart was written in do not change it. The order chart exists in the repository as SCXML and as YAML:</p>
+<pre data-lang="Shell"><code>vt hash crates/vertep-dm-rust/tests/charts/order.scxml
+vt hash crates/vertep-dm-rust/tests/charts/order.yaml</code></pre>
+<pre class="output" data-lang="Output"><code>urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e
+urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e</code></pre>
+    <p>Annotations do not change it either. Append one triple about a state to the projected Turtle and hash the result:</p>
+<pre data-lang="Shell"><code>printf '\nc:s.paid &lt;http://www.w3.org/2000/01/rdf-schema#comment&gt; "the order is paid" .\n' &gt; note.ttl
+cat order.ttl note.ttl &gt; order-annotated.ttl
+vt hash order-annotated.ttl
+vt validate order-annotated.ttl</code></pre>
+<pre class="output" data-lang="Output"><code>urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e
+order-annotated.ttl: ok: urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e</code></pre>
+    <p>So a store can attach comments, usage statistics or certificates to a chart without changing which chart it is. A certificate from <code>vt certify</code> hangs off the version IRI with <code>vt:certifiedBy</code>; because the IRI is a content hash, a certificate can never apply to a different chart.</p>
+    <div class="nb"><p>The runtime records the version IRI in every journal entry. An actor stays on the version it started with until it reaches a top-level final state or is migrated explicitly, and replay always uses the version recorded for each stretch of the journal. See <a href="runtime.html">The actor runtime</a> for chart versioning and migrations.</p></div>
+
+    <h2 id="formats">Serialization formats and vt convert</h2>
+    <p><code>vertep-rdf</code> reads and writes Turtle, N-Triples, N-Quads and TriG, all RDF 1.2, with triples in sorted order so the output is stable. In the dataset formats (N-Quads, TriG) the chart sits in the named graph whose name is its version IRI:</p>
+<pre data-lang="Shell"><code>vt convert --to trig crates/vertep-dm-rust/tests/charts/order.scxml</code></pre>
+<pre class="output" data-lang="Output (first lines)"><code>@prefix c: &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#&gt; .
+@prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; .
+@prefix vt: &lt;https://w3id.org/vertep/vt#&gt; .
+&lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e&gt; {
+	c:chart:d0:x0 a vt:ExtensionNode ;
+		vt:attributeValue "decimal" ;
+		vt:localName "type" ;
+		vt:namespace "https://w3id.org/vertep/vt#" ;</code></pre>
+    <table>
+      <thead><tr><th><code>--to</code></th><th>Writes</th></tr></thead>
+      <tbody>
+        <tr><td><code>scxml</code></td><td>SCXML 1.0 with the <code>vt:</code> extensions</td></tr>
+        <tr><td><code>yaml</code></td><td>The YAML chart format</td></tr>
+        <tr><td><code>turtle</code></td><td>RDF 1.2 Turtle, one graph</td></tr>
+        <tr><td><code>trig</code></td><td>RDF 1.2 TriG, chart in the graph named by its version</td></tr>
+        <tr><td><code>nquads</code></td><td>RDF 1.2 N-Quads, same layout</td></tr>
+      </tbody>
+    </table>
+    <p>The input surface is detected from the file extension (<code>.scxml</code>, <code>.xml</code>, <code>.yaml</code>, <code>.yml</code>, <code>.ttl</code>, <code>.trig</code>, <code>.nq</code>, <code>.nt</code>) and otherwise from the content. RDF input goes through the shapes and reconstruction, so converting Turtle back to SCXML is the round trip:</p>
+<pre data-lang="Shell"><code>vt convert --to turtle crates/vertep-dm-rust/tests/charts/order.scxml &gt; order.ttl
+vt convert --to scxml order.ttl</code></pre>
+<pre class="output" data-lang="Output (first lines)"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#" version="1.0" name="order" datamodel="rust" initial="idle"&gt;
+  &lt;vt:types xmlns:vt="https://w3id.org/vertep/vt#"&gt;type Pay = { amount: decimal };
+type Approval = { by: iri };</code></pre>
+    <p><code>vt convert</code> refuses a conversion that would lose information rather than drop it silently. All flags are listed on <a href="cli.html">The vt command</a>.</p>
+
+    <h2 id="journal">The journal as RDF</h2>
+    <p>Each journal entry of an actor is a small RDF graph, stored as a named graph. The runtime module fixes stable IRIs for everything an actor writes, derived from the actor's address <code>A</code>, so replaying a journal or projecting it again gives the same IRIs (from the header of <code>vt-runtime.ttl</code>):</p>
+    <table>
+      <thead><tr><th>Thing</th><th>IRI</th></tr></thead>
+      <tbody>
+        <tr><td>Journal entry (also the name of its graph)</td><td><code>A/entry/&lt;position&gt;</code></td></tr>
+        <tr><td>Input event of an entry</td><td><code>A/entry/&lt;position&gt;/input</code></td></tr>
+        <tr><td>Outgoing send</td><td><code>A/entry/&lt;position&gt;/send/&lt;k&gt;</code></td></tr>
+        <tr><td>Timer</td><td><code>A/entry/&lt;position&gt;/timer/&lt;send id&gt;</code></td></tr>
+        <tr><td>Reminder</td><td><code>A/reminder/&lt;name&gt;</code></td></tr>
+        <tr><td>Snapshot (also the name of its graph)</td><td><code>A/snapshot/&lt;position&gt;</code></td></tr>
+        <tr><td>Dead letter</td><td><code>A/dead-letter/&lt;hex digest of the message id&gt;</code>, in graph <code>A/dead-letters</code></td></tr>
+        <tr><td>Mailbox row</td><td><code>A/mailbox/&lt;sequence&gt;</code>, in graph <code>A/mailbox</code></td></tr>
+        <tr><td>Current state</td><td>the graph named <code>A</code></td></tr>
+      </tbody>
+    </table>
+    <p>An input entry (<code>vt:InputEntry</code>, a <code>vt:JournalEntry</code>) records the accepted input with its name, type, payload, send id, origin, origin type and message id; the chart version; the timestamp stamped when it was dequeued; the configuration digest after the macrostep; and its effects: outgoing sends, timers scheduled and cancelled, invocations started, requests issued and answered, and transitions taken. Migration and fork entries carry snapshots instead. The store adds <code>rdf:type vt:JournalEntry</code>, <code>vt:actor</code> and <code>vt:position</code> (see <code>crates/vertep-runtime/src/journal.rs</code>). Every entry the runtime writes must conform to the runtime shapes; a test validates them on both the in-memory store and tiramemsu.</p>
+    <p>The current-state graph <code>A</code> holds the actor's type, its chart version, its status (<code>vt:Running</code> or <code>vt:Terminated</code>), one <code>vt:inState</code> triple per active state pointing at the state node IRI of that chart version, the datamodel as JSON text (<code>vt:datamodelState</code>) and its pending timers.</p>
+    <p>Statements about statements, such as "this transition was taken because of that entry" or a decider's confidence in a choice, are RDF 1.2 triple-term annotations. A graph store that only speaks RDF 1.1 gets classic <code>rdf:Statement</code> reification instead, and reads it back as the same annotation.</p>
+
+    <h2 id="sparql">SPARQL, now and as of a time</h2>
+    <p>Storage is two traits in <code>vertep-store</code>: a <code>JournalStore</code> with compare-and-set appends, and a <code>GraphStore</code> that takes quads and answers SPARQL. Tiramemsu, the default, implements both on one file per shard. On tiramemsu an append and the new state graph commit in one transaction, and the state statements are stored as derived facts whose support is the entry that caused them.</p>
+    <p>Tiramemsu never deletes rows, so history is kept by construction. A <code>TiramemsuShard</code> gives you read-only views that are themselves graph stores:</p>
+    <table>
+      <thead><tr><th>Method</th><th>What it reads</th></tr></thead>
+      <tbody>
+        <tr><td><code>view_now()</code></td><td>The graphs as they are now</td></tr>
+        <tr><td><code>view_as_of(t)</code></td><td>The graphs right after transaction <code>t</code> committed, read from the store's history, not by replay</td></tr>
+        <tr><td><code>view_as_of_time(ms)</code></td><td>The graphs after the last transaction committed at or before an instant (epoch milliseconds of the store's clock)</td></tr>
+        <tr><td><code>state_causes(actor, triple)</code></td><td>The journal entries whose appends caused a live state statement, by following its support links</td></tr>
+        <tr><td><code>state_history(actor, triple)</code></td><td>Every lifetime of a state statement, as (added at, retracted at) transaction pairs</td></tr>
+      </tbody>
+    </table>
+    <p>The query is ordinary SPARQL over the named-graph layout above. This sketch follows the store tests in <code>crates/vertep-tiramemsu/tests/backend.rs</code>, using the <code>vt:inState</code> predicate the runtime writes:</p>
+<pre data-lang="Rust"><code>use vertep_store::GraphStore;
+use vertep_tiramemsu::TiramemsuShard;
+
+let shard = TiramemsuShard::open("data/shard-0.db")?;
+let t = shard.last_tx()?;            // remember a transaction ...
+// ... later, after more appends:
+let actor = "https://acme.example/actors/Order/8f3a";
+let q = format!(
+    "SELECT ?s WHERE {{ GRAPH &lt;{actor}&gt; {{ &lt;{actor}&gt; &lt;https://w3id.org/vertep/vt#inState&gt; ?s }} }}"
+);
+let then = shard.view_as_of(t).query(&amp;q)?.into_solutions()?;   // states as of t
+let now  = shard.view_now().query(&amp;q)?.into_solutions()?;      // states now</code></pre>
+    <p>Views are read-only: writing to one returns <code>StoreError::Unsupported</code>. For the state after a given journal <em>position</em> rather than a store transaction, the runtime's <code>Node::state_at(address, position)</code> rebuilds it from the journal instead.</p>
+    <p><code>vertep-oxigraph</code> implements only <code>GraphStore</code>, on an embedded Oxigraph (<code>OxigraphStore</code>) or any SPARQL 1.1 endpoint (<code>SparqlEndpoint</code>). It may not hold a journal, because SPARQL Update has no compare-and-set. Instead a <code>Projector</code> copies journal entries into it in order, idempotently, and records per actor how far it got. Reads there are eventually consistent; consistent reads go to tiramemsu. When the target store lacks RDF 1.2 triple terms, annotations are written with RDF 1.1 reification.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="browser.html">← Browser and JavaScript</a>
+      <a href="verification.html">Verification →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

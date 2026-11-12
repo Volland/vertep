@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vertep — statecharts, actors, deterministic agents</title>
+<meta name="description" content="Vertep is a family of Rust crates for W3C SCXML statecharts that run as durable actors, keep their history as RDF, let LLMs choose only among the moves a chart allows, and agree step for step with a model proven in Lean.">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="index.html"><img src="assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="docs/index.html">Docs</a>
+      <a href="examples/index.html">Examples</a>
+      <a href="articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero hatched">
+  <div class="hero-inner">
+    <div>
+      <p class="kicker">Statecharts · Actors · Agents · Proofs</p>
+      <h1>Vertep</h1>
+      <p class="lede">Statecharts that run as durable actors, write down every step they take, let a language model choose only among the moves the chart allows, and agree step for step with a model proven in Lean.</p>
+      <div class="actions">
+        <a class="btn primary" href="docs/index.html">Begin here</a>
+        <a class="btn" href="examples/index.html">See the examples</a>
+        <a class="btn" href="articles/deterministic-agents.html">Why deterministic agents</a>
+      </div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="rays"></div>
+      <div class="disc"></div>
+      <div class="goat"><img src="assets/img/goat.svg" alt=""></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="band-inner">
+    <div class="split">
+      <div>
+        <h2 style="text-align:left">A theatre in a box</h2>
+        <p>The <em>vertep</em> is the travelling puppet theatre of Ukrainian Christmas: a wooden box of two tiers, carried from house to house behind a star on a pole, with the goat dancing among the carollers. Its puppets cannot wander. Each moves along a slot cut into the stage floor, and the puppeteer, however clever, can only choose which slot a puppet takes next.</p>
+        <p>Vertep the library is built the same way. A <strong>chart</strong> is the stage with its slots. An <strong>actor</strong> is a puppet that moves only along transitions. A guard, a person or a language model may choose the next move, but none of them can cut a new slot. And the whole play is written down, so it can be performed again, exactly, without the puppeteer.</p>
+        <p><a href="articles/statecharts.html">Read: The shape of behaviour →</a></p>
+      </div>
+      <figure class="plate" style="margin-top:0">
+        <div class="plate-inner">
+          <svg viewBox="0 0 420 300" width="420" role="img" aria-labelledby="stage-t">
+            <title id="stage-t">A chart as a stage: states connected by transitions, with a decide state where the decider picks one of the offered moves</title>
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+              <pattern id="ph" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+            </defs>
+            <g font-family="IM Fell English SC, Georgia, serif" font-size="17" style="fill:var(--ink)">
+              <rect x="14" y="120" width="92" height="54" rx="14" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+              <text x="60" y="152" text-anchor="middle">idle</text>
+              <rect x="160" y="104" width="112" height="86" rx="14" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+              <rect x="160" y="104" width="112" height="86" rx="14" fill="url(#ph)"/>
+              <text x="216" y="142" text-anchor="middle" style="fill:var(--on-orange)">decide</text>
+              <text x="216" y="164" text-anchor="middle" font-size="13" font-family="JetBrains Mono, monospace" style="fill:var(--on-orange)">vt:decide</text>
+              <rect x="320" y="22" width="88" height="48" rx="14" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+              <text x="364" y="51" text-anchor="middle">tooling</text>
+              <rect x="320" y="124" width="88" height="48" rx="14" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+              <text x="364" y="153" text-anchor="middle">human</text>
+              <rect x="320" y="226" width="88" height="48" rx="14" style="fill:var(--paper);stroke:var(--ink)" stroke-width="5" />
+              <rect x="325" y="231" width="78" height="38" rx="10" style="fill:none;stroke:var(--paper)" stroke-width="2"/>
+              <text x="364" y="255" text-anchor="middle">done</text>
+            </g>
+            <g fill="none" style="stroke:var(--ink)" stroke-width="2.2" marker-end="url(#arr)">
+              <path d="M106 147 H156"/>
+              <path d="M272 124 C296 100 300 70 318 54"/>
+              <path d="M272 147 H316"/>
+              <path d="M272 170 C296 196 300 226 318 244"/>
+              <path d="M320 40 C250 20 210 60 212 100" stroke-dasharray="5 4"/>
+            </g>
+            <g font-family="JetBrains Mono, monospace" font-size="12" style="fill:var(--ink-2)">
+              <text x="112" y="139">task</text>
+              <text x="252" y="80">call_tool</text>
+              <text x="276" y="140">escalate</text>
+              <text x="262" y="226">finish</text>
+              <text x="222" y="30">vt:reply</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption>Plate I. <b>The slots of the stage.</b> The decider picks among the offered transitions only.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="band hatched">
+  <div class="band-inner">
+    <h2>Six pillars</h2>
+    <p class="sub">One deterministic core, and around it everything a long-lived, auditable process needs.</p>
+    <div class="cards">
+      <a class="card" href="docs/charts.html">
+        <div class="card-head"><span class="num">I</span><h3>Full SCXML</h3></div>
+        <div class="card-body"><p>The W3C SCXML algorithm in full, checked against the W3C conformance suite. Write charts in SCXML, YAML or the <code>statechart!</code> macro; all lower to one typed IR.</p><span class="more">Writing charts →</span></div>
+      </a>
+      <a class="card" href="docs/runtime.html">
+        <div class="card-head"><span class="num">II</span><h3>Durable actors</h3></div>
+        <div class="card-body"><p>Virtual actors addressed by IRI. Every accepted input is journaled before it is processed, with compare-and-set appends, a transactional outbox and durable timers.</p><span class="more">The runtime →</span></div>
+      </a>
+      <a class="card" href="docs/agents.html">
+        <div class="card-head"><span class="num">III</span><h3>Deterministic agents</h3></div>
+        <div class="card-body"><p>At a <code>vt:decide</code> state an LLM, a person or a guard picks among the enabled events. Decisions and model results are journaled, so a run replays without any model.</p><span class="more">Agents →</span></div>
+      </a>
+      <a class="card" href="docs/rdf.html">
+        <div class="card-head"><span class="num">IV</span><h3>Charts as RDF</h3></div>
+        <div class="card-body"><p>Every chart projects losslessly to RDF 1.2 with SHACL shapes. Its version is the hash of its canonical form, and journals can be queried with SPARQL, as of any moment.</p><span class="more">RDF and versions →</span></div>
+      </a>
+      <a class="card" href="docs/distribution.html">
+        <div class="card-head"><span class="num">V</span><h3>Anywhere it must run</h3></div>
+        <div class="card-body"><p>Clusters with leased shards over QUIC, federation across trust boundaries with DIDs and relay mailboxes, and the same core in the browser through WebAssembly.</p><span class="more">Cluster, federation, browser →</span></div>
+      </a>
+      <a class="card" href="docs/verification.html">
+        <div class="card-head"><span class="num">VI</span><h3>Proven in Lean</h3></div>
+        <div class="card-body"><p>A Lean model of the semantics replays the Rust traces as a differential oracle. Decider safety, grant enforcement and legal configurations are theorems, not hopes.</p><span class="more">Verification →</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="band-inner">
+    <div class="split">
+      <div>
+        <h2 style="text-align:left">The way of one event</h2>
+        <p>Nothing nondeterministic touches the core. Time, randomness, model output and the network arrive only as events in a mailbox, and each one is written to the journal <em>before</em> the pure <code>step</code> function sees it.</p>
+        <p><code>step</code> takes a configuration, a datamodel and an event, and returns the next configuration and a list of effects. The shell carries out the effects: it sends messages, arms timers and asks deciders. Their answers come back as new events.</p>
+        <p>So the journal is the whole truth of an actor. Replay it and you get the same states, on a server, in a browser or in the Lean model.</p>
+      </div>
+      <figure class="plate" style="margin-top:0">
+        <div class="plate-inner">
+          <svg viewBox="0 0 420 330" width="420" role="img" aria-labelledby="way-t">
+            <title id="way-t">An event goes from the mailbox to the journal to the pure step function; its effects are performed by the shell and their results return to the mailbox</title>
+            <defs>
+              <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+              <pattern id="ph2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+            </defs>
+            <rect x="200" y="8" width="210" height="314" style="fill:none;stroke:var(--ink)" stroke-width="1.5" stroke-dasharray="6 5"/>
+            <text x="305" y="314" text-anchor="middle" font-family="IM Fell English SC, Georgia, serif" font-size="14" style="fill:var(--ink-2)">pure and replayable</text>
+            <g font-family="IM Fell English SC, Georgia, serif" font-size="17" style="fill:var(--ink)">
+              <rect x="20" y="30" width="150" height="52" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+              <text x="95" y="61" text-anchor="middle">Mailbox</text>
+              <rect x="230" y="30" width="150" height="52" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+              <rect x="230" y="30" width="150" height="52" fill="url(#ph2)"/>
+              <text x="305" y="61" text-anchor="middle">Journal</text>
+              <rect x="230" y="138" width="150" height="62" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+              <text x="305" y="166" text-anchor="middle" style="fill:var(--on-orange)">step</text>
+              <text x="305" y="186" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" style="fill:var(--on-orange)">(config, dm, event)</text>
+              <rect x="230" y="248" width="150" height="46" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+              <text x="305" y="276" text-anchor="middle">Effects</text>
+              <rect x="10" y="194" width="170" height="62" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2.5"/>
+              <text x="95" y="222" text-anchor="middle" style="fill:var(--paper)">Shell</text>
+              <text x="95" y="242" text-anchor="middle" font-size="10.5" font-family="JetBrains Mono, monospace" style="fill:var(--paper)">sends · timers · deciders</text>
+            </g>
+            <g fill="none" style="stroke:var(--ink)" stroke-width="2.2" marker-end="url(#arr2)">
+              <path d="M170 56 H226"/>
+              <path d="M305 82 V134"/>
+              <path d="M305 200 V244"/>
+              <path d="M230 271 C170 271 140 268 120 260"/>
+              <path d="M95 194 V86"/>
+            </g>
+            <g font-family="JetBrains Mono, monospace" font-size="11" style="fill:var(--ink-2)">
+              <text x="176" y="48">append</text>
+              <text x="312" y="112">deliver</text>
+              <text x="104" y="140">results as</text>
+              <text x="104" y="154">new events</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption>Plate II. <b>The way of one event.</b> Append first, then step.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="band-inner">
+    <h2>A choice point, in the chart's own words</h2>
+    <p class="sub">From <code>crates/vertep-agent/examples/support-agent.scxml</code>: the model may call a tool, finish or escalate, and nothing else.</p>
+<pre data-lang="SCXML"><code>&lt;state id="decide" vt:decide="llm/claude" vt:fallback="human/support" vt:deadline="30s"
+       vt:maxDecisions="10" vt:candidates="call_tool finish escalate"&gt;
+  &lt;transition event="call_tool" target="tooling"&gt;
+    &lt;send event="tool.call" targetexpr="ev.data.tool"&gt;&lt;content expr="ev.data.args"/&gt;&lt;/send&gt;
+  &lt;/transition&gt;
+  &lt;transition event="finish" target="done"&gt;&lt;assign location="answer" expr="ev.data"/&gt;&lt;/transition&gt;
+  &lt;transition event="escalate" target="human"/&gt;
+  &lt;transition event="vt.agent.budget-exhausted" target="budget_out"/&gt;
+  &lt;transition event="error.decide.invalid" target="decide"/&gt;
+  &lt;transition event="vt.decide.refused" target="human"/&gt;
+&lt;/state&gt;</code></pre>
+    <p style="max-width:44rem;margin:1.6rem auto 0">On entry, the core computes the events that would be enabled and offers them to the decider named <code>llm/claude</code>. Its answer returns as the event <code>vt.decision</code>, is journaled, and is accepted only if it was one of the offered candidates. If no answer comes within 30 seconds, the durable deadline hands the choice to a person. After ten decisions, the budget event ends the loop.</p>
+  </div>
+</section>
+
+<section class="band ink">
+  <div class="band-inner">
+    <h2>Where it stands</h2>
+    <p class="sub">Seven milestones, from the SCXML core to the browser, are built. Every requirement is traced from its spec to the code that implements it and the test or proof that checks it.</p>
+    <div class="cards">
+      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Specified</h3></div><div class="card-body"><p>303 requirements in OpenSpec, with scenarios, linked to decisions and constraints in a typed graph.</p></div></div>
+      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Built</h3></div><div class="card-body"><p>Twenty Rust crates and two npm packages: core, surfaces, runtime, agents, cluster, federation, WebAssembly.</p></div></div>
+      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Checked</h3></div><div class="card-body"><p>The W3C SCXML suite, Rust-against-Lean differential traces, container fault tests, and Lean theorems with no <code>sorry</code>.</p></div></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="docs/index.html" style="color:inherit">Docs</a><a href="examples/index.html" style="color:inherit">Examples</a><a href="articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

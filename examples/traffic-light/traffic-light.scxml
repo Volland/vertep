@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A traffic light with a pedestrian crossing, on the `null` datamodel.
+
+  `operating` is a parallel state with two regions that run side by side:
+  - `light` cycles red -> green -> yellow -> red. Each colour schedules its own end with a
+    delayed <send> of `tick`, and cancels it on exit, so leaving a colour early (a pedestrian
+    pressing the button) never lets a stale timer fire later.
+  - `crossing` shows walk / don't walk. It has no events of its own: eventless transitions
+    follow the light with the `In()` predicate, the one condition the null datamodel supports.
+
+  `fault` leaves the whole parallel state for `flashing`; `reset` brings the light back to red.
+  Illustrates the scxml-interpretation capability (parallel states, eventless transitions,
+  delayed send and cancel) and scxml-format (reading an SCXML 1.0 document).
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" datamodel="null"
+       name="traffic-light" initial="operating">
+
+  <parallel id="operating">
+    <transition event="fault" target="flashing"/>
+
+    <state id="light" initial="red">
+      <state id="red">
+        <onentry><send id="light-timer" event="tick" delay="30s"/></onentry>
+        <onexit><cancel sendid="light-timer"/></onexit>
+        <transition event="tick" target="green"/>
+      </state>
+      <state id="green">
+        <onentry><send id="light-timer" event="tick" delay="25s"/></onentry>
+        <onexit><cancel sendid="light-timer"/></onexit>
+        <transition event="tick" target="yellow"/>
+        <!-- a pedestrian cuts the green phase short -->
+        <transition event="button" target="yellow"/>
+      </state>
+      <state id="yellow">
+        <onentry><send id="light-timer" event="tick" delay="5s"/></onentry>
+        <onexit><cancel sendid="light-timer"/></onexit>
+        <transition event="tick" target="red"/>
+      </state>
+    </state>
+
+    <state id="crossing" initial="dont_walk">
+      <state id="dont_walk">
+        <transition cond="In('red')" target="walk"/>
+      </state>
+      <state id="walk">
+        <transition cond="In('green')" target="dont_walk"/>
+      </state>
+    </state>
+  </parallel>
+
+  <state id="flashing">
+    <transition event="reset" target="operating"/>
+  </state>
+</scxml>

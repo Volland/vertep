@@ -1,0 +1,58 @@
+# order.yaml with one deliberate type error: the `add` transition assigns the item's `sku`
+# (a string) to `ctx.total` (a decimal). `vt typecheck` reports it with its line, column and
+# path in the document and exits 1.
+#
+# A typed order chart in YAML on the CEL datamodel.
+#
+# `types` names record and union types, `events` gives every event its payload type and
+# `context` gives every data item a type and an initial value. Guards and assignments are CEL
+# expressions: `ctx` is the context, `ev.data` the event payload. `vt typecheck` checks every
+# expression against these declarations before the chart ever runs.
+#
+# Illustrates the type-system capability (named types, typed events and context, Command Line
+# Type Tools), yaml-format and cel-datamodel.
+vertep: 1
+name: order
+datamodel: cel
+types:
+  Item: { sku: string, qty: int, price: decimal }
+  Pay: { amount: decimal, method: { oneOf: { Card: { last4: string }, Invoice: null } } }
+  Ship: { carrier: string, tracking: "optional<string>" }
+events:
+  add: Item
+  checkout: null
+  pay: Pay
+  approve: null
+  ship: Ship
+  cancel: null
+context:
+  items: { type: "list<Item>", init: "[]" }
+  total: { type: decimal, init: "0" }
+  limit: { type: decimal, init: "500" }
+initial: shopping
+states:
+  shopping:
+    on: { cancel: cancelled }
+    initial: cart
+    states:
+      cart:
+        on:
+          add:
+            - cond: "ev.data.qty > 0"
+              actions:
+                - assign: { location: ctx.items, expr: "ctx.items + [ev.data]" }
+                - assign: { location: ctx.total, expr: "ev.data.sku" }
+          checkout:
+            - { cond: "size(ctx.items) > 0", target: payment }
+      payment:
+        on:
+          pay:
+            - { cond: "ev.data.amount < ctx.total", target: payment }
+            - { cond: "ctx.total > ctx.limit", target: review }
+            - { target: fulfilment }
+      review:
+        on: { approve: fulfilment }
+  fulfilment:
+    on: { ship: shipped }
+  shipped: { type: final }
+  cancelled: { type: final }

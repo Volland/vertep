@@ -1,0 +1,9 @@
+ctx.items: list(Item)
+ctx.total: decimal
+ctx.limit: decimal
+ev.data[add]: Item
+ev.data[checkout]: null_type
+ev.data[pay]: Pay
+ev.data[approve]: null_type
+ev.data[ship]: Ship
+ev.data[cancel]: null_type

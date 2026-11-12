@@ -1,0 +1,15 @@
+run 1, decider bound to `policy`:
+  decider asked in `review`: offered ["reject", "escalate"] -> escalate
+  decider asked in `manager`: offered ["approve", "reject"] -> approve
+  final: ["approved"] context={"amount":250}
+journal:
+  1 start
+  2 event     request
+  3 decision  escalate (offer https://example.org/agents/refund/7/decision/2.0, rationale "amount is above my approval limit")
+  4 decision  approve (offer https://example.org/agents/refund/7/decision/3.0, rationale "manager approved: item returned unopened")
+run 2, same journal, no decider bound:
+  final: ["approved"] context={"amount":250}
+  as of entry 2: ["review"]
+  as of entry 3: ["manager"]
+  as of entry 4: ["approved"]
+  entries replayed: 4, decider calls: 0

@@ -1,0 +1,14 @@
+actor https://example.org/charts/order/42
+process 1: ["awaiting_payment"] context={"items":2}
+  entry 1 at +0s: add              timers scheduled: []
+  entry 2 at +0s: add              timers scheduled: []
+  entry 3 at +0s: checkout         timers scheduled: ["payment.timeout"]
+  pending timer payment.timeout due at +900s
+process 1 stops
+process 2: ["awaiting_payment"] context={"items":2} (replayed 3 entries)
+process 2 at +900s: ["expired"] context={"items":2}
+  entry 1 at +0s: add              timers scheduled: []
+  entry 2 at +0s: add              timers scheduled: []
+  entry 3 at +0s: checkout         timers scheduled: ["payment.timeout"]
+  entry 4 at +900s: payment.timeout  timers scheduled: []
+as of entry 1: ["cart"] context={"items":1}

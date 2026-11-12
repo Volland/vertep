@@ -1,0 +1,272 @@
+@prefix c: <urn:vertep:chart:sha256:46431c540d155bee9016c61ee7a8f734890a92342ed9f91188aea25a602f5731#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix vt: <https://w3id.org/vertep/vt#> .
+c:chart:ia0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.operating .
+c:chart:ia:sel:chart vt:choice c:s.operating .
+c:chart:ia:sel:s.operating vt:choice c:chart:ia0 .
+c:chart a vt:Chart ;
+	vt:binding "early" ;
+	vt:bindingExplicit false ;
+	vt:child c:s.flashing , c:s.operating ;
+	vt:datamodel "null" ;
+	vt:datamodelExplicit true ;
+	vt:initial c:chart:ia0 ;
+	vt:name "traffic-light" .
+c:s.crossing:ia0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:s.crossing ;
+	vt:state c:s.dont_walk .
+c:s.crossing:ia:sel:chart vt:choice c:s.operating .
+c:s.crossing:ia:sel:s.crossing vt:choice c:s.dont_walk .
+c:s.crossing:ia:sel:s.dont_walk vt:choice c:s.crossing:ia0 .
+c:s.crossing:ia:sel:s.operating vt:choice c:s.operating .
+c:s.crossing a vt:State , vt:StateNode ;
+	vt:ancestor c:chart , c:s.operating ;
+	vt:child c:s.dont_walk , c:s.walk ;
+	vt:id "crossing" ;
+	vt:idGenerated false ;
+	vt:initial c:s.crossing:ia0 ;
+	vt:order 1 .
+c:s.dont_walk:t0:sel:chart vt:choice c:s.operating .
+c:s.dont_walk:t0:sel:s.crossing vt:choice c:s.walk .
+c:s.dont_walk:t0:sel:s.operating vt:choice c:s.operating .
+c:s.dont_walk:t0:sel:s.walk vt:choice c:s.dont_walk:t0:tg0 .
+c:s.dont_walk:t0:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.walk .
+c:s.dont_walk:t0 a vt:Transition ;
+	vt:cond "In('red')"^^vt:nullExpr ;
+	vt:order 0 ;
+	vt:source c:s.dont_walk ;
+	vt:target c:s.dont_walk:t0:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.dont_walk a vt:State , vt:StateNode ;
+	vt:ancestor c:chart , c:s.crossing , c:s.operating ;
+	vt:id "dont_walk" ;
+	vt:idGenerated false ;
+	vt:order 0 ;
+	vt:transition c:s.dont_walk:t0 .
+c:s.flashing:t0:ev0 a vt:Token ;
+	vt:order 0 ;
+	vt:value "reset" .
+c:s.flashing:t0:sel:chart vt:choice c:s.operating .
+c:s.flashing:t0:sel:s.operating vt:choice c:s.flashing:t0:tg0 .
+c:s.flashing:t0:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.operating .
+c:s.flashing:t0 a vt:Transition ;
+	vt:event c:s.flashing:t0:ev0 ;
+	vt:order 0 ;
+	vt:source c:s.flashing ;
+	vt:target c:s.flashing:t0:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.flashing a vt:State , vt:StateNode ;
+	vt:ancestor c:chart ;
+	vt:id "flashing" ;
+	vt:idGenerated false ;
+	vt:order 1 ;
+	vt:transition c:s.flashing:t0 .
+c:s.green:en0:a0 a vt:ExecutableContent , vt:Send ;
+	vt:delay "25s" ;
+	vt:eventName "tick" ;
+	vt:order 0 ;
+	vt:sendId "light-timer" .
+c:s.green:en0 a vt:OnEntry ;
+	vt:action c:s.green:en0:a0 ;
+	vt:order 0 .
+c:s.green:ex0:a0 a vt:Cancel , vt:ExecutableContent ;
+	vt:order 0 ;
+	vt:sendId "light-timer" .
+c:s.green:ex0 a vt:OnExit ;
+	vt:action c:s.green:ex0:a0 ;
+	vt:order 0 .
+c:s.green:t0:ev0 a vt:Token ;
+	vt:order 0 ;
+	vt:value "tick" .
+c:s.green:t0:sel:chart vt:choice c:s.operating .
+c:s.green:t0:sel:s.light vt:choice c:s.yellow .
+c:s.green:t0:sel:s.operating vt:choice c:s.operating .
+c:s.green:t0:sel:s.yellow vt:choice c:s.green:t0:tg0 .
+c:s.green:t0:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.yellow .
+c:s.green:t0 a vt:Transition ;
+	vt:event c:s.green:t0:ev0 ;
+	vt:order 0 ;
+	vt:source c:s.green ;
+	vt:target c:s.green:t0:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.green:t1:ev0 a vt:Token ;
+	vt:order 0 ;
+	vt:value "button" .
+c:s.green:t1:sel:chart vt:choice c:s.operating .
+c:s.green:t1:sel:s.light vt:choice c:s.yellow .
+c:s.green:t1:sel:s.operating vt:choice c:s.operating .
+c:s.green:t1:sel:s.yellow vt:choice c:s.green:t1:tg0 .
+c:s.green:t1:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.yellow .
+c:s.green:t1 a vt:Transition ;
+	vt:event c:s.green:t1:ev0 ;
+	vt:order 1 ;
+	vt:source c:s.green ;
+	vt:target c:s.green:t1:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.green a vt:State , vt:StateNode ;
+	vt:ancestor c:chart , c:s.light , c:s.operating ;
+	vt:id "green" ;
+	vt:idGenerated false ;
+	vt:onentry c:s.green:en0 ;
+	vt:onexit c:s.green:ex0 ;
+	vt:order 1 ;
+	vt:transition c:s.green:t0 , c:s.green:t1 .
+c:s.light:ia0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:s.light ;
+	vt:state c:s.red .
+c:s.light:ia:sel:chart vt:choice c:s.operating .
+c:s.light:ia:sel:s.light vt:choice c:s.red .
+c:s.light:ia:sel:s.operating vt:choice c:s.operating .
+c:s.light:ia:sel:s.red vt:choice c:s.light:ia0 .
+c:s.light a vt:State , vt:StateNode ;
+	vt:ancestor c:chart , c:s.operating ;
+	vt:child c:s.green , c:s.red , c:s.yellow ;
+	vt:id "light" ;
+	vt:idGenerated false ;
+	vt:initial c:s.light:ia0 ;
+	vt:order 0 .
+c:s.operating:t0:ev0 a vt:Token ;
+	vt:order 0 ;
+	vt:value "fault" .
+c:s.operating:t0:sel:chart vt:choice c:s.flashing .
+c:s.operating:t0:sel:s.flashing vt:choice c:s.operating:t0:tg0 .
+c:s.operating:t0:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.flashing .
+c:s.operating:t0 a vt:Transition ;
+	vt:event c:s.operating:t0:ev0 ;
+	vt:order 0 ;
+	vt:source c:s.operating ;
+	vt:target c:s.operating:t0:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.operating a vt:Parallel , vt:StateNode ;
+	vt:ancestor c:chart ;
+	vt:child c:s.crossing , c:s.light ;
+	vt:id "operating" ;
+	vt:idGenerated false ;
+	vt:order 0 ;
+	vt:transition c:s.operating:t0 .
+c:s.red:en0:a0 a vt:ExecutableContent , vt:Send ;
+	vt:delay "30s" ;
+	vt:eventName "tick" ;
+	vt:order 0 ;
+	vt:sendId "light-timer" .
+c:s.red:en0 a vt:OnEntry ;
+	vt:action c:s.red:en0:a0 ;
+	vt:order 0 .
+c:s.red:ex0:a0 a vt:Cancel , vt:ExecutableContent ;
+	vt:order 0 ;
+	vt:sendId "light-timer" .
+c:s.red:ex0 a vt:OnExit ;
+	vt:action c:s.red:ex0:a0 ;
+	vt:order 0 .
+c:s.red:t0:ev0 a vt:Token ;
+	vt:order 0 ;
+	vt:value "tick" .
+c:s.red:t0:sel:chart vt:choice c:s.operating .
+c:s.red:t0:sel:s.green vt:choice c:s.red:t0:tg0 .
+c:s.red:t0:sel:s.light vt:choice c:s.green .
+c:s.red:t0:sel:s.operating vt:choice c:s.operating .
+c:s.red:t0:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.green .
+c:s.red:t0 a vt:Transition ;
+	vt:event c:s.red:t0:ev0 ;
+	vt:order 0 ;
+	vt:source c:s.red ;
+	vt:target c:s.red:t0:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.red a vt:State , vt:StateNode ;
+	vt:ancestor c:chart , c:s.light , c:s.operating ;
+	vt:id "red" ;
+	vt:idGenerated false ;
+	vt:onentry c:s.red:en0 ;
+	vt:onexit c:s.red:ex0 ;
+	vt:order 0 ;
+	vt:transition c:s.red:t0 .
+c:s.walk:t0:sel:chart vt:choice c:s.operating .
+c:s.walk:t0:sel:s.crossing vt:choice c:s.dont_walk .
+c:s.walk:t0:sel:s.dont_walk vt:choice c:s.walk:t0:tg0 .
+c:s.walk:t0:sel:s.operating vt:choice c:s.operating .
+c:s.walk:t0:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.dont_walk .
+c:s.walk:t0 a vt:Transition ;
+	vt:cond "In('green')"^^vt:nullExpr ;
+	vt:order 0 ;
+	vt:source c:s.walk ;
+	vt:target c:s.walk:t0:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.walk a vt:State , vt:StateNode ;
+	vt:ancestor c:chart , c:s.crossing , c:s.operating ;
+	vt:id "walk" ;
+	vt:idGenerated false ;
+	vt:order 1 ;
+	vt:transition c:s.walk:t0 .
+c:s.yellow:en0:a0 a vt:ExecutableContent , vt:Send ;
+	vt:delay "5s" ;
+	vt:eventName "tick" ;
+	vt:order 0 ;
+	vt:sendId "light-timer" .
+c:s.yellow:en0 a vt:OnEntry ;
+	vt:action c:s.yellow:en0:a0 ;
+	vt:order 0 .
+c:s.yellow:ex0:a0 a vt:Cancel , vt:ExecutableContent ;
+	vt:order 0 ;
+	vt:sendId "light-timer" .
+c:s.yellow:ex0 a vt:OnExit ;
+	vt:action c:s.yellow:ex0:a0 ;
+	vt:order 0 .
+c:s.yellow:t0:ev0 a vt:Token ;
+	vt:order 0 ;
+	vt:value "tick" .
+c:s.yellow:t0:sel:chart vt:choice c:s.operating .
+c:s.yellow:t0:sel:s.light vt:choice c:s.red .
+c:s.yellow:t0:sel:s.operating vt:choice c:s.operating .
+c:s.yellow:t0:sel:s.red vt:choice c:s.yellow:t0:tg0 .
+c:s.yellow:t0:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.red .
+c:s.yellow:t0 a vt:Transition ;
+	vt:event c:s.yellow:t0:ev0 ;
+	vt:order 0 ;
+	vt:source c:s.yellow ;
+	vt:target c:s.yellow:t0:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.yellow a vt:State , vt:StateNode ;
+	vt:ancestor c:chart , c:s.light , c:s.operating ;
+	vt:id "yellow" ;
+	vt:idGenerated false ;
+	vt:onentry c:s.yellow:en0 ;
+	vt:onexit c:s.yellow:ex0 ;
+	vt:order 2 ;
+	vt:transition c:s.yellow:t0 .

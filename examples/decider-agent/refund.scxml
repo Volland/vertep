@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A refund agent with two choice points, on the CEL datamodel.
+
+  `review` and `manager` are decide states: `vt:decide="policy"` hands the choice among their
+  events to whatever decider the host binds to `policy` (a guard table, an LLM, a person, another
+  actor). The chart still owns the rules: the decider is offered only the events that are
+  enabled right now, so with an amount over 100 `approve` is never offered in `review`, whatever
+  the decider would like.
+
+  Illustrates the deciders capability (Decide State Declaration, Enabled Event Offer, Decisions
+  Are Journaled Inputs, Decider Safety).
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" name="refund-agent" initial="idle">
+  <datamodel>
+    <data id="amount" expr="0"/>
+  </datamodel>
+
+  <state id="idle">
+    <transition event="request" target="review">
+      <assign location="amount" expr="ev.data.amount"/>
+    </transition>
+  </state>
+
+  <state id="review" vt:decide="policy" vt:candidates="approve reject escalate">
+    <transition event="approve" cond="ctx.amount &lt;= 100" target="approved"/>
+    <transition event="reject" target="rejected"/>
+    <transition event="escalate" cond="ctx.amount > 100" target="manager"/>
+  </state>
+
+  <state id="manager" vt:decide="policy" vt:candidates="approve reject">
+    <transition event="approve" target="approved"/>
+    <transition event="reject" target="rejected"/>
+  </state>
+
+  <state id="approved"/>
+  <state id="rejected"/>
+</scxml>

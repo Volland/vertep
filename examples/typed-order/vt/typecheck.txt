@@ -1,0 +1,1 @@
+examples/typed-order/order.yaml: ok: 3 named types, 6 typed events, 3 context fields

@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The actor runtime — Vertep docs</title>
+<meta name="description" content="How vertep-runtime runs charts as durable actors: lifecycle classes, sending and requests, mailboxes and transports, the journal, storage, durable timers, time travel and chart migrations.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html" aria-current="page">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
+    <h1>The actor runtime</h1>
+    <p class="lede"><code>vertep-runtime</code> turns a chart into a durable actor: addressed by an IRI, fed by a mailbox, run one macrostep per turn, and made durable by one journal entry per turn. This page covers the lifecycle classes, sending, mailboxes and transports, the journal and its storage, durable timers, time travel and chart migrations.</p>
+
+    <h2 id="shell">A shell around a pure step</h2>
+    <p>The runtime is an imperative shell around the pure, <code>no_std</code> <code>step</code> of <code>vertep-core</code>. Everything that waits, retries, stores or talks to the network lives in the shell. Nothing inside <code>step</code> awaits, reads a clock or draws a random number. Time enters as the timestamp the shell stamps on each event when it is dequeued, and that timestamp is journaled. This one split is what makes replay deterministic and lets the Lean model check every macrostep.</p>
+    <p>One turn of a virtual actor, as <code>crates/vertep-runtime/src/node.rs</code> runs it:</p>
+    <ol>
+      <li>Receive the oldest message that no active state defers.</li>
+      <li>Drop it if its message id is already in the journal, if it is a second reply to one request, or if it is a timer that was cancelled.</li>
+      <li>Stamp the time and run one macrostep (the very first entry also runs the start macrostep).</li>
+      <li>Append the entry with compare-and-set at the expected position, together with the current-state change and the fencing token. On a conflict, step down and send nothing.</li>
+      <li>Acknowledge the message. Then dispatch the recorded sends (the outbox), arm timers, start and cancel invocations, record dead letters, and write a snapshot every N entries.</li>
+    </ol>
+
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 640 300" width="640" role="img" aria-labelledby="runtime-turn-t">
+          <title id="runtime-turn-t">One turn: a message leaves the mailbox, is checked against the journal, runs one macrostep, is appended with compare-and-set, and only then are its sends dispatched through the directory and a transport into another mailbox</title>
+          <defs>
+            <marker id="runtime-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+            <pattern id="runtime-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+          </defs>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="16" style="fill:var(--ink)">
+            <rect x="12" y="40" width="120" height="54" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="72" y="72" text-anchor="middle">Mailbox</text>
+            <rect x="172" y="40" width="120" height="54" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="232" y="64" text-anchor="middle">Seen</text>
+            <text x="232" y="83" text-anchor="middle" font-size="13">message id?</text>
+            <rect x="332" y="34" width="120" height="66" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <text x="392" y="64" text-anchor="middle" style="fill:var(--on-orange)">step</text>
+            <text x="392" y="84" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--on-orange)">one macrostep</text>
+            <rect x="492" y="40" width="136" height="54" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <rect x="492" y="40" width="136" height="54" fill="url(#runtime-hatch)"/>
+            <text x="560" y="64" text-anchor="middle">Journal</text>
+            <text x="560" y="83" text-anchor="middle" font-size="12" font-family="JetBrains Mono, monospace">append(n, n+1)</text>
+            <rect x="492" y="190" width="136" height="54" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="560" y="222" text-anchor="middle" style="fill:var(--paper)">Outbox</text>
+            <rect x="332" y="190" width="120" height="54" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="392" y="222" text-anchor="middle">Directory</text>
+            <rect x="172" y="190" width="120" height="54" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="232" y="222" text-anchor="middle">Transport</text>
+            <rect x="12" y="190" width="120" height="54" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="72" y="214" text-anchor="middle">Mailbox</text>
+            <text x="72" y="233" text-anchor="middle" font-size="13">of the receiver</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2.2" marker-end="url(#runtime-arr)">
+            <path d="M132 67 H168"/>
+            <path d="M292 67 H328"/>
+            <path d="M452 67 H488"/>
+            <path d="M560 94 V186"/>
+            <path d="M492 217 H456"/>
+            <path d="M332 217 H296"/>
+            <path d="M172 217 H136"/>
+            <path d="M232 94 C232 140 160 140 110 120" stroke-dasharray="5 4"/>
+          </g>
+          <g font-family="JetBrains Mono, monospace" font-size="11" style="fill:var(--ink-2)">
+            <text x="128" y="152">yes: ack and drop</text>
+            <text x="568" y="138">committed:</text>
+            <text x="568" y="152">ack, then</text>
+            <text x="568" y="166">dispatch</text>
+            <text x="356" y="270">resolve IRI</text>
+            <text x="40" y="270">deliver, retry until accepted</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Plate III. <b>One turn.</b> The append is the commit point; nothing leaves before it.</figcaption>
+    </figure>
+
+    <h2 id="first-node">A first node</h2>
+    <p>The facade crate <code>vertep</code> re-exports the runtime and the tiramemsu backend under its default features (<code>runtime</code>, <code>tiramemsu</code>, <code>scxml</code>). Its quickstart, <code>crates/vertep/examples/quickstart.rs</code>, opens a tiramemsu directory, registers an order chart as a chart type, and sends one event to a virtual actor. Abridged:</p>
+<pre data-lang="Rust"><code>const ORDER: &amp;str = r#"&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="open"&gt;
+  &lt;state id="open"&gt;
+    &lt;transition event="pay" target="paid"&gt;&lt;send event="ship" delay="200ms"/&gt;&lt;/transition&gt;
+  &lt;/state&gt;
+  &lt;state id="paid"&gt;&lt;transition event="ship" target="shipped"/&gt;&lt;/state&gt;
+  &lt;state id="shipped"/&gt;
+&lt;/scxml&gt;"#;
+
+const ORDER_TYPE: &amp;str = "https://example.org/charts/order";
+
+let backend = Arc::new(TiramemsuBackend::open(&amp;dir, 1)?);
+let mut node = Node::builder(backend.clone(), Shell::tokio()).build();
+let chart = vertep::scxml::read_str(ORDER).map_err(|e| format!("{e:?}"))?.chart;
+let version = node.register_type(ORDER_TYPE, chart)?;
+
+// A virtual actor exists for every key: no create call, the first message activates it.
+let order = Address::virtual_actor(ORDER_TYPE, "42")?;
+node.send(&amp;order, Event::named("pay", EventType::External))?;
+
+// ... run the node for 400 ms on a LocalSet, then:
+let now = node.state(&amp;order)?;
+let then = node.state_at(&amp;order, 1)?;   // time travel by replay</code></pre>
+    <p>Run it with <code>cargo run -p vertep --example quickstart</code>:</p>
+<pre class="output" data-lang="Output"><code>chart version urn:vertep:chart:sha256:6b74f6c5d780053619e9d360bbd73331f41fd52709d0bb7f5310d175b1272b08
+now: ["shipped"] after 2 entries
+  entry 1: pay (timers scheduled: 1)
+  entry 2: ship (timers scheduled: 0)
+as of entry 1: ["paid"]
+  tiramemsu tx 2: in ["paid"]
+  tiramemsu tx 3: in ["paid"]
+  tiramemsu tx 4: in ["paid"]
+  tiramemsu tx 5: in ["shipped"]
+  tiramemsu tx 6: in ["shipped"]</code></pre>
+    <p>The delayed <code>ship</code> was written into entry 1 as a durable timer and fired 200 ms later as an ordinary input, entry 2. The last lines read the current-state graph as it was after each tiramemsu transaction, without replay. The runnable examples on the <a href="../examples/index.html">examples page</a> include a durable actor that survives a process restart.</p>
+    <div class="nb"><p>A <code>Node</code> runs on one thread, because datamodels need not be <code>Send</code>. Run it inside a <code>tokio::task::LocalSet</code> and talk to it from elsewhere through <code>node.handle()</code>, a <code>NodeHandle</code> that is <code>Send + Sync</code>. For tests, <code>Shell::virtual_time(start_ms)</code> returns a shell and a <code>VirtualClock</code> you advance by hand, and <code>node.run_until_idle()</code> drives the node without async.</p></div>
+
+    <h2 id="lifecycle">Lifecycle classes</h2>
+    <p>Every actor has one absolute IRI address and belongs to one of three lifecycle classes. They differ in who owns the actor's lifetime and where its state lives.</p>
+    <table>
+      <thead><tr><th></th><th>Virtual actor</th><th>Invoked actor</th><th>Stateless worker</th></tr></thead>
+      <tbody>
+        <tr><td>Address</td><td><code>&lt;chart type&gt;/&lt;key&gt;</code></td><td><code>&lt;parent&gt;/invoke/&lt;id&gt;</code></td><td>the pool's address</td></tr>
+        <tr><td>Exists</td><td>always, logically</td><td>while the invoking state is active</td><td>while the pool is registered</td></tr>
+        <tr><td>State</td><td>its own journal and snapshots</td><td>through its parent</td><td>none; the caller journals results</td></tr>
+        <tr><td>Reached by</td><td><code>&lt;send&gt;</code>, <code>vt:request</code></td><td>the parent; <code>#_parent</code> back</td><td><code>&lt;send&gt;</code>, <code>vt:request</code></td></tr>
+        <tr><td>Activations</td><td>at most one per node</td><td>one</td><td>up to the pool size</td></tr>
+        <tr><td>Created with</td><td><code>register_type</code>, then any message</td><td><code>&lt;invoke&gt;</code></td><td><code>register_worker</code></td></tr>
+      </tbody>
+    </table>
+    <p><strong>Virtual actors</strong> are activated by a message or a due timer: the runtime loads the latest snapshot, replays the entries after it, and checks each entry's configuration digest. An actor idle for <code>idle_timeout_ms</code> (60 s by default) with nothing deliverable is deactivated; its state does not depend on staying in memory. <code>Address::virtual_actor(chart_type, key)</code> builds the address, and the same pair always gives the same address.</p>
+    <p>A virtual actor cannot be the target of <code>&lt;invoke&gt;</code>, because no state owns its lifetime and cancelling a parent state must never stop a shared actor. <code>register_type</code> refuses a chart whose <code>&lt;invoke&gt;</code> names a virtual actor (<code>RegisterError::InvokesVirtualActor</code>).</p>
+    <p><strong>Invoked actors</strong> start when the invoking state is entered and are cancelled when it exits, as SCXML defines. Besides charts, <code>node.register_actor_kind(invoke_type, factory)</code> lets <code>&lt;invoke type="…"&gt;</code> start a function actor (<code>FnActor</code>) or a stream actor (<code>StreamActor</code>). An <code>&lt;invoke&gt;</code> may carry a restart policy, read from <code>crates/vertep-runtime/src/chart.rs</code>:</p>
+    <table>
+      <thead><tr><th>Attribute</th><th>Values</th><th>Default</th></tr></thead>
+      <tbody>
+        <tr><td><code>vt:restart</code></td><td><code>never</code>, <code>on-failure</code>, <code>always</code></td><td><code>never</code></td></tr>
+        <tr><td><code>vt:restart-limit</code></td><td>restarts allowed within the window</td><td>3</td></tr>
+        <tr><td><code>vt:restart-window</code></td><td>a duration</td><td><code>60s</code></td></tr>
+        <tr><td><code>vt:restart-backoff</code></td><td>the first wait; the n-th restart waits <code>base × 2^(n-1)</code></td><td><code>100ms</code></td></tr>
+      </tbody>
+    </table>
+    <p>When the limit is exceeded, the parent receives <code>error.execution</code>. Supervision follows the <code>&lt;invoke&gt;</code> tree, so there is no separate supervisor hierarchy. Virtual actors are not supervised this way: a failed turn leaves the journal unchanged, and the next message activates the actor again after <code>failure_backoff_ms</code>.</p>
+    <p><strong>Stateless workers</strong> suit LLM calls, tool execution and heavy computation. <code>node.register_worker(address, pool, handler)</code> registers a pool of activations that run an async function. Nothing a worker does is journaled; its reply is journaled by the caller as an input, so replaying the caller never runs the work again.</p>
+
+    <h2 id="sending">Sending and requests</h2>
+    <p>From outside the actor system, <code>node.send(&amp;to, event)</code> or <code>handle.send(&amp;to, event)</code> delivers an event and returns its message id. Inside a chart, <code>&lt;send&gt;</code> does the same, with <code>_event.origin</code> set to the sender's address so <code>&lt;send targetexpr="_event.origin"&gt;</code> always replies to the right actor.</p>
+    <p>A chart never blocks. To ask and wait for an answer, a state declares a <code>&lt;vt:request&gt;</code> element. This chart is from <code>crates/vertep-runtime/tests/messaging.rs</code>:</p>
+<pre data-lang="SCXML"><code>&lt;state id="idle"&gt;&lt;transition event="quote" target="quoting"/&gt;&lt;/state&gt;
+&lt;state id="quoting"&gt;
+  &lt;vt:request target="https://example.org/charts/pricer/b" event="price.get"
+              timeout="5s" reply="priced" ontimeout="failed"/&gt;
+  &lt;transition event="ping"/&gt;
+&lt;/state&gt;
+&lt;state id="priced"/&gt;
+&lt;state id="failed"/&gt;</code></pre>
+    <p>Before compiling, the runtime lowers this into plain SCXML: a <code>&lt;send&gt;</code> on entry, a generated waiting substate, a transition on <code>vt:reply</code> to <code>priced</code> and one on <code>error.timeout</code> to <code>failed</code>. Other events are handled normally while the request is open. The replier answers with an ordinary send of the event <code>vt:reply</code>:</p>
+<pre data-lang="SCXML"><code>&lt;state id="s"&gt;
+  &lt;transition event="price.get"&gt;
+    &lt;send event="vt:reply" targetexpr="_event.origin"&gt;&lt;content expr="({price: 42})"/&gt;&lt;/send&gt;
+  &lt;/transition&gt;
+&lt;/state&gt;</code></pre>
+    <ul>
+      <li><strong>Correlation ids</strong> are computed from the actor's IRI, the journal position of the macrostep that issued the request, and the request's index in it. Replay rebuilds the same id without storing it separately.</li>
+      <li><strong>The timeout</strong> is a durable timer recorded in the same journal entry, so it survives deactivation and restarts.</li>
+      <li><strong>Duplicate replies</strong> are dropped: at most one reply per correlation id is delivered.</li>
+    </ul>
+    <p>Code outside the actor system, such as an HTTP handler or a test, may block: <code>handle.ask(&amp;to, event, timeout).await</code> sends the event and waits for its <code>vt:reply</code>, returning <code>AskError::Timeout</code> if none arrives in time.</p>
+
+    <h3 id="defer">Deferred and unhandled events</h3>
+    <p>SCXML discards an external event that enables no transition. Actors must not lose messages that way, so a state can defer events by descriptor, and each chart chooses what happens to the rest. From <code>tests/messaging.rs</code>:</p>
+<pre data-lang="SCXML"><code>&lt;state id="busy" vt:defer="order.*"&gt;
+  &lt;transition event="finish" target="idle"/&gt;
+&lt;/state&gt;</code></pre>
+    <p>While <code>busy</code> is active, an <code>order.cancel</code> message stays in the mailbox, in order, and is offered again once the actor leaves <code>busy</code>. Deferral lives in the mailbox, not in <code>step</code>, so the SCXML core and its conformance suite are unchanged.</p>
+    <p>The <code>vt:unhandled</code> attribute on <code>&lt;scxml&gt;</code> sets the policy for events that enable nothing and are not deferred:</p>
+    <table>
+      <thead><tr><th>Value</th><th>Effect</th><th>Default for</th></tr></thead>
+      <tbody>
+        <tr><td><code>discard</code></td><td>drop it, as SCXML does</td><td>plain sessions</td></tr>
+        <tr><td><code>dead-letter</code></td><td>record a <code>vt:DeadLetter</code> in the receiver's graph</td><td>virtual actors</td></tr>
+        <tr><td><code>error</code></td><td>raise <code>error.unhandled</code> in the chart with the event as data</td><td></td></tr>
+      </tbody>
+    </table>
+    <p>Dead letters are graph data with sender, event, payload, reason and time. <code>node.dead_letters(&amp;address)</code> lists them.</p>
+
+    <h2 id="mailboxes">Mailboxes, transports and the directory</h2>
+    <p>An address resolves through a directory to a mailbox, and transports deliver into mailboxes. Each of the three is a trait with several implementations, which is what lets the same <code>&lt;send&gt;</code> reach a local actor, an actor on another cluster node, or an actor behind a DID relay.</p>
+    <p>The mailbox contract, from <code>crates/vertep-runtime/src/mailbox.rs</code> (helper methods omitted):</p>
+<pre data-lang="Rust"><code>pub trait Mailbox: Send + Sync {
+    fn enqueue(&amp;self, env: Envelope) -&gt; Result&lt;(), MailboxError&gt;;
+    /// The oldest message that is neither in flight nor deferred, now marked in flight.
+    fn receive(&amp;self, deferred: &amp;[String]) -&gt; Option&lt;Envelope&gt;;
+    /// Removes the in-flight message (its turn is durable).
+    fn ack(&amp;self, message_id: &amp;str) -&gt; Result&lt;(), MailboxError&gt;;
+    fn release(&amp;self, message_id: &amp;str);
+    fn release_all(&amp;self);
+    fn pending(&amp;self) -&gt; Vec&lt;Envelope&gt;;
+    fn pending_deliverable(&amp;self, deferred: &amp;[String]) -&gt; usize;
+}</code></pre>
+    <table>
+      <thead><tr><th>Piece</th><th>Implementations</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Mailboxes</td><td><code>MemoryMailboxes</code>, <code>StoreMailboxes</code></td><td>Store-backed mailboxes live in the actor's storage and outlive the process. Set with <code>NodeBuilder::mailboxes</code>, or per IRI scheme with <code>mailboxes_for_scheme</code>.</td></tr>
+        <tr><td>Transports</td><td><code>LocalTransport</code> (the SCXML Event I/O Processor, alias <code>scxml</code>); the cluster, DIDComm, TSP and WebSocket processors</td><td>Each is an SCXML Event I/O Processor that <code>&lt;send type="…"&gt;</code> selects; <code>_event.origintype</code> names the one that delivered.</td></tr>
+        <tr><td>Directory</td><td>a <code>Resolver</code> per IRI scheme</td><td>Resolution depends only on the address, so reactivation or relocation keeps it. <code>handle.register_resolver(scheme, resolver)</code>.</td></tr>
+        <tr><td>Placement</td><td>none on a single node; <code>ClusterNode</code> in a cluster</td><td>Answers <code>Local</code>, <code>Remote(mailbox)</code> or <code>Hold</code> before a message is delivered or an actor activated.</td></tr>
+      </tbody>
+    </table>
+    <p>Mailbox order is promised per sender and receiver only. Across senders there is no order, which is what makes relays and clusters possible at all.</p>
+    <p>The WebSocket Event I/O Processor (feature <code>websocket</code>) links a server node and browser nodes. Its frames and delivery rules are on <a href="browser.html">Browser and JavaScript</a>.</p>
+
+    <h2 id="journal">The journal</h2>
+    <p>A virtual actor's state is a deterministic replay of the inputs it accepted. The journal is the only source of truth; the current-state graph, snapshots and any external graph store are derived from it.</p>
+    <p>Each entry holds the input (event name, payload, message id, origin and origin type, the journaled timestamp), the chart version it ran under, the sends with their send ids, the timers scheduled or cancelled, the resulting configuration digest and the position. Entries are numbered from 1 without gaps. Besides input entries there are migration entries and fork entries.</p>
+    <p>Three rules carry the guarantees:</p>
+    <ul>
+      <li><strong>Append before processing is visible.</strong> The append is the commit point. Before it nothing is visible to anyone; after it every recorded send is dispatched at least once. A turn that fails never reaches the append, so it leaves the journal unchanged.</li>
+      <li><strong>Compare-and-set.</strong> An append succeeds only if the journal is still at the expected position. Two activations of one actor can never both extend its history: the second gets a conflict, discards its state and sends nothing.</li>
+      <li><strong>Deduplication before step.</strong> A message whose id is already journaled is acknowledged and dropped. A send's message id is built from the sender's address and send id, so a resend after a crash is the same message to the receiver. Delivery is at least once; processing is effectively once.</li>
+    </ul>
+    <table>
+      <thead><tr><th>Crash or fault</th><th>State after recovery</th></tr></thead>
+      <tbody>
+        <tr><td>During <code>step</code>, before the append</td><td>as if the message never arrived; it is delivered again</td></tr>
+        <tr><td>After the append, before the ack</td><td>the entry exists; the redelivered message is dropped as a duplicate</td></tr>
+        <tr><td>After the ack, before dispatch</td><td>pending sends are found in the entry and dispatched on activation</td></tr>
+        <tr><td>Transport refuses a send</td><td>the send stays pending and is retried; the receiver deduplicates</td></tr>
+        <tr><td>Two activations of one actor</td><td>one append wins; the other gets a conflict and deactivates</td></tr>
+        <tr><td>Replay produces a different digest</td><td>activation fails with <code>ReplayDivergence</code> instead of running on wrong state</td></tr>
+        <tr><td>Timer due while the node was down</td><td>fired after restart, in due order</td></tr>
+      </tbody>
+    </table>
+    <p>Random values requested by executable content come from a generator seeded from the entry IRI, so replay reproduces them. <code>node.journal(&amp;address)</code> returns the decoded entries; <code>NodeConfig { crash_at: Some(CrashPoint::BeforeAppend), .. }</code> simulates a crash in tests.</p>
+
+    <h2 id="storage">Storage</h2>
+    <p>Storage is two RDF-agnostic traits in <code>vertep-store</code>, so no backend is asked for a guarantee it cannot give. A journal store must append linearizably per actor; a graph store only promises quads in and SPARQL out.</p>
+<pre data-lang="Rust"><code>pub trait JournalStore: Send + Sync {
+    fn capabilities(&amp;self) -&gt; JournalCapabilities;   // fencing, state_in_append
+    /// Appends `entries` if, and only if, the last entry is at `expected`.
+    fn append(&amp;self, actor: &amp;NamedNode, expected: Position, entries: &amp;[Entry],
+              meta: &amp;AppendMeta) -&gt; Result&lt;Position, AppendError&gt;;
+    fn read(&amp;self, actor: &amp;NamedNode, from: Position) -&gt; Result&lt;Vec&lt;JournalRecord&gt;, StoreError&gt;;
+    fn head(&amp;self, actor: &amp;NamedNode) -&gt; Result&lt;Position, StoreError&gt;;
+    fn actors(&amp;self) -&gt; Result&lt;Vec&lt;NamedNode&gt;, StoreError&gt;;
+}
+
+pub trait GraphStore: Send + Sync {
+    fn capabilities(&amp;self) -&gt; GraphCapabilities;     // RDF 1.2 or the RDF 1.1 fallback
+    fn insert_quads(&amp;self, quads: &amp;[Quad]) -&gt; Result&lt;(), StoreError&gt;;
+    fn remove_quads(&amp;self, quads: &amp;[Quad]) -&gt; Result&lt;(), StoreError&gt;;
+    fn clear_graph(&amp;self, graph: &amp;NamedNode) -&gt; Result&lt;(), StoreError&gt;;
+    fn query(&amp;self, sparql: &amp;str) -&gt; Result&lt;QueryResults, StoreError&gt;;
+}</code></pre>
+    <p><code>AppendError</code> is <code>Conflict</code>, <code>Fenced</code>, <code>Unsupported</code>, <code>Invalid</code> or <code>Storage</code>. <code>AppendMeta</code> carries an optional fencing token (a scope IRI and an epoch) and an optional state delta. A store that does not enforce fencing refuses a token rather than ignoring it. A node's <code>Storage</code> pairs one journal store with the graph stores that hold each actor's current state, snapshots, outbox marks, dead letters and store-backed mailbox.</p>
+    <table>
+      <thead><tr><th>Backend</th><th>Crate</th><th>Implements</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td><code>TiramemsuBackend</code>, <code>TiramemsuShard</code></td><td><code>vertep-tiramemsu</code> (default)</td><td>both traits</td><td>the default: journal and current state in one file per shard</td></tr>
+        <tr><td><code>MemoryStore</code></td><td><code>vertep-store</code></td><td>both traits</td><td>tests and the reference implementation</td></tr>
+        <tr><td><code>OxigraphStore</code>, <code>SparqlEndpoint</code></td><td><code>vertep-oxigraph</code></td><td>graph store only</td><td>a queryable projection in Oxigraph or any SPARQL 1.1 endpoint</td></tr>
+        <tr><td><code>SplitStorage</code></td><td><code>vertep-runtime</code></td><td>pairs a journal store with a separate graph store</td><td>current state written after each append</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Why tiramemsu is the default.</strong> Tiramemsu is a bitemporal triple store that never deletes rows, so the journal is append-only by construction and history costs nothing extra. One append is one transaction that checks the head, writes the entry, derives the new current-state statements with the entry as their support, and acknowledges the message. So the actor's current state commits together with the input that caused it, and each state statement can be traced back to its entry (<code>TiramemsuShard::state_causes</code>). <code>TiramemsuBackend::open(dir, shard_count)</code> opens a directory of shard files, one writer each, with actors placed by an FNV-1a hash of their address IRI.</p>
+    <p><strong>Why Oxigraph only holds a projection.</strong> SPARQL Update has no compare-and-set, so a SPARQL store cannot be a journal store. The <code>Projector</code> in <code>vertep-store</code> copies journal entries into a graph store in order, idempotently, and records how far it got per actor as <code>vt:projectedPosition</code>, so an interrupted run is completed by running it again. Consistent reads go to the journal store; the projection may lag.</p>
+
+    <h2 id="timers">Durable timers</h2>
+    <p>A delayed <code>&lt;send&gt;</code> is recorded in the journal entry that scheduled it and fired later as an ordinary input, with a message id derived from its send id. A deactivated actor needs no running process to keep its timers. Due times are computed from the scheduling entry's journaled timestamp, so replay never reads a clock. A <code>&lt;cancel&gt;</code> is journaled too, and a cancelled timer never fires.</p>
+    <p>Recurring reminders use the <code>&lt;vt:reminder&gt;</code> element in executable content. From <code>crates/vertep-runtime/tests/durable_timers.rs</code>:</p>
+<pre data-lang="SCXML"><code>&lt;state id="polling"&gt;
+  &lt;onentry&gt;&lt;vt:reminder name="poll" period="10min" event="poll.tick"/&gt;&lt;/onentry&gt;
+  &lt;transition event="poll.tick"/&gt;
+  &lt;transition event="stop" target="done"/&gt;
+&lt;/state&gt;
+&lt;final id="done"/&gt;</code></pre>
+    <p>A reminder fires every period until it is cancelled by name (<code>&lt;vt:reminder name="poll" cancel="true"/&gt;</code>) or the actor reaches a top-level final state. After downtime, every overdue timer fires in due order, and a reminder fires once for all the occurrences it missed. Durations accept <code>ms</code>, <code>s</code>, <code>min</code>, <code>h</code> and <code>d</code>, or a bare number of milliseconds. <code>node.pending_timers()</code> lists the armed timers in due order.</p>
+
+    <h2 id="time-travel">Time travel</h2>
+    <p>There are two ways to look at an actor's past, and the quickstart output above shows both.</p>
+    <ul>
+      <li><strong>By replay.</strong> <code>node.state_at(&amp;address, position)</code> rebuilds the state after any journal position without touching the live actor or the journal. It works on every backend.</li>
+      <li><strong>In the store.</strong> On tiramemsu, <code>shard.view_as_of(t)</code> reads the graphs as they were right after transaction <code>t</code>, and <code>shard.view_as_of_time(ms)</code> as of a wall-clock instant. Both answer SPARQL from the store's own history, without replay. <code>shard.state_history(actor, triple)</code> lists when a state statement was added and retracted.</li>
+    </ul>
+    <p>The named graphs follow a fixed layout: an actor's current state is in the graph named by its address, each journal entry in the graph named by its entry IRI. Both IRIs are reproduced by replay. The <a href="rdf.html">RDF and versions</a> page shows SPARQL queries over them.</p>
+
+    <h2 id="versions">Chart versions and migrations</h2>
+    <p>A chart version is the content address of the chart as written: <code>urn:vertep:chart:sha256:&lt;hex&gt;</code>, the hash of its canonical RDF form. The same chart loaded from SCXML or YAML gets the same version, and registering it again is a no-op. Every journal entry names the version it ran under.</p>
+    <ul>
+      <li><strong>Pin until final.</strong> <code>register_type</code> with a new chart makes it the latest version of the type. New actors start on it; existing actors stay on their version until they reach a top-level final state.</li>
+      <li><strong>Replay uses the recorded version.</strong> Each run of entries with one version is replayed with that version, never a newer one. A version that cannot be loaded fails activation with <code>MissingVersion</code>.</li>
+      <li><strong>The registry keeps what journals need.</strong> <code>node.remove_version(iri)</code> is refused with <code>RemoveError::InUse</code> while a non-final actor runs that version.</li>
+    </ul>
+    <p>Moving a running actor to a new version is an explicit migration, written as a journal entry that holds the snapshot before, the migration IRI and the snapshot after. From <code>crates/vertep-runtime/tests/chart_versioning.rs</code>:</p>
+<pre data-lang="Rust"><code>let v1 = node.register_type(&amp;ty("pay"), scxml("Idle", V1)).unwrap();
+// ... the actor runs on v1 ...
+let v2 = node.register_type(&amp;ty("pay"), scxml("Idle", V2_RENAMED)).unwrap();
+node.register_migration(
+    Migration::identity("urn:vertep:migration:card2", v1.clone(), v2.clone())
+        .rename_state("Paying.Card", "Paying.Card2"),
+);
+node.migrate(&amp;a, "urn:vertep:migration:card2").unwrap();</code></pre>
+    <p>A <code>Migration</code> maps configurations (explicitly with <code>map_configuration</code>, or by state renames) and may transform the datamodel with <code>with_transform</code>. Before applying it, the runtime enumerates every configuration reachable in the old chart, ignoring guards, and refuses the migration with <code>MigrateError::Unmapped</code> if any is not mapped. A failed transform appends nothing.</p>
+    <p>Rolling back is a fork, not a rewrite: <code>node.fork(&amp;source, position, &amp;new_address)</code> starts a new actor from the source's state at that position, under the version it had then. The source's journal is unchanged. A chart can also request its own migration with <code>&lt;vt:migrate to="…" migration="…"/&gt;</code> in executable content; the request is processed at the start of a later turn, never inside the requesting macrostep.</p>
+
+    <h2 id="config">Node settings</h2>
+    <p><code>NodeConfig</code>, set with <code>NodeBuilder::config</code>:</p>
+    <table>
+      <thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>idle_timeout_ms</code></td><td>60 000</td><td>an idle virtual actor with nothing deliverable is deactivated</td></tr>
+        <tr><td><code>snapshot_interval</code></td><td>100</td><td>a snapshot every N entries; 0 disables snapshots</td></tr>
+        <tr><td><code>fencing</code></td><td>none</td><td>the fencing token every append carries; a cluster sets it per shard</td></tr>
+        <tr><td><code>failure_backoff_ms</code></td><td>1 000</td><td>how long an actor whose turn failed waits before it is activated again</td></tr>
+        <tr><td><code>crash_at</code></td><td>none</td><td>a simulated crash point, for tests of the journal protocol</td></tr>
+      </tbody>
+    </table>
+    <p>The shell reaches its async runtime only through three small traits, <code>Spawn</code>, <code>Clock</code> and <code>Sleep</code>, bundled as a <code>Shell</code>. <code>Shell::tokio()</code> is the server shell; the browser build supplies its own (see <a href="browser.html">Browser and JavaScript</a>).</p>
+
+    <div class="nb warn"><p>Single activation is guaranteed per node by the scheduler, and across processes by the journal's compare-and-set. Across a cluster it comes from shard leases with fencing epochs, described on <a href="distribution.html">Cluster and federation</a>. The architecture view also states that an invoked chart child has no journal of its own and is reproduced by replaying its parent, so a child that must survive the loss of its node should be a virtual actor reached by <code>&lt;send&gt;</code>.</p></div>
+
+    <p>The design notes behind this page are in <code>tg.md/views/runtime.md</code> and <code>tg.md/views/persistence.md</code>; the normative requirements are in <code>openspec/specs/actor-model</code>, <code>messaging</code>, <code>event-journal</code>, <code>storage</code>, <code>durable-timers</code> and <code>chart-versioning</code>.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="types.html">← Datamodels and types</a>
+      <a href="agents.html">Agents and deciders →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

@@ -4972,6 +4972,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "vertep-examples"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "vertep",
+ "vertep-cli",
+ "vertep-dm-cel",
+ "vertep-dm-rust",
+ "vertep-yaml",
+]
+
+[[package]]
 name = "vertep-federation"
 version = "0.1.0"
 dependencies = [

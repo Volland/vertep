@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cluster and federation — Vertep docs</title>
+<meta name="description" content="How Vertep actors run on many machines: trusted clusters with shard leases, fencing epochs, QUIC and worker pools, and federation across trust boundaries with DIDs, grants and DIDComm or TSP relay mailboxes.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html" aria-current="page">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
+    <h1>Cluster and federation</h1>
+    <p class="lede">Two ways to run actors on more than one machine. A cluster is a set of trusted nodes sharing one population of actors, placed by shard. Federation connects actors of different owners through relays nobody needs to trust. A chart cannot tell which case it is in: <code>&lt;send target="…"&gt;</code> looks the same for all of them.</p>
+
+    <h2 id="two-problems">Two separate problems</h2>
+    <p>Both reuse the runtime's three layers: an address resolves through a directory to a mailbox, and transports deliver into mailboxes as SCXML Event I/O Processors (see <a href="runtime.html#mailboxes">the actor runtime</a>). What differs is trust.</p>
+    <table>
+      <thead><tr><th></th><th>Cluster (<code>vertep-cluster</code>)</th><th>Federation (<code>vertep-federation</code>)</th></tr></thead>
+      <tbody>
+        <tr><td>Trust</td><td>all nodes trusted, mutual TLS</td><td>each party trusts only itself</td></tr>
+        <tr><td>Addresses</td><td><code>vt:</code>-style IRIs</td><td>DIDs, opt-in per actor</td></tr>
+        <tr><td>Directory</td><td>shard table: <code>hash(IRI) mod N</code> to the lease owner</td><td>DID resolver: the DID document's services</td></tr>
+        <tr><td>Mailbox</td><td>the shard owner's mailbox</td><td>a DIDComm mediator or TSP endpoint, which may be offline</td></tr>
+        <tr><td>Transport</td><td>QUIC, one stream per sender and receiver pair</td><td>DIDComm v2 forward, TSP direct or routed</td></tr>
+        <tr><td>Sender identity</td><td>cluster certificate</td><td>verified DID, journaled with the event</td></tr>
+        <tr><td>Authorization</td><td>membership only</td><td>DID-scoped grants, inbound and outbound</td></tr>
+      </tbody>
+    </table>
+
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 640 320" width="640" role="img" aria-labelledby="distribution-map-t">
+          <title id="distribution-map-t">Left, a trusted cluster of three nodes that share shards under leases from a lease authority and talk over QUIC. Right, another organisation's node. Between them, an untrusted mediator that holds only ciphertext.</title>
+          <defs>
+            <marker id="distribution-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+            <pattern id="distribution-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+          </defs>
+          <rect x="8" y="8" width="330" height="304" style="fill:none;stroke:var(--ink)" stroke-width="1.5" stroke-dasharray="6 5"/>
+          <text x="173" y="302" text-anchor="middle" font-family="IM Fell English SC, Georgia, serif" font-size="14" style="fill:var(--ink-2)">cluster: trusted, mutual TLS</text>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="16" style="fill:var(--ink)">
+            <rect x="58" y="24" width="230" height="48" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="173" y="46" text-anchor="middle" style="fill:var(--paper)">Lease authority</text>
+            <text x="173" y="63" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--paper)">static · gossip · etcd · k8s</text>
+            <rect x="24" y="130" width="92" height="64" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="70" y="156" text-anchor="middle">node a</text>
+            <text x="70" y="176" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace">shards 0–3</text>
+            <rect x="127" y="130" width="92" height="64" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="173" y="156" text-anchor="middle">node b</text>
+            <text x="173" y="176" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace">shards 4–7</text>
+            <rect x="230" y="130" width="92" height="64" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <text x="276" y="156" text-anchor="middle" style="fill:var(--on-orange)">node c</text>
+            <text x="276" y="176" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace" style="fill:var(--on-orange)">DID actor</text>
+            <rect x="420" y="130" width="110" height="64" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <rect x="420" y="130" width="110" height="64" fill="url(#distribution-hatch)"/>
+            <text x="475" y="156" text-anchor="middle">Mediator</text>
+            <text x="475" y="176" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace">ciphertext only</text>
+            <rect x="420" y="236" width="200" height="56" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="520" y="260" text-anchor="middle">Org 2 node</text>
+            <text x="520" y="279" text-anchor="middle" font-size="11" font-family="JetBrains Mono, monospace">pickup, verify, grant, journal</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2" marker-end="url(#distribution-arr)">
+            <path d="M110 72 L76 126" stroke-dasharray="5 4"/>
+            <path d="M173 72 V126" stroke-dasharray="5 4"/>
+            <path d="M236 72 L270 126" stroke-dasharray="5 4"/>
+            <path d="M322 162 H416"/>
+            <path d="M475 194 V232"/>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2" marker-start="url(#distribution-arr)" marker-end="url(#distribution-arr)">
+            <path d="M74 198 C90 240 150 240 166 198"/>
+            <path d="M180 198 C196 240 256 240 272 198"/>
+          </g>
+          <g font-family="JetBrains Mono, monospace" font-size="11" style="fill:var(--ink-2)">
+            <text x="180" y="98">leases,</text>
+            <text x="180" y="112">epochs</text>
+            <text x="98" y="258">QUIC</text>
+            <text x="206" y="258">QUIC</text>
+            <text x="346" y="152">authcrypt</text>
+            <text x="346" y="182">+ forward</text>
+            <text x="484" y="218">pickup</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Plate IV. <b>Inside and across the boundary.</b> Leases inside the cluster; encryption and grants across it.</figcaption>
+    </figure>
+
+    <h2 id="cluster">The cluster</h2>
+    <p>The facade's <code>cluster</code> feature brings in <code>vertep-cluster</code> with its <code>gossip</code>, <code>quic</code> and <code>runtime</code> features. The etcd and Kubernetes authorities are separate features (<code>etcd</code>, <code>kubernetes</code>) that you enable on <code>vertep-cluster</code> directly.</p>
+
+    <h3 id="metadata">Cluster metadata and shards</h3>
+    <p>A cluster is fixed at creation by its <code>ClusterMeta</code>: an identifier, a shard count, a hash version and a replication factor, kept in <code>cluster.meta</code>. A node built with different values is refused when it joins.</p>
+    <ul>
+      <li><strong>The shard count is a power of two.</strong> It bounds write parallelism, so choose it generously (256 or 1024). A power of two turns resharding into a split: under <code>mod 2N</code>, an actor in shard <code>s</code> lands in <code>s</code> or <code>s + N</code>.</li>
+      <li><strong>The hash is versioned and platform-independent.</strong> Version 1 is FNV-1a 64-bit over the IRI's UTF-8 bytes, the same hash <code>vertep-tiramemsu</code> uses for single-node shard files, so a single-node directory and a cluster agree on placement. Golden vectors are checked in CI on Linux and macOS, x86_64 and arm64.</li>
+      <li><strong>One shard is one journal store with one writer</strong>, typically one tiramemsu file. Placement is per shard, not per actor: the directory has N entries, not one per actor. A hot shard concentrates load on one writer; actors are not moved individually.</li>
+    </ul>
+
+    <h3 id="membership">Membership</h3>
+    <p>One <code>Membership</code> trait reports the current view, notifies subscribers, and grants, renews, releases and revokes shard leases. The runtime never depends on which implementation is configured. Views carry strictly increasing version numbers, and a node ignores a view not newer than the one it holds.</p>
+    <table>
+      <thead><tr><th>Implementation</th><th>Members from</th><th>Lease authority</th><th>Where</th></tr></thead>
+      <tbody>
+        <tr><td>Static</td><td>configuration (<code>StaticConfig</code>)</td><td>a <code>MemoryAuthority</code> hosted by one process, deterministic assignment</td><td>fixed fleets, tests</td></tr>
+        <tr><td>Gossip</td><td>SWIM with indirect probes (<code>GossipMembership</code>)</td><td>a deterministic leader among active members</td><td>self-forming clusters without infrastructure</td></tr>
+        <tr><td>etcd</td><td>etcd v3 over its JSON gateway (<code>EtcdAuthority</code>)</td><td>etcd leases; a permanent key holds each shard's epoch</td><td>operated clusters, feature <code>etcd</code></td></tr>
+        <tr><td>Kubernetes</td><td><code>coordination.k8s.io/v1</code> Lease objects (<code>KubeAuthority</code>)</td><td>the API server; grants expire by observation</td><td>clusters on Kubernetes, feature <code>kubernetes</code></td></tr>
+      </tbody>
+    </table>
+    <p>Joining checks the cluster id, shard count and node id. Leaving drains first: the node refuses new activations, finishes running macrosteps, flushes outboxes, ships each shard and hands it over. Failure detection marks a silent member suspect after 3 s and failed after 10 s by default (<code>DetectorConfig</code>), and a failed member's leases become free only after they expire.</p>
+    <p>Gossip lease granting is weaker than consensus under partitions. Fencing keeps it safe, at the cost of availability. A gossip leader's epochs carry a tag from its identifier and start, so a leader that restarts never grants an epoch twice; the fault-injection matrix found that bug and the fix has a test.</p>
+
+    <h3 id="leases">Leases and fencing epochs</h3>
+    <p>A node owns a shard through a time-bounded lease. Every new grant carries a strictly greater fencing epoch; a renewal keeps the epoch. By default a lease lasts 10 s, and the owner stops starting macrosteps 2 s before it ends, by its own monotonic clock (<code>LeaseConfig</code>), to absorb clock drift and pauses.</p>
+    <p>At most one activation of a virtual actor can commit macrosteps under any epoch. Three checks give that, in order of cost:</p>
+    <ol>
+      <li><strong>Routing.</strong> A node activates an actor only while it holds an unexpired lease on its shard. Other nodes forward the message to the owner, with a hop limit.</li>
+      <li><strong>Lease timing.</strong> The owner stops before expiry, so in the normal case two owners never overlap.</li>
+      <li><strong>Fenced append.</strong> Under clock skew or a long pause, a stale owner's append carries an epoch lower than the one the journal store has accepted, and is rejected as <code>Fenced</code>. Its outbound frames carry the old <code>(shard, epoch)</code> too, and receivers drop them into the dead-letter graph. The append is also a compare-and-set on the actor's journal position.</li>
+    </ol>
+    <p>Lean proves the invariant behind this: for every shard and epoch at most one writer's appends are accepted, and accepted journal positions are totally ordered across epochs (see <a href="verification.html">Verification</a>).</p>
+
+    <h3 id="in-runtime">The cluster inside a node</h3>
+    <p>A <code>ClusterNode</code> joins one runtime <code>Node</code> to the cluster. It is the node's placement, its storage and its cluster Event I/O Processor. Before the runtime delivers a message or activates an actor, it asks the placement, which answers:</p>
+    <ul>
+      <li><strong>Local</strong>, when this node holds an unexpired lease on the actor's shard;</li>
+      <li><strong>Remote</strong>, a mailbox that frames the envelope and sends it with retries until it is acknowledged or the delivery deadline passes, after which the sender gets <code>error.communication</code>;</li>
+      <li><strong>Hold</strong>, when no live owner exists: the message waits in the local mailbox and the actor is not activated.</li>
+    </ul>
+    <p>Every append goes through <code>ClusterStorage</code>, which routes it to the shard's store and stamps the node's lease epoch as the fencing token. The wiring, from <code>crates/vertep-cluster/tests/rt/mod.rs</code>:</p>
+<pre data-lang="Rust"><code>let cluster = ClusterNode::new(membership.clone() as Arc&lt;dyn Membership&gt;, config);
+wire.connect(&amp;cluster);                       // MemoryWire in tests; QuicWire in production
+
+let node = Node::builder(storage as Arc&lt;dyn Storage&gt;, Shell::tokio())   // a ClusterStorage
+    .datamodels(Arc::new(vertep_dm_ecma::EcmaRegistry))
+    .placement(cluster.placement())
+    .transport(cluster.processor())            // &lt;send type="cluster"&gt;
+    .build();
+cluster.attach(node.handle());</code></pre>
+    <p><code>ClusterConfig</code> holds the transport settings:</p>
+    <table>
+      <thead><tr><th>Field</th><th>Default</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>hop_limit</code></td><td>4</td><td>forwards between nodes before a message fails</td></tr>
+        <tr><td><code>mailbox_bound</code></td><td>1024</td><td>an inbound frame waits while the target's mailbox holds this many messages</td></tr>
+        <tr><td><code>dedup_capacity</code></td><td>65 536</td><td>accepted message ids the receiver remembers</td></tr>
+        <tr><td><code>delivery_deadline</code></td><td>30 s</td><td>how long an outbound message is retried</td></tr>
+        <tr><td><code>retry_backoff</code></td><td>50 ms</td><td>the pause between retries</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="quic">The QUIC transport</h3>
+    <p>Nodes talk over QUIC with mutual TLS. Every node has a certificate from the cluster's CA for <code>&lt;node&gt;.&lt;cluster&gt;.vertep.internal</code>, and a server accepts a client only if the certificate chains to the cluster CA and names a current member, so a foreign certificate or a removed member is refused during the handshake.</p>
+    <ul>
+      <li><strong>Ordering.</strong> Frames of one sender and receiver pair travel on one stream, in order; other pairs use other streams and never wait for it. Past a stream cap per peer, pairs share streams by hash, still in order per pair.</li>
+      <li><strong>Backpressure.</strong> The receiver reads the next frame of a stream only after the previous one is stored in a mailbox, so a full mailbox slows exactly the streams that feed it. Accepted messages are never dropped.</li>
+      <li><strong>Delivery.</strong> At least once: the sender retries until the receiver confirms the message is stored. Virtual actors deduplicate by the journal's message ids, other receivers by a bounded id cache. A frame is at most 1 MiB by default.</li>
+      <li><strong>Stale routing.</strong> A node that is no longer a shard's owner forwards the message and sends a redirect, so the sender updates its table.</li>
+    </ul>
+
+    <h3 id="workers">Worker pools</h3>
+    <p>Stateless workers are pooled, never sharded, and never take a lease. Any node that declares a worker type may run activations of it. A request is routed by the sending node: it picks an activation by policy, creates one on a declaring member when none has capacity, queues within a bound, or refuses at once with an error event.</p>
+    <table>
+      <thead><tr><th>Policy</th><th>Picks</th></tr></thead>
+      <tbody>
+        <tr><td><code>RoundRobin</code></td><td>the activations with free capacity, in turn</td></tr>
+        <tr><td><code>LeastOutstanding</code></td><td>the activation with the fewest requests in progress</td></tr>
+        <tr><td><code>PreferLocal</code></td><td>an activation on the sender's own node when one has capacity; otherwise the least loaded</td></tr>
+      </tbody>
+    </table>
+    <p>Results are journaled by the caller, so replay never calls the worker again. A worker node that fails fails its requests to their callers as error events or request timeouts. A request is retried once on another activation only if the worker type is declared idempotent, because a retried LLM or tool call can have outside effects.</p>
+
+    <h3 id="replication">Replication and moving shards</h3>
+    <p>With a replication factor above one, every shard has <code>rf - 1</code> standbys: the members after the owner in the sorted list of active members. The owner ships to its standbys what they lack and acknowledges an append only after the configured number of them stored it. If the quorum is not reached, the append fails, and the actor's journal is neither read nor extended until a later shipment catches the standbys up. So an entry that missed the quorum never produces effects, and a standby that takes over holds every entry whose effects anyone saw. A standby refuses a stream from an epoch lower than one it has accepted.</p>
+    <p>With replication factor 1 there is no standby. A failed owner's shards stay unavailable until its disk returns, and no other node may take such a shard with an empty journal. Messages wait in mailboxes rather than being lost.</p>
+    <p>To move a shard, the rebalancer drains the old owner, ships the journal suffix the new owner lacks, verifies the end position, and transfers the lease at a higher epoch. Late messages at the old owner are forwarded with a redirect. With a shared journal store a move is a lease transfer only.</p>
+    <p>Resharding is offline. <code>vt cluster reshard &lt;dir&gt; &lt;out&gt;</code> doubles the shard count of a stopped cluster: it reads the data directory (<code>cluster.meta</code>, the shard files and the <code>leases</code> dump), refuses if the cluster is running, re-hashes every actor IRI into shard <code>s</code> or <code>s + N</code>, and writes the new files and metadata to <code>&lt;out&gt;</code>.</p>
+
+    <div class="nb warn">
+      <p>Known gaps in the cluster, as of this release:</p>
+      <ul>
+        <li><strong>Journal shipping between nodes has no wire protocol yet.</strong> The shipping hook accepts any copy of a journal, and the tests ship between stores in one process. Moving a shard between machines needs a way to copy its file that you supply.</li>
+        <li><strong>A cluster no larger than its replication factor stops writing while a node is down.</strong> With fewer live members than the replication factor, appends wait rather than acknowledge with fewer copies than configured. A three-node cluster with factor 3 stops writing a shard while one of its nodes is down.</li>
+        <li><strong>Hot shards are not split.</strong> Placement is per shard; individual actors are never moved off a busy shard.</li>
+      </ul>
+    </div>
+
+    <h3 id="faults">Fault injection</h3>
+    <p>Two harnesses check the cluster. <code>tests/faults.rs</code> runs in process over static, gossip and a stand-in for the external authorities on simulated time, and over etcd and Kubernetes in containers, each with a shared journal and with replication factors 1 and 3. <code>tests/containers.rs</code> runs every node as its own process (the <code>vertep-fault-node</code> binary) and injects network disconnects, pauses, kills and restarts, a lease clock at half speed, and lost frames. A checker requires every actor journal to be linear, at most one writer per shard and epoch, every acknowledged message processed exactly once, and no fenced side effect accepted. Every history is replayed through the Lean lease model, which must reach the same accept and reject decisions.</p>
+    <p>The nightly CI job runs:</p>
+<pre data-lang="Shell"><code>VERTEP_CONTAINER_TESTS=require \
+  cargo test -p vertep-cluster --release --features differential,etcd,kubernetes \
+  --test faults --test simulation --test runtime --test external --test containers -- --test-threads 2</code></pre>
+    <p>Without <code>VERTEP_CONTAINER_TESTS</code> the container tests skip; <code>=1</code> runs them when Docker is available and <code>=require</code> fails without it. Set <code>VERTEP_HISTORY_DIR</code> to keep the histories as JSON lines.</p>
+
+    <h2 id="federation">Federation</h2>
+    <p>The facade's <code>federation</code> feature brings in <code>vertep-federation</code> with DIDComm v2 and TSP. Actors on ordinary IRIs never touch any of it: their sends are delivered without DID resolution, keys or cryptography.</p>
+
+    <h3 id="dids">DID identities</h3>
+    <p>A DID is optional and per actor. An actor that crosses a trust boundary uses its DID as its address, so the DID is also the subject of its journal and current-state graph. A DID resolver acts as the directory: the DID document's services become routes, and its verification methods become keys.</p>
+    <table>
+      <thead><tr><th>Method</th><th>Resolution</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td><code>did:key</code></td><td>offline</td><td>simple, keys only</td></tr>
+        <tr><td><code>did:peer</code></td><td>offline</td><td>pairwise relationships</td></tr>
+        <tr><td><code>did:web</code></td><td>over HTTP, through a fetcher you supply</td><td>actors with a web domain</td></tr>
+        <tr><td><code>did:webvh</code></td><td>over HTTP with log verification, feature <code>webvh</code></td><td>long-lived public actors with verifiable key history</td></tr>
+      </tbody>
+    </table>
+    <p>Resolution is cached with a bounded size and time to live, and re-resolved on expiry or endpoint failure. Applications can register or override method resolvers in the <code>ResolverRegistry</code>.</p>
+    <p>Private keys stay behind the <code>KeyManager</code> trait (<code>InMemoryKeyManager</code>, <code>FileKeyManager</code>) and never enter journals, snapshots, the graph or datamodels: a never-forget store could only erase them by destroying the key that encrypts them. Rotating a key keeps the DID, with a grace period for retired keys. <code>Federation::provision</code> creates an actor's keys and DID and binds the DID to a chart type and key on the node.</p>
+
+    <h3 id="admission">Authenticated senders and grants</h3>
+    <p>An inbound message from across a trust boundary passes these checks before any journal append, in order:</p>
+    <ol>
+      <li>decrypt it with the <code>KeyManager</code>;</li>
+      <li>verify the sender against its resolved DID document (an anonymous message is refused unless the receiver's <code>AnonymousPolicy</code> is <code>Allow</code>);</li>
+      <li>find a grant for this sender, target and event;</li>
+      <li>check the payload against the receiver's declared event type;</li>
+      <li>drop it if its message id was already seen.</li>
+    </ol>
+    <p>An admitted event carries the sender's DID in <code>_event.origin</code> and <code>_event.originverified</code> set to true; an anonymous one has neither. The verification outcome is journaled with the event, so replay never resolves a DID or checks a signature again, and the pure core sees only the origin and one boolean. A refused message is recorded in the graph <code>&lt;actor&gt;/inbound</code>, acknowledged to the relay, and answered with <code>error.communication</code> when the sender is verified and had contacted the actor first. An ungranted message never costs the receiver a journal append.</p>
+    <p>Grants are checked at both ends. A grant names a grantee, a target and SCXML event descriptors, with an optional expiry:</p>
+<pre data-lang="Rust"><code>// from crates/vertep-federation/examples/two_orgs.rs
+a.fed.grant_outbound(Grant::new(buyer.did.as_str(), shop.did.as_str(), ["order.*"]));
+b.fed.grant_inbound(Grant::new(buyer.did.as_str(), shop.did.as_str(), ["order.*"]));</code></pre>
+    <p>A grant can also arrive as a verifiable credential from a trusted issuer (<code>accept_credential</code>). Grants are published into the actor's identity graph, <code>&lt;did&gt;/identity</code>, so "who may talk to this agent" is a query:</p>
+<pre data-lang="SPARQL"><code>PREFIX vt-id: &lt;https://w3id.org/vertep/vt-id#&gt;
+SELECT ?grantee ?event ?until WHERE {
+  GRAPH ?g {
+    ?grant a vt-id:Grant ;
+           vt-id:target &lt;did:webvh:example.org:agents:billing&gt; ;
+           vt-id:grantee ?grantee ;
+           vt-id:event ?event .
+    OPTIONAL { ?grant vt-id:expires ?until }
+  }
+}</code></pre>
+    <p>Chart guards can still decide more finely on top of grants, for example accepting <code>approve</code> only from one DID.</p>
+
+    <h3 id="relays">Relay mailboxes: DIDComm and TSP</h3>
+    <p>DIDComm v2 mediators and TSP endpoints serve as mailboxes and transports, so an actor can receive while deactivated or offline. Payloads are encrypted end to end: a relay sees routing data only, never the event name, payload, send id or origin.</p>
+    <ul>
+      <li><strong>DIDComm v2.</strong> The sender authcrypts (or anoncrypts) to the recipient and wraps one forward message per routing key. The receiving node picks up in batches. A remote mediator is bound through Mediator Coordination 2.0 and Message Pickup 3.0.</li>
+      <li><strong>TSP.</strong> The actor's DID maps to a TSP identifier; messages go direct when the endpoint is reachable, or routed through intermediaries, nested so that only the final recipient opens them.</li>
+      <li><strong>Acknowledge after the append.</strong> The receiving mailbox acknowledges a message to the relay only after the turn that processed it is durable, or when it drops it as a duplicate. A crash causes redelivery, never loss.</li>
+      <li><strong>Transport choice.</strong> The relay outbox tries the DID document's services in preference order, TSP first and then DIDComm by default, with fallback. <code>&lt;send type="tsp"&gt;</code> or <code>type="didcomm"</code> restricts a send to one transport.</li>
+      <li><strong>Undeliverable.</strong> Unreachable recipients are retried with backoff (by default 5 attempts, starting at 1 s and doubling up to 60 s). After that the sending chart receives <code>error.communication</code> with the send id and the reason, without ever blocking.</li>
+    </ul>
+    <p>Wiring a node, as the module documentation of <code>crates/vertep-federation/src/federation.rs</code> sketches it:</p>
+<pre data-lang="Rust"><code>let fed = Federation::builder(resolver, network).protocol(didcomm).pickup(binding).build();
+let node = Node::builder(storage, shell)
+    .mailboxes_for_scheme("did", fed.mailboxes())     // local DID actors' relay mailboxes
+    .transport(fed.transport(TransportKind::DidComm)) // &lt;send type="didcomm"&gt;
+    .build();
+fed.attach(&amp;node.handle());                         // did: resolver, wake-ups, error path
+let did = fed.provision(&amp;node.handle(), chart_type, key, &amp;config, km)?;  // DID as address
+loop { node.run_until_idle(); fed.pump(); }</code></pre>
+    <p>The example <code>crates/vertep-federation/examples/two_orgs.rs</code> runs two organisations' nodes and an in-process test mediator. The buyer's <code>&lt;send&gt;</code> to the shop's <code>did:peer</code> DID is resolved to the mediator, authcrypted and forwarded; the shop's node picks it up, verifies the sender, checks the grant and journals the event before acknowledging it:</p>
+<pre data-lang="Shell"><code>cargo run -p vertep-federation --example two_orgs --features didcomm,testkit</code></pre>
+<pre class="output" data-lang="Output"><code>shop journaled order.placed from did:peer:2.Vz6MksFJPi77yVK2k5KeaVZQNqqFneW7JKC3r3S8pYjwyUHmx.Ez6LSiZjqpMXyzKGQPeDC4pCw8n3iovG3ibdtvHFABppNvQhW.SeyJpZCI6IiNkaWRjb21tIiwicyI6eyJhIjpbImRpZGNvbW0vdjIiXSwiciI6WyJkaWQ6cGVlcjoyLlZ6Nk1rcEJXYVdhcTR3REZCb29WeHFIY0xyaUxxcUM1SkVtR04zdVdWTWJ5V0hzMVkuRXo2TFNyUFpVREhoWnhOa0VRZjljdWtpcnJZVmUzeFJraU13eHhEeDVoRHFwcHd2ei5TZXlKcFpDSTZJaU5rYVdSamIyMXRJaXdpY3lJNmV5SjFjbWtpT2lKb2RIUndjem92TDIxbFpHbGhkRzl5TG1WNFlXMXdiR1V2Wkdsa1kyOXRiU0o5TENKMElqb2laRzBpZlEja2V5LTIiXSwidXJpIjoiaHR0cHM6Ly9tZWRpYXRvci5leGFtcGxlL2RpZGNvbW0ifSwidCI6ImRtIn0 via https://w3id.org/vertep/vt-id#DIDCommEventProcessor (send id Some("o-1"))
+mediator still holds 0 message(s)</code></pre>
+    <p>The DID differs on every run, because the example generates fresh keys. The event's origin is the buyer's verified DID, its origin type is the DIDComm Event I/O Processor, and the mediator holds nothing once the shop's turn is durable.</p>
+
+    <div class="nb warn">
+      <p>Known gaps in federation:</p>
+      <ul>
+        <li><strong>Live delivery over WebSocket from a mediator is not bound.</strong> Pickup from a remote mediator works in batches: <code>Federation::go_live</code> opens live sessions only on the in-process relays (the node's own inbound queue and the test mediator and intermediary), not through <code>pickup::MediatorClient</code>. Interop with a third-party mediator (Hyperledger Identus) is tested over HTTP, in Docker, when <code>VERTEP_MEDIATOR_INTEROP=1</code> is set, and skipped otherwise.</li>
+        <li><strong>The facade's <code>federation</code> feature does not enable <code>did:webvh</code>.</strong> Enable the <code>webvh</code> feature on <code>vertep-federation</code> for it.</li>
+        <li><strong>No Lean proofs cover federation.</strong> It is checked by interop and integration tests only.</li>
+      </ul>
+    </div>
+
+    <h2 id="failures">What each failure costs</h2>
+    <p>Safety never depends on clocks or relays behaving well; only availability does.</p>
+    <table>
+      <thead><tr><th>Failure</th><th>What happens</th></tr></thead>
+      <tbody>
+        <tr><td>A partition isolates a shard owner</td><td>a new owner gets a higher epoch; the old owner's appends and frames are fenced</td></tr>
+        <tr><td>Clock skew beyond the safety margin</td><td>fencing on appends and frames keeps safety</td></tr>
+        <tr><td>Owner crash, replication factor 1</td><td>the shard is unavailable until the disk returns; messages wait</td></tr>
+        <tr><td>Lost acknowledgement</td><td>retry; the receiver deduplicates by message id</td></tr>
+        <tr><td>Stale routing table</td><td>redirect and forward, within the hop limit</td></tr>
+        <tr><td>Worker node dies mid-request</td><td>error event or request timeout to the caller; no silent retry unless idempotent</td></tr>
+        <tr><td>Mediator crashes after a pickup</td><td>no acknowledgement before the append, so the message is delivered again and deduplicated</td></tr>
+        <tr><td>Key rotated while messages are in flight</td><td>retired keys work for a grace period; undecryptable messages are recorded</td></tr>
+        <tr><td>Recipient unreachable for good</td><td><code>error.communication</code> after the retry policy; the chart is not blocked</td></tr>
+      </tbody>
+    </table>
+
+    <p>The same core also runs in the browser, linked to a server node over a WebSocket transport. That is the subject of the next page, <a href="browser.html">Browser and JavaScript</a>. The design notes are in <code>tg.md/views/distribution.md</code>; the requirements in <code>openspec/specs/cluster-membership</code>, <code>shard-placement</code>, <code>cluster-transport</code>, <code>worker-pools</code>, <code>did-identity</code> and <code>relay-mailboxes</code>.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="agents.html">← Agents and deciders</a>
+      <a href="browser.html">Browser and JavaScript →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

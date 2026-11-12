@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agents and deciders — Vertep docs</title>
+<meta name="description" content="How Vertep builds agents from statecharts: vt:decide states, the Decider trait and its kinds, LLM and tool actors, capability grants, plan charts, journaled replay and forks, and what the design does and does not contain.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html" aria-current="page">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
+    <h1>Agents and deciders</h1>
+    <p class="lede">An agent in Vertep is an ordinary chart. A language model, a person or a rule may choose the next move at a <code>vt:decide</code> state, but only among the events the chart enables at that moment. Every answer is journaled before the chart sees it, so a run replays without any model.</p>
+
+    <p>Everything on this page lives in the crate <code>vertep-agent</code> (<code>crates/vertep-agent</code>). The facade crate <code>vertep</code> re-exports it as <code>vertep::agent</code> when you turn on its <code>agent</code> feature.</p>
+
+    <h2 id="invariant">The invariant</h2>
+    <p>A decider only proposes an event. The chart checks the proposal and then decides. Nothing outside the pure <code>step</code> function changes the chart, its datamodel or the store.</p>
+    <p>The agent layer adds no new execution semantics to SCXML. Each feature lowers onto constructs the core already has: states, <code>&lt;invoke&gt;</code>, <code>&lt;send&gt;</code>, internal events, durable timers and journal entries. Models, people, tools and plans sit outside the core and reach it only through the mailbox. Three properties follow:</p>
+    <table>
+      <thead><tr><th>Property</th><th>How it is kept</th></tr></thead>
+      <tbody>
+        <tr><td>Bounded choice</td><td>The decider sees only the candidate set, and only an offered candidate is accepted.</td></tr>
+        <tr><td>Replay without models</td><td>Decisions, model results and tool results are journaled inputs. Replay reads them; it calls nothing.</td></tr>
+        <tr><td>Bounded reach</td><td>Invoked LLM, tool and plan actors may send only where their capability grant allows. The send path checks it.</td></tr>
+      </tbody>
+    </table>
+
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 640 330" width="640" role="img" aria-labelledby="agents-cycle-t">
+          <title id="agents-cycle-t">The decision cycle: step computes the offer, the host asks the decider, the answer is journaled, checked against the offer, and only then raised as an event</title>
+          <defs>
+            <marker id="agents-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+            <pattern id="agents-ph" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+          </defs>
+          <rect x="468" y="26" width="164" height="94" style="fill:none;stroke:var(--ink)" stroke-width="1.5" stroke-dasharray="6 5"/>
+          <text x="550" y="18" text-anchor="middle" font-family="IM Fell English SC, Georgia, serif" font-size="14" style="fill:var(--ink-2)">untrusted</text>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="17" style="fill:var(--ink)">
+            <rect x="20" y="40" width="140" height="64" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <text x="90" y="68" text-anchor="middle" style="fill:var(--on-orange)">step</text>
+            <text x="90" y="88" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" style="fill:var(--on-orange)">enabled_events</text>
+            <rect x="250" y="40" width="140" height="64" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="320" y="68" text-anchor="middle" style="fill:var(--paper)">Agent host</text>
+            <text x="320" y="88" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" style="fill:var(--paper)">the shell</text>
+            <rect x="480" y="40" width="140" height="64" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <rect x="480" y="40" width="140" height="64" fill="url(#agents-ph)"/>
+            <text x="550" y="64" text-anchor="middle">Decider</text>
+            <text x="550" y="82" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" style="fill:var(--ink-2)">llm · human</text>
+            <text x="550" y="95" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" style="fill:var(--ink-2)">guard · actor</text>
+            <rect x="480" y="200" width="140" height="60" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <rect x="480" y="200" width="140" height="60" fill="url(#agents-ph)"/>
+            <text x="550" y="226" text-anchor="middle">Journal</text>
+            <text x="550" y="246" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" style="fill:var(--ink-2)">append first</text>
+            <rect x="250" y="200" width="140" height="60" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="320" y="226" text-anchor="middle">Check the offer</text>
+            <text x="320" y="246" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10.5" style="fill:var(--ink-2)">offered? fresh?</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2.2" marker-end="url(#agents-arr)">
+            <path d="M160 72 H246"/>
+            <path d="M390 72 H476"/>
+            <path d="M550 104 V196"/>
+            <path d="M480 230 H394"/>
+            <path d="M250 230 C150 230 90 190 90 108"/>
+            <path d="M320 260 V296"/>
+          </g>
+          <g font-family="JetBrains Mono, monospace" font-size="11" style="fill:var(--ink-2)">
+            <text x="176" y="64">offer</text>
+            <text x="414" y="64">ask</text>
+            <text x="558" y="158">vt.decision</text>
+            <text x="404" y="222">deliver</text>
+            <text x="82" y="168" text-anchor="end">raise the</text>
+            <text x="82" y="182" text-anchor="end">chosen event</text>
+            <text x="330" y="314">else error.decide.invalid</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Plate. <b>The decision cycle.</b> The answer is written down before it is checked, and checked before it is taken.</figcaption>
+    </figure>
+
+    <h2 id="decide-states">Decide states</h2>
+    <p>A decide state is an ordinary <code>&lt;state&gt;</code> with extension attributes in the <code>vt:</code> namespace (<code>https://w3id.org/vertep/vt#</code>). The IR has no special field for it, so the binding survives the SCXML and YAML readers and writers unchanged. The attributes are read in <code>crates/vertep-agent/src/decide.rs</code>:</p>
+    <table>
+      <thead><tr><th>Attribute</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>vt:decide="llm/claude"</code></td><td>The decider binding. Required; an empty value is an error.</td></tr>
+        <tr><td><code>vt:candidates="approve reject"</code></td><td>Event descriptors the state may offer, separated by spaces. Without it, every enabled event is a candidate.</td></tr>
+        <tr><td><code>vt:deadline="30s"</code></td><td>How long to wait for an answer. It is a durable timer, so it fires across deactivation and replay.</td></tr>
+        <tr><td><code>vt:fallback="human/support"</code></td><td>The binding asked when the deadline passes.</td></tr>
+        <tr><td><code>vt:maxDecisions="10"</code></td><td>How many decisions this state may accept over the actor's life. Entering it once more raises <code>vt.agent.budget-exhausted</code> instead of asking.</td></tr>
+      </tbody>
+    </table>
+    <p>Only an atomic or compound <code>&lt;state&gt;</code> can decide. The binding on a <code>&lt;parallel&gt;</code>, <code>&lt;final&gt;</code> or <code>&lt;history&gt;</code> is rejected, as are a malformed deadline or bound. A chart with such an error is not accepted by the agent host.</p>
+    <p>This is the decide state of <code>crates/vertep-agent/examples/support-agent.scxml</code>:</p>
+<pre data-lang="SCXML"><code>&lt;state id="decide" vt:decide="llm/claude" vt:fallback="human/support" vt:deadline="30s"
+       vt:maxDecisions="10" vt:candidates="call_tool finish escalate"&gt;
+  &lt;transition event="call_tool" target="tooling"&gt;
+    &lt;send event="tool.call" targetexpr="ev.data.tool"&gt;&lt;content expr="ev.data.args"/&gt;&lt;/send&gt;
+  &lt;/transition&gt;
+  &lt;transition event="finish" target="done"&gt;&lt;assign location="answer" expr="ev.data"/&gt;&lt;/transition&gt;
+  &lt;transition event="escalate" target="human"/&gt;
+  &lt;transition event="vt.agent.budget-exhausted" target="budget_out"/&gt;
+  &lt;transition event="error.decide.invalid" target="decide"/&gt;
+  &lt;transition event="vt.decide.refused" target="human"/&gt;
+&lt;/state&gt;</code></pre>
+    <p>The same binding can be written as one element, <code>&lt;vt:decide decider="d" deadline="2s"/&gt;</code>, with attributes <code>decider</code>, <code>deadline</code>, <code>fallback</code>, <code>candidates</code> and <code>maxDecisions</code>. In the YAML surface a decide state lists its extensions. This chart is taken from the test <code>decide_state_parsed_from_scxml</code> in <code>crates/vertep-agent/tests/deciders.rs</code>:</p>
+<pre data-lang="YAML"><code>vertep: 1
+name: y
+states:
+  review:
+    extensions:
+      - { local: decide, attribute: llm/claude }
+      - { local: maxDecisions, attribute: "3" }
+    on: { approve: done }
+  done: { type: final }</code></pre>
+
+    <h3 id="cycle">One decision, step by step</h3>
+    <ol>
+      <li><strong>Offer.</strong> After each macrostep the agent machine recomputes the candidate set of every active decide state with the pure function <code>enabled_events</code>. A candidate is an event for which SCXML selection would take a transition out of the decide state, one of its active descendants or one of its ancestors, restricted to <code>vt:candidates</code> when given, in document order. Guards are evaluated on a probe copy of the datamodel, so the actor's own data is never touched.</li>
+      <li><strong>Ask.</strong> The host passes a <code>DecisionRequest</code> to the bound decider. The actor does not block: it stays in an ordinary active state and goes on processing other events.</li>
+      <li><strong>Return.</strong> The answer comes back as the input <code>vt.decision</code>. The host appends it to the journal, deduplicated by correlation id, and only then applies it.</li>
+      <li><strong>Check.</strong> The decision is accepted only if its correlation id names the open offer, its event is a candidate, its payload matches the candidate's schema, its annotations are valid, and the transition it would take now is the one that was enabled at offer time. Then the chosen event is raised and normal SCXML selection takes the transition.</li>
+    </ol>
+    <p>Events whose names start with <code>error.</code>, <code>done.</code>, <code>vt.</code>, <code>vt:</code> or <code>cancel.invoke</code> are never offered. The runtime raises those; a decider cannot choose them.</p>
+    <p>A guard that reads the event payload cannot be evaluated at offer time, because the payload does not exist yet. Such a guard counts as holding when the offer is made, and is evaluated for real when the decision arrives. If it fails then, the decision is rejected with the reason <code>not-enabled</code>. This makes a payload guard a useful second check on what a model sends.</p>
+    <p>Here is how the offer bounds the choice. In the refund chart of the <code>decider-agent</code> example (<code>examples/decider-agent/refund.scxml</code>), <code>approve</code> in the state <code>review</code> carries <code>cond="ctx.amount &amp;lt;= 100"</code>. For a request of 250 the decider is offered only <code>reject</code> and <code>escalate</code>, whatever it would prefer.</p>
+
+    <h3 id="decide-events">Events of a decide state</h3>
+    <table>
+      <thead><tr><th>Event</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td><code>vt.decision</code></td><td>The input that carries a decider's answer. Charts do not handle it; the machine checks it and raises the chosen event.</td></tr>
+        <tr><td><code>error.decide.invalid</code></td><td>A decision was not accepted. <code>ev.data.reason</code> is <code>not-a-candidate</code>, <code>payload-schema</code>, <code>stale</code>, <code>annotation</code> or <code>not-enabled</code>; the data also carries <code>correlation</code>, <code>event</code> and the violated <code>paths</code>.</td></tr>
+        <tr><td><code>vt.decide.refused</code></td><td>The decider refused. An LLM decider refuses when the model call fails or its answer is not a decision.</td></tr>
+        <tr><td><code>error.decide.timeout</code></td><td>The deadline passed and no fallback is declared.</td></tr>
+        <tr><td><code>vt.decide.none</code></td><td>The candidate set is empty, so nobody is asked.</td></tr>
+        <tr><td><code>vt.agent.budget-exhausted</code></td><td>The state has accepted <code>vt:maxDecisions</code> decisions already.</td></tr>
+      </tbody>
+    </table>
+    <p>An open request can change under the actor's feet. Each offer has a fingerprint: the candidate event names plus their schema hashes. When a later macrostep changes the fingerprint, or the state is re-entered, the request is cancelled and offered again under a new correlation id; a late answer to the old id is rejected as <code>stale</code>. When the state is exited, its offer is closed.</p>
+    <p>Correlation ids have the form <code>&lt;actor&gt;/decision/&lt;position&gt;.&lt;k&gt;</code>, where the position is that of the journaled input whose macrostep made the offer. Replay therefore reproduces the same ids, and a fork renames only the actor prefix.</p>
+
+    <h2 id="deciders">Deciders</h2>
+    <p>The contract, from <code>crates/vertep-agent/src/decider.rs</code>:</p>
+<pre data-lang="Rust"><code>pub trait Decider: Send + Sync {
+    /// The decider's kind.
+    fn kind(&amp;self) -&gt; DeciderKind;
+    /// Decides; the future may take arbitrarily long (the actor keeps running).
+    fn decide(&amp;self, request: DecisionRequest) -&gt; BoxFuture&lt;'static, DecisionOutcome&gt;;
+    /// The request `correlation` was cancelled or superseded; a later answer is stale.
+    fn cancel(&amp;self, _correlation: &amp;str) {}
+}
+
+pub enum DecisionOutcome {
+    Decision(Decision),   // event, payload, annotations
+    Refusal(Refusal),     // reason
+}</code></pre>
+    <p>A <code>DecisionRequest</code> holds the decide state id, the candidates (each with its event name and payload JSON Schema), a read-only <code>ContextView</code> of the datamodel at offer time, the actor IRI, the correlation id, the binding asked, and whether this is a fallback. A decider owns its copy of the request. It has no handle on the chart, the datamodel or the store, so returning a value is all it can do.</p>
+
+    <h3 id="kinds">Four kinds</h3>
+    <table>
+      <thead><tr><th>Kind</th><th>Type</th><th>How it decides</th></tr></thead>
+      <tbody>
+        <tr><td>Guard</td><td><code>GuardDecider</code></td><td>The first candidate, in document order, whose decision guard holds. Guards are CEL over <code>ctx</code>, taken from explicit rules (<code>with_rules</code>) or from <code>vt:decisionGuard</code> on the chart's transitions (<code>from_chart</code>); <code>first_enabled</code> picks among listed events unconditionally. The same candidates and context always give the same answer.</td></tr>
+        <tr><td>LLM</td><td><code>LlmDecider</code></td><td>Asks a model for structured output whose schema is a <code>oneOf</code> over the candidates, each branch <code>{event: const, payload, rationale?, confidence?}</code>.</td></tr>
+        <tr><td>Human</td><td><code>HumanDecider</code></td><td>Puts the request in an <code>Inbox</code>. A person reads <code>inbox.pending()</code> and answers with <code>inbox.answer(correlation, outcome)</code>.</td></tr>
+        <tr><td>Actor</td><td><code>ActorDecider</code></td><td>Sends <code>vt.decide.request</code> to another actor as a non-blocking request and reads its reply as <code>{event, payload, rationale?, confidence?}</code>.</td></tr>
+      </tbody>
+    </table>
+    <p>You can also implement <code>Decider</code> yourself and report <code>DeciderKind::Custom</code>. The <code>decider-agent</code> example on the <a href="../examples/index.html">examples page</a> does this with a scripted decider.</p>
+    <p>Binding names such as <code>llm/claude</code> are plain strings. The prefix is a convention for readers, not a type: the support-agent kit binds <code>human/support</code> to a guard decider. Bindings are registered on the host builder; this is from <code>crates/vertep-agent/examples/support/kit.rs</code>:</p>
+<pre data-lang="Rust"><code>let clock = VirtualClock::new(T0);
+let mut b = AgentHost::builder(Arc::new(clock.clone()))
+    .provider("triage", Arc::new(triage))
+    .decider(
+        "llm/claude",
+        Arc::new(
+            LlmDecider::new("claude", Arc::new(model), "claude-opus-5-5").with_instructions(
+                "You are a support agent. Use the tools, then finish with an answer.",
+            ),
+        ),
+    )
+    .decider(
+        "human/support",
+        Arc::new(GuardDecider::with_rules(vec![
+            vertep_agent::decider::GuardRule {
+                event: "finish".into(),
+                guard: None,
+                payload: Some("{'text': 'A person will get back to you.'}".into()),
+            },
+        ])),
+    );
+for t in tools() {
+    b = b.tool(t);
+}</code></pre>
+    <p>Spawning an actor whose chart names a binding that is not registered fails with <code>InstantiateError::UnknownDecider</code>, before any input is processed.</p>
+    <p>A decision may carry annotations: a rationale, a confidence in [0, 1], the decider kind and binding, the model, the prompt hash, the token usage and whether a fallback answered. They are recorded in the graph. They never influence which transition is taken.</p>
+
+    <h2 id="llm-actors">LLM actors</h2>
+    <p>One model call is an invoked child: <code>&lt;invoke type="vt:llm"&gt;</code>. It lives as long as the invoking state and is cancelled when that state exits, like any SCXML invoke. From the support agent:</p>
+<pre data-lang="SCXML"><code>&lt;state id="triaging"&gt;
+  &lt;invoke type="vt:llm" id="triage" vt:provider="triage" vt:model="claude-opus-5-5"
+          vt:template="Triage this support ticket in one line: {{context.ticket.text}}"/&gt;
+  &lt;transition event="done.invoke.triage" target="decide"&gt;&lt;assign location="triage" expr="ev.data.text"/&gt;&lt;/transition&gt;
+  &lt;transition event="error.llm" target="decide"/&gt;
+&lt;/state&gt;</code></pre>
+    <table>
+      <thead><tr><th>Attribute</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>vt:provider</code></td><td>The provider binding (required).</td></tr>
+        <tr><td><code>vt:model</code></td><td>The model identifier.</td></tr>
+        <tr><td><code>vt:template</code></td><td>The prompt template; the <code>&lt;content&gt;</code> body may be used instead.</td></tr>
+        <tr><td><code>vt:output</code></td><td>A structured output type in the type language, for example <code>{ category: billing | tech | other, urgency: int }</code>.</td></tr>
+        <tr><td><code>vt:temperature</code>, <code>vt:maxTokens</code></td><td>Generation parameters.</td></tr>
+        <tr><td><code>vt:stream="true"</code></td><td>Deliver <code>vt.llm.partial</code> events while the model streams. Partials are never journaled.</td></tr>
+        <tr><td><code>vt:retry="3"</code>, <code>vt:backoff="1s"</code></td><td>At most three attempts, with durable exponential backoff from one second.</td></tr>
+      </tbody>
+    </table>
+    <p>Templates substitute <code>{{context.&lt;path&gt;}}</code> (the data items) and <code>{{event.&lt;path&gt;}}</code>. Strings go in verbatim and other values as canonical JSON. A missing path is a template error, and then no call is made. The rendered prompt is hashed (<code>sha256:&lt;hex&gt;</code>) and the hash is recorded.</p>
+    <p>The result reaches the chart as <code>done.invoke.&lt;id&gt;</code>. With <code>vt:output</code>, its data is the parsed and validated value. Without it, the data is an object with <code>text</code>, <code>model</code>, <code>call</code>, <code>promptHash</code>, <code>usage</code> and <code>toolCalls</code>. In the journal the result is an input of kind <code>llm.result</code>, appended before the chart processes it. On replay that entry is read back, and no provider is called.</p>
+    <p>A failure raises <code>error.llm</code> with a class: <code>rate-limited</code>, <code>schema</code>, <code>transport</code>, <code>auth</code>, <code>invalid-request</code>, <code>provider</code> or <code>unknown-provider</code>. Nothing is retried behind the chart's back. You either handle <code>error.llm</code> with transitions, or declare <code>vt:retry</code>, which retries the classes <code>rate-limited</code>, <code>schema</code>, <code>transport</code> and <code>provider</code> on journaled backoff timers. Each attempt is a separate journaled call.</p>
+    <p>Every call records prompt and completion tokens, the model, the provider binding, latency and an optional cost. The running totals of an actor are visible to its guards as the read-only data item <code>vt_usage</code>, with the fields <code>prompt_tokens</code>, <code>completion_tokens</code>, <code>total_tokens</code>, <code>calls</code> and <code>cost</code>. A budget guard such as <code>cond="vt_usage.total_tokens &amp;lt; 50000"</code> reads it like any other data. Calls made by an LLM decider count too.</p>
+
+    <h3 id="providers">Providers</h3>
+<pre data-lang="Rust"><code>pub trait Provider: Send + Sync {
+    /// Completes `request`.
+    fn complete(
+        &amp;self,
+        request: ProviderRequest,
+    ) -&gt; BoxFuture&lt;'static, Result&lt;ProviderResult, ProviderError&gt;&gt;;
+    /// Streams `request` as chunks followed by the final result, when the provider can.
+    fn stream(
+        &amp;self,
+        _request: ProviderRequest,
+    ) -&gt; Option&lt;BoxStream&lt;'static, Result&lt;StreamItem, ProviderError&gt;&gt;&gt; {
+        None
+    }
+}</code></pre>
+    <p>A <code>ProviderRequest</code> carries the rendered prompt, the model, the generation parameters, an optional output schema and the tools the model may call (exactly the granted ones). A <code>ProviderResult</code> carries the content, usage, the model id the provider reports, an optional cost and any tool calls.</p>
+    <p>No vendor SDK is needed to build or run Vertep. Two providers ship with the crate. <code>ScriptedProvider</code> returns answers you push into it; the tests and examples use it, so they run with no network and no key. The <code>anthropic</code> cargo feature adds <code>AnthropicProvider</code>, which maps requests and responses for the Anthropic Messages API over an <code>HttpClient</code> that your application supplies; Vertep pulls in no HTTP stack.</p>
+
+    <h2 id="tools-grants">Tools and capability grants</h2>
+    <p>A tool is registered by IRI with an argument type and a result type in the type language. Its JSON Schemas are derived from those types. From the support kit:</p>
+<pre data-lang="Rust"><code>let orders = Tool::new(
+    ORDERS,                                        // "https://example.org/tools/order-lookup"
+    "type Order = { id: string, status: string };", // declarations
+    "{ id: string }",                               // argument type
+    "Order",                                        // result type
+    |args: Value| async move {
+        let id = match vertep_agent::json::field(&amp;args, "id") {
+            Some(Value::String(id)) =&gt; id.clone(),
+            _ =&gt; return Err("no id".to_owned()),
+        };
+        Ok(json(serde_json::json!({ "id": id, "status": "returned" })))
+    },
+)
+.expect("the order tool is well-typed")
+.with_description("Look up an order by id");</code></pre>
+    <p>A chart calls a tool in one of two ways. <code>&lt;invoke type="vt:tool" src="&lt;tool IRI&gt;"&gt;</code> passes its <code>&lt;param&gt;</code>s or <code>&lt;content&gt;</code> as arguments, and the result arrives as <code>done.invoke.&lt;id&gt;</code>. A <code>&lt;send&gt;</code> whose target is the tool IRI gets its result as <code>vt:reply</code>; the support agent uses this form. Arguments are checked against the argument type before the tool runs. A failure raises <code>error.tool</code> with the class <code>arguments</code>, <code>execution</code>, <code>result</code> or <code>unknown</code>. Tool results are journaled in the caller's journal.</p>
+    <p>A capability grant says what an invoked LLM, tool or plan actor may reach: send targets (actor IRIs and <code>#_parent</code>), tools, decider bindings and, for plans, functions. A state or an <code>&lt;invoke&gt;</code> declares it either as attributes or as an element:</p>
+<pre data-lang="SCXML"><code>&lt;invoke type="vt:llm" id="summary" vt:provider="p" vt:model="m1"
+        vt:template="Summarise the case of {{context.customer.name}}."
+        vt:grantTools="https://example.org/tools/search https://example.org/tools/fetch"
+        vt:grantTargets="#_parent"/&gt;
+
+&lt;vt:grant targets="#_parent vt:actor/Crm/1" tools="vt:tool/search"
+          deciders="human/inbox" functions="vt:action/notify"/&gt;</code></pre>
+    <p>The attribute forms are <code>vt:grantTargets</code>, <code>vt:grantTools</code>, <code>vt:grantDeciders</code> and <code>vt:grantFunctions</code>; several <code>vt:grant</code> elements add up. A child's effective grant is its parent's effective grant intersected with its own declaration, recursively, so authority never widens down the invoke tree. An LLM call is offered exactly the granted tools.</p>
+    <p>Enforcement sits in the send path, not in the LLM adapter, so it covers plans and nested invokes the same way. An ungranted send is not delivered. The sender gets <code>error.communication</code> with the reason <code>not-granted</code>, and the parent gets <code>vt.grant.denied</code>, which it journals. Runtime actors invoked from ordinary charts are wrapped in <code>GrantedActor</code>, which filters their sends the same way.</p>
+    <div class="nb warn"><p>Grants restrict invoked children. They do not restrict the agent chart's own <code>&lt;send&gt;</code> elements: those go wherever the chart says. In <code>support-agent.scxml</code> the <code>call_tool</code> transition sends to <code>targetexpr="ev.data.tool"</code>, a target the model chose, and the chart declares no payload type, so the decision is checked by event name only. If that matters, give <code>call_tool</code> a payload type or a guard on <code>ev.data.tool</code>.</p></div>
+
+    <h2 id="react">A ReAct loop is a chart</h2>
+    <p>The model as the main driver needs no feature of its own. It is a decide loop whose candidates are tool calls, a finish event and an escalation, bounded by <code>vt:maxDecisions</code> or by a guard on a counter or on <code>vt_usage</code>. The whole support agent, <code>crates/vertep-agent/examples/support-agent.scxml</code>:</p>
+<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" initial="idle" name="support-agent"&gt;
+  &lt;datamodel&gt;
+    &lt;data id="ticket" expr="null"/&gt;
+    &lt;data id="triage" expr="''"/&gt;
+    &lt;data id="steps" expr="0"/&gt;
+    &lt;data id="observations" expr="[]"/&gt;
+    &lt;data id="answer" expr="null"/&gt;
+  &lt;/datamodel&gt;
+
+  &lt;state id="idle"&gt;
+    &lt;transition event="task" target="triaging"&gt;&lt;assign location="ticket" expr="ev.data"/&gt;&lt;/transition&gt;
+  &lt;/state&gt;
+
+  &lt;state id="triaging"&gt;
+    &lt;invoke type="vt:llm" id="triage" vt:provider="triage" vt:model="claude-opus-5-5"
+            vt:template="Triage this support ticket in one line: {{context.ticket.text}}"/&gt;
+    &lt;transition event="done.invoke.triage" target="decide"&gt;&lt;assign location="triage" expr="ev.data.text"/&gt;&lt;/transition&gt;
+    &lt;transition event="error.llm" target="decide"/&gt;
+  &lt;/state&gt;
+
+  &lt;state id="decide" vt:decide="llm/claude" vt:fallback="human/support" vt:deadline="30s"
+         vt:maxDecisions="10" vt:candidates="call_tool finish escalate"&gt;
+    &lt;transition event="call_tool" target="tooling"&gt;
+      &lt;send event="tool.call" targetexpr="ev.data.tool"&gt;&lt;content expr="ev.data.args"/&gt;&lt;/send&gt;
+    &lt;/transition&gt;
+    &lt;transition event="finish" target="done"&gt;&lt;assign location="answer" expr="ev.data"/&gt;&lt;/transition&gt;
+    &lt;transition event="escalate" target="human"/&gt;
+    &lt;transition event="vt.agent.budget-exhausted" target="budget_out"/&gt;
+    &lt;transition event="error.decide.invalid" target="decide"/&gt;
+    &lt;transition event="vt.decide.refused" target="human"/&gt;
+  &lt;/state&gt;
+
+  &lt;state id="tooling"&gt;
+    &lt;transition event="vt:reply" target="decide"&gt;
+      &lt;assign location="observations" expr="ctx.observations + [ev.data.result]"/&gt;
+      &lt;assign location="steps" expr="ctx.steps + 1"/&gt;
+    &lt;/transition&gt;
+    &lt;transition event="error.tool" target="decide"&gt;&lt;assign location="steps" expr="ctx.steps + 1"/&gt;&lt;/transition&gt;
+  &lt;/state&gt;
+
+  &lt;state id="human" vt:decide="human/support" vt:candidates="finish"&gt;
+    &lt;transition event="finish" target="done"&gt;&lt;assign location="answer" expr="ev.data"/&gt;&lt;/transition&gt;
+  &lt;/state&gt;
+
+  &lt;final id="done"&gt;
+    &lt;donedata&gt;&lt;param name="answer" expr="ctx.answer"/&gt;&lt;param name="steps" expr="ctx.steps"/&gt;&lt;/donedata&gt;
+  &lt;/final&gt;
+  &lt;final id="budget_out"&gt;
+    &lt;donedata&gt;&lt;param name="steps" expr="ctx.steps"/&gt;&lt;/donedata&gt;
+  &lt;/final&gt;
+&lt;/scxml&gt;</code></pre>
+    <p>The example <code>react_support_agent</code> runs it on a virtual clock with a scripted model that searches the knowledge base, looks up the order and finishes. It prints the final state, the journal and the usage:</p>
+<pre data-lang="Shell"><code>cargo run -p vertep-agent --example react_support_agent</code></pre>
+<pre class="output" data-lang="Output"><code>configuration: []
+done data: Some(Object([("answer", Object([("confidence", Number(0.95)), ("text", String("Your refund for A-17 is on its way."))])), ("steps", Number(2.0))]))
+  1 start
+  2 event
+  3 llm.result
+  4 decision
+  5 tool.result
+  6 decision
+  7 tool.result
+  8 decision
+model usage: 4 calls, 2520 prompt + 189 completion tokens</code></pre>
+    <p>The configuration is empty because the chart reached its top-level final state. The journal holds every outside answer in order: the task event, the triage result, three decisions and two tool results. The four model calls are the triage call and the three decisions.</p>
+
+    <h2 id="plans">Plan charts</h2>
+    <p>A model may write a chart fragment as a plan. The chart proposes it with the event <code>vt.plan.proposed</code> and runs it with <code>&lt;invoke type="vt:plan"&gt;</code>. Before it runs, a plan is parsed from YAML or Turtle into the IR and checked with the same well-formedness rules and SHACL shapes as any chart, plus four restrictions:</p>
+    <ul>
+      <li>The datamodel is <code>cel</code> or <code>null</code>. CEL has no side effects and always terminates.</li>
+      <li>There is no <code>&lt;script&gt;</code>.</li>
+      <li>Every Rust guard or action IRI and every <code>vt:call</code> names a granted function.</li>
+      <li>CEL expressions type-check under the CEL-only policy.</li>
+    </ul>
+    <p>An accepted plan is named by the chart version IRI of its canonical RDF, so identical plans share one IRI and one node in the graph. It runs only as an invoked child of the requesting state. It never becomes a virtual actor, never outlives that state, and affects its parent only by sending events. Its grant is the invoking state's effective grant intersected with the plan's own root <code>vt:grant</code>.</p>
+    <p>This plan is accepted in the test <code>plan_in_yaml_accepted_for_validation</code> (<code>crates/vertep-agent/tests/plan_charts.rs</code>). Its root extension declares the result type:</p>
+<pre data-lang="YAML"><code>vertep: 1
+name: booking
+datamodel: cel
+extensions:
+  - { local: result, attribute: "{ booked: bool }" }
+states:
+  book:
+    entry:
+      - send: { event: hello, target: "#_parent" }
+      - send: { event: confirmed }
+    on: { confirmed: done }
+  done:
+    type: final
+    donedata: { params: [ { name: booked, expr: "true" } ] }</code></pre>
+    <p>The invoking state declares the bounds: <code>vt:maxMacrosteps</code> (default 1000), <code>vt:maxSends</code> (default 100) and <code>vt:maxDuration</code> (a durable timer; no default). A plan that finishes delivers <code>done.invoke.&lt;id&gt;</code> if its done data has the declared result type. Otherwise the parent gets <code>error.plan</code> with the class <code>parse</code>, <code>invalid</code>, <code>bounds</code> or <code>result</code>. Accepted and rejected plans are both recorded, with lineage back to the model call that wrote them.</p>
+    <p>An agent can change its own chart only through a new chart version and a migration (<code>propose_self_modification</code> in <code>crates/vertep-agent/src/plan.rs</code>). The new chart is validated and registered under its content address, and the migration goes through the ordinary chart-versioning procedure on the runtime node. The accepted migration is a journal entry; a rejection is delivered to the actor as <code>vt.self-modification.rejected</code>. A running chart is never patched in place, because that would break replay of the recorded version. See <a href="runtime.html">the actor runtime</a> for versions and migrations.</p>
+
+    <h2 id="journal">Journaling, replay and forks</h2>
+    <p>Agent actors run in their own deterministic shell, <code>AgentHost</code>, over a pure <code>AgentMachine</code>. Each turn takes the oldest input, drops it if its message id or correlation id was already processed, appends it to the journal, applies it, and then performs the effects. The journal kinds are <code>start</code>, <code>event</code>, <code>decision</code>, <code>refusal</code>, <code>timer</code>, <code>llm.result</code>, <code>llm.error</code> and <code>tool.result</code>.</p>
+    <p>Deactivating an actor drops only its in-memory machine. The next input or due timer reactivates it by replay, which asks no decider and calls no provider or tool. The <code>decider-agent</code> example shows this: it opens a second host on the same journal with no decider bound at all, and gets the same states and data.</p>
+    <p>To explore another choice, fork the journal. <code>AgentHost::fork(actor, position, new_actor, inject)</code> copies entries 1 to <code>position</code> under a new actor IRI, replays them, and then delivers the inputs you inject. History is a branch, never an edit. The example <code>fork_from_journal</code> forks the support run right after the first tool result and injects a <code>finish</code> decision:</p>
+<pre data-lang="Shell"><code>cargo run -p vertep-agent --example fork_from_journal</code></pre>
+<pre class="output" data-lang="Output"><code>original: Some(Object([("answer", Object([("confidence", Number(0.95)), ("text", String("Your refund for A-17 is on its way."))])), ("steps", Number(2.0))]))
+forking at 5 in ["decide"]
+open offer https://example.org/agents/support/42/fork-1/decision/5.0 with ["call_tool", "finish", "escalate"]
+fork: Some(Object([("answer", Object([("text", String("Escalated by a supervisor."))])), ("steps", Number(1.0))]))
+triage calls after the fork: 0</code></pre>
+    <p>The fork reproduces the offer that was open at position 5, under its own IRI. The triage model is not called again.</p>
+    <div class="nb warn"><p>The agent journal is the trait <code>AgentJournal</code>, and the crate implements it only with <code>MemoryJournal</code>, an in-memory store that keeps entries as JSON text. A durable agent journal on tiramemsu or another store is not in the tree yet; implement <code>AgentJournal</code> (append with a position check, read, list actors) to provide one.</p></div>
+
+    <h2 id="ontology">The agent graph</h2>
+    <p><code>AgentHost::graph(actor)</code> returns the provenance graph of a run in the <code>vt-agent:</code> module (<code>https://w3id.org/vertep/agent#</code>), which ships with <code>vertep-rdf</code> together with its SHACL shapes. It names deciders, decisions, LLM calls, tools, tool calls, grants, plans and plan executions, aligned to PROV-O by subclassing. The alignment axioms are included as plain triples, so PROV-O queries work without a reasoner. A decision's annotations sit on the RDF 1.2 triple term of the statement <code>decision vt-agent:chose event</code>. See <a href="rdf.html">RDF and versions</a> for querying.</p>
+
+    <h2 id="verification">What is proven</h2>
+    <p>The Lean model (<code>lean/vertep-lean/VertepLean/AgentTheorems.lean</code>) states the agent properties over every decider and every output, adversarial output included. These theorems are in the pinned axiom check:</p>
+    <table>
+      <thead><tr><th>Theorem</th><th>In plain words</th></tr></thead>
+      <tbody>
+        <tr><td><code>decider_safety</code></td><td>If a decision makes a reachable agent state take a candidate, there was an open offer with that correlation id, the candidate was in it, its transition was enabled at offer time, and selection now picks the same transition.</td></tr>
+        <tr><td><code>stale_not_taken</code></td><td>A decision whose correlation id names no open offer takes nothing.</td></tr>
+        <tr><td><code>unknown_not_taken</code></td><td>A decision for an event that is not among the open offer's candidates takes nothing.</td></tr>
+        <tr><td><code>decision_dedup</code>, <code>decision_once</code></td><td>A decision whose correlation id was already answered changes nothing, so a redelivered decision has no further effect.</td></tr>
+        <tr><td><code>replay_live</code></td><td>Replaying the inputs a live run journaled gives the state the live run reached.</td></tr>
+        <tr><td><code>grants_do_not_escalate</code></td><td>A child's effective grant is exactly the intersection of its parent's and its own.</td></tr>
+        <tr><td><code>grant_enforced</code>, <code>ungranted_not_delivered</code>, <code>granted_delivered</code></td><td>The send filter delivers granted sends and nothing addressed to an ungranted target.</td></tr>
+      </tbody>
+    </table>
+    <p>These are theorems about the Lean model. The Rust code is tied to it by differential testing, not by proof; the Rust side checks the same conditions at run time. See <a href="verification.html">Verification</a>.</p>
+
+    <h2 id="risks">Risks and containment</h2>
+    <p>The design contains failures with mechanisms that do not depend on the model behaving well. It is just as important to know what it does not contain.</p>
+    <table>
+      <thead><tr><th>Risk</th><th>What contains it</th></tr></thead>
+      <tbody>
+        <tr><td>Prompt injection makes the model pick a harmful action</td><td>Only offered candidates are accepted, so the model cannot invent a transition. Route high-risk moves to a human decider, and keep the dangerous event out of <code>vt:candidates</code> or behind a guard.</td></tr>
+        <tr><td>Malformed or hostile payloads</td><td>Payloads are checked against the candidate's schema on typed charts, and payload guards are evaluated when the decision arrives (<code>not-enabled</code>).</td></tr>
+        <tr><td>Injection through a plan</td><td>CEL or null datamodel only, granted functions only, execution bounds, run as a sandboxed child.</td></tr>
+        <tr><td>Model nondeterminism</td><td>Results and decisions are journaled before processing; replay and forks call no model.</td></tr>
+        <tr><td>Token and cost runaway</td><td><code>vt:maxDecisions</code>, guards on <code>vt_usage</code>, per-call accounting.</td></tr>
+        <tr><td>Malformed structured output</td><td>Validation after every call, <code>error.llm</code> with class <code>schema</code>, retries written in the chart.</td></tr>
+        <tr><td>Nobody answers</td><td>A durable deadline with a fallback decider; the wait never blocks the actor.</td></tr>
+      </tbody>
+    </table>
+    <p>What the invariant does not give you:</p>
+    <ul>
+      <li><strong>A legal move can still be a bad one.</strong> The guarantee is that the model picks among enabled transitions, not that it picks well. If <code>finish</code> is enabled, a manipulated model can finish with a wrong answer. Put the judgement you need in guards, candidates and human states.</li>
+      <li><strong>Payloads are data the model wrote.</strong> On an untyped chart a decision is checked by event name only, and its payload flows into the datamodel and into sends. Tool arguments are checked against the tool's argument type, which limits shape, not intent.</li>
+      <li><strong>Data can carry instructions.</strong> Ticket text, tool results and observations go into prompts. The design does not filter them. It limits what a misled model can do; it does not stop the model from being misled.</li>
+      <li><strong>Grants cover invoked children only.</strong> The agent chart's own sends are as wide as the chart makes them (see the caveat above).</li>
+      <li><strong>Annotations are self-reported.</strong> Rationale and confidence come from the decider and are recorded, never checked or used to select a transition.</li>
+    </ul>
+
+    <h2 id="run">Running the tests</h2>
+<pre data-lang="Shell"><code>cargo test -p vertep-agent
+cargo test -p vertep-agent --features anthropic   # adds the Anthropic mapping's unit tests</code></pre>
+    <p>The tests are grouped by capability: <code>tests/deciders.rs</code>, <code>tests/llm_actors.rs</code>, <code>tests/plan_charts.rs</code>, and <code>tests/examples.rs</code>, which runs the support-agent examples. Each test names the spec scenario it checks in an <code>@tg: verifies::</code> comment, so you can find the test for any requirement in <code>openspec/specs/deciders</code>, <code>llm-actors</code> and <code>plan-charts</code>.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="runtime.html">← The actor runtime</a>
+      <a href="distribution.html">Cluster and federation →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The shape of behaviour — Vertep</title>
+<meta name="description" content="Why statecharts: from flat state machines to Harel's hierarchy and orthogonality, the W3C SCXML algorithm, a pure step function, and what a Lean proof found in the entry algorithm.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="index.html" aria-current="page">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+  <header class="article-head">
+    <p class="kicker">Article the first</p>
+    <h1>The shape of behaviour</h1>
+    <p class="byline">On statecharts, and why a program that waits should say what it is waiting for</p>
+  </header>
+
+  <p>Most programs that live for a long time are waiting. An order waits for payment, a support ticket waits for an answer, a door waits to be opened, an agent waits for a model. While they wait, they are <em>in a state</em>, and what they do next depends on that state and on what happens to them. That sentence is the whole idea of a state machine. The trouble starts when we try to write it down.</p>
+
+  <h2>Booleans pretending to be states</h2>
+
+  <p>The usual way to write state is not to write it. A record grows fields: <code>paid</code>, <code>shipped</code>, <code>cancelled</code>, <code>awaiting_review</code>. Each handler checks some of them. Nobody wrote down which combinations are possible, so every handler has to guess. Can an order be both <code>cancelled</code> and <code>shipped</code>? The schema allows it. Four booleans make sixteen combinations, and in practice perhaps five of them are real. The other eleven are bugs waiting for a path that reaches them.</p>
+
+  <p>A state machine names the five and forbids the rest. It says which events each state answers and where each answer leads. Anything not written is not possible. That is a stronger promise than any number of <code>if</code> statements can make, because it is a promise about the whole program, not about one handler.</p>
+
+  <p>Flat state machines have a well-known weakness, though: they explode. Two independent concerns, each with two states, need four combined states. Three need eight. Add a "cancel from anywhere" rule and you draw the same arrow from every state. Engineers who tried flat machines on real systems often went back to booleans, because the diagram became harder to read than the code.</p>
+
+  <figure class="plate">
+    <div class="plate-inner">
+      <svg viewBox="0 0 560 220" width="560" role="img" aria-labelledby="p1t">
+        <title id="p1t">Left: a flat machine for two independent switches needs four states and eight arrows. Right: a parallel state with two regions needs four states and four arrows, and each region reads on its own.</title>
+        <defs>
+          <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+          <pattern id="h1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".3"/></pattern>
+        </defs>
+        <g font-family="JetBrains Mono, monospace" font-size="12" style="fill:var(--ink)" text-anchor="middle">
+          <g style="fill:var(--paper);stroke:var(--ink)" stroke-width="2">
+            <rect x="20" y="30" width="96" height="40" rx="10"/><rect x="164" y="30" width="96" height="40" rx="10"/>
+            <rect x="20" y="150" width="96" height="40" rx="10"/><rect x="164" y="150" width="96" height="40" rx="10"/>
+          </g>
+          <text x="68" y="55">off · off</text><text x="212" y="55">on · off</text>
+          <text x="68" y="175">off · on</text><text x="212" y="175">on · on</text>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="1.8" marker-end="url(#a1)">
+            <path d="M116 44 H160"/><path d="M164 58 H120"/>
+            <path d="M116 164 H160"/><path d="M164 178 H120"/>
+            <path d="M54 70 V146"/><path d="M82 150 V74"/>
+            <path d="M198 70 V146"/><path d="M226 150 V74"/>
+          </g>
+          <text x="140" y="214" font-family="IM Fell English SC, Georgia, serif" font-size="15" style="fill:var(--ink-2)">flat: 4 states, 8 arrows</text>
+
+          <rect x="310" y="16" width="232" height="180" rx="14" style="fill:url(#h1);stroke:var(--ink)" stroke-width="2.5"/>
+          <line x1="426" y1="24" x2="426" y2="188" style="stroke:var(--ink)" stroke-width="2" stroke-dasharray="6 5"/>
+          <g style="fill:var(--paper);stroke:var(--ink)" stroke-width="2">
+            <rect x="328" y="44" width="80" height="38" rx="10"/><rect x="328" y="132" width="80" height="38" rx="10"/>
+            <rect x="444" y="44" width="80" height="38" rx="10"/><rect x="444" y="132" width="80" height="38" rx="10"/>
+          </g>
+          <text x="368" y="68">off</text><text x="368" y="156">on</text>
+          <text x="484" y="68">off</text><text x="484" y="156">on</text>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="1.8" marker-end="url(#a1)">
+            <path d="M356 82 V128"/><path d="M380 132 V86"/>
+            <path d="M472 82 V128"/><path d="M496 132 V86"/>
+          </g>
+          <text x="426" y="214" font-family="IM Fell English SC, Georgia, serif" font-size="15" style="fill:var(--ink-2)">parallel: 4 states, 4 arrows</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Plate I. <b>Two switches.</b> With three switches the flat machine needs eight states; the parallel one needs six.</figcaption>
+  </figure>
+
+  <h2>Harel's three additions</h2>
+
+  <p>In 1987 David Harel published <em>Statecharts: A Visual Formalism for Complex Systems</em>, written while he was working on avionics. He kept the state machine and added three things.</p>
+
+  <p><strong>Hierarchy.</strong> A state may contain states. Being in <code>payment</code> means also being in <code>checkout</code>, so a transition drawn once on <code>checkout</code>, such as <em>cancel</em>, applies to every state inside it. The repeated arrows disappear.</p>
+
+  <p><strong>Orthogonality.</strong> A parallel state has regions that are all active at once, each with its own current state. Independent concerns stay independent. The product of their states is never drawn, and never has to be.</p>
+
+  <p><strong>History.</strong> A history state remembers where a compound state was when it was left, so that coming back resumes there instead of at the start. Pausing and resuming, interrupting for an alarm, stepping out to ask a human: all of these are history.</p>
+
+  <p>With these three additions, a diagram of a real system fits on a page and still says everything the program may do.</p>
+
+  <h2>One chart, written down</h2>
+
+  <p>Here is a small order flow in SCXML, the W3C's XML notation for statecharts. <code>checkout</code> is a compound state, so its <code>cancel</code> transition covers <code>cart</code>, <code>payment</code> and <code>review</code> at once. Two transitions answer <code>authorized</code>. The first whose condition holds wins, in document order.</p>
+
+<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
+       datamodel="ecmascript" initial="idle" name="order"&gt;
+  &lt;datamodel&gt;&lt;data id="total" expr="0"/&gt;&lt;/datamodel&gt;
+
+  &lt;state id="idle"&gt;
+    &lt;transition event="start" target="checkout"/&gt;
+  &lt;/state&gt;
+
+  &lt;state id="checkout" initial="cart"&gt;
+    &lt;transition event="cancel" target="cancelled"/&gt;
+    &lt;state id="cart"&gt;
+      &lt;transition event="pay" cond="_event.data.amount &amp;gt; 0" target="payment"&gt;
+        &lt;assign location="total" expr="_event.data.amount"/&gt;
+      &lt;/transition&gt;
+    &lt;/state&gt;
+    &lt;state id="payment"&gt;
+      &lt;transition event="authorized" cond="total &amp;gt; 100" target="review"/&gt;
+      &lt;transition event="authorized" target="paid"/&gt;
+    &lt;/state&gt;
+    &lt;state id="review"&gt;
+      &lt;transition event="approve" target="paid"/&gt;
+    &lt;/state&gt;
+  &lt;/state&gt;
+
+  &lt;final id="paid"/&gt;
+  &lt;final id="cancelled"/&gt;
+&lt;/scxml&gt;</code></pre>
+
+<pre class="output" data-lang="vt validate"><code>$ vt validate order.scxml
+order.scxml: ok: urn:vertep:chart:sha256:23ede432a69736bd8c523baf5547828af92211b2cb5e9c1f99d1ac084d730327</code></pre>
+
+  <p>The last line of the output deserves a word. Vertep names every chart by the hash of its canonical RDF form. Change one transition and the name changes. Every journal entry records the version it ran under, so you can always tell which rules an actor was following when it did what it did.</p>
+
+  <h2>The algorithm is the specification</h2>
+
+  <p>A diagram is not yet a program. Many statechart libraries agree on the pictures and disagree on the details. What happens when two transitions in different regions fire on one event and both leave a shared ancestor? Which runs first, exit actions or transition actions? Does an event raised inside an action interrupt the current step?</p>
+
+  <p>SCXML, a W3C Recommendation since 2015, answers all of these with an algorithm, given in pseudo-code in its Appendix D. One external event starts a <em>macrostep</em>. The interpreter selects the enabled transitions, resolves conflicts between them by document order, and fires them as one <em>microstep</em>: exit the states being left, run the transitions' actions, enter the new states. Then it takes eventless transitions and internal events, microstep after microstep, until nothing more is enabled. Only then does it look at the next external event. This is called <em>run to completion</em>, and it is what makes a chart's behaviour predictable.</p>
+
+  <p>Vertep implements that algorithm in full, as the normative behaviour of every chart, and runs the W3C conformance suite against it. Where the Recommendation leaves room for reading, Vertep writes its reading down as a decision, and the Lean model has to make the same choice.</p>
+
+  <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+  <h2>Step as a pure function</h2>
+
+  <p>Inside Vertep, the algorithm is two functions in <code>vertep-core</code>: <code>start</code> opens a session, and <code>step</code> takes the session and one input and returns what happened.</p>
+
+<pre data-lang="Rust"><code>pub fn step(chart: &amp;CompiledChart, session: Session, input: Input, dm: &amp;mut dyn Datamodel)
+    -&gt; Result&lt;Outcome, StepError&gt;;   // Outcome { session, effects, trace }</code></pre>
+
+  <p>It does no I/O. It has no clock, no randomness and no network. When a chart wants to send a message, start a timer or ask a model, <code>step</code> does not do it. It returns an <em>effect</em> that says so, and the runtime shell around it carries the effect out. The result comes back later as another event.</p>
+
+  <p>This one restriction pays for most of what Vertep does:</p>
+
+  <ul>
+    <li><strong>Journals.</strong> If <code>step</code> is pure, an actor's state is fully determined by the events it accepted. Store those events in order, before processing them, and you have stored the actor.</li>
+    <li><strong>Replay.</strong> Feed the same events to <code>step</code> again, on another machine, a year later, or in a browser, and you get the same states.</li>
+    <li><strong>Time travel.</strong> The state at any past moment is the replay up to that moment.</li>
+    <li><strong>Portability.</strong> The core needs nothing from its host, so the same crate runs on servers and in WebAssembly.</li>
+    <li><strong>Checking.</strong> A pure function can be compared with another pure function. That is where Lean comes in.</li>
+  </ul>
+
+  <h2>What the proof found</h2>
+
+  <p>Vertep has a second implementation of the semantics, written in Lean 4. The Rust core records every step as a trace, and the Lean model replays the same inputs and must produce the same trace. That is differential testing, and it catches disagreements. A proof goes further. It says something about every chart, not just the ones a test generator happens to build.</p>
+
+  <p>One of the properties a statechart must never violate is simple to state. In every configuration, an active compound state has exactly one active child, and an active parallel state has all of its children active. The Lean package now proves it. Every session reachable by <code>start</code> and <code>step</code> from a well-formed chart has a legal configuration.</p>
+
+  <p>Writing that proof turned up five charts that passed validation and broke the property, all in the Rust runtime as well. Two became validation rules: a history target listed next to its own sibling, and an <code>initial</code> that names a history state with no default. The other three were in the entry algorithm, and they share a cause. The algorithm as Appendix D writes it recomputes a transition's domain from the history it has just recorded, and its <code>addAncestorStatesToEnter</code> climbs up to a history state's parent even when the transition's domain lies below that parent. On the right chart, with deep history and a parallel state in the right place, entry re-entered states that were still active. The result was a compound state with two active children, or a parallel state left inactive under its active region.</p>
+
+  <p>The fix is a one-line rule, now in both cores: entry never enters a state that is not a proper descendant of the transition's domain. Each case has a regression test in Rust and a matching check in Lean. None of these charts is exotic, and no test suite in the project had built one. The proof found them because a proof cannot skip a case.</p>
+
+  <blockquote>A chart says what may happen. The algorithm says what does happen. The proof says the two agree, for every chart.</blockquote>
+
+  <h2>Why this matters beyond charts</h2>
+
+  <p>A long-lived process is a promise to behave a certain way over time, often with money, people or other machines depending on it. Statecharts make that promise legible: you can point at a diagram and say "it cannot ship a cancelled order", and be right. A precise algorithm makes the promise executable. A pure step function makes it replayable. A proof makes it trustworthy.</p>
+
+  <p>The same structure also tells us where to put things that are <em>not</em> predictable, such as a person's judgement or a language model's answer. They go at the choice points, as events, under the chart's rules. That is the subject of the <a href="deterministic-agents.html">next article</a>.</p>
+
+  <nav class="pager" aria-label="Articles">
+    <a href="index.html">← All articles</a>
+    <a href="deterministic-agents.html">The goat does not choose the play →</a>
+  </nav>
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

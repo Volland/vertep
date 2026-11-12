@@ -1,0 +1,11 @@
+actor https://example.org/charts/cart/alice
+snapshot @1: ["filled"] items=2
+snapshot @2: ["filled"] items=3
+snapshot @4: ["ordered"] items=3
+now: ["ordered"] matches('ordered') = true
+journal:
+  1 add      {"qty":2} -> ["s.empty:t0"]
+  2 add      {"qty":1} -> ["s.filled:t0"]
+  3 pay      null      -> []
+  4 checkout null      -> ["s.filled:t1"]
+as of entry 1: ["filled"] items = 2

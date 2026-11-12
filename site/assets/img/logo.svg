@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="t">
+  <title id="t">Vertep</title>
+  <!-- The Vertep seal: the vertep goat set in the heart of the Alatyr star. -->
+  <defs>
+    <pattern id="logo-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="5" stroke="#17120f" stroke-width="1.1"/>
+    </pattern>
+    <clipPath id="logo-roundel"><circle cx="120" cy="120" r="62"/></clipPath>
+    <clipPath id="logo-head">
+      <path d="M58 194 C60 162 64 136 72 112 C76 92 84 74 98 64 C110 57 124 60 133 71 L163 116 C169 125 171 133 165 138 C159 142 151 142 145 142 C143 153 142 167 139 182 C132 169 127 157 125 149 C121 151 117 153 113 157 C111 169 111 181 113 194 Z"/>
+    </clipPath>
+  </defs>
+  <g stroke-linejoin="miter">
+    <path d="M120 8 L232 120 L120 232 L8 120 Z" fill="#e8641c"/>
+    <path d="M40.8 40.8 H199.2 V199.2 H40.8 Z" fill="#e8641c"/>
+    <path d="M120 8 L232 120 L120 232 L8 120 Z" fill="url(#logo-hatch)" opacity=".38"/>
+    <path d="M40.8 40.8 H199.2 V199.2 H40.8 Z" fill="url(#logo-hatch)" opacity=".38"/>
+    <path d="M120 8 L232 120 L120 232 L8 120 Z" fill="none" stroke="#17120f" stroke-width="13"/>
+    <path d="M40.8 40.8 H199.2 V199.2 H40.8 Z" fill="none" stroke="#17120f" stroke-width="13"/>
+    <path d="M120 8 L232 120 L120 232 L8 120 Z" fill="none" stroke="#fbf6ec" stroke-width="4.5"/>
+    <path d="M40.8 40.8 H199.2 V199.2 H40.8 Z" fill="none" stroke="#fbf6ec" stroke-width="4.5"/>
+  </g>
+  <g fill="#17120f">
+    <circle cx="120" cy="8" r="5"/><circle cx="232" cy="120" r="5"/><circle cx="120" cy="232" r="5"/><circle cx="8" cy="120" r="5"/>
+    <circle cx="40.8" cy="40.8" r="5"/><circle cx="199.2" cy="40.8" r="5"/><circle cx="199.2" cy="199.2" r="5"/><circle cx="40.8" cy="199.2" r="5"/>
+  </g>
+  <!-- roundel -->
+  <circle cx="120" cy="120" r="70" fill="#17120f"/>
+  <circle cx="120" cy="120" r="64" fill="#fbf6ec"/>
+  <g clip-path="url(#logo-roundel)">
+    <g transform="translate(62 54) scale(.6)">
+      <path d="M113 63 C114 34 98 11 66 3 C86 21 97 42 100 66 Z" fill="#17120f"/>
+      <path d="M99 67 C93 38 72 15 34 13 C58 28 75 48 85 76 Z" fill="#17120f"/>
+      <path d="M52 14 L48 26 M63 17 L58 30 M73 22 L66 36 M82 29 L74 44" stroke="#fbf6ec" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M92 90 C72 84 50 90 36 104 C56 109 78 104 96 98 Z" fill="#17120f"/>
+      <path d="M58 194 C60 162 64 136 72 112 C76 92 84 74 98 64 C110 57 124 60 133 71 L163 116 C169 125 171 133 165 138 C159 142 151 142 145 142 C143 153 142 167 139 182 C132 169 127 157 125 149 C121 151 117 153 113 157 C111 169 111 181 113 194 Z" fill="#17120f"/>
+      <g clip-path="url(#logo-head)" stroke="#fbf6ec" stroke-width="2.4" stroke-linecap="round" fill="none">
+        <path d="M60 150 C70 146 82 146 92 150 M60 160 C72 155 86 155 98 160 M66 134 C74 131 82 131 88 134 M104 106 C112 112 122 114 132 112 M135 82 L158 117"/>
+      </g>
+      <path d="M108 90 C113 83 123 82 129 89 C123 95 113 95 108 90 Z" fill="#e8641c" stroke="#fbf6ec" stroke-width="2"/>
+      <rect x="113" y="87.6" width="11" height="3.2" rx="1.6" fill="#17120f"/>
+      <path d="M56 168 C76 177 98 177 118 167 L119 180 C98 190 76 190 55 181 Z" fill="#e8641c" stroke="#17120f" stroke-width="4"/>
+    </g>
+  </g>
+  <circle cx="120" cy="120" r="64" fill="none" stroke="#e8641c" stroke-width="3"/>
+</svg>

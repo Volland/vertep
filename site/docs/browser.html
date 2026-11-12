@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browser and JavaScript — Vertep docs</title>
+<meta name="description" content="Run Vertep actors in browsers and Node.js with @vertep/web: a worker-hosted actor system, OPFS journals, typed events, time travel, SPARQL and a WebSocket transport to server actors.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="browser.html" aria-current="page">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
+    <h1>Browser and JavaScript</h1>
+    <p class="lede">The same core that runs on servers, compiled to WebAssembly and hosted in a worker. This page shows how to build the two npm packages, start an actor system, talk to actors, read their journals, keep them in OPFS and connect them to server actors.</p>
+
+    <h2 id="packages">Two packages</h2>
+    <p>The JavaScript bindings live in <code>bindings/js</code>, an npm workspace with two packages. The Rust side is the crate <code>crates/vertep-wasm</code>.</p>
+    <table>
+      <thead><tr><th>Package</th><th>What it holds</th></tr></thead>
+      <tbody>
+        <tr><td><code>@vertep/web</code></td><td>The typed client (<code>createActorSystem</code>, <code>ActorRef</code>, <code>VertepError</code>), the worker entry <code>@vertep/web/worker</code>, and two WebAssembly builds: <code>core</code> (core, shell, the <code>null</code>, CEL and <code>rust</code> datamodels, an in-memory store) and <code>journal</code> (the same plus tiramemsu on SQLite in WebAssembly).</td></tr>
+        <tr><td><code>@vertep/dm-ecma</code></td><td>A third WebAssembly build with the boa ECMAScript engine, exported as <code>ecmascript</code>. It is separate because boa does not fit the main package's size budget.</td></tr>
+      </tbody>
+    </table>
+    <p>Both packages are ES modules, both are at version <code>0.1.0</code>, and both need Node.js 22 or later. A release script, <code>bindings/js/scripts/check-version.mjs</code>, fails when a package version differs from the Rust workspace version.</p>
+
+    <div class="nb warn"><p>Neither package is published to npm yet. Their <code>package.json</code> files carry <code>publishConfig</code> with the <code>next</code> tag, but the publish task in <code>openspec/changes/m6-wasm-js/tasks.md</code> is still open. Build them from source as shown below.</p></div>
+
+    <h2 id="build">Building from source</h2>
+    <p>You need the Rust toolchain pinned in <code>rust-toolchain.toml</code> (it already lists the <code>wasm32-unknown-unknown</code> target), Node.js 22 or later, and the <code>wasm-bindgen</code> CLI at exactly the version <code>crates/vertep-wasm/Cargo.toml</code> pins, which is <code>0.2.128</code> today. The build script stops if the two versions differ.</p>
+<pre data-lang="Shell"><code>cargo install wasm-bindgen-cli --version 0.2.128
+cd bindings/js
+npm install
+npm run build          # scripts/build.sh: the WebAssembly builds, the native helper, vt, then tsc
+npm test               # node --test over packages/web/test/
+npm run check:size     # the bundle size budget</code></pre>
+    <p><code>scripts/build.sh</code> builds <code>vertep-wasm</code> four times with different features: <code>core</code> and <code>journal</code> into <code>packages/web/wasm/</code>, <code>journal,ecmascript</code> into <code>packages/dm-ecma/wasm/</code>, and a test-only build with the conformance runner into <code>.native/wasm-test</code>, which is never published. It also builds the native helper <code>vertep-wasm-native</code> and <code>vt</code> into <code>bindings/js/.native/</code>, because the tests compare WebAssembly results with native ones. Set <code>VERTEP_PROFILE=dev</code> for a fast unoptimised build, and <code>VERTEP_SKIP_ECMA=1</code> to skip the ECMAScript and test builds.</p>
+    <p>To use the packages in another project before they are published, pack them and install the tarball: <code>npm pack -w @vertep/web</code>, then <code>npm install ./vertep-web-0.1.0.tgz</code>. The package test <code>packages/web/test/package.test.mjs</code> does exactly this and runs a small program from the installed copy.</p>
+
+    <h2 id="shape">One worker holds everything</h2>
+    <p>The whole actor system runs in one dedicated worker: a Web Worker in a browser, a <code>worker_threads</code> worker in Node.js. The page keeps only a thin client. Every client call returns a Promise or delivers results through a subscription, so nothing blocks the main thread.</p>
+    <p>Why one worker for all of it? A step calls guards and actions synchronously, and tiramemsu's WebAssembly host is synchronous too, with an OPFS file system that needs the synchronous access handles only a dedicated worker has. So the core, the shell, the journal and your guard and action functions must share one thread.</p>
+
+    <figure class="plate">
+      <div class="plate-inner">
+        <svg viewBox="0 0 440 300" width="440" role="img" aria-labelledby="browser-shape-t">
+          <title id="browser-shape-t">The page holds a typed client that posts commands to a dedicated worker; the worker holds the runtime, the core, the implementations, the journal in OPFS and the WebSocket processor that talks to server actors</title>
+          <defs>
+            <marker id="browser-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+            <pattern id="browser-ph" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".35"/></pattern>
+          </defs>
+          <rect x="10" y="10" width="130" height="200" style="fill:none;stroke:var(--ink)" stroke-width="1.5" stroke-dasharray="6 5"/>
+          <rect x="170" y="10" width="260" height="200" style="fill:none;stroke:var(--ink)" stroke-width="1.5" stroke-dasharray="6 5"/>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="14" style="fill:var(--ink-2)">
+            <text x="75" y="200" text-anchor="middle">main thread</text>
+            <text x="300" y="200" text-anchor="middle">dedicated worker</text>
+          </g>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="16" style="fill:var(--ink)">
+            <rect x="24" y="30" width="102" height="44" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="75" y="57" text-anchor="middle">your code</text>
+            <rect x="24" y="110" width="102" height="54" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="75" y="134" text-anchor="middle">client</text>
+            <text x="75" y="153" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" style="fill:var(--ink-2)">@vertep/web</text>
+            <rect x="184" y="30" width="110" height="44" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="239" y="57" text-anchor="middle">runtime</text>
+            <rect x="308" y="30" width="110" height="44" style="fill:var(--orange);stroke:var(--ink)" stroke-width="3"/>
+            <text x="363" y="57" text-anchor="middle" style="fill:var(--on-orange)">core · step</text>
+            <rect x="184" y="110" width="110" height="54" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <rect x="184" y="110" width="110" height="54" fill="url(#browser-ph)"/>
+            <text x="239" y="134" text-anchor="middle">tiramemsu</text>
+            <text x="239" y="153" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" style="fill:var(--ink-2)">journal + graph</text>
+            <rect x="308" y="110" width="110" height="54" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="363" y="134" text-anchor="middle">guards and</text>
+            <text x="363" y="153" text-anchor="middle">actions</text>
+            <rect x="184" y="236" width="110" height="44" style="fill:var(--ink);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="239" y="263" text-anchor="middle" style="fill:var(--paper)">OPFS file</text>
+            <rect x="308" y="236" width="122" height="44" style="fill:var(--paper);stroke:var(--ink)" stroke-width="2.5"/>
+            <text x="369" y="263" text-anchor="middle">server actors</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="2.2" marker-end="url(#browser-arr)">
+            <path d="M75 74 V106"/>
+            <path d="M126 130 C150 110 160 70 180 56" marker-start="url(#browser-arr)"/>
+            <path d="M294 52 H304"/>
+            <path d="M239 74 V106"/>
+            <path d="M363 74 V106"/>
+            <path d="M239 164 V232"/>
+            <path d="M286 74 C300 150 340 200 360 232" stroke-dasharray="5 4" marker-start="url(#browser-arr)"/>
+          </g>
+          <g font-family="JetBrains Mono, monospace" font-size="10" style="fill:var(--ink-2)">
+            <text x="136" y="96">postMessage</text>
+            <text x="334" y="196">WebSocket</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>Plate. <b>The page and its worker.</b> Commands and notifications cross by message only.</figcaption>
+    </figure>
+
+    <p>The shell maps the runtime's three needs onto the JavaScript event loop: <code>spawn</code> uses <code>wasm_bindgen_futures::spawn_local</code>, <code>sleep</code> is a <code>setTimeout</code> future, and the clock is <code>Date.now()</code>, read only when a journal entry is stamped. Wall-clock time reaches a chart only as a journaled timestamp, just as on a server.</p>
+
+    <h2 id="first-run">A first run in Node.js</h2>
+    <p>This program uses the built package from the repository. The chart is the CEL counter from <code>packages/web/test/helpers.mjs</code>; CEL charts need no implementations module.</p>
+<pre data-lang="JavaScript"><code>import { createActorSystem, VertepError } from "@vertep/web";
+
+const COUNTER = `&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="idle" datamodel="cel"&gt;
+  &lt;datamodel&gt;&lt;data id="n" expr="0"/&gt;&lt;/datamodel&gt;
+  &lt;state id="idle"&gt;
+    &lt;transition event="inc"&gt;&lt;assign location="ctx.n" expr="ctx.n + 1"/&gt;&lt;/transition&gt;
+    &lt;transition event="add"&gt;&lt;assign location="ctx.n" expr="ctx.n + ev.data.by"/&gt;&lt;/transition&gt;
+    &lt;transition event="go" target="busy"/&gt;
+  &lt;/state&gt;
+  &lt;state id="busy"&gt;&lt;transition event="done" target="idle"/&gt;&lt;/state&gt;
+&lt;/scxml&gt;`;
+
+const system = await createActorSystem({ storage: "memory", journal: true });
+console.log("build:", system.build);
+const counter = system.virtual({ source: COUNTER, format: "scxml", type: "https://example.org/charts/counter" }, "c1");
+counter.subscribe((s) =&gt; console.log("snapshot", s.position, s.configuration, s.context));
+await new Promise((r) =&gt; setTimeout(r, 20));
+await counter.send({ type: "inc" });
+await counter.send({ type: "add", by: 4 });
+await counter.send({ type: "go" });
+console.log("can done?", await counter.can({ type: "done" }));
+const then = await counter.asOf({ position: 1 });
+console.log("as of position 1:", then.configuration, then.context);
+for (const e of await counter.journal()) console.log("journal", e.position, e.kind, e.event?.name);
+console.log("address:", await counter.address);
+try {
+  await system.spawn(`&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="a"&gt;&lt;state id="a"&gt;&lt;transition event="x" target="missing"/&gt;&lt;/state&gt;&lt;/scxml&gt;`);
+} catch (e) {
+  console.log(e instanceof VertepError, e.code, e.violations[0]);
+}
+await system.terminate();</code></pre>
+<pre class="output" data-lang="Output"><code>build: journal
+snapshot 1 [ 'idle' ] { n: 1 }
+snapshot 2 [ 'idle' ] { n: 5 }
+snapshot 3 [ 'busy' ] { n: 5 }
+can done? true
+as of position 1: [ 'idle' ] { n: 1 }
+journal 1 input inc
+journal 2 input add
+journal 3 input go
+address: https://example.org/charts/counter/c1
+true ChartInvalid {
+  column: 88,
+  line: 1,
+  message: 'transition target names unknown state `missing`'
+}</code></pre>
+    <p>The subscription is set up a moment before the first send because <code>subscribe</code> registers with the worker asynchronously; the package's own tests do the same. The virtual actor's address is the chart type IRI followed by the key.</p>
+
+    <h2 id="system">Creating an actor system</h2>
+    <p><code>createActorSystem(options)</code> starts the worker and resolves once its store is open. The options are the <code>SystemOptions</code> interface in <code>packages/web/src/client.ts</code>.</p>
+    <table>
+      <thead><tr><th>Option</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>storage</code></td><td><code>"opfs"</code> (durable) or <code>"memory"</code> (volatile). Required: there is no default, and no fallback from one to the other. Anything else rejects with <code>InvalidArgument</code>.</td></tr>
+        <tr><td><code>path</code></td><td>The store path, which is the tiramemsu file name.</td></tr>
+        <tr><td><code>journal</code></td><td>For <code>memory</code>: keep a tiramemsu journal that can be exported. <code>opfs</code> always keeps one.</td></tr>
+        <tr><td><code>import</code></td><td>A journal file (<code>Uint8Array</code>) to start from; use it with <code>journal: true</code>.</td></tr>
+        <tr><td><code>charts</code></td><td>Charts to register before the first scheduling round. That round recovers overdue durable timers, so a chart must be registered here for its actors' overdue timers to fire (once) after a reopen.</td></tr>
+        <tr><td><code>implementations</code></td><td>URL of a module whose <code>guards</code> and <code>actions</code> exports become named functions. The worker imports it.</td></tr>
+        <tr><td><code>dev</code>, <code>onImpurity</code></td><td>Development mode: after each new entry the journal is replayed and compared with the live state; a mismatch is reported to <code>onImpurity</code> (or <code>console.warn</code>).</td></tr>
+        <tr><td><code>idleTimeoutMs</code></td><td>Idle deactivation of virtual actors.</td></tr>
+        <tr><td><code>datamodel</code></td><td>Another WebAssembly build, such as <code>ecmascript</code> from <code>@vertep/dm-ecma</code>.</td></tr>
+        <tr><td><code>transports</code></td><td><code>{ websocket: {...} }</code>, the transport to server actors; see <a href="#websocket">below</a>.</td></tr>
+        <tr><td><code>workerUrl</code></td><td>The worker entry; the bundled <code>worker.js</code> by default.</td></tr>
+      </tbody>
+    </table>
+    <p>The worker loads the smallest build the options allow. A plain <code>memory</code> store loads <code>core</code>, which has no SQLite. A journaled store (<code>opfs</code>, <code>journal: true</code> or <code>import</code>) loads <code>journal</code>. <code>system.build</code> tells you which one it got: <code>"core"</code>, <code>"journal"</code> or <code>"custom"</code>. <code>system.terminate()</code> stops the worker; later calls reject with <code>WorkerTerminated</code>.</p>
+
+    <h2 id="actors">Actors from SCXML, YAML or RDF</h2>
+    <p>A chart source is validated and content-addressed exactly as it is natively, before any actor runs it. An invalid chart rejects with <code>ChartInvalid</code>, and <code>error.violations</code> lists every problem with its line and column.</p>
+    <table>
+      <thead><tr><th>Call</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>system.spawn(chart, {format, type, key})</code></td><td>Starts an actor from a chart source and resolves to an <code>ActorRef</code>.</td></tr>
+        <tr><td><code>system.register(chart, {format, type})</code></td><td>Registers a chart under a type IRI (its version IRI by default) and resolves to <code>{type, version}</code>.</td></tr>
+        <tr><td><code>system.virtual(chart or type, key)</code></td><td>The virtual actor of that type and key. It is activated by its first message; every later call with the same type and key reaches the same actor.</td></tr>
+        <tr><td><code>system.actor(address)</code></td><td>A reference to any actor by address IRI, local or on a server.</td></tr>
+        <tr><td><code>system.actors()</code></td><td>Every actor with a journal.</td></tr>
+      </tbody>
+    </table>
+    <p><code>format</code> is <code>"scxml"</code>, <code>"yaml"</code> or <code>"rdf"</code>. The worker also accepts <code>turtle</code>, <code>ntriples</code>, <code>nquads</code> and <code>trig</code>, and guesses the format from the first characters of the source when none is given (<code>crates/vertep-wasm/src/charts.rs</code>). A chart can be passed as a plain string or as a <code>ChartSpec</code> object, <code>{source, format, type}</code>, which is what <code>vt gen ts</code> generates.</p>
+<pre data-lang="JavaScript"><code>// from packages/web/test/api.test.mjs
+await system.register(ORDER, { type: ORDER_TYPE });
+const a = system.virtual(ORDER_TYPE, "k1");
+assert.deepEqual(await system.actors(), []);      // nothing journaled before the first message
+await a.send({ type: "pay" });
+const b = system.virtual(ORDER_TYPE, "k1");
+assert.equal(await b.address, await a.address);</code></pre>
+    <p>Before its first message a virtual actor has no journal, so <code>getSnapshot</code> reports the start configuration at position 0. Entry one carries the start macrostep together with the first event.</p>
+
+    <h2 id="send">Sending and requesting</h2>
+    <p>An event is a plain object: its name in <code>type</code>, and its payload's fields beside it, as in <code>{ type: "add", by: 4 }</code>. A payload that is not a record goes in <code>data</code>: <code>{ type: "count", data: 3 }</code>. Inside the chart the payload is <code>ev.data</code> as usual.</p>
+    <ul>
+      <li><code>actor.send(event, {messageId})</code> resolves to <code>{messageId}</code>. Every send carries a message id, a fresh <code>urn:uuid:</code> one by default. Pass your own to make a retry safe: a second send with the same id is processed once and journaled once.</li>
+      <li><code>actor.request(event, {timeoutMs})</code> resolves with the chart's <code>vt:reply</code> event. It rejects with <code>RequestTimeout</code> after <code>timeoutMs</code> (30,000 by default), and a late reply is dropped.</li>
+    </ul>
+<pre data-lang="SCXML"><code>&lt;!-- the PRICER chart from packages/web/test/helpers.mjs --&gt;
+&lt;state id="s"&gt;
+  &lt;transition event="price.get"&gt;
+    &lt;send event="vt:reply" targetexpr="ev.origin"&gt;&lt;content expr="{'price': 42}"/&gt;&lt;/send&gt;
+  &lt;/transition&gt;
+&lt;/state&gt;</code></pre>
+<pre data-lang="JavaScript"><code>const reply = await pricer.request({ type: "price.get" }, { timeoutMs: 2000 });
+reply.name;   // "vt:reply"
+reply.data;   // { price: 42 }</code></pre>
+    <p><code>request</code> is the promise-based ask for code outside the actor system. Charts keep using the non-blocking <code>vt:request</code>.</p>
+
+    <h2 id="subscriptions">Snapshots and subscriptions</h2>
+    <p>A <code>Snapshot</code> has <code>address</code>, <code>position</code> (the journal position it follows), <code>version</code> (the chart version IRI), <code>configuration</code> (active state ids in document order), <code>context</code>, <code>terminated</code>, and <code>matches(id)</code>. The API borrows XState's words, but the semantics are SCXML's, and there is no mode that changes them.</p>
+    <table>
+      <thead><tr><th>Call</th><th>What it gives</th></tr></thead>
+      <tbody>
+        <tr><td><code>actor.getSnapshot()</code></td><td>The current snapshot.</td></tr>
+        <tr><td><code>actor.subscribe(f)</code></td><td>One snapshot per macrostep that changed the configuration or the context. Returns an unsubscribe function.</td></tr>
+        <tr><td><code>actor.onTransition(f)</code></td><td>Per macrostep: the triggering event and the transitions taken, each as <code>{source, targets, iri}</code>.</td></tr>
+        <tr><td><code>actor.can(event)</code></td><td>Whether the actor accepts the event now: it enables a transition, or an active state defers it. Nothing changes and nothing is journaled.</td></tr>
+        <tr><td><code>snapshot.matches(id)</code></td><td>Whether state <code>id</code> is active. It checks a state id, not a dotted path.</td></tr>
+      </tbody>
+    </table>
+    <p>Notifications arrive in journal order, at most once per macrostep, and never show a microstep. The transitions in a notification are the ones the journal entry recorded, which the runtime sorts by node IRI; the order they ran in across microsteps is not recorded yet.</p>
+
+    <h2 id="journal">Journal, time travel and SPARQL</h2>
+    <p>Every actor's history is its journal, and the browser journal has the same format as the native one.</p>
+    <ul>
+      <li><code>actor.journal({from})</code> lists entries: <code>position</code>, <code>kind</code> (<code>input</code>, <code>migration</code> or <code>fork</code>), <code>version</code>, <code>messageId</code>, <code>timestamp</code>, <code>digest</code>, and the <code>event</code>, <code>transitions</code> and <code>timer</code> when present.</li>
+      <li><code>actor.asOf({position})</code> or <code>actor.asOf({time})</code> returns the snapshot after a past position or as of a transaction time. It is read-only.</li>
+      <li><code>system.query(sparql, {time})</code> runs SPARQL on the graph store, now or as believed at <code>time</code> (epoch milliseconds). Results are <code>{variables, rows}</code>, <code>{boolean}</code> or <code>{triples}</code>. Queries of the current state work on any store; a query with <code>time</code> needs a journaled store, and the plain in-memory store rejects it because it keeps no history.</li>
+      <li><code>system.exportJournal()</code> returns the journal file as bytes, to download or to open with the native runtime.</li>
+    </ul>
+    <p>This program follows the <code>ORDER</code> chart from the tests, whose <code>pay</code> transition arms a 300 ms timer that moves it on to <code>shipped</code>:</p>
+<pre data-lang="JavaScript"><code>const system = await createActorSystem({ storage: "memory", journal: true });
+const order = await system.spawn(ORDER);
+const addr = await order.address;
+await order.send({ type: "pay" });
+const afterPay = Date.now();
+await new Promise((r) =&gt; setTimeout(r, 500));
+const q = `SELECT ?s WHERE { GRAPH &lt;${addr}&gt; { &lt;${addr}&gt; &lt;https://w3id.org/vertep/vt#inState&gt; ?s } }`;
+console.log("now:", (await system.query(q)).rows);
+console.log("as of afterPay:", (await system.query(q, { time: afterPay })).rows);
+const bytes = await system.exportJournal();
+console.log("journal file:", bytes.length, "bytes, header", JSON.stringify(new TextDecoder().decode(bytes.slice(0, 15))));</code></pre>
+<pre class="output" data-lang="Output"><code>now: [
+  {
+    s: '&lt;urn:vertep:chart:sha256:f2410655de9eca00fe4d9f4610fe8a35f37f6dbb2338b14cedf3dd518df8d345#s.shipped&gt;'
+  }
+]
+as of afterPay: [
+  {
+    s: '&lt;urn:vertep:chart:sha256:f2410655de9eca00fe4d9f4610fe8a35f37f6dbb2338b14cedf3dd518df8d345#s.paid&gt;'
+  }
+]
+journal file: 229376 bytes, header "SQLite format 3"</code></pre>
+    <p>State nodes are minted under the chart version IRI, so the answer names the exact chart that was running. See <a href="rdf.html">RDF and versions</a> for the vocabulary.</p>
+
+    <h2 id="implementations">Guards and actions in JavaScript</h2>
+    <p>A chart with the <code>rust</code> datamodel names its guards and actions by IRI. In the browser those names resolve to JavaScript functions exported by an implementations module, which the worker imports at start. This is the test fixture <code>packages/web/test/fixtures/impl.mjs</code>:</p>
+<pre data-lang="JavaScript"><code>// An implementations module: named guards and actions, imported inside the worker.
+export const guards = {
+  "vt:guard/order/positive": ({ event }) =&gt; event.amount &gt; 0,
+};
+
+export const actions = {
+  "vt:action/order/record": ({ context, event, raise }) =&gt; {
+    context.total = event.amount;
+    raise({ type: "receipt", amount: event.amount });
+  },
+};</code></pre>
+<pre data-lang="JavaScript"><code>const system = await createActorSystem({
+  storage: "memory",
+  implementations: new URL("./fixtures/impl.mjs", import.meta.url),
+});</code></pre>
+    <p>A guard receives <code>{context, event}</code>. An action receives <code>{context, event, raise, send}</code>, may change <code>context</code> in place or return a new one, and may raise internal events or send with <code>{target, delay}</code>. Guards must be pure. Unlike in Rust, nothing in the language helps you here, so turn on <code>dev: true</code> while developing: impure functions then show up as replay mismatches. For charts that a language model writes, prefer the CEL datamodel, which needs no module at all.</p>
+
+    <h2 id="storage">Storage: OPFS and Web Locks</h2>
+    <p>Storage is chosen once, explicitly, and never changes behind your back.</p>
+    <ul>
+      <li><strong><code>opfs</code></strong> keeps the tiramemsu journal in the Origin Private File System. It needs OPFS synchronous access handles, which exist only in a browser's dedicated worker. Where they are missing (in Node.js, for example) <code>createActorSystem</code> rejects with <code>StorageUnavailable</code>, and no memory store is opened in its place.</li>
+      <li><strong><code>memory</code></strong> is volatile. With <code>journal: true</code> it still keeps a tiramemsu journal, which you can export and later pass back as <code>import</code>. This is how Node.js persists.</li>
+    </ul>
+    <p>Before opening an OPFS store the worker takes a Web Lock named <code>vertep:store:&lt;path&gt;</code> with <code>ifAvailable</code>. A second tab or worker that opens the same store gets <code>StoreLocked</code> at once instead of waiting or corrupting the file, because tiramemsu allows one writer per file. The lock is released when the holding worker terminates. The same helper is exported as <code>takeStoreLock(path)</code> and <code>lockName(path)</code>.</p>
+    <p>A journal file moves between the browser and a server unchanged: the storage tests export a journal from WebAssembly, replay it natively, and import a native one back, with identical snapshots.</p>
+<pre data-lang="JavaScript"><code>// from packages/web/test/storage.test.mjs: persist through export
+const first = await createActorSystem({ storage: "memory", journal: true });
+const a = first.virtual({ source: COUNTER, format: "scxml", type: ORDER_TYPE }, "p");
+await a.send({ type: "add", by: 2 });
+const file = await first.exportJournal();
+await first.terminate();
+
+const later = await createActorSystem({
+  storage: "memory", journal: true, import: file,
+  charts: [{ source: COUNTER, type: ORDER_TYPE }],
+});
+const b = later.virtual(ORDER_TYPE, "p");   // same state, and it resumes</code></pre>
+
+    <h2 id="errors">Errors</h2>
+    <p>Every rejection is a <code>VertepError</code> with a stable <code>code</code>. The list is shared with the Rust side in <code>crates/vertep-wasm/src/error.rs</code>.</p>
+    <table>
+      <thead><tr><th>Code</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td><code>ChartInvalid</code></td><td>A chart source failed to read or validate; <code>violations</code> holds each problem with <code>line</code>, <code>column</code> and, when known, <code>path</code>.</td></tr>
+        <tr><td><code>StorageUnavailable</code></td><td>The requested storage does not exist here (OPFS outside a dedicated worker, no Web Locks, or a build without the journal).</td></tr>
+        <tr><td><code>StoreLocked</code></td><td>Another worker or tab holds the store.</td></tr>
+        <tr><td><code>RequestTimeout</code></td><td>No reply within a request's timeout.</td></tr>
+        <tr><td><code>WorkerTerminated</code></td><td>The worker died or was terminated; raised on the client side only.</td></tr>
+        <tr><td><code>TransportRefused</code></td><td>The WebSocket server refused the connection credential.</td></tr>
+        <tr><td><code>NotFound</code></td><td>A call named an actor, chart type or subscription that does not exist.</td></tr>
+        <tr><td><code>InvalidArgument</code></td><td>Malformed arguments, such as an event without a <code>type</code>.</td></tr>
+        <tr><td><code>Activation</code></td><td>An actor could not be activated or replayed, for example an <code>ecmascript</code> chart in a build without boa.</td></tr>
+        <tr><td><code>Delivery</code></td><td>A message could not be delivered.</td></tr>
+        <tr><td><code>Store</code></td><td>The store failed.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="websocket">Talking to server actors over WebSocket</h2>
+    <p>Browser and Node.js actors reach server actors by IRI through a WebSocket transport. It is registered as an SCXML Event I/O Processor, so a chart sends with <code>type="websocket"</code>, and events from the server arrive with <code>_event.origintype</code> set to <code>https://w3id.org/vertep/vt#WebSocketEventProcessor</code>. The server end is in <code>vertep-runtime</code> behind the <code>websocket</code> feature (<code>crates/vertep-runtime/src/websocket/server.rs</code>).</p>
+<pre data-lang="SCXML"><code>&lt;!-- the CLIENT chart from packages/web/test/helpers.mjs --&gt;
+&lt;state id="c"&gt;
+  &lt;transition event="go"&gt;&lt;send type="websocket" event="ping" target="https://server.example/charts/server/s1"/&gt;&lt;/transition&gt;
+  &lt;transition event="pong"&gt;&lt;assign location="ctx.n" expr="ctx.n + 1"/&gt;&lt;assign location="ctx.ot" expr="ev.origintype"/&gt;&lt;/transition&gt;
+&lt;/state&gt;</code></pre>
+<pre data-lang="JavaScript"><code>// from packages/web/test/websocket.test.mjs
+const system = await createActorSystem({
+  storage: "memory",
+  charts: [chart],
+  transports: {
+    websocket: { url, credentials: async () =&gt; credential, targets: ["https://server.example/"], reconnectMs: 50 },
+  },
+});</code></pre>
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>url</code></td><td>The server endpoint, <code>ws:</code> or <code>wss:</code>.</td></tr>
+        <tr><td><code>credentials</code></td><td>A provider called before every connection. It stays on the main thread; the worker asks for its value, which goes in the <code>hello</code> frame.</td></tr>
+        <tr><td><code>targets</code></td><td>IRI prefixes of the server's actors. Without it, every address not hosted locally goes to the server.</td></tr>
+        <tr><td><code>hosts</code></td><td>IRI prefixes of this system's actors, announced to the server.</td></tr>
+        <tr><td><code>node</code></td><td>This system's node IRI; a fresh one by default.</td></tr>
+        <tr><td><code>reconnectMs</code></td><td>The first reconnect delay, doubling up to 5 s; 200 by default.</td></tr>
+      </tbody>
+    </table>
+    <p>The frames are JSON text: <code>hello</code>, then <code>welcome</code> or <code>refused</code>, then <code>message</code> (an envelope with message id, target, origin, event name and payload) and <code>ack</code>. Delivery is at least once: an actor's send stays owed in its outbox until the peer's <code>ack</code>, is sent again after a reconnect, and is dropped as a duplicate by message id at the receiver. The end-to-end test forces dropped acknowledgements and duplicated frames, and checks that each ping and pong is journaled once.</p>
+    <p>A JavaScript <code>send</code> to a server actor resolves when the server acknowledges it, and rejects with <code>TransportRefused</code> when the credential is refused.</p>
+    <div class="nb warn"><p><code>request</code> to a server actor is not supported yet, according to the implementation notes in <code>tg.md/views/browser.md</code>; use <code>send</code> and a reply event. DID-authenticated envelopes from the <a href="distribution.html">federation layer</a> are planned to wrap the same frames later; today the credential provider is the only authentication.</p></div>
+
+    <h2 id="types">Generated TypeScript types</h2>
+    <p><code>vt gen ts &lt;chart&gt; [--name N]</code> prints a TypeScript module from the chart's IR types: the event union with typed payloads, the context type, the state-id union, the chart as a typed <code>ChartSpec</code>, and a typed <code>create&lt;Name&gt;Actor</code>. It is one more projection of the same type language that gives JSON Schema, SHACL and Rust (see <a href="types.html">Datamodels and types</a>). Run on the YAML fixture <code>bindings/js/packages/web/test/fixtures/order.yaml</code>:</p>
+<pre data-lang="Shell"><code>cargo run -q --release -p vertep-cli -- gen ts bindings/js/packages/web/test/fixtures/order.yaml</code></pre>
+<pre class="output" data-lang="Output"><code>// Generated by `vt gen ts` from chart urn:vertep:chart:sha256:492380086576395e03d1d5ce904e3f4f788896a3b442f6c760a6bc95374e1187. Do not edit.
+import type { ActorRef, ActorSystem, ChartSpec, JsonValue } from "@vertep/web";
+
+export type Pay = { amount: number | string };
+
+export type OrderEvent =
+  | { type: "start" }
+  | { type: "pay" } &amp; Pay
+  | { type: "authorized" }
+  | { type: "cancel" };
+export interface OrderContext {
+  total: number | string;
+}
+export type OrderStateId = "idle" | "checkout" | "cart" | "payment" | "review" | "paid" | "cancelled";
+
+/** The chart, typed: pass it to `spawn` or `virtual`. */
+export const orderChart: ChartSpec&lt;OrderEvent, OrderContext, OrderStateId&gt; = {
+  source: "vertep: 1\nname: order\ntypes: { Pay: { amount: decimal } }\nevents: { start: null, pay: Pay, authorized: null, cancel: null }\ncontext:\n  total: { type: decimal, init: \"0\" }\nstates:\n  idle: { on: { start: checkout } }\n  checkout:\n    on: { cancel: cancelled }\n    states:\n      cart:\n        on:\n          pay: [ { cond: \"ev.data.amount &lt;= 0\", target: cart }, { target: payment, actions: [ { assign: { location: ctx.total, expr: \"ev.data.amount\" } } ] } ]\n      payment:\n        on:\n          authorized:\n            - { cond: \"ctx.total &gt; 100\", target: review }\n            - { target: paid }\n      review: { on: { approve: paid } }\n  paid: { type: final }\n  cancelled: { type: final }\n",
+  format: "yaml",
+  type: "urn:vertep:chart:sha256:492380086576395e03d1d5ce904e3f4f788896a3b442f6c760a6bc95374e1187",
+};
+
+/** The virtual actor of this chart with `key`, typed. */
+export function createOrderActor(system: ActorSystem, key: string): ActorRef&lt;OrderEvent, OrderContext, OrderStateId&gt; {
+  return system.virtual(orderChart, key);
+}</code></pre>
+    <p>With the generated module, <code>createOrderActor(system, "o1").send({ type: "refund" })</code> is a compile error, and so are a wrong payload type, a missing or extra field, and <code>matches("nowhere")</code>. The test <code>packages/web/test/types.test.mjs</code> checks seven such errors with the TypeScript compiler, and a property test checks that the TypeScript and JSON Schema projections accept the same values. A <code>decimal</code> becomes <code>number | string</code>. A chart with no declared types falls back to <code>{ type: string; [field: string]: JsonValue }</code> and <code>JsonValue</code> for the context.</p>
+
+    <h2 id="ecmascript">The ECMAScript datamodel</h2>
+    <p>Charts with <code>datamodel="ecmascript"</code> need the boa engine, which ships in <code>@vertep/dm-ecma</code>. Pass its build to the system:</p>
+<pre data-lang="JavaScript"><code>import { createActorSystem } from "@vertep/web";
+import { ecmascript } from "@vertep/dm-ecma";
+const system = await createActorSystem({ storage: "memory", datamodel: ecmascript });</code></pre>
+    <p>Without it, spawning an ECMAScript chart rejects with <code>Activation</code>. The <code>ecmascript</code> build includes the journal, so it serves both storage kinds.</p>
+
+    <h2 id="size">Bundle size</h2>
+    <p>The main package has a size budget, measured with gzip level 9 over the WebAssembly, its glue and the client and worker JavaScript. <code>npm run check:size</code> fails when a build exceeds its budget. The core budget was 600 KB at first; the SPARQL engine that the graph store needs is 637 KB on its own, so the budget was raised to 1.2 MB rather than dropping SPARQL from the browser.</p>
+<pre class="output" data-lang="npm run check:size"><code>core: 1159.7 KB gzip (budget 1200 KB)
+journal: 2198.1 KB gzip (budget 2500 KB)</code></pre>
+    <table>
+      <thead><tr><th>Build</th><th>Contents</th><th>Gzip</th><th>Budget</th></tr></thead>
+      <tbody>
+        <tr><td><code>core</code></td><td>core, shell, <code>null</code>/CEL/<code>rust</code> datamodels, in-memory store, SPARQL</td><td>1,159.7 KB</td><td>1,200 KB</td></tr>
+        <tr><td><code>journal</code></td><td>the above plus tiramemsu on SQLite</td><td>2,198.1 KB</td><td>2,500 KB</td></tr>
+        <tr><td><code>@vertep/dm-ecma</code></td><td>journal build plus boa (WebAssembly file alone)</td><td>3,182.2 KB</td><td>none</td></tr>
+      </tbody>
+    </table>
+    <p>The journal build is loaded only when a journaled store opens, so a page that uses volatile memory storage downloads the core build alone. The sizes above were measured on the builds in the repository on 2026-11-12; KB means 1,000 bytes.</p>
+
+    <h2 id="tests">How the bindings are tested</h2>
+    <ul>
+      <li><strong>Same steps as native.</strong> <code>core.test.mjs</code> runs the same charts and inputs through the WebAssembly core and the native helper and requires byte-for-byte equal traces.</li>
+      <li><strong>Conformance.</strong> <code>conformance.test.mjs</code> runs the W3C IRP suite in WebAssembly and requires the native verdicts and the same allow-list gate, and replays the differential traces against the native ones. See <a href="verification.html">Verification</a>.</li>
+      <li><strong>Browser only.</strong> <code>browser.test.mjs</code> drives headless Chrome over the DevTools protocol for OPFS, the second-writer lock and WebSocket in a real Web Worker. It is skipped when Chrome is not installed; set <code>CHROME</code> to its binary.</li>
+      <li><strong>Packaging.</strong> <code>package.test.mjs</code> packs <code>@vertep/web</code>, installs the tarball offline and runs a program from it, and checks the version and budget gates.</li>
+    </ul>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="distribution.html">← Cluster and federation</a>
+      <a href="rdf.html">RDF and versions →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a></nav>
+  </div>
+</footer>
+</body>
+</html>

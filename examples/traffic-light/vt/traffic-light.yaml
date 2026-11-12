@@ -1,0 +1,61 @@
+vertep: 1
+name: traffic-light
+datamodel: "null"
+initial: operating
+states:
+  operating:
+    type: parallel
+    on:
+      fault: flashing
+    states:
+      light:
+        initial: red
+        states:
+          red:
+            entry:
+              - send:
+                  event: tick
+                  id: light-timer
+                  delay: "30s"
+            exit:
+              - cancel:
+                  sendid: light-timer
+            on:
+              tick: green
+          green:
+            entry:
+              - send:
+                  event: tick
+                  id: light-timer
+                  delay: "25s"
+            exit:
+              - cancel:
+                  sendid: light-timer
+            on:
+              tick: yellow
+              button: yellow
+          yellow:
+            entry:
+              - send:
+                  event: tick
+                  id: light-timer
+                  delay: "5s"
+            exit:
+              - cancel:
+                  sendid: light-timer
+            on:
+              tick: red
+      crossing:
+        initial: dont_walk
+        states:
+          dont_walk:
+            always:
+              cond: "In('red')"
+              target: walk
+          walk:
+            always:
+              cond: "In('green')"
+              target: dont_walk
+  flashing:
+    on:
+      reset: operating
