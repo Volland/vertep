@@ -475,6 +475,7 @@ pub fn check_chart(chart: &Chart) -> Result<TypedChart, Vec<Diagnostic>>;   // r
 - **Opt-in** (`Opt-In Chart Typing`, `Dynamic Value Boundary`): untyped charts run on `value` exactly as in M0; `value` enters static code only through a checked conversion.
 - **System events** (`Event Type Declarations`): `done.state.*`, `done.invoke.*` and `error.*` have predefined types; a wildcard descriptor sees the union of matching payload types.
 - **SCXML** (`Typed SCXML Attributes`): `vt:type` on `<data>`, `<send>` and `<param>` plus a `vt:types` element; other processors ignore them and run the chart untyped.
+- **Generated values**: the checker also types what the interpreter writes without an expression of the chart: a bare `<assign>` (`undefined`) needs an optional location, `idlocation` a string location, `foreach` item and index locations their element and `int` types, `namelist` entries are keyed by the whole location, and declared `error.*` and `done.state.*` payloads must accept what the platform raises (decision "The chart checker types the values the core generates", found by the Lean type soundness proof).
 
 ### Projections
 

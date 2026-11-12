@@ -60,3 +60,18 @@ The Lean package SHALL define the RDF encoding of values and the SHACL Core proj
 #### Scenario: Unfolding is monotone
 - **WHEN** the encoding of a value conforms to the shapes of a type unfolded `k` times
 - **THEN** it conforms to the shapes unfolded `k + 1` times
+
+### Requirement: Chart Type Soundness
+The Lean package SHALL prove type soundness of `start` and `step` relative to the static typing a chart passed the chart type checker with: the declared types of locations and events and the static types the checker gives expressions, inline contents and `foreach` items. Given a typed answer tape, a datamodel kept typed by typed requests, a session whose queued events are typed and a typed input event, every successful `start` and `step`, and the partial result of one that exhausts the microstep budget, SHALL write to a typed location only values of its type, SHALL keep the datamodel typed, and SHALL send, forward and queue only events whose payloads have their declared types. A typed answer tape is the datamodel's obligation, stated as an assumption: an answer to a request for an expression, an inline content or the items of a `foreach` array whose static type is `T` is a value of type `T`. The values the core generates itself, `undefined` for an `<assign>` without value, `idlocation` identifiers, `foreach` items and indices, the platform's `error.*` payloads and `done.state.*` data, SHALL be checked by the chart type checker. Expressions and contents the datamodel's typer cannot type are outside the statement: their values reach typed locations through the datamodel's checked conversion.
+
+#### Scenario: Typed step keeps the datamodel typed
+- **WHEN** the theorem is applied to `step` on a checked chart with a typed tape, a typed datamodel, a typed session and a typed input event
+- **THEN** every `assignValue` and `bindVar` to a typed location carries a value of that location's type and the datamodel after the step's requests is typed
+
+#### Scenario: Sent and queued events carry their declared payloads
+- **WHEN** the same theorem is applied
+- **THEN** every `send` and `forward` effect and every event left in the internal queue whose name has a declared payload type carries a payload of that type
+
+#### Scenario: Generated values are checked
+- **WHEN** a chart writes `undefined` with a bare `<assign>` to a location of a required type, stores an `idlocation` in a location that does not accept strings, or binds `foreach` items or indices to locations of other types
+- **THEN** the chart type checker rejects it, and the Lean step writes the value that breaks the location's type

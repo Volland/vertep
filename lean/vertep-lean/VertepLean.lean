@@ -65,3 +65,8 @@ import VertepLean.Config.EntryTargets
 import VertepLean.Config.EntryMain
 import VertepLean.Config.Entry
 import VertepLean.Config.Theorem
+import VertepLean.TypedStep.Basic
+import VertepLean.TypedStep.Hoare
+import VertepLean.TypedStep.Exec
+import VertepLean.TypedStep.Interp
+import VertepLean.TypedStep.Theorem

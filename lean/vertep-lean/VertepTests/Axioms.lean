@@ -59,7 +59,11 @@ def mainTheorems : List Name :=
     ``Vertep.configuration_wellformedness_of, ``Vertep.compile_cwf,
     ``Vertep.configuration_wellformedness_of_entry, ``Vertep.entry_legal,
     ``Vertep.configuration_wellformedness, ``Vertep.compound_exclusivity,
-    ``Vertep.parallel_completeness ]
+    ``Vertep.parallel_completeness,
+    ``Vertep.Typed.typed_step_soundness, ``Vertep.Typed.typed_start_soundness,
+    ``Vertep.Typed.step_typed, ``Vertep.Typed.stepFull_typed, ``Vertep.Typed.start_typed,
+    ``Vertep.Typed.startFull_typed, ``Vertep.Typed.datamodel_typed,
+    ``Vertep.Typed.vertep_typed_soundness ]
 
 /-- The axioms of `n` outside the allowed set. -/
 def disallowed (n : Name) : CoreM (Array Name) := do

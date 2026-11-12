@@ -137,7 +137,11 @@ fn record_with_unknown_field() {
 /// it out; verification-backlog 4.2).
 #[test]
 fn undefined_entry_is_no_unknown_field() {
-    let v = obj(&[("id", s("o-1")), ("amount", s("3")), ("note", Value::Undefined)]);
+    let v = obj(&[
+        ("id", s("o-1")),
+        ("amount", s("3")),
+        ("note", Value::Undefined),
+    ]);
     assert!(check_value(&order(), &v).is_ok());
     let payment = parse_type("Card { last4: string } | Cash").unwrap();
     let w = obj(&[("tag", s("Cash")), ("note", Value::Undefined)]);
@@ -856,4 +860,241 @@ fn raise_of_a_payload_event_and_typed_params_are_checked() {
     assert_eq!(diags.len(), 2, "{diags:?}");
     assert!(diags[0].message.contains("<raise> cannot carry one"));
     assert_eq!(diags[1].kind, DiagnosticKind::Param);
+}
+
+// ======================================================== values the core generates (4.4)
+
+/// `<assign location="ctx.n"/>` with an `int` location.
+fn bare_assign(location: &str) -> Exec {
+    Exec::new(ExecKind::Assign {
+        location: location.into(),
+        expr: None,
+        content: None,
+    })
+}
+
+/// A bare `<assign>` stores `undefined`, which only an optional or `value` location accepts
+/// (decision "The chart checker types the values the core generates"; found by the Lean type
+/// soundness theorem, verification-backlog 4.4).
+// @tg: verifies:: [[openspec:formal-model#Chart Type Soundness#Generated values are checked]] {level: unit}
+#[test]
+fn bare_assign_to_a_required_location_is_rejected() {
+    let c = chart(
+        "",
+        vec![
+            typed_data("n", "int", Some("0")),
+            typed_data("m", "optional<int>", None),
+        ],
+        vec![transition(
+            "go",
+            None,
+            "done",
+            vec![bare_assign("ctx.n"), bare_assign("ctx.m")],
+        )],
+    );
+    let diags = check_chart(&c, &cel()).unwrap_err();
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert!(
+        diags[0].message.contains("stores undefined"),
+        "{}",
+        diags[0].message
+    );
+    assert!(
+        diags[0].message.contains("`ctx.n` has type int"),
+        "{}",
+        diags[0].message
+    );
+}
+
+/// An `idlocation` receives the generated send or invoke identifier, a string.
+// @tg: verifies:: [[openspec:formal-model#Chart Type Soundness#Generated values are checked]] {level: unit}
+#[test]
+fn idlocation_must_hold_a_string() {
+    let idsend = |l: &str| {
+        Exec::new(ExecKind::Send(Box::new(Send {
+            event: Some("tick".into()),
+            target: Some("#_internal".into()),
+            idlocation: Some(l.into()),
+            ..Send::default()
+        })))
+    };
+    let mut c = chart(
+        "",
+        vec![
+            typed_data("n", "int", Some("0")),
+            typed_data("s", "string", Some("''")),
+        ],
+        vec![transition(
+            "go",
+            None,
+            "done",
+            vec![idsend("ctx.n"), idsend("ctx.s")],
+        )],
+    );
+    c.states[0].invokes = vec![
+        crate::ir::Invoke {
+            idlocation: Some("ctx.n".into()),
+            ..crate::ir::Invoke::default()
+        },
+        crate::ir::Invoke {
+            idlocation: Some("ctx.s".into()),
+            ..crate::ir::Invoke::default()
+        },
+    ];
+    let diags = check_chart(&c, &cel()).unwrap_err();
+    assert_eq!(diags.len(), 2, "{diags:?}");
+    for d in &diags {
+        assert!(d.message.contains("idlocation `ctx.n`"), "{}", d.message);
+        assert!(d.message.contains("has type int"), "{}", d.message);
+    }
+}
+
+/// `foreach` binds the array's items to `item` and `int` indices to `index`.
+// @tg: verifies:: [[openspec:formal-model#Chart Type Soundness#Generated values are checked]] {level: unit}
+#[test]
+fn foreach_item_and_index_locations_are_checked() {
+    let each = |item: &str, index: Option<&str>| {
+        Exec::new(ExecKind::Foreach {
+            array: "ctx.xs".into(),
+            item: item.into(),
+            index: index.map(str::to_string),
+            body: Vec::new(),
+        })
+    };
+    let data = || {
+        vec![
+            typed_data("xs", "list<string>", None),
+            typed_data("n", "int", Some("0")),
+            typed_data("s", "string", Some("''")),
+        ]
+    };
+    let ok = chart(
+        "",
+        data(),
+        vec![transition(
+            "go",
+            None,
+            "done",
+            vec![each("ctx.s", Some("ctx.n"))],
+        )],
+    );
+    assert_eq!(check_chart(&ok, &cel()).map(|_| ()), Ok(()));
+    let bad = chart(
+        "",
+        data(),
+        vec![transition(
+            "go",
+            None,
+            "done",
+            vec![each("ctx.n", Some("ctx.s"))],
+        )],
+    );
+    let diags = check_chart(&bad, &cel()).unwrap_err();
+    assert_eq!(diags.len(), 2, "{diags:?}");
+    assert!(
+        diags[0]
+            .message
+            .contains("the foreach item `ctx.n` has type string, expected int")
+    );
+    assert!(
+        diags[1]
+            .message
+            .contains("the foreach index `ctx.s` has type int, expected string")
+    );
+}
+
+/// The runtime keys a `namelist` entry by the whole location (`eval_payload`), so the checker
+/// does too: `namelist="ctx.total"` supplies the field `ctx.total`, not `total`.
+#[test]
+fn namelist_entries_are_keyed_by_the_whole_location() {
+    let mut s = send("pay", &[], 12);
+    if let ExecKind::Send(snd) = &mut s.kind {
+        snd.namelist = vec!["ctx.total".into()];
+    }
+    let c = chart(
+        "event pay: { total: decimal };",
+        vec![typed_data("total", "decimal", Some("0"))],
+        vec![transition("go", None, "done", vec![s])],
+    );
+    let diags = check_chart(&c, &cel()).unwrap_err();
+    let msgs: Vec<&str> = diags.iter().map(|d| d.message.as_str()).collect();
+    assert!(
+        msgs.iter().any(|m| m.contains("unknown field `ctx.total`")),
+        "{msgs:?}"
+    );
+    assert!(
+        msgs.iter().any(|m| m.contains("missing field `total`")),
+        "{msgs:?}"
+    );
+}
+
+/// A declared `error.execution` or `error.communication` must accept the platform's
+/// `{ kind, message }` payload, and a declared `done.state.<id>` must accept no data and the
+/// `<donedata>` of the final children of `<id>`.
+#[test]
+fn declared_platform_events_accept_the_platform_payloads() {
+    let required = chart(
+        "event error.execution: { kind: string, message: string, code: int };",
+        vec![],
+        vec![transition("go", None, "done", vec![])],
+    );
+    let diags = check_chart(&required, &cel()).unwrap_err();
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert!(
+        diags[0]
+            .message
+            .contains("{ kind: string, message: string }")
+    );
+    let extended = chart(
+        "event error.communication: { kind: string, message: string, code: optional<int> };",
+        vec![],
+        vec![transition("go", None, "done", vec![])],
+    );
+    assert!(check_chart(&extended, &cel()).is_ok());
+
+    let with_done = |decl: &str, expr: &str| {
+        let mut c = chart(decl, vec![], vec![transition("go", None, "done", vec![])]);
+        let mut fin = State::new("fin", StateElement::Final);
+        fin.donedata = Some(crate::ir::DoneData {
+            content: None,
+            params: vec![Param {
+                name: "total".into(),
+                expr: Some(expr.into()),
+                location: None,
+                span: Span::NONE,
+            }],
+            span: Span::NONE,
+        });
+        c.states[0].children = vec![fin];
+        c
+    };
+    let diags = check_chart(
+        &with_done("event done.state.idle: { total: int };", "1"),
+        &cel(),
+    )
+    .unwrap_err();
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert!(
+        diags[0].message.contains("must be optional"),
+        "{}",
+        diags[0].message
+    );
+    let diags = check_chart(
+        &with_done("event done.state.idle: optional<{ total: int }>;", "'one'"),
+        &cel(),
+    )
+    .unwrap_err();
+    assert_eq!(diags.len(), 1, "{diags:?}");
+    assert!(
+        diags[0].message.contains("field `total`"),
+        "{}",
+        diags[0].message
+    );
+    assert!(
+        check_chart(
+            &with_done("event done.state.idle: optional<{ total: int }>;", "1"),
+            &cel()
+        )
+        .is_ok()
+    );
 }

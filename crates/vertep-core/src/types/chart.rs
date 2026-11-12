@@ -13,12 +13,12 @@ use core::fmt;
 use crate::compile::CompiledChart;
 use crate::datamodel::{Event, Value};
 use crate::ir::{
-    Block, Chart, Data, Exec, ExecKind, Extension, ExtensionValue, Invoke, Param, Span, State,
-    Transition, VT_NS,
+    Block, Chart, Content, Data, Exec, ExecKind, Extension, ExtensionValue, Invoke, Param, Span,
+    State, StateElement, Transition, VT_NS,
 };
 use crate::types::check::{TypeError, TypeErrorKind, ValuePath, is_assignable};
 use crate::types::decl::{DeclError, Declarations};
-use crate::types::events::EventTable;
+use crate::types::events::{EventTable, error_payload_type};
 use crate::types::syntax::{SyntaxError, parse_declarations, parse_type};
 use crate::types::ty::{Field, Type};
 use crate::validate::Violation;
@@ -699,6 +699,7 @@ pub fn check_chart(chart: &Chart, typer: &dyn ExprTyper) -> Result<ChartTypes, V
         context: Vec::new(),
         diags,
     };
+    ck.platform_events();
     // Context: every <data> item, in document order.
     let mut data_items: Vec<(&Data, String)> = Vec::new();
     collect_data_located(chart, &mut data_items);
@@ -948,8 +949,71 @@ impl Checker<'_> {
                 self.expr(c, &any, DiagnosticKind::Action, &dl, dd.span, false);
             }
         }
+        // The platform raises `done.state.<id>` with the <donedata> of the final child entered.
+        let done = format!("done.state.{}", s.id);
+        if let Some((_, declared)) = self.events.iter().find(|(n, _)| *n == done) {
+            let declared = declared.cloned();
+            for c in &s.children {
+                if c.element != StateElement::Final {
+                    continue;
+                }
+                let Some(dd) = &c.donedata else { continue };
+                let dl = format!("state \"{}\", donedata", c.id);
+                let content_type = dd
+                    .content
+                    .as_ref()
+                    .and_then(|c| c.expr.as_ref())
+                    .map(|x| self.typer_quiet(x, &any, false));
+                self.check_payload(
+                    Some(declared.clone()),
+                    &done,
+                    &[],
+                    &dd.params,
+                    dd.content.as_ref(),
+                    content_type,
+                    &any,
+                    DiagnosticKind::Action,
+                    &dl,
+                    dd.span,
+                );
+            }
+        }
         for c in &s.children {
             self.state(c);
+        }
+    }
+
+    /// Declared events the platform raises must accept the payloads it raises them with:
+    /// `error.execution` and `error.communication` carry `{ kind: string, message: string }`,
+    /// and `done.state.<id>` carries no data when its `<donedata>` fails or the state is a
+    /// parallel state.
+    fn platform_events(&mut self) {
+        let mut found: Vec<String> = Vec::new();
+        for (name, payload) in self.events.iter() {
+            if name == "error.execution" || name == "error.communication" {
+                let accepts =
+                    payload.is_some_and(|t| is_assignable(self.decls, &error_payload_type(), t));
+                if !accepts {
+                    let shown = payload.map_or("no payload".to_string(), |t| t.to_string());
+                    found.push(format!(
+                        "event `{name}` is raised by the platform with payload \
+                         {{ kind: string, message: string }}, which its declared payload {shown} \
+                         does not accept"
+                    ));
+                }
+            } else if name.starts_with("done.state.")
+                && let Some(t) = payload
+                && !self.optional_or_value(t)
+            {
+                found.push(format!(
+                    "event `{name}` is raised by the platform without data when its <donedata> \
+                     fails or its state is a parallel state, so its payload type {t} must be \
+                     optional"
+                ));
+            }
+        }
+        for m in found {
+            self.push(DiagnosticKind::Declaration, "vt:types", Span::NONE, m);
         }
     }
 
@@ -979,6 +1043,9 @@ impl Checker<'_> {
             .chain(inv.content.as_ref().and_then(|c| c.expr.as_ref()))
         {
             self.expr(e, &any, DiagnosticKind::Action, loc, inv.span, false);
+        }
+        if let Some(l) = &inv.idlocation {
+            self.idlocation(l, &any, DiagnosticKind::Action, loc, inv.span);
         }
         self.block(&inv.finalize, &any, &format!("{loc}, finalize"));
     }
@@ -1054,8 +1121,27 @@ impl Checker<'_> {
                     );
                 }
             }
-            ExecKind::Assign { location, expr, .. } => {
+            ExecKind::Assign {
+                location,
+                expr,
+                content,
+            } => {
                 let want = self.expr(location, event, act, loc, span, true);
+                if expr.is_none()
+                    && content.is_none()
+                    && let ExprType::Known(w) = &want
+                    && !self.optional_or_value(w)
+                {
+                    // A bare <assign> stores undefined.
+                    self.push(
+                        act,
+                        loc,
+                        span,
+                        format!(
+                            "an <assign> without expr or content stores undefined, but `{location}` has type {w}"
+                        ),
+                    );
+                }
                 if let Some(x) = expr {
                     let got = self.expr(x, event, act, loc, span, false);
                     if let ExprType::Known(w) = want {
@@ -1080,7 +1166,12 @@ impl Checker<'_> {
                     self.block(&br.body, event, &bloc);
                 }
             }
-            ExecKind::Foreach { array, body, .. } => {
+            ExecKind::Foreach {
+                array,
+                item,
+                index,
+                body,
+            } => {
                 let got = self.expr(array, event, act, loc, span, false);
                 if let ExprType::Known(t) = &got
                     && !matches!(resolve(self.decls, t), Some(Type::List(_) | Type::Value))
@@ -1091,6 +1182,25 @@ impl Checker<'_> {
                         span,
                         format!("foreach array has type {t}, expected a list"),
                     );
+                }
+                // The item variable holds the array's items, the index an int.
+                let item_type = match &got {
+                    ExprType::Known(t) => match resolve(self.decls, t) {
+                        Some(Type::List(i)) => ExprType::Known((**i).clone()),
+                        Some(Type::Value) => ExprType::Known(Type::Value),
+                        _ => ExprType::Unknown,
+                    },
+                    _ => ExprType::Unknown,
+                };
+                if let ExprType::Known(w) = self.expr(item, event, act, loc, span, true) {
+                    let what = format!("the foreach item `{item}`");
+                    self.expect(&item_type, &w, &what, act, loc, span);
+                }
+                if let Some(ix) = index
+                    && let ExprType::Known(w) = self.expr(ix, event, act, loc, span, true)
+                {
+                    let what = format!("the foreach index `{ix}`");
+                    self.expect(&ExprType::Known(Type::INT), &w, &what, act, loc, span);
                 }
                 self.block(body, event, &format!("{loc}, foreach"));
             }
@@ -1162,9 +1272,64 @@ impl Checker<'_> {
             .as_ref()
             .and_then(|c| c.expr.as_ref())
             .map(|x| self.expr(x, event, k, loc, span, false));
+        if let Some(l) = &send.idlocation {
+            self.idlocation(l, event, k, loc, span);
+        }
         let name = send.event.as_deref().unwrap_or_default();
-        let supplies =
-            !send.params.is_empty() || !send.namelist.is_empty() || send.content.is_some();
+        self.check_payload(
+            payload,
+            name,
+            &send.namelist,
+            &send.params,
+            send.content.as_ref(),
+            content_type,
+            event,
+            k,
+            loc,
+            span,
+        );
+    }
+
+    /// An `idlocation` stores the generated identifier, a string.
+    fn idlocation(
+        &mut self,
+        l: &str,
+        event: &EventScope,
+        k: DiagnosticKind,
+        loc: &str,
+        span: Span,
+    ) {
+        if let ExprType::Known(w) = self.expr(l, event, k, loc, span, true)
+            && !is_assignable(self.decls, &Type::STRING, &w)
+        {
+            self.push(
+                k,
+                loc,
+                span,
+                format!("idlocation `{l}` stores a string identifier, but has type {w}"),
+            );
+        }
+    }
+
+    /// Check the payload an element computes (its `namelist`, `<param>`s and `<content>`)
+    /// against the payload of the event it carries: `None` no constraint, `Some(None)` no
+    /// payload, `Some(Some(t))` a payload of type `t`. A `namelist` entry is keyed by the whole
+    /// location, as the runtime builds the payload.
+    #[allow(clippy::too_many_arguments)]
+    fn check_payload(
+        &mut self,
+        payload: Option<Option<Type>>,
+        name: &str,
+        namelist: &[String],
+        params: &[Param],
+        content: Option<&Content>,
+        content_type: Option<ExprType>,
+        event: &EventScope,
+        k: DiagnosticKind,
+        loc: &str,
+        span: Span,
+    ) {
+        let supplies = !params.is_empty() || !namelist.is_empty() || content.is_some();
         match payload {
             None => {}
             Some(None) if supplies => {
@@ -1175,12 +1340,21 @@ impl Checker<'_> {
                 if let Some(ct) = &content_type {
                     self.expect(ct, &t, "the content", k, loc, span);
                 }
+                if !supplies && self.optional_or_value(&t) {
+                    // No payload: undefined, which an optional payload accepts.
+                    return;
+                }
+                // Supplied entries make an object, which an optional record holds as is.
                 let record = match resolve(self.decls, &t) {
                     Some(Type::Record(fields)) => Some(fields.clone()),
+                    Some(Type::Optional(inner)) => match resolve(self.decls, inner) {
+                        Some(Type::Record(fields)) => Some(fields.clone()),
+                        _ => None,
+                    },
                     _ => None,
                 };
                 let Some(fields) = record else {
-                    if !send.params.is_empty() || !send.namelist.is_empty() {
+                    if !params.is_empty() || !namelist.is_empty() {
                         self.push(
                             k,
                             loc,
@@ -1191,7 +1365,7 @@ impl Checker<'_> {
                     return;
                 };
                 let mut supplied: Vec<&str> = Vec::new();
-                for p in &send.params {
+                for p in params {
                     supplied.push(&p.name);
                     let Some(f) = fields.iter().find(|f| f.name == p.name) else {
                         self.push(
@@ -1219,8 +1393,8 @@ impl Checker<'_> {
                         span,
                     );
                 }
-                for n in &send.namelist {
-                    let field = n.rsplit('.').next().unwrap_or(n);
+                for n in namelist {
+                    let field = n.as_str();
                     supplied.push(field);
                     match fields.iter().find(|f| f.name == field) {
                         None => self.push(
@@ -1244,7 +1418,7 @@ impl Checker<'_> {
                         }
                     }
                 }
-                if send.content.is_none() {
+                if content.is_none() {
                     for f in &fields {
                         if !supplied.contains(&f.name.as_str()) && !self.optional_or_value(&f.ty) {
                             self.push(
