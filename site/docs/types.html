@@ -451,8 +451,8 @@ export function createCounterActor(system: ActorSystem, key: string): ActorRef&l
     <p>For a projection <code>P</code>, the property is <code>check(T, v) = P.accepts(P(T), encode(v))</code>: the checker accepts a value exactly when the projection accepts its canonical encoding.</p>
     <ul>
       <li><strong>JSON Schema:</strong> tested on generated values and near misses (the property test <code>checker_json_schema_and_shacl_agree</code> in <code>crates/vertep-rdf/tests/types.rs</code>), and proven in Lean as <code>JsonSchema.jsonSchema_agrees</code>, for JSON values and for type blocks whose unions have distinct tags. The <code>pattern</code> keyword is read as the lexical rule its regular expression encodes; that the regular expression and the rule agree is not proven.</li>
-      <li><strong>SHACL:</strong> tested by the same property test, and proven in Lean (<code>Types.Shacl.shacl_agrees</code>) for the intended shapes. The list shapes Rust publishes are not yet well-formed SHACL paths (backlog task 4.7).</li>
-      <li><strong>Type soundness of <code>step</code></strong> (a well-typed chart only ever writes well-typed values) is not proven yet. <code>vt certify</code> accepts typed charts, and the SHACL projection of types is proven to agree with the checker.</li>
+      <li><strong>SHACL:</strong> tested by the same property test, and proven in Lean (<code>Types.Shacl.shacl_agrees</code>) for the intended shapes. List members carry a <code>vt:listMember</code> predicate, so every shape path is a plain predicate path that standard SHACL engines check.</li>
+      <li><strong>Type soundness of <code>step</code></strong> (a well-typed chart only ever writes well-typed values) is proven in Lean, relative to the checker's typing and a datamodel that answers each expression with a value of its static type. <code>vt certify</code> accepts typed charts, and the SHACL projection of types is proven to agree with the checker.</li>
     </ul>
     <p>The open items are tracked in <code>openspec/changes/verification-backlog/tasks.md</code> and described on <a href="verification.html">Verification</a>.</p>
 
