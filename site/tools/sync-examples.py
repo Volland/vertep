@@ -16,11 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 EX = ROOT / "examples"
 OUT = ROOT / "site" / "examples"
 
-FONTS = (
-    "https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400"
-    "&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC"
-    "&family=JetBrains+Mono:wght@400;600&family=Ruslan+Display&display=swap"
-)
+FONTS = "../assets/css/fonts.css"  # self-hosted, no third-party request
 
 
 def read(rel: str) -> str:
@@ -221,8 +217,6 @@ def page(title: str, desc: str, current: str, sidebar: str, main: str) -> str:
 <title>{title} — Vertep examples</title>
 <meta name="description" content="{escape(desc)}">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="{FONTS}">
 <link rel="stylesheet" href="../assets/css/vertep.css">
 </head>
@@ -237,6 +231,7 @@ def page(title: str, desc: str, current: str, sidebar: str, main: str) -> str:
       <a href="../docs/index.html">Docs</a>
       <a href="index.html" aria-current="page">Examples</a>
       <a href="../articles/index.html">Articles</a>
+      <a href="../about.html">About</a>
     </nav>
   </div>
 </header>
@@ -252,7 +247,7 @@ def page(title: str, desc: str, current: str, sidebar: str, main: str) -> str:
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
   </div>
 </footer>
 </body>

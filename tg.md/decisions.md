@@ -1144,6 +1144,14 @@ The website in `site/` is hand-written HTML with one stylesheet and SVG marks: n
 
 The look is woodcut gravure in three inks, black, white and orange, with paper and ink swapped in dark mode; the tokens and components are in `site/assets/css/vertep.css`. Code on the pages is taken from files in the repository, and command output is pasted from real runs, so a page that disagrees with the code is a bug in the page. The example pages are written by `site/tools/sync-examples.py` from the sources and recorded outputs that `cargo test -p vertep-examples` checks; the pages are committed, so viewing the site still needs no build. The workflow `.github/workflows/pages.yml` deploys `site/` unchanged to GitHub Pages at https://volland.github.io/vertep/ on every push that touches it; package READMEs and crate metadata (`homepage`) link there, and load the logo from it.
 
+## Legal pages mirror the author's own site
+
+The site carries a German Impressum, Datenschutzerklärung and AGB, plus an About page, all taken from pavlyshyn.me, and links to lean4knowledge.com and pavlyshyn.me from every footer.
+
+- motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: secondary, since: "2026-11-12"}
+
+The legal identity (name, Berlin address, supervisory authority) is the one on pavlyshyn.me, so the three sites state one provider. Like the author's site, these pages load no third-party resource: the fonts are self-hosted woff2 files in `site/assets/fonts/`, declared in `site/assets/css/fonts.css`, so the only personal data is the GitHub Pages server log and the Datenschutz says nothing more. The AGB cover consulting, architecture and training services only; the software stays under MIT or Apache-2.0. `about.html` is built from the author's home page, CV and book list. The footer and the main navigation, including those written by `site/tools/sync-examples.py`, link all four pages.
+
 ## Hosts instantiate CEL charts typed
 
 Every host creates a chart's datamodel through `DatamodelRegistry::create_for`, and `CelRegistry` instantiates a chart that declares types with its projected CEL type environment, refusing one with CEL type errors.
