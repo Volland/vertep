@@ -80,7 +80,7 @@
     <h2 id="projection">The projection</h2>
     <p><code>vt convert --to turtle</code> prints a chart's projection. Here it is for the typed order chart in <code>crates/vertep-dm-rust/tests/charts/order.scxml</code>. The full output is 262 lines; the excerpt below keeps the prefixes, the chart node, the state <code>idle</code> and its one transition, in the order <code>vt</code> wrote them.</p>
 <pre data-lang="Shell"><code>vt convert --to turtle crates/vertep-dm-rust/tests/charts/order.scxml</code></pre>
-<pre class="output" data-lang="Output (trimmed)"><code>@prefix c: &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#&gt; .
+<pre class="output" data-lang="Output (trimmed)"><code>@prefix c: &lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f#&gt; .
 @prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; .
 @prefix vt: &lt;https://w3id.org/vertep/vt#&gt; .
 
@@ -154,8 +154,8 @@ c:s.idle a vt:State , vt:StateNode ;
     <p>To see a shape at work, take the Turtle above, delete the single line <code>vt:source c:s.idle ;</code> from the transition, and validate it. <code>vt validate</code> reads RDF as well as SCXML and YAML:</p>
 <pre data-lang="Shell"><code>vt validate order-broken.ttl</code></pre>
 <pre class="output" data-lang="Output"><code>order-broken.ttl: graph does not conform to the chart shapes: 2 violation(s):
-  &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#s.idle:t0&gt; (^vt:transition|(^vt:initialTransition/^vt:initialElement)) = &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#s.idle&gt;: value not also a value of &lt;https://w3id.org/vertep/vt#source&gt; (EqualsConstraintComponent)
-  &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#s.idle:t0&gt; vt:source: a transition has exactly one source state (MinCountConstraintComponent)</code></pre>
+  &lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f#s.idle:t0&gt; (^vt:transition|(^vt:initialTransition/^vt:initialElement)) = &lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f#s.idle&gt;: value not also a value of &lt;https://w3id.org/vertep/vt#source&gt; (EqualsConstraintComponent)
+  &lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f#s.idle:t0&gt; vt:source: a transition has exactly one source state (MinCountConstraintComponent)</code></pre>
     <p>The command exits with status 1. Each violation names the focus node, the path and the constraint component, so a report points at the triple to fix.</p>
     <p>A few rules cannot be written in SHACL Core and are checked by reconstruction instead: the <code>vt:order</code> values of a list are exactly 0 to n−1, expression datatypes match the chart's datamodel, a graph holds one chart, and the derived triples agree with a fresh projection. Triples that are not part of the projection, such as your own comments on a state, are ignored by reconstruction and by hashing.</p>
     <p>The same shapes are transcribed into the Lean model, and a theorem tying them to the Lean <code>WellFormed</code> predicate is planned but not yet proven; see <a href="verification.html#open">Verification</a>.</p>
@@ -222,25 +222,25 @@ c:s.idle a vt:State , vt:StateNode ;
     <p>Because the hash covers the projection and nothing else, formatting, comments and the surface a chart was written in do not change it. The order chart exists in the repository as SCXML and as YAML:</p>
 <pre data-lang="Shell"><code>vt hash crates/vertep-dm-rust/tests/charts/order.scxml
 vt hash crates/vertep-dm-rust/tests/charts/order.yaml</code></pre>
-<pre class="output" data-lang="Output"><code>urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e
-urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e</code></pre>
+<pre class="output" data-lang="Output"><code>urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f
+urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f</code></pre>
     <p>Annotations do not change it either. Append one triple about a state to the projected Turtle and hash the result:</p>
 <pre data-lang="Shell"><code>printf '\nc:s.paid &lt;http://www.w3.org/2000/01/rdf-schema#comment&gt; "the order is paid" .\n' &gt; note.ttl
 cat order.ttl note.ttl &gt; order-annotated.ttl
 vt hash order-annotated.ttl
 vt validate order-annotated.ttl</code></pre>
-<pre class="output" data-lang="Output"><code>urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e
-order-annotated.ttl: ok: urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e</code></pre>
+<pre class="output" data-lang="Output"><code>urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f
+order-annotated.ttl: ok: urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f</code></pre>
     <p>So a store can attach comments, usage statistics or certificates to a chart without changing which chart it is. A certificate from <code>vt certify</code> hangs off the version IRI with <code>vt:certifiedBy</code>; because the IRI is a content hash, a certificate can never apply to a different chart.</p>
     <div class="nb"><p>The runtime records the version IRI in every journal entry. An actor stays on the version it started with until it reaches a top-level final state or is migrated explicitly, and replay always uses the version recorded for each stretch of the journal. See <a href="runtime.html">The actor runtime</a> for chart versioning and migrations.</p></div>
 
     <h2 id="formats">Serialization formats and vt convert</h2>
     <p><code>vertep-rdf</code> reads and writes Turtle, N-Triples, N-Quads and TriG, all RDF 1.2, with triples in sorted order so the output is stable. In the dataset formats (N-Quads, TriG) the chart sits in the named graph whose name is its version IRI:</p>
 <pre data-lang="Shell"><code>vt convert --to trig crates/vertep-dm-rust/tests/charts/order.scxml</code></pre>
-<pre class="output" data-lang="Output (first lines)"><code>@prefix c: &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e#&gt; .
+<pre class="output" data-lang="Output (first lines)"><code>@prefix c: &lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f#&gt; .
 @prefix xsd: &lt;http://www.w3.org/2001/XMLSchema#&gt; .
 @prefix vt: &lt;https://w3id.org/vertep/vt#&gt; .
-&lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e&gt; {
+&lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f&gt; {
 	c:chart:d0:x0 a vt:ExtensionNode ;
 		vt:attributeValue "decimal" ;
 		vt:localName "type" ;

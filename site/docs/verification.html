@@ -163,15 +163,15 @@ theorem configuration_wellformedness : ConfigurationWellFormedness :=
     <p>Proving it was not a formality. The attempt found three bugs in the W3C Appendix D entry algorithm as both cores implemented it, each producing an illegal configuration from a valid chart with history states. All three are fixed in Rust and Lean, with regression tests on both sides. The Rust property test <code>crates/vertep-conformance/tests/config_legality.rs</code> never generated those shapes, which is why the proof, not the test, found them. The protocol models found two more bugs in the Rust runtime (an outbox mark that passed refused sends, and colliding mailbox row IRIs when two nodes share a store), also fixed.</p>
     <div class="nb"><p>Some limits are deliberate. The type theorems read a <code>pattern</code> as the lexical rule its regular expression encodes; the regular expressions themselves are not proven equal to those rules. Lean decides <code>int</code> on the exact decimal while Rust decides it on an <code>f64</code>, so differential cases stay away from the edges of the signed 64-bit range.</p></div>
 
-    <h2 id="open">What is still open</h2>
+    <h2 id="open">The backlog</h2>
     <p>The open items are tracked in <code>openspec/changes/verification-backlog/tasks.md</code>. As that file stands:</p>
     <table>
       <thead><tr><th>Task</th><th>Statement</th><th>State</th></tr></thead>
       <tbody>
         <tr><td>2.3 Shapes equivalence</td><td>the chart shapes accept the projection of <code>c</code> exactly when <code>WellFormed c</code></td><td>Not started as a proof. The statement is in <code>lean/vertep-lean/Pending/ShapesEquiv.lean</code>, outside the library. <code>vertep-shapes</code> checks the agreement empirically, at about a minute per small chart.</td></tr>
-        <tr><td>4.2 SHACL projection of types</td><td>a value's RDF encoding conforms to its type's generated shape exactly when it has the type</td><td>Not started. Needs the value encoding and the generated shapes as LeanRDF terms.</td></tr>
+        <tr><td>4.2 SHACL projection of types</td><td>a value's RDF encoding conforms to its type's generated shape exactly when it has the type</td><td>Done. <code>Types.Shacl.shacl_agrees</code>: a value's encoding conforms to its type's shape (named types unfolded far enough) exactly when it has the type, also stated against LeanRDF's validator. It assumes distinct union tags and object keys, and that LeanRDF's regular expressions decide the decimal, datetime and IRI patterns as the type checker does (checked on samples, not proven). The shapes Rust publishes for lists use an IRI where SHACL needs a path, so a standard engine skips list members; that is open as task 4.7.</td></tr>
         <tr><td>4.4 Type soundness of <code>step</code></td><td>a well-typed chart, configuration and input give a well-typed datamodel and well-typed output events</td><td>Not started. The Lean <code>step</code> has no expression typer; the values it writes come from the untyped answer tape.</td></tr>
-        <tr><td>4.5 <code>vt certify</code> for typed charts</td><td>certify charts with a <code>vt:types</code> block</td><td>Partial. The type checker is already compared with Rust (<code>vertep-types</code>); the Lean side does not yet hash a chart together with its type triples, so a typed chart is refused (see below).</td></tr>
+        <tr><td>4.5 <code>vt certify</code> for typed charts</td><td>certify charts with a <code>vt:types</code> block</td><td>Done. The checker reads the <code>vt:types</code> block, derives the type triples as Rust does and hashes them into the version; 1,000 generated typed charts certify under the Rust version.</td></tr>
         <tr><td>2.4, 4.6 Annotations and axioms</td><td>every theorem traced and its axioms pinned</td><td>Partial; waits on the theorems above.</td></tr>
       </tbody>
     </table>
@@ -272,9 +272,12 @@ vt certify crates/vertep-scxml/tests/corpus/irp_style.scxml</code></pre>
 Build it from the Lean model and put it on PATH, or point VT_CERTIFY at it:
   cd lean/vertep-lean &amp;&amp; lake build &amp;&amp; export VT_CERTIFY=$PWD/.lake/build/bin/vt-certify
 No certificate was produced.</code></pre>
-    <div class="nb warn"><p>Typed charts cannot be certified yet (backlog 4.5). The Rust version hash covers the chart's type triples (<code>vt:declaresType</code>, the type definitions and their shapes), and the Lean checker hashes the chart without them, so the two versions differ and the checker exits with status 2. The type triples are ground, with no blank nodes, so the fix is to read them on the Lean side; no blank-node canonicalization is needed.</p>
-<pre class="output" data-lang="Output"><code>$ vt certify order.scxml      # crates/vertep-dm-rust/tests/charts/order.scxml
-not the projection of a chart: node IRIs are minted under &lt;urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e&gt;, but the chart's version is &lt;urn:vertep:chart:sha256:8d33f0f736000680efb507f4a4377197d0fb155ead5cd5fd4e46692f8f372e01&gt;</code></pre></div>
+    <div class="nb"><p>Typed charts certify as well (backlog 4.5, done 2026-11-12):</p>
+<pre class="output" data-lang="Output"><code>$ vt certify crates/vertep-dm-rust/tests/charts/order.scxml
+&lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f&gt; &lt;https://w3id.org/vertep/vt#certifiedBy&gt; &lt;urn:vertep:cert:sha256:b9adf42734b3ce2e71ac4d6a6cd87569d41aee090031360b377534e298d9665e&gt; .
+&lt;urn:vertep:cert:sha256:b9adf427…&gt; &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;https://w3id.org/vertep/vt#Certificate&gt; .
+&lt;urn:vertep:cert:sha256:b9adf427…&gt; &lt;https://w3id.org/vertep/vt#theorem&gt; "Vertep.checkWF_iff" .
+…  (trimmed: five more theorems, the toolchain, the LeanRDF revision and the checker hash)</code></pre></div>
 
     <h2 id="run">Running the checks</h2>
     <p>You need the Rust toolchain from <code>rust-toolchain.toml</code> for everything, and elan (which installs the pinned Lean toolchain) for the Lean steps.</p>

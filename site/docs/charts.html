@@ -522,9 +522,9 @@ event cancel;
 &lt;/scxml&gt;</code></pre>
     <p>The SCXML and YAML show how the <code>rust</code> datamodel appears in the IR. A guard is a <code>cond</code> holding an IRI, <code>vt:guard/&lt;chart&gt;/&lt;function&gt;</code>. An action is a <code>&lt;foreach&gt;</code> whose <code>array</code> is the action's IRI, <code>vt:action/&lt;chart&gt;/&lt;function&gt;</code>. Evaluating the array runs the action, which may change the context, and yields the events it emitted; the body sends each one. This keeps every effect of an action visible in the IR and in the step output, without any change to the interpreter. The rules are in <code>crates/vertep-dm-rust/src/lowering.rs</code>.</p>
 <pre class="output" data-lang="Output"><code>$ vt hash order.scxml
-urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e
+urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f
 $ vt hash order.yaml
-urn:vertep:chart:sha256:db5eae1866986ee4e05239aa1033297d44c6d3271cdcc8569ac724e800ebc82e</code></pre>
+urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f</code></pre>
     <p>The macro's <code>VERSION</code> constant is the same IRI; the test checks it.</p>
     <div class="nb"><p>The datamodel is part of the chart, so it is part of the version. The same states written once with CEL expressions and once with Rust functions are two charts with two versions.</p></div>
 

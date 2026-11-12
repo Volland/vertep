@@ -102,7 +102,7 @@ EXAMPLES = [
             ("p", "<code>vt gen ts</code> writes a module for <code>@vertep/web</code>: the event union, the context interface, the state names and a typed <code>createActor</code>."),
             ("raw", run("vt gen ts examples/typed-order/order.yaml")),
             ("out", (ts_excerpt(), "TypeScript, excerpt")),
-            ("warn", "Typed CEL charts are checked by <code>vt typecheck</code> but do not yet run typed in the actor runtime, the agent host or the browser worker: these hosts build an untyped CEL datamodel, so a <code>decimal</code> field starts as an integer and decimal payload fields stay strings. The example's test runs this chart on a typed CEL datamodel built directly with <code>vertep_dm_cel::load</code>."),
+            ("nb", "Every host loads a chart that declares types with its typed CEL datamodel: the actor runtime, the agent host and the browser worker refuse a chart with CEL type errors, and an event whose payload does not match its declared type is replaced by <code>error.execution</code> before the chart sees it."),
             ("ul", [
                 "CEL-level errors, such as an operator applied to the wrong types, are reported only after the structural checks pass, and without a line and column.",
                 "<code>vt schema --format rust</code> is listed in <code>--help</code> but exits with code 2: Rust types come from the <code>statechart!</code> macro.",
