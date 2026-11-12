@@ -12,7 +12,7 @@
   "scripts": {
     "build": "sh scripts/build.sh",
     "build:ts": "tsc -p packages/web && tsc -p packages/dm-ecma",
-    "test": "node --test --test-concurrency=1 packages/web/test/",
+    "test": "node --test --test-concurrency=1 \"packages/web/test/*.test.mjs\"",
     "check:size": "node scripts/check-size.mjs",
     "check:version": "node scripts/check-version.mjs"
   },

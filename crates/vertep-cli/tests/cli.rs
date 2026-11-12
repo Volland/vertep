@@ -298,7 +298,8 @@ fn certify_typed_charts_with_the_lean_checker() {
     ];
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     for krate in std::fs::read_dir(&crates).expect("crates") {
-        let Ok(charts) = std::fs::read_dir(krate.expect("crate").path().join("tests/charts")) else {
+        let Ok(charts) = std::fs::read_dir(krate.expect("crate").path().join("tests/charts"))
+        else {
             continue;
         };
         for f in charts {
