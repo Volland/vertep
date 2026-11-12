@@ -535,6 +535,40 @@ fn history_entry_stops_at_the_transition_domain() {
     );
 }
 
+/// Regression (Lean Configuration Well-Formedness proof): as above with the default of `h`
+/// going through a second history state `h2` of `P`. Entering `h2` with its ancestors up to the
+/// domain, which is not an ancestor of `h2`, climbed to the root and completed the parallel
+/// `Z`'s active region `R` by default.
+#[test]
+fn history_default_through_a_history_stops_at_the_domain() {
+    let cc = compile(chart(vec![parallel(
+        "Z",
+        vec![
+            compound(
+                "P",
+                vec![
+                    history("h", HistoryType::Deep, "h2"),
+                    history("h2", HistoryType::Deep, "A1"),
+                    compound(
+                        "A",
+                        vec![
+                            atomic("A1").on(tr("g", "A2")),
+                            atomic("A2").on(tr("e", "h")),
+                        ],
+                    ),
+                ],
+            ),
+            compound("R", vec![atomic("B1").on(tr("f", "B2")), atomic("B2")]),
+        ],
+    )]));
+    let o = run_null(&cc);
+    let o = send_null(&cc, o.session, "f");
+    let o = send_null(&cc, o.session, "g");
+    assert_eq!(active(&cc, &o), ids(&["Z", "P", "A", "A2", "R", "B2"]));
+    let o = send_null(&cc, o.session, "e");
+    assert_eq!(active(&cc, &o), ids(&["Z", "P", "A", "A1", "R", "B2"]));
+}
+
 // ----- Final States And Done Events ---------------------------------------------------------
 
 // @tg: verifies:: [[openspec:scxml-interpretation#Final States And Done Events#Compound done event]] {level: unit}

@@ -430,13 +430,16 @@ pub enum Certification {
 }
 
 /// Run `vt-certify` on the chart's projection.
+///
+/// Each call gets its own scratch directory: a sample can hold the same chart twice, and a
+/// directory named by the chart alone was removed by one worker thread while another's
+/// `vt-certify` still used it.
 pub fn certify(tools: &LeanTools, chart: &Chart) -> Result<Certification, String> {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let dir = std::env::temp_dir().join(format!(
-        "vertep-certify-{}-{:x}",
+        "vertep-certify-{}-{}",
         std::process::id(),
-        Sha256::digest(crate::lean::chart_nquads(chart).as_bytes())[..8]
-            .iter()
-            .fold(0u64, |a, b| (a << 8) | u64::from(*b))
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("chart.nq");

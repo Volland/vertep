@@ -49,7 +49,13 @@ def mainTheorems : List Name :=
     ``Vertep.Lease.shard_epochs_ordered, ``Vertep.Lease.message_once, ``Vertep.Lease.stale_append_fenced,
     ``Vertep.Lease.frames_ordered, ``Vertep.Lease.stale_frame_dropped,
     ``Vertep.Types.check_iff, ``Vertep.Types.check_sound, ``Vertep.Types.Chain.dedup,
-    ``Vertep.Types.JsonSchema.validate_proj, ``Vertep.Types.JsonSchema.jsonSchema_agrees ]
+    ``Vertep.Types.JsonSchema.validate_proj, ``Vertep.Types.JsonSchema.jsonSchema_agrees,
+    ``Vertep.CWF.legal_iff_below, ``Vertep.eff_adequate, ``Vertep.start_entry,
+    ``Vertep.exit_legal, ``Vertep.Config.microstep_spec, ``Vertep.Config.reachable_inv,
+    ``Vertep.configuration_wellformedness_of, ``Vertep.compile_cwf,
+    ``Vertep.configuration_wellformedness_of_entry, ``Vertep.entry_legal,
+    ``Vertep.configuration_wellformedness, ``Vertep.compound_exclusivity,
+    ``Vertep.parallel_completeness ]
 
 /-- The axioms of `n` outside the allowed set. -/
 def disallowed (n : Name) : CoreM (Array Name) := do

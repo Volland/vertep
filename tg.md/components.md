@@ -119,7 +119,7 @@ The Lean 4 package on LeanRDF: the IR, types, `step`, journal protocol and decid
 - realizes:: [[decisions#Lean verification bridge]]
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
-First phase landed 2026-11-11 on Lean v4.35.0 and LeanRDF `b407b97`: the IR, `WellFormed` with a proven decision procedure, compile and the Appendix D kernel mirroring Rust, the executable `step` over an answer tape, and proofs of step determinism, transition selection and dynamic type soundness. `scripts/check.sh` gates `sorry` and axioms. See [[decisions#Configuration well-formedness proof is pending]].
+First phase landed 2026-11-11 on Lean v4.35.0 and LeanRDF `b407b97`: the IR, `WellFormed` with a proven decision procedure, compile and the Appendix D kernel mirroring Rust, the executable `step` over an answer tape, and proofs of step determinism, transition selection and dynamic type soundness. `scripts/check.sh` gates `sorry` and axioms. Configuration well-formedness is proven since 2026-11-12, see [[decisions#Configuration well-formedness is proven]].
 
 Second phase landed 2026-11-11: Lean projection, canonical N-Quads, SHA-256 and reconstruction; the `vertep-oracle` executable, which replays recorded tapes and reproduces the Rust traces on all 201 IRP root documents; `vt-certify`, which recomputes the chart version and emits a `vt:certifiedBy` certificate; and `vertep-shapes`, which runs the chart shapes on LeanRDF's proven SHACL validator. Proven: reconstruction soundness, canonical form and version determined by the chart, certified charts are `WellFormed`. The RDF round trip and shapes equivalence are checked differentially, not yet proven. Its certificate terms are declared in the `vt:` verification module, `crates/vertep-rdf/ontology/vt-verification.ttl`.
 

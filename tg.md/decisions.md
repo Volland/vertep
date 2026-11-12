@@ -231,6 +231,8 @@ Where the SCXML Recommendation leaves room, `vertep-core` reads it as follows; t
 - `SessionDone` is emitted exactly once, also on cancel; a `<state>` whose only children are history states is rejected by validation.
 - A history target stands for its parent's position in the target-set rule, and cycles through history default transitions are rejected (found by the Lean model).
 - The microstep budget charges every microstep record: selections that fire transitions and internal events consumed without enabling any, so a failing eventless guard that keeps raising `error.execution` ends in `BudgetExceeded` (found by differential testing).
+- Transition domains are computed once per microstep, before `exitStates` records history, and entry uses the same domains; Appendix D recomputes them from the history just recorded, which left a single-region parallel state inactive under its active region (found by the configuration proof).
+- Entry never enters a state that is not a proper descendant of the transition's domain: Appendix D's `addAncestorStatesToEnter(s, history.parent)` re-entered active states above a domain lying below the history's parent and completed their parallel ancestors' other regions next to the regions still active, leaving two active children (found by the configuration proof, twice: a history default inside a parallel region, and one reached through a second history state).
 
 ## IRP suite from a pinned mirror
 
@@ -244,12 +246,20 @@ The mirror's `update-txml.sh` copies the W3C files unchanged; the only local edi
 
 ## Configuration well-formedness proof is pending
 
-The theorem that `step` preserves legal configurations is stated only in `lean/vertep-lean/Pending/`, outside the build, because the Lean model found two charts that pass validation and break it.
+Superseded on 2026-11-12 by [[decisions#Configuration well-formedness is proven]]: the theorem had been stated only outside the build while the Lean model kept finding charts that pass validation and break it.
 
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: secondary}
 
-The counterexamples: a transition targeting a history state and its sibling, which leaves two active children; and an `initial` naming a history state without a default transition, which recursed without bound in Rust. Both are now validator rules in Rust (2026-11-11), to be mirrored in `WellFormed`; the proof then needs lemmas for compile correctness, exit and entry legality, a history invariant and fuel adequacy. No theorem is stated with `sorry` meanwhile. With both rules in place no counterexample is known (2026-11-11), and the RDF round-trip and shapes-equivalence theorems are pending in the same way.
+## Configuration well-formedness is proven
+
+The Lean package proves that every running session reachable by `start` and `step` from a well-formed chart has a legal configuration, with no `sorry` and only the standard axioms.
+
+- supersedes:: [[decisions#Configuration well-formedness proof is pending]] {reason: "proven 2026-11-12"}
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[constraints#SCXML interpretation algorithm]] {weight: secondary}
+
+`configuration_wellformedness` (`lean/vertep-lean/VertepLean/Config/Theorem.lean`) is built from compile correctness, the exit lemma, the history invariant, fuel adequacy, the entry lemma and the interpreter invariant through every action of `start` and `step`. The proof found five counterexamples, all runtime bugs in Rust, now validator rules or semantic fixes in both cores with regression tests (see [[decisions#Appendix D readings in the Rust core]]): a history target next to its sibling; an `initial` naming a history state without a default transition; the domain recomputed on entry (a deep history of a single-region parallel state); and twice, entry climbing above a domain that lies below a history's parent. The shapes-equivalence theorem is still pending.
 
 ## Journal entries are stamped by the store
 

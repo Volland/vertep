@@ -166,6 +166,19 @@ def historyBelowDomain : Chart :=
 #guard idsAfter historyBelowDomain ["f", "g"] == ["P", "Q", "R1", "A", "A2", "R2", "B2"]
 #guard idsAfter historyBelowDomain ["f", "g", "e"] == ["P", "Q", "R1", "A", "A1", "R2", "B2"]
 
+/-- Regression: as above with the default of `h` going through a second history state `h2` of
+`P`. Entering `h2` with its ancestors up to the domain, which is not an ancestor of `h2`, climbed
+to the root and completed the parallel `Z`'s active region `R` by default. Rust test
+`history_default_through_a_history_stops_at_the_domain`. -/
+def historyChainBelowDomain : Chart :=
+  { states := [node "Z" .parallel [
+      node "P" (children := [histNode "h" .deep ["h2"], histNode "h2" .deep ["A1"],
+        node "A" (children := [node "A1" (ts := [tr ["g"] ["A2"]]),
+                               node "A2" (ts := [tr ["e"] ["h"]])])]),
+      node "R" (children := [node "B1" (ts := [tr ["f"] ["B2"]]), node "B2"])]] }
+#guard checkWF historyChainBelowDomain
+#guard idsAfter historyChainBelowDomain ["f", "g", "e"] == ["Z", "P", "A", "A1", "R", "B2"]
+
 /-- Final states: `done.state.a` is raised and handled; a top-level final ends the session. -/
 def finals : Chart :=
   { states := [node "a" (children := [node "a1" (ts := [tr ["e"] ["f"]]), node "f" .final])

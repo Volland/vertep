@@ -14,6 +14,7 @@ The pattern follows verification-guided development: the Rust code stays untrust
 Rust finds answers and Lean checks them: the theorems are about the Lean model, and the bridge to Rust is trace equality, not extraction.
 
 - describes:: [[decisions#Lean verification bridge]]
+- describes:: [[decisions#Configuration well-formedness is proven]]
 - describes:: [[components#vertep-lean]]
 - describes:: [[capabilities#Formal model]]
 - describes:: [[constraints#Aeneas supports a Rust subset]]
@@ -149,7 +150,7 @@ Each milestone adds proof obligations; M0 proves the semantics, M1 the types, M2
 | Milestone | Theorem | Statement | Requirement or task |
 |---|---|---|---|
 | M0 | Step determinism | equal session, input and tape give equal session, effects and requests | `Step Determinism Theorem` |
-| M0 | Configuration well-formedness | from a legal configuration `step` reaches only legal ones: root active, one child per active compound, all children per active parallel, parents active | `Configuration Well-Formedness Theorem` |
+| M0 | Configuration well-formedness | from a legal configuration `step` reaches only legal ones: root active, one child per active compound, all children per active parallel, parents active; proven as `configuration_wellformedness` (2026-11-12) | `Configuration Well-Formedness Theorem` |
 | M0 | Transition selection | each microstep's set is enabled, conflict-free and optimal per SCXML 3.13 | `Transition Selection Theorem` |
 | M0 | Shapes equivalence | `validate shapes (toRDF c) = conforms` iff `WellFormed c` | `Shapes Equivalence Theorem` |
 | M0 | RDF round trip | `fromRDF (project c base) = .ok (c, base)` on well-formed charts, any base (`Rdf.fromRDF_project`, proven); equal charts have equal canonical forms | `RDF Round Trip Theorem` |
@@ -222,6 +223,7 @@ What the models abstract, and what the oracles found:
 - The journal model advances the outbox mark only over delivered sends, as the Transactional Outbox requires. Rust used to advance it after handing sends to the transport and keep a refused send only as an in-memory retry, which a crash would lose; fixed 2026-11-11, the Rust mark now passes only delivered sends (`refused_send_survives_a_crash`).
 - The journal property tests found that two live nodes whose durable mailboxes share one store lose messages: `StoreMailbox` numbered row IRIs by its own sequence, so they collided and acknowledging one message stripped the other's type and recipient. Fixed 2026-11-11 with row IRIs that carry the envelope's digest; `journal_protocol_shared_durable_mailboxes_lose_no_message` runs.
 - The lease oracle needs every grant in the history. The fault-injection harness now records the grants `Membership::tick` makes as well as its own, and its histories replay in strict mode (11,241 decisions agree on five seeds) from the fault-injection test itself.
+- The configuration proof found three Rust runtime bugs in the W3C Appendix D entry algorithm itself, each giving an illegal configuration on a valid chart; all fixed 2026-11-11/12 in both cores with Rust and Lean regressions (see [[decisions#Appendix D readings in the Rust core]]): the domain recomputed on entry from the history just recorded (`deep_history_of_single_region_parallel_reenters_the_parallel`), and entry climbing above a domain that lies below a history's parent (`history_entry_stops_at_the_transition_domain`, `history_default_through_a_history_stops_at_the_domain`). `reachable_configurations_are_legal` in `vertep-conformance` checks legality on generated charts; its generator never builds these shapes, which is why the proof, not the property test, found them.
 - The protocol-model review also found that the Rust type checker did not terminate on `type A = optional<A>` against a non-null value; see [[decisions#Type checking stops on non-contractive recursion]], which the Lean type language mirrors (see the type language section below).
 
 ## Type language

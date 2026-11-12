@@ -336,20 +336,16 @@ def EntryAcc.add (acc : EntryAcc) (s : Nat) : EntryAcc :=
 
 mutual
 /-- Appendix D `addDescendantStatesToEnter` (Rust `add_descendants`), with recursion fuel.
-`floor` is the domain of the transition being entered: a history state restores its states with
-their ancestors up to its parent, or up to `floor` when the domain lies below the parent (the
-exit left everything above the domain active; Appendix D entered those states again and
-completed their parallel ancestors' other regions next to the regions still active). -/
+`floor` is the domain of the transition being entered (see `addAnc`). -/
 def addDesc (hist : List (Nat × List Nat)) (floor : Nat) : Nat → Nat → EntryAcc → Option EntryAcc
   | 0, _, _ => none
   | n + 1, s, acc =>
     if cc.isHistory s then
       let par := ((cc.st s).parent).getD 0
-      let stop := if cc.isDesc floor par then floor else par
       match histValue hist s with
       | some v => do
         let acc ← v.foldlM (fun acc x => addDesc hist floor n x acc) acc
-        v.foldlM (fun acc x => addAnc hist floor n x (some stop) acc) acc
+        v.foldlM (fun acc x => addAnc hist floor n x (some par) acc) acc
       | none =>
         match cc.historyDefault s with
         | some d => do
@@ -357,7 +353,7 @@ def addDesc (hist : List (Nat × List Nat)) (floor : Nat) : Nat → Nat → Entr
             acc.histContent.filter (fun e => e.1 != par) ++ [(par, d)] }
           let tg := (cc.tr d).targets
           let acc ← tg.foldlM (fun acc x => addDesc hist floor n x acc) acc
-          tg.foldlM (fun acc x => addAnc hist floor n x (some stop) acc) acc
+          tg.foldlM (fun acc x => addAnc hist floor n x (some par) acc) acc
         | none => pure acc
     else
       let acc := acc.add s
@@ -374,13 +370,19 @@ def addDesc (hist : List (Nat × List Nat)) (floor : Nat) : Nat → Nat → Entr
           if acc.toEnter.any (fun x => cc.isDesc x c) then pure acc
           else addDesc hist floor n c acc) acc
       else pure acc
-/-- Appendix D `addAncestorStatesToEnter` (Rust `add_ancestors`, which never adds the root),
-with recursion fuel. -/
+/-- Appendix D `addAncestorStatesToEnter` (Rust `add_ancestors`), with recursion fuel, entering
+only proper descendants of `floor`, the domain of the transition being entered (so never the
+root): the exit left the domain and everything above it active. A history state restores its
+states with their ancestors up to its parent, and the domain can lie below that parent (a
+default or recorded value inside a region of a parallel state below the parent, reached from
+inside that region); Appendix D then entered the active states between the domain and the
+parent again and completed their parallel ancestors' other regions next to the regions still
+active. -/
 def addAnc (hist : List (Nat × List Nat)) (floor : Nat) :
     Nat → Nat → Option Nat → EntryAcc → Option EntryAcc
   | 0, _, _, _ => none
   | n + 1, s, stop, acc =>
-    ((cc.ancestorsBelow s stop).filter (· != 0)).foldlM (fun acc anc =>
+    ((cc.ancestorsBelow s stop).filter (fun a => a != 0 && cc.isDesc a floor)).foldlM (fun acc anc =>
       let acc := acc.add anc
       if cc.isParallel anc then
         (cc.st anc).children.foldlM (fun acc c =>
@@ -399,7 +401,7 @@ def entryFuel : Nat := 4 * cc.size + 4
 `transition_domains`, taken before the exit), so entry stops where the exit started; Appendix D
 recomputes them from `hist`, which can move a domain below a state the exit left (a deep history
 of a parallel state with one region) that is then never entered again. Each transition's
-domain is also the `floor` of its history restorations (see `addDesc`). -/
+domain is also the `floor` below which `addAnc` enters ancestors. -/
 def entrySet (hist dhist : List (Nat × List Nat)) (ts : List Nat) : Option EntryAcc :=
   ts.foldlM (fun acc t => do
     let dom := cc.domain dhist t

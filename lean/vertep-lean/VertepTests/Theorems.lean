@@ -69,4 +69,24 @@ theorem no_undeclared_locations (c : Chart) (hwf : WellFormed c) (cc : CChart)
 theorem extension_point_present (cc : CChart) : TypedStepSoundness cc dynamicTypes :=
   dynamic_typed_soundness cc
 
+/-- Applied to any step of a well-formed chart, the Configuration Well-Formedness Theorem leaves
+no compound state with two active children. -/
+-- @tg: verifies:: [[openspec:formal-model#Configuration Well-Formedness Theorem#Compound exclusivity]] {level: unit}
+theorem step_compound_exclusive (c : Chart) (hwf : WellFormed c) (cc : CChart)
+    (hcc : compile c = .ok cc) (s : Session) (hs : Reachable cc s) (i : Input) (t : Tape)
+    (o : Out cc) (h : step cc s i t = .ok o) (ht : o.session.terminated = false)
+    (x : Nat) (hx : x ∈ o.session.config) (hc : cc.isCompound x = true)
+    (a b : Nat) (ha : a ∈ (cc.st x).children) (hb : b ∈ (cc.st x).children)
+    (sa : a ∈ o.session.config) (sb : b ∈ o.session.config) : a = b :=
+  compound_exclusivity c hwf cc hcc o.session (.step s i t o hs h) ht x hx hc a ha b hb sa sb
+
+/-- Every region of a parallel state active after a step is active. -/
+-- @tg: verifies:: [[openspec:formal-model#Configuration Well-Formedness Theorem#Parallel completeness]] {level: unit}
+theorem step_parallel_complete (c : Chart) (hwf : WellFormed c) (cc : CChart)
+    (hcc : compile c = .ok cc) (s : Session) (hs : Reachable cc s) (i : Input) (t : Tape)
+    (o : Out cc) (h : step cc s i t = .ok o) (ht : o.session.terminated = false)
+    (x : Nat) (hx : x ∈ o.session.config) (hp : cc.isParallel x = true)
+    (r : Nat) (hr : r ∈ (cc.st x).children) : r ∈ o.session.config :=
+  parallel_completeness c hwf cc hcc o.session (.step s i t o hs h) ht x hx hp r hr
+
 end Vertep.Test

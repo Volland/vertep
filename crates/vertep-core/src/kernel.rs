@@ -383,11 +383,7 @@ pub fn compute_entry_set(
 /// `addDescendantStatesToEnter`. `fuel` bounds the history default transitions followed (see
 /// [`effective_targets_within`]); every other recursion goes strictly deeper in the tree.
 ///
-/// `floor` is the domain of the transition being entered. A history state restores its
-/// states with their ancestors up to its parent, or up to `floor` when the domain lies below
-/// the parent: the exit left everything above the domain active, and Appendix D's
-/// `addAncestorStatesToEnter(s, parent)` entered those states again, completing their parallel
-/// ancestors' other regions by default next to the regions still active.
+/// `floor` is the domain of the transition being entered; see [`add_ancestors`].
 fn add_descendants(
     chart: &CompiledChart,
     history: &History,
@@ -399,11 +395,6 @@ fn add_descendants(
     let st = chart.state(state);
     if matches!(st.kind, StateKind::History(_)) {
         let parent = st.parent.unwrap_or(ROOT);
-        let stop = if chart.is_descendant(floor, parent) {
-            floor
-        } else {
-            parent
-        };
         match history.get(state) {
             Some(v) => {
                 let v = v.to_vec();
@@ -411,7 +402,7 @@ fn add_descendants(
                     add_descendants(chart, history, s, p, fuel, floor);
                 }
                 for &s in &v {
-                    add_ancestors(chart, history, s, Some(stop), p, fuel, floor);
+                    add_ancestors(chart, history, s, Some(parent), p, fuel, floor);
                 }
             }
             None => {
@@ -424,7 +415,7 @@ fn add_descendants(
                         add_descendants(chart, history, s, p, fuel - 1, floor);
                     }
                     for &s in &chart.transition(dt).targets {
-                        add_ancestors(chart, history, s, Some(stop), p, fuel - 1, floor);
+                        add_ancestors(chart, history, s, Some(parent), p, fuel - 1, floor);
                     }
                 }
             }
@@ -455,6 +446,13 @@ fn add_descendants(
     }
 }
 
+/// `addAncestorStatesToEnter`, entering only proper descendants of `floor`, the domain of the
+/// transition being entered: the exit left the domain and everything above it active. A
+/// history state restores its states with their ancestors up to its parent, and the domain can
+/// lie below that parent (a default or recorded value inside a region of a parallel state
+/// below the parent, reached from inside that region); Appendix D then entered the active
+/// states between the domain and the parent again and completed their parallel ancestors'
+/// other regions by default next to the regions still active.
 fn add_ancestors(
     chart: &CompiledChart,
     history: &History,
@@ -465,7 +463,7 @@ fn add_ancestors(
     floor: StateIdx,
 ) {
     for anc in proper_ancestors(chart, state, ancestor) {
-        if anc == ROOT {
+        if anc == ROOT || !chart.is_descendant(anc, floor) {
             continue;
         }
         p.states.insert(anc);

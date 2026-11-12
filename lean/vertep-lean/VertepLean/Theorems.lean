@@ -10,8 +10,8 @@ import VertepLean.Step
   `TypedStepSoundness` is the named M1 extension point and `dynamic_typed_soundness` shows the
   M0 theorem is its instance for the dynamic (unityped) type system.
 
-The Configuration Well-Formedness Theorem is not proven yet; its statement lives in
-`Pending/ConfigWF.lean`, outside the build.
+The Configuration Well-Formedness Theorem is in `VertepLean/Config/Theorem.lean`
+(`configuration_wellformedness_of`, proven from compile correctness and the entry lemma).
 -/
 
 namespace Vertep
