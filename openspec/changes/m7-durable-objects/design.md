@@ -149,12 +149,20 @@ Two validly signed entries with the same (object, epoch, position) and different
 
 A different entry at the same position from a *higher* epoch is not equivocation. It is the normal replacement of an uncommitted tail.
 
-### D7. Custodian set changes travel as replicated custody state
-A controller-signed reconfiguration request changes the custody configuration (version, custodians, quorum). Every append batch carries the configuration, and custodians accept it with the journal under the writer's epoch. The change takes effect once a quorum of the old set has accepted it and the new custodians hold the committed chain. The writer then updates the `did:webvh` log. The custody state is authoritative, and the DID document is used for discovery.
+### D7. Custodian set changes use joint consensus
+A controller-signed request changes the custody configuration (version, custodians, quorum). Custody state is a configuration record: the effective set and, while a change is in progress, the pending next set. Batches and promises carry the record. The change runs in two phases:
 
-Promises carry the configuration the custodian accepted, so a candidate adopts the configuration accepted in the highest epoch, as it does for the chain. When that configuration is newer than the one it prepared with, it prepares again with the new set. Changes are single-step: one at a time, each accepted before the next. Raft-style joint consensus was rejected as unnecessary at this rate of change.
+1. The writer ships the journal with the new set pending. While pending, every commit and every election needs a quorum of the old set and a quorum of the new set.
+2. Once both quorums have accepted the whole journal with the new set pending, the new set takes effect. The writer ships the switch, and publishes the `did:webvh` update once a quorum of the new set has accepted it.
 
-*Refined during implementation:* the plan wrote the change as a journal entry, which runtime replay cannot decode.
+Custodians never take a record back within one epoch. A candidate that sees a newer record in a promise prepares again with it, which needs both quorums when the record is joint.
+
+Rejected: switching once a quorum of the *old* set and every newcomer accepted (the first implementation). The Lean custody model produced two counterexamples to that rule:
+
+- A shrink let stale members of the new set elect a writer without a committed entry.
+- A change interrupted after reaching one new member let a candidate win with the new set alone, while another could win the same epoch with the old set.
+
+Both are now regression tests (`shrink_keeps_committed_entries`, `interrupted_change_keeps_one_writer`). Raft's joint consensus is the standard fix.
 
 ### D8. Durable agent journal over `JournalStore`
 `StoreAgentJournal` stores each `AgentInput` as a journal entry of the agent's actor, using compare-and-set at `head + 1`, with the same JSON text `MemoryJournal` keeps. `AgentHost::builder` keeps `MemoryJournal` as the default for tests and accepts a store-backed journal. An agent declared as a durable object gets the custody journal (D3), which is a `JournalStore`.

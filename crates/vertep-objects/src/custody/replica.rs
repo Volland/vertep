@@ -19,7 +19,8 @@ use vertep_store::{AppendMeta, Entry, JournalStore, Position, StoreError};
 use super::config::{CustodyConfig, Role};
 use super::wire::{
     AppendBatch, CustodyRequest, CustodyResponse, EpochPromise, Evidence, KeyDirectory, KeyWrap,
-    WireEntry, WireFacts, entry_from_nquads, verify_keeper_authorship, verify_keeper_seal,
+    WireEntry, WireFacts, entry_from_nquads, record_rank, verify_keeper_authorship,
+    verify_keeper_seal,
 };
 use crate::chain::{ChainHead, Digest, EntrySigner, HostKeys, verify_entry};
 
@@ -39,6 +40,9 @@ enum LogRecord {
         base: u64,
         entries: Vec<WireEntry>,
         config: Option<CustodyConfig>,
+        /// The pending configuration after this batch (`None`: no change in progress).
+        #[serde(default)]
+        next: Option<CustodyConfig>,
         keys: Vec<KeyWrap>,
     },
     Evidence {
@@ -60,6 +64,8 @@ struct State {
     facts: Vec<WireFacts>,
     /// (epoch from which a configuration holds, configuration), ascending.
     configs: Vec<(u64, CustodyConfig)>,
+    /// The pending configuration of a change in progress.
+    next: Option<CustodyConfig>,
     keys: Vec<KeyWrap>,
     evidence: Vec<Evidence>,
     refused: BTreeSet<u64>,
@@ -99,6 +105,7 @@ impl State {
                 base,
                 entries,
                 config,
+                next,
                 keys,
             } => {
                 self.promised = self.promised.max(*epoch);
@@ -116,6 +123,7 @@ impl State {
                 {
                     self.configs.push((*epoch, c.clone()));
                 }
+                self.next = next.clone().filter(|n| n.version > self.config().version);
                 for k in keys {
                     if !self.keys.contains(k) {
                         self.keys.push(k.clone());
@@ -134,12 +142,14 @@ impl State {
 /// that epoch names it a host, and its keys come from the key directory.
 struct ConfigHostKeys<'a> {
     state: &'a State,
+    pending: Option<&'a CustodyConfig>,
     directory: &'a dyn KeyDirectory,
 }
 
 impl HostKeys for ConfigHostKeys<'_> {
     fn host_keys(&self, _object: &NamedNode, epoch: u64, writer: &str) -> Option<Vec<PublicKey>> {
-        if !self.state.config_at(epoch).is_host(writer) {
+        let pending = self.pending.is_some_and(|p| p.is_host(writer));
+        if !(self.state.config_at(epoch).is_host(writer) || pending) {
             return None;
         }
         self.directory.verification_keys(writer)
@@ -306,6 +316,11 @@ impl Replica {
         self.lock().config().clone()
     }
 
+    /// The pending configuration of a change in progress, if any.
+    pub fn next(&self) -> Option<CustodyConfig> {
+        self.lock().next.clone()
+    }
+
     /// Every configuration accepted, with the epoch it holds from.
     pub fn configs(&self) -> Vec<(u64, CustodyConfig)> {
         self.lock().configs.clone()
@@ -371,14 +386,22 @@ impl Replica {
             } => {
                 let before = self.history().map(|_| {
                     let st = self.lock();
-                    (st.promised, st.accepted_epoch, Self::log_hashes(&st))
+                    (
+                        st.promised,
+                        st.accepted_epoch,
+                        Self::log_hashes(&st),
+                        super::host::config_json(st.config()),
+                        st.next.as_ref().map(super::host::config_json),
+                    )
                 });
                 let answer = self.prepare(*epoch);
-                if let (Some(h), Some((highest, ae, log))) = (self.history(), before) {
+                if let (Some(h), Some((highest, ae, log, config, next))) = (self.history(), before)
+                {
                     h.record(serde_json::json!({
                         "kind": "prepare", "custodian": self.custodian(), "candidate": candidate,
                         "epoch": epoch, "promised": matches!(answer, CustodyResponse::Promise(_)),
                         "highest_before": highest, "accepted_epoch": ae, "log": log,
+                        "config": config, "next": next,
                     }));
                 }
                 answer
@@ -409,6 +432,10 @@ impl Replica {
                         "epoch": batch.epoch, "after": batch.after, "entries": entries,
                         "outcome": outcome, "log_after": Self::log_hashes(&st),
                         "accepted_epoch_after": st.accepted_epoch,
+                        "config": super::host::config_json(&batch.config),
+                        "next": batch.next.as_ref().map(super::host::config_json),
+                        "config_after": super::host::config_json(st.config()),
+                        "next_after": st.next.as_ref().map(super::host::config_json),
                     }));
                 }
                 answer
@@ -439,6 +466,7 @@ impl Replica {
             head_hash: st.head_hash().map(|d| d.to_hex()),
             accepted_epoch: st.accepted_epoch,
             config: st.config().clone(),
+            next: st.next.clone(),
             signature: String::new(),
         };
         match promise.sign(self.me.as_ref()) {
@@ -456,6 +484,7 @@ impl Replica {
             entries: st.entries.iter().skip(from - 1).cloned().collect(),
             keys: st.keys.clone(),
             configs: st.configs.clone(),
+            next: st.next.clone(),
         }
     }
 
@@ -466,14 +495,17 @@ impl Replica {
         base: u64,
         entries: &[WireEntry],
         batch_config: &CustodyConfig,
+        batch_next: Option<&CustodyConfig>,
     ) -> Result<Vec<WireFacts>, String> {
         // Configurations in force while checking: the replica's, plus the batch's for its epoch.
         let mut view = st.clone();
         if batch_config.version > view.config().version {
             view.configs.push((u64::MAX, batch_config.clone()));
         }
+        let pending = batch_next.cloned().or_else(|| st.next.clone());
         let keys = ConfigHostKeys {
             state: &view,
+            pending: pending.as_ref(),
             directory: self.directory.as_ref(),
         };
         let mut head = ChainHead {
@@ -516,8 +548,9 @@ impl Replica {
                     if !verify_keeper_authorship(k, &pk) {
                         return Err(format!("entry {}: bad-signature", pos.get()));
                     }
-                    let sealer_is_host =
-                        view.config().is_host(&k.sealer) || batch_config.is_host(&k.sealer);
+                    let sealer_is_host = view.config().is_host(&k.sealer)
+                        || batch_config.is_host(&k.sealer)
+                        || pending.as_ref().is_some_and(|p| p.is_host(&k.sealer));
                     let sealed_ok = sealer_is_host
                         && self
                             .directory
@@ -583,13 +616,33 @@ impl Replica {
                 ),
             };
         }
-        if batch.config.validate().is_err() {
+        // Within one epoch the configuration record only moves forward (a late, older batch
+        // of the same writer does not take a pending change back).
+        if batch.epoch == st.accepted_epoch
+            && record_rank(&batch.config, batch.next.as_ref())
+                < record_rank(st.config(), st.next.as_ref())
+        {
+            return CustodyResponse::Refused {
+                highest: st.promised,
+                reason: "an older configuration record within the accepted epoch".into(),
+            };
+        }
+        if batch.config.validate().is_err()
+            || batch
+                .next
+                .as_ref()
+                .is_some_and(|n| n.validate().is_err() || n.version != batch.config.version + 1)
+        {
             return CustodyResponse::Failed {
                 reason: "invalid configuration".into(),
             };
         }
-        let writer_known =
-            st.config().is_host(&batch.writer) || batch.config.is_host(&batch.writer);
+        let writer_known = st.config().is_host(&batch.writer)
+            || batch.config.is_host(&batch.writer)
+            || batch
+                .next
+                .as_ref()
+                .is_some_and(|n| n.is_host(&batch.writer));
         let verified = writer_known
             && self
                 .directory
@@ -694,10 +747,11 @@ impl Replica {
                 reason: "a keeper stores encrypted entries only".into(),
             };
         }
-        if let Err(reason) = self.verify_new(&st, base, &new, &batch.config) {
+        if let Err(reason) = self.verify_new(&st, base, &new, &batch.config, batch.next.as_ref()) {
             return CustodyResponse::Failed { reason };
         }
         let config = (batch.config.version > st.config().version).then(|| batch.config.clone());
+        let next_changes = batch.next != st.next;
         let keys: Vec<KeyWrap> = batch
             .keys
             .iter()
@@ -707,6 +761,7 @@ impl Replica {
         let changes = !new.is_empty()
             || replace
             || config.is_some()
+            || next_changes
             || !keys.is_empty()
             || newer
             || batch.epoch > st.promised;
@@ -716,6 +771,7 @@ impl Replica {
                 base,
                 entries: new,
                 config,
+                next: batch.next.clone(),
                 keys,
             };
             if let Err(e) = self.write(&mut st, rec) {

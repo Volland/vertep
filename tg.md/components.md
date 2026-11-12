@@ -408,7 +408,7 @@ Durable objects: DID-addressed virtual actors with hash-chained, signed journals
 - realizes:: [[decisions#Replication rides TSP through a replica link]]
 - realizes:: [[decisions#Keepers store ciphertext under a per-object content key]]
 - realizes:: [[decisions#Equivocation is kept as evidence]]
-- realizes:: [[decisions#Custodian set changes are replicated, then published]]
+- realizes:: [[decisions#Custodian set changes use joint consensus]]
 - realizes:: [[decisions#Hosts share the object VID and only the writer acknowledges]]
 - scheduled_in:: [[roadmap#M7 Durable objects]]
 

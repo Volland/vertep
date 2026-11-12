@@ -97,11 +97,17 @@ A custodian or host that observes two validly signed entries for the same object
 - **THEN** the keeper stores both signed entries as evidence, refuses further epoch-5 entries, and reports the evidence to the object's controller
 
 ### Requirement: Custodian Set Changes
-The object's controller SHALL be able to change the custodian set with a request signed by its DID update key. The writer SHALL replicate the new set as custody state with the journal, and the change SHALL take effect when a quorum of the old set has accepted it and the new custodians have stored the committed chain. Epochs won after that SHALL need a quorum of the new set. The writer SHALL then publish the new set in the DID document. The journal is authoritative for custody, and the DID document is used for discovery.
+The object's controller SHALL be able to change the custodian set with a request signed by its DID update key. The change SHALL use joint consensus:
+
+1. The writer SHALL replicate the journal with the new set pending. While the change is pending, a commit and an election SHALL each need a quorum of the old set and a quorum of the new set.
+2. The new set SHALL take effect only once a quorum of the old set and a quorum of the new set have accepted the whole journal with the new set pending.
+3. The change SHALL be published in the DID document only once a quorum of the new set has accepted the switch.
+
+A candidate that learns of a newer set or a pending change from a promise SHALL prepare again with it. The custody state is authoritative, and the DID document is used for discovery.
 
 #### Scenario: Replace a keeper
 - **WHEN** the controller replaces keeper K1 with K3
-- **THEN** K3 receives the committed chain, the old quorum accepts the new set, the DID document lists K3, the next epoch is won with promises from the new set, and K1's later promises no longer count
+- **THEN** K3 receives the committed chain, quorums of the old and the new set accept the change, the DID document lists K3, the next epoch is won with promises from the new set, and K1's later promises no longer count
 
 #### Scenario: Unsigned change refused
 - **WHEN** a host asks to change the custodian set without the controller's signature
@@ -110,3 +116,11 @@ The object's controller SHALL be able to change the custodian set with a request
 #### Scenario: Old set cannot elect after a change
 - **WHEN** a host gathers a quorum of promises only from custodians of the previous set after the change took effect
 - **THEN** other custodians refuse its entries, and no effects occur
+
+#### Scenario: Shrink keeps committed entries
+- **WHEN** the set shrinks to members that missed a committed entry, and the writer cannot reach a quorum of the new set
+- **THEN** the change does not take effect, and a later writer elected by those members still adopts the committed entry
+
+#### Scenario: Interrupted change keeps one writer
+- **WHEN** a writer starts a change, reaches only one member of the new set, and fails
+- **THEN** a candidate that learns of the pending change needs quorums of both sets, adopts every committed entry, and no other candidate can win the same epoch with the old set alone

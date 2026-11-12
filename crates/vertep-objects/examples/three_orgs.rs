@@ -194,7 +194,8 @@ fn main() -> Result<(), Error> {
     let stop = Arc::new(AtomicBool::new(false));
     let pump = {
         let keeper = TspCustodyEndpoint::new(k.session.clone(), rk.clone(), resolve.clone());
-        let (stop, mediator, net, kd) = (stop.clone(), mediator.clone(), net.clone(), k.did.clone());
+        let (stop, mediator, net, kd) =
+            (stop.clone(), mediator.clone(), net.clone(), k.did.clone());
         thread::spawn(move || {
             while !stop.load(Ordering::SeqCst) {
                 let _ = pump_mailbox(&keeper, mediator.as_ref(), &kd, net.as_ref());

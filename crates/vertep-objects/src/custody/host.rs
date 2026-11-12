@@ -26,7 +26,7 @@ use super::link::{CustodianLink, CustodyTransport, WriterBatch};
 use super::replica::Replica;
 use super::wire::{
     AppendBatch, ContentKey, CustodyRequest, CustodyResponse, EpochPromise, KeyDirectory, KeyWrap,
-    WireEntry, entry_from_nquads, open_keeper_entry, signing_bytes,
+    WireEntry, entry_from_nquads, open_keeper_entry, record_rank, signing_bytes,
 };
 use crate::chain::{
     ChainHead, ChainLink, Digest, EntrySigner, HostKeys, content_hash, read_link, seal,
@@ -301,6 +301,15 @@ impl HostKeys for ConfigsHostKeys<'_> {
     }
 }
 
+/// A configuration as recorded in custody histories.
+pub(crate) fn config_json(c: &CustodyConfig) -> serde_json::Value {
+    serde_json::json!({
+        "version": c.version,
+        "custodians": c.custodians.iter().map(|x| x.id.as_str()).collect::<Vec<_>>(),
+        "quorum": c.quorum,
+    })
+}
+
 /// An adopted chain and the configurations it was verified under.
 type Adopted = (Vec<Entry>, Vec<(u64, CustodyConfig)>);
 
@@ -345,6 +354,7 @@ impl CustodyHost {
         directory: Arc<dyn KeyDirectory>,
     ) -> Self {
         let config = local.config();
+        let pending = local.next();
         CustodyHost {
             object,
             signer,
@@ -362,7 +372,7 @@ impl CustodyHost {
                 committed: Position::ZERO,
                 behind: false,
                 config,
-                pending: None,
+                pending,
                 content_keys: BTreeMap::new(),
                 current_key: None,
                 wraps: Vec::new(),
@@ -438,8 +448,10 @@ impl CustodyHost {
             .take(committed.get() as usize)
             .filter_map(|e| e.facts().ok().map(|f| f.hash.to_hex()))
             .collect();
+        let (config, next) = (self.local.config(), self.local.next());
         self.record(serde_json::json!({
             "kind": "committed", "host": self.host(), "epoch": epoch, "log": log,
+            "config": config_json(&config), "next": next.as_ref().map(config_json),
         }));
     }
 
@@ -499,7 +511,7 @@ impl CustodyHost {
         st.mode = Mode::Idle;
         st.committed = Position::ZERO;
         st.behind = false;
-        st.pending = None;
+        st.pending = self.local.next();
         st.content_keys.clear();
         st.current_key = None;
         st.wraps.clear();
@@ -577,7 +589,10 @@ impl CustodyHost {
     pub fn elect(&self, epoch: u64) -> Result<Elected, CustodyError> {
         let mut st = self.lock();
         let mut epoch = epoch;
+        // The configuration record prepared with: the effective set and, while a change is in
+        // progress, the pending one (joint consensus: quorums of both are needed).
         let mut config = st.config.clone();
+        let mut next = st.pending.clone();
         let object = self.object.as_str().to_owned();
         let mut promises: Vec<EpochPromise>;
         let mut rounds = 0;
@@ -585,19 +600,27 @@ impl CustodyHost {
             rounds += 1;
             promises = Vec::new();
             let mut highest = 0;
-            for c in &config.custodians {
+            let mut targets: Vec<String> = config
+                .custodians
+                .iter()
+                .chain(next.iter().flat_map(|n| n.custodians.iter()))
+                .map(|c| c.id.clone())
+                .collect();
+            targets.sort();
+            targets.dedup();
+            for c in &targets {
                 let req = CustodyRequest::Prepare {
                     object: object.clone(),
                     epoch,
                     candidate: self.host().to_owned(),
                 };
-                match self.call(&c.id, &req) {
+                match self.call(c, &req) {
                     Some(CustodyResponse::Promise(p))
                         if p.epoch == epoch
-                            && p.custodian == c.id
+                            && &p.custodian == c
                             && self
                                 .directory
-                                .verification_keys(&c.id)
+                                .verification_keys(c)
                                 .is_some_and(|k| p.verify(&k)) =>
                     {
                         promises.push(p);
@@ -607,26 +630,35 @@ impl CustodyHost {
                 }
             }
             st.highest_seen = st.highest_seen.max(highest).max(epoch);
-            if !config.is_quorum(promises.iter().map(|p| p.custodian.as_str())) {
+            // A newer configuration record reported by a custodian: prepare again with it.
+            if let Some(p) = promises
+                .iter()
+                .max_by_key(|p| record_rank(&p.config, p.next.as_ref()))
+                && record_rank(&p.config, p.next.as_ref()) > record_rank(&config, next.as_ref())
+                && rounds < 4
+            {
+                config = p.config.clone();
+                next = p.next.clone();
+                epoch = st.highest_seen + 1;
+                continue;
+            }
+            let ids = || promises.iter().map(|p| p.custodian.as_str());
+            if !(config.is_quorum(ids()) && next.as_ref().is_none_or(|n| n.is_quorum(ids()))) {
                 return Err(CustodyError::NoQuorum {
                     promised: promises.len(),
                     needed: config.quorum,
                     highest,
                 });
             }
-            // A newer configuration accepted by a custodian: prepare again with its set.
-            let newest = promises
-                .iter()
-                .max_by_key(|p| (p.accepted_epoch, p.config.version))
-                .map(|p| p.config.clone())
-                .unwrap_or_else(|| config.clone());
-            if newest.version > config.version && rounds < 4 {
-                config = newest;
-                epoch = st.highest_seen + 1;
-                continue;
-            }
             break;
         }
+        let is_quorum = |ids: &mut dyn Iterator<Item = &str>| {
+            let ids: Vec<&str> = ids.collect();
+            config.is_quorum(ids.iter().copied())
+                && next
+                    .as_ref()
+                    .is_none_or(|n| n.is_quorum(ids.iter().copied()))
+        };
         // Candidates in adoption order: highest accepted epoch, then longest.
         let mut order: Vec<&EpochPromise> = promises.iter().collect();
         order.sort_by_key(|p| std::cmp::Reverse((p.accepted_epoch, p.head)));
@@ -634,11 +666,11 @@ impl CustodyHost {
         let mut skipped = Vec::new();
         let mut adopted: Option<Adopted> = None;
         for p in order {
-            let remaining = promises
+            let mut remaining = promises
                 .iter()
                 .filter(|q| !excluded.contains(&q.custodian))
                 .map(|q| q.custodian.as_str());
-            if !config.is_quorum(remaining) {
+            if !is_quorum(&mut remaining) {
                 break;
             }
             let read = CustodyRequest::Read {
@@ -649,6 +681,7 @@ impl CustodyHost {
                 entries,
                 keys,
                 configs,
+                ..
             }) = self.call(&p.custodian, &read)
             else {
                 excluded.insert(p.custodian.clone());
@@ -726,7 +759,13 @@ impl CustodyHost {
             None => {
                 let g = st.wraps.iter().map(|w| w.generation).max().unwrap_or(0) + 1;
                 let key = ContentKey::generate(g).map_err(store_err)?;
-                for h in config.hosts() {
+                let mut hosts: Vec<&str> = config
+                    .hosts()
+                    .chain(next.iter().flat_map(|n| n.hosts()))
+                    .collect();
+                hosts.sort_unstable();
+                hosts.dedup();
+                for h in hosts {
                     let agree = self.directory.agreement_key(h).ok_or_else(|| {
                         CustodyError::Invalid(format!("no key-agreement key for host {h}"))
                     })?;
@@ -748,6 +787,7 @@ impl CustodyHost {
             after: 0,
             entries: chain.iter().map(WireEntry::clear).collect(),
             config: config.clone(),
+            next: next.clone(),
             keys: st.wraps.clone(),
             signature: String::new(),
         }
@@ -758,6 +798,7 @@ impl CustodyHost {
             "kind": "elected", "host": self.host(), "epoch": epoch,
             "promised_by": promises.iter().map(|p| p.custodian.as_str()).collect::<Vec<_>>(),
             "adopted": chain.iter().map(|e| content_hash(e).to_hex()).collect::<Vec<_>>(),
+            "config": config_json(&config), "next": next.as_ref().map(config_json),
         }));
         match self.local.handle(&CustodyRequest::Append(batch)) {
             CustodyResponse::Ack { .. } => {}
@@ -773,6 +814,7 @@ impl CustodyHost {
         }
         st.mode = Mode::Writer { epoch };
         st.config = config.clone();
+        st.pending = next.clone();
         st.committed = Position::ZERO;
         st.behind = true;
         // Start shipping each custodian from the head it promised when that is a prefix of
@@ -846,15 +888,42 @@ impl CustodyHost {
         if own > epoch {
             return (acks, Some(own));
         }
-        if self.local.accepted_epoch() == epoch {
+        let config = st.config.clone();
+        let next = st.pending.clone();
+        // The own replica takes the writer's configuration record like any custodian (an empty
+        // batch at its head) and counts only once it holds that record in this epoch: a joint
+        // quorum needs every counted member to know the change.
+        if self.local.config() != config || self.local.next() != next {
+            let sync = AppendBatch {
+                object: self.object.as_str().to_owned(),
+                epoch,
+                writer: self.host().to_owned(),
+                after: head.get(),
+                entries: Vec::new(),
+                config: config.clone(),
+                next: next.clone(),
+                keys: st.wraps.clone(),
+                signature: String::new(),
+            }
+            .sign(self.signer.as_ref());
+            if let Ok(batch) = sync
+                && let CustodyResponse::Refused { highest, .. } =
+                    self.local.handle(&CustodyRequest::Append(batch))
+                && highest > epoch
+            {
+                return (acks, Some(highest));
+            }
+        }
+        if self.local.accepted_epoch() == epoch
+            && self.local.config() == config
+            && self.local.next() == next
+        {
             acks.insert(self.host().to_owned());
         }
-        let config = st.pending.clone().unwrap_or_else(|| st.config.clone());
-        let mut targets: Vec<(String, Role)> = st
-            .config
+        let mut targets: Vec<(String, Role)> = config
             .custodians
             .iter()
-            .chain(config.custodians.iter())
+            .chain(next.iter().flat_map(|n| n.custodians.iter()))
             .map(|c| (c.id.clone(), c.role))
             .collect();
         targets.sort();
@@ -898,6 +967,7 @@ impl CustodyHost {
                     after,
                     entries,
                     config: config.clone(),
+                    next: next.clone(),
                     keys: st.wraps.clone(),
                 },
             );
@@ -1044,7 +1114,8 @@ impl CustodyHost {
             writer: self.host().to_owned(),
             after: expected.get(),
             entries: sealed.iter().map(WireEntry::clear).collect(),
-            config: st.pending.clone().unwrap_or_else(|| st.config.clone()),
+            config: st.config.clone(),
+            next: st.pending.clone(),
             keys: st.wraps.clone(),
             signature: String::new(),
         }
@@ -1180,11 +1251,10 @@ impl CustodyHost {
             return Err(CustodyError::NotWriter);
         };
         let new = request.config.clone();
-        let target_version = st
-            .pending
-            .as_ref()
-            .map_or(st.config.version + 1, |p| p.version);
-        if new.version != target_version {
+        let starting = st.pending.is_none() && st.config.version + 1 == new.version;
+        let joint = st.pending.as_ref() == Some(&new);
+        let switched = st.pending.is_none() && st.config == new;
+        if !(starting || joint || switched) {
             return Err(CustodyError::Invalid(format!(
                 "configuration version {} does not follow {}",
                 new.version, st.config.version
@@ -1195,7 +1265,7 @@ impl CustodyHost {
                 "the writer must stay a host; hand the object off first".into(),
             ));
         }
-        if st.pending.is_none() {
+        if starting {
             let old_hosts: BTreeSet<String> = st.config.hosts().map(str::to_owned).collect();
             let new_hosts: BTreeSet<String> = new.hosts().map(str::to_owned).collect();
             let removed = !old_hosts.is_subset(&new_hosts);
@@ -1228,31 +1298,44 @@ impl CustodyHost {
             }
             st.pending = Some(new.clone());
         }
+        // Phase 1 (joint consensus): a quorum of the old set and a quorum of the new set accept
+        // the whole journal with the new set pending; meanwhile every commit needs both.
+        let head = self.local.head();
+        if st.pending.is_some() {
+            let (acks, fenced) = self.ship(&mut st, epoch);
+            if let Some(h) = fenced {
+                st.mode = Mode::Deposed { highest: h };
+                return Err(CustodyError::Deposed { highest: h });
+            }
+            if !Self::quorum_reached(&st, &acks) {
+                return Err(CustodyError::NotAccepted(format!(
+                    "joint phase: {} custodians accepted; quorums of the old and the new set are needed",
+                    acks.len()
+                )));
+            }
+            st.committed = head;
+            st.behind = false;
+            self.record_commit(epoch, head);
+            // Phase 2: the new set takes effect.
+            st.config = new;
+            st.pending = None;
+        }
+        // The new set accepts the switch; only then is the change published.
         let (acks, fenced) = self.ship(&mut st, epoch);
         if let Some(h) = fenced {
             st.mode = Mode::Deposed { highest: h };
             return Err(CustodyError::Deposed { highest: h });
         }
-        let head = self.local.head();
-        let newcomers: Vec<&str> = new
-            .custodians
-            .iter()
-            .map(|c| c.id.as_str())
-            .filter(|id| st.config.role_of(id).is_none())
-            .collect();
-        let all_new_hold = newcomers
-            .iter()
-            .all(|id| st.acked.get(*id).is_some_and(|p| *p >= head));
-        if !(st.config.is_quorum(acks.iter().map(String::as_str)) && all_new_hold) {
+        if !st.config.is_quorum(acks.iter().map(String::as_str)) {
+            st.behind = true;
             return Err(CustodyError::NotAccepted(format!(
-                "{} custodians accepted; every new custodian must hold the journal",
+                "the switch is accepted by {} custodians, not yet a quorum of the new set",
                 acks.len()
             )));
         }
-        st.config = new;
-        st.pending = None;
         st.committed = head;
         st.behind = false;
+        self.record_commit(epoch, head);
         drop(st);
         if let Some(entry) = &request.did_log_entry {
             let publisher = self

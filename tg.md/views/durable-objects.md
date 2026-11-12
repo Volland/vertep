@@ -103,12 +103,12 @@ A custodian's replica is an append-only log of custody records (promises, accept
 
 ## Custodian set changes
 
-The controller signs a new configuration; the writer ships it with the journal, switches once the old quorum and every new custodian accepted, and then publishes the `did:webvh` update.
+The controller signs a new set; the writer replicates it as pending, which needs quorums of both sets, switches once both quorums hold the journal, and then publishes the `did:webvh` update.
 
-- describes:: [[decisions#Custodian set changes are replicated, then published]]
+- describes:: [[decisions#Custodian set changes use joint consensus]]
 - describes:: [[constraints#did:webvh updates need the web host]]
 
-Promises carry the configuration each custodian accepted, so a later candidate adopts the newest one and prepares again with its set. Custodians refuse batches that carry an older configuration than they hold, which keeps a host stuck on the old set from writing.
+Custody state is a configuration record: the effective set and, during a change, the pending next set. While a change is pending, every commit and every election needs a quorum of each set. Promises report the record, so a candidate that meets a pending change prepares again under both sets. Custodians refuse batches that carry an older set than they hold. The first rule (switch on a quorum of the old set plus every newcomer) lost committed entries in two counterexamples the Lean custody model produced, a shrink and an interrupted change; both are regression tests now.
 
 ## Inside the runtime
 

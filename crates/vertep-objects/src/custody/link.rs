@@ -128,8 +128,10 @@ pub struct WriterBatch {
     pub after: Position,
     /// Sealed clear entries.
     pub entries: Vec<Entry>,
-    /// The configuration shipped.
+    /// The effective configuration shipped.
     pub config: CustodyConfig,
+    /// The pending configuration of a change in progress.
+    pub next: Option<CustodyConfig>,
     /// The key wraps shipped.
     pub keys: Vec<KeyWrap>,
 }
@@ -189,6 +191,7 @@ impl ReplicaLink<WriterBatch> for CustodianLink {
             after: batch.after.get(),
             entries,
             config: batch.config.clone(),
+            next: batch.next.clone(),
             keys: batch.keys.clone(),
             signature: String::new(),
         }

@@ -140,7 +140,11 @@ enum Opened {
     Event(Box<OpenedMessage>),
 }
 
-fn open_message(session: &TspSession, resolve: &ResolveVid, bytes: &[u8]) -> Result<Opened, String> {
+fn open_message(
+    session: &TspSession,
+    resolve: &ResolveVid,
+    bytes: &[u8],
+) -> Result<Opened, String> {
     let mut copy = bytes.to_vec();
     let r = |id: &str| resolve(id);
     match session.open(&mut copy, &r).map_err(|e| e.to_string())? {

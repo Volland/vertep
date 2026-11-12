@@ -12,7 +12,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use serde_json::Value;
-use vertep_objects::custody::{CustodyHost, CustodyRequest, History};
+use vertep_objects::custody::{
+    Custodian, CustodyHost, CustodyRequest, History, ReconfigurationRequest,
+};
 use vertep_objects::testkit::{CustodyFixture, turn};
 use vertep_store::Position;
 
@@ -22,6 +24,8 @@ const HOSTS: [&str; 3] = [
     "did:web:c.example.org",
 ];
 const KEEPERS: [&str; 2] = ["did:web:k1.example.net", "did:web:k2.example.net"];
+/// A spare keeper that reconfigurations swap in for, and out of, K2's place.
+const SPARE: &str = "did:web:k3.example.net";
 
 /// xorshift64*: deterministic per seed.
 struct Rng(u64);
@@ -42,7 +46,11 @@ impl Rng {
 
 fn hashes(v: &Value) -> Vec<String> {
     v.as_array()
-        .map(|a| a.iter().filter_map(|h| h.as_str().map(str::to_owned)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|h| h.as_str().map(str::to_owned))
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -95,7 +103,9 @@ fn check(history: &[Value]) -> Result<(), String> {
 
 /// One randomised run; returns its history.
 fn run(seed: u64, steps: usize) -> Arc<History> {
-    let f = CustodyFixture::new(&HOSTS, &KEEPERS, None);
+    let mut f = CustodyFixture::new(&HOSTS, &KEEPERS, None);
+    let spare = f.make_party(SPARE);
+    f.parties.push(spare);
     let history = History::new(&f.config);
     for p in &f.parties {
         p.replica.set_history(history.clone());
@@ -108,7 +118,12 @@ fn run(seed: u64, steps: usize) -> Arc<History> {
             h
         })
         .collect();
-    let all: Vec<&str> = HOSTS.iter().chain(KEEPERS.iter()).copied().collect();
+    let all: Vec<&str> = HOSTS
+        .iter()
+        .chain(KEEPERS.iter())
+        .chain(std::iter::once(&SPARE))
+        .copied()
+        .collect();
     let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1);
     let mut turn_no = 0u64;
     for _ in 0..steps {
@@ -161,6 +176,31 @@ fn run(seed: u64, steps: usize) -> Arc<History> {
                     hosts[i].restart();
                 }
             }
+            // Custodian-set changes: a writer swaps K2 and the spare keeper (joint consensus).
+            90..=93 => {
+                let h = &hosts[rng.below(3) as usize];
+                if h.writer_epoch().is_some() {
+                    let cur = h.config();
+                    let (out, inn) = if cur.role_of(KEEPERS[1]).is_some() {
+                        (KEEPERS[1], SPARE)
+                    } else {
+                        (SPARE, KEEPERS[1])
+                    };
+                    let mut cfg = cur.clone();
+                    cfg.version += 1;
+                    cfg.custodians.retain(|c| c.id != out);
+                    cfg.custodians.push(Custodian::keeper(inn));
+                    let req = ReconfigurationRequest {
+                        object: f.object.as_str().into(),
+                        config: cfg,
+                        did_log_entry: None,
+                        signature: String::new(),
+                    }
+                    .sign(&f.controller.signer)
+                    .unwrap();
+                    let _ = h.reconfigure(&req);
+                }
+            }
             // Catch-up attempts and reads.
             _ => {
                 let h = &hosts[rng.below(3) as usize];
@@ -172,9 +212,11 @@ fn run(seed: u64, steps: usize) -> Arc<History> {
 }
 
 fn lean_custody() -> Option<PathBuf> {
-    let dir = std::env::var_os("VT_LEAN_BIN").map(PathBuf::from).unwrap_or_else(|| {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../lean/vertep-lean/.lake/build/bin")
-    });
+    let dir = std::env::var_os("VT_LEAN_BIN")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../lean/vertep-lean/.lake/build/bin")
+        });
     let bin = dir.join("vertep-custody");
     bin.is_file().then_some(bin)
 }
@@ -191,7 +233,9 @@ fn randomised_custody_faults_keep_safety() {
     std::fs::create_dir_all(&out).unwrap();
     let lean = lean_custody();
     if lean.is_none() && cfg!(feature = "differential") {
-        panic!("the Lean custody model is not built: cd lean/vertep-lean && lake build vertep-custody");
+        panic!(
+            "the Lean custody model is not built: cd lean/vertep-lean && lake build vertep-custody"
+        );
     }
     let mut elections = 0;
     let mut commits = 0;

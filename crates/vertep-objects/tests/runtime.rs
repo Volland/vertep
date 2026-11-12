@@ -45,8 +45,7 @@ fn node_for(f: &CustodyFixture, host: &Arc<CustodyHost>, shell: Shell) -> Node {
         .build();
     node.register_type(TICKET, chart(TICKET_XML)).unwrap();
     node.register_type(SINK, chart(SINK_XML)).unwrap();
-    node.handle()
-        .bind_address(&object(f), TICKET, "8812");
+    node.handle().bind_address(&object(f), TICKET, "8812");
     node
 }
 
@@ -67,9 +66,10 @@ fn var(v: &Value, name: &str) -> Option<f64> {
     match v {
         Value::Object(kv) => kv.iter().find_map(|(k, x)| {
             if k == name
-                && let Value::Number(n) = x {
-                    return Some(*n);
-                }
+                && let Value::Number(n) = x
+            {
+                return Some(*n);
+            }
             var(x, name)
         }),
         Value::Array(a) => match a.as_slice() {
@@ -87,7 +87,11 @@ fn read(node: &mut Node, a: &Address, name: &str) -> f64 {
 
 fn five() -> CustodyFixture {
     CustodyFixture::new(
-        &["did:web:a.example.org", "did:web:b.example.org", "did:web:c.example.org"],
+        &[
+            "did:web:a.example.org",
+            "did:web:b.example.org",
+            "did:web:c.example.org",
+        ],
         &["did:web:k1.example.net", "did:web:k2.example.net"],
         None,
     )
@@ -103,7 +107,11 @@ fn no_quorum_no_effects() {
     node.send(&object(&f), ev("work")).unwrap();
     node.run_until_idle();
     assert_eq!(read(&mut node, &sink(), "done"), 1.0);
-    for d in ["did:web:b.example.org", "did:web:c.example.org", "did:web:k1.example.net"] {
+    for d in [
+        "did:web:b.example.org",
+        "did:web:c.example.org",
+        "did:web:k1.example.net",
+    ] {
         f.set_up(d, false);
     }
     node.send(&object(&f), ev("work")).unwrap();
@@ -113,8 +121,16 @@ fn no_quorum_no_effects() {
         1.0,
         "no message from a turn no quorum accepted"
     );
-    assert_eq!(a.committed().get(), 1, "the turn no quorum accepted is not readable");
-    for d in ["did:web:b.example.org", "did:web:c.example.org", "did:web:k1.example.net"] {
+    assert_eq!(
+        a.committed().get(),
+        1,
+        "the turn no quorum accepted is not readable"
+    );
+    for d in [
+        "did:web:b.example.org",
+        "did:web:c.example.org",
+        "did:web:k1.example.net",
+    ] {
         f.set_up(d, true);
     }
     // The failed turn's message was released and the actor parked; after the back-off it is
@@ -126,7 +142,10 @@ fn no_quorum_no_effects() {
     let done = read(&mut node, &sink(), "done");
     let count = read(&mut node, &object(&f), "count");
     assert_eq!(count, 3.0, "three distinct work events, each applied once");
-    assert_eq!(done, 3.0, "every committed turn had its effects exactly once");
+    assert_eq!(
+        done, 3.0,
+        "every committed turn had its effects exactly once"
+    );
 }
 
 // @tg: verifies:: [[openspec:durable-objects#Effects After Durable Commit#Single-host object]] {level: integration}
@@ -164,7 +183,10 @@ fn address_survives_a_host_change() {
     let mut node_b = node_for(&f, &b, shell);
     let replayed = node_b.state(&object(&f)).unwrap();
     assert_eq!(replayed.configuration, before.configuration);
-    assert_eq!(var(&replayed.datamodel, "count"), var(&before.datamodel, "count"));
+    assert_eq!(
+        var(&replayed.datamodel, "count"),
+        var(&before.datamodel, "count")
+    );
     // The sender keeps the same address; the event reaches the object on host B.
     node_b.send(&object(&f), ev("work")).unwrap();
     node_b.run_until_idle();
@@ -174,7 +196,12 @@ fn address_survives_a_host_change() {
     assert_eq!(read(&mut node_b, &sink(), "done"), 3.0);
 }
 
-fn arm_then_fail_over(f: &CustodyFixture, clock: &VirtualClock, shell: &Shell, fire_on_a: bool) -> Node {
+fn arm_then_fail_over(
+    f: &CustodyFixture,
+    clock: &VirtualClock,
+    shell: &Shell,
+    fire_on_a: bool,
+) -> Node {
     let a = f.custody_host("did:web:a.example.org");
     {
         let mut node_a = node_for(f, &a, shell.clone());
@@ -206,7 +233,11 @@ fn alarm_fires_after_failover() {
     assert_eq!(node_b.pending_timers().len(), 1, "B re-armed A's alarm");
     clock.advance(Duration::from_secs(480));
     node_b.run_until_idle();
-    assert_eq!(read(&mut node_b, &object(&f), "fired"), 1.0, "fired once on host B");
+    assert_eq!(
+        read(&mut node_b, &object(&f), "fired"),
+        1.0,
+        "fired once on host B"
+    );
     clock.advance(Duration::from_secs(3600));
     node_b.run_until_idle();
     assert_eq!(read(&mut node_b, &object(&f), "fired"), 1.0);
@@ -218,8 +249,15 @@ fn alarm_not_fired_twice() {
     let f = five();
     let (shell, clock) = Shell::virtual_time(T0);
     let mut node_b = arm_then_fail_over(&f, &clock, &shell, true);
-    assert!(node_b.pending_timers().is_empty(), "a fired timer is not armed again");
+    assert!(
+        node_b.pending_timers().is_empty(),
+        "a fired timer is not armed again"
+    );
     clock.advance(Duration::from_secs(3600));
     node_b.run_until_idle();
-    assert_eq!(read(&mut node_b, &object(&f), "fired"), 1.0, "B does not fire it again");
+    assert_eq!(
+        read(&mut node_b, &object(&f), "fired"),
+        1.0,
+        "B does not fire it again"
+    );
 }

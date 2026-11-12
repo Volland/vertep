@@ -426,8 +426,17 @@ pub struct EpochPromise {
     pub accepted_epoch: u64,
     /// The custody configuration the custodian accepted.
     pub config: CustodyConfig,
+    /// The pending configuration of a change in progress (joint consensus), if any.
+    #[serde(default)]
+    pub next: Option<CustodyConfig>,
     /// The custodian's signature over the other fields.
     pub signature: String,
+}
+
+/// The rank of a configuration record: a single configuration `v` is below the joint record
+/// `v` with `v+1` pending, which is below the single configuration `v+1`.
+pub fn record_rank(config: &CustodyConfig, next: Option<&CustodyConfig>) -> u64 {
+    config.version * 2 + u64::from(next.is_some())
 }
 
 /// A batch of entries a writer ships to a custodian.
@@ -443,8 +452,11 @@ pub struct AppendBatch {
     pub after: u64,
     /// The entries, in order, up to the writer's head.
     pub entries: Vec<WireEntry>,
-    /// The custody configuration the writer holds.
+    /// The effective custody configuration the writer holds.
     pub config: CustodyConfig,
+    /// The configuration the writer is changing to, while a change is in progress.
+    #[serde(default)]
+    pub next: Option<CustodyConfig>,
     /// Content keys wrapped to hosts.
     pub keys: Vec<KeyWrap>,
     /// The writer's signature over the other fields.
@@ -542,6 +554,9 @@ pub enum CustodyResponse {
         keys: Vec<KeyWrap>,
         /// The configurations it accepted, with the epoch each took effect in.
         configs: Vec<(u64, CustodyConfig)>,
+        /// The pending configuration it accepted, if a change is in progress.
+        #[serde(default)]
+        next: Option<CustodyConfig>,
     },
     /// The request failed (malformed, bad signature, invalid entries, storage).
     #[serde(rename = "https://w3id.org/vertep/custody/1.0#failed")]
@@ -742,9 +757,7 @@ impl KeyDirectory for ResolverKeyDirectory {
     }
     fn agreement_key(&self, did: &str) -> Option<PublicKey> {
         let doc = self.doc(did)?;
-        doc.key_agreement_methods()
-            .first()
-            .map(|m| m.public_key)
+        doc.key_agreement_methods().first().map(|m| m.public_key)
     }
     fn controller_keys(&self, object: &str) -> Option<Vec<PublicKey>> {
         let doc = self.doc(object)?;

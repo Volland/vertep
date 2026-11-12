@@ -169,8 +169,7 @@ impl CustodyFixture {
     pub fn make_party(&self, did: &str) -> Party {
         let id = TestHost::new(did);
         self.directory.add_verification(did, id.public);
-        self.directory
-            .set_agreement(did, id.agreement_public);
+        self.directory.set_agreement(did, id.agreement_public);
         let store = Arc::new(MemoryStore::new());
         let replica = Arc::new(
             Replica::open(

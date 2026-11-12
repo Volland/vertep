@@ -16,7 +16,8 @@ use vertep_runtime::VirtualClock;
 use vertep_store::JournalStore;
 use vertep_tiramemsu::TiramemsuShard;
 
-const HEAD: &str = r#"<datamodel><data id="summary" expr="''"/><data id="n" expr="0"/></datamodel>"#;
+const HEAD: &str =
+    r#"<datamodel><data id="summary" expr="''"/><data id="n" expr="0"/></datamodel>"#;
 
 /// `start` runs one model call, then waits in the decide state `review` for a human.
 fn agent_chart() -> Chart {

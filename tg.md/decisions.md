@@ -1160,6 +1160,14 @@ Rust, XML (SCXML) and YAML blocks on the site are highlighted by `site/tools/hig
 
 Pygments does the lexing and is needed only when the tool runs, never to view the site; the tool is idempotent and leaves the text of every block unchanged. `site/tools/sync-examples.py` calls the same function, so regenerated example pages keep their colours. The theme is in the "code highlighting" section of `site/assets/css/vertep.css`: ink and the rubric orange only, separated by weight and slant too, and it follows the dark-mode tokens. Blocks of other languages and the recorded outputs stay plain.
 
+## Editor lint and spell-check are configured in the repository
+
+Markdown lint and spell-check rules live in `.markdownlint.json` and `cspell.json` at the repository root, so every editor shows the same marks and project words are not flagged one by one.
+
+- motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: secondary, since: "2026-11-12"}
+
+The lint config switches off inline-HTML, first-line-heading, line-length and bare-URL rules, because the README's centred header needs HTML and the `tg.md/` sections carry long lines and URLs. The word list holds project terms (Vertep, SCXML, SHACL, tiramemsu) and the British spellings come from the `en-GB` language. Tables in the README use the spaced `| --- |` separator that lint expects.
+
 ## Hosts instantiate CEL charts typed
 
 Every host creates a chart's datamodel through `DatamodelRegistry::create_for`, and `CelRegistry` instantiates a chart that declares types with its projected CEL type environment, refusing one with CEL type errors.
@@ -1263,14 +1271,23 @@ Two validly signed entries for one object, epoch and position with different has
 
 A different entry at the same position from a higher epoch is the normal replacement of an uncommitted tail, not equivocation. Byzantine fault tolerance among hosts is out of scope.
 
-## Custodian set changes are replicated, then published
+## Custodian set changes use joint consensus
 
-A controller-signed reconfiguration is custody state replicated with every batch; it takes effect once a quorum of the old set accepts it and the new custodians hold the chain, and then the `did:webvh` log is updated (M7 design D7).
+A signed change first replicates the new set as pending, needing quorums of both sets for every commit and election; it takes effect once both quorums hold the journal and is published once the new set accepts the switch (M7 design D7).
 
 - motivated_by:: [[decisions#Custody epochs are won by quorum promises]] {weight: primary, since: "2026-11-12"}
 - motivated_by:: [[constraints#did:webvh updates need the web host]] {weight: secondary}
+- supersedes:: [[decisions#Custodian set changes are replicated, then published]] {since: "2026-11-12", reason: "the Lean custody model found two counterexamples: a shrink and an interrupted change could lose committed entries"}
 
-Promises carry the accepted configuration, so a later candidate adopts the configuration accepted in the highest epoch and prepares again with it when it is newer. One change at a time; Raft-style joint consensus is not needed at this rate of change.
+Custody state is a configuration record, the effective set plus an optional pending next set, carried by every batch and promise. A candidate that sees a newer record prepares again with it. Custodians never take a record back within one epoch. The rejected rule switched once a quorum of the old set and every newcomer accepted: stale members of a shrunk set, or the new set alone after an interrupted change, could then elect a writer without a committed entry. Both counterexamples are regression tests.
+
+## Custodian set changes are replicated, then published
+
+Superseded first rule: a controller-signed reconfiguration took effect once a quorum of the old set accepted it and the new custodians held the chain.
+
+- motivated_by:: [[decisions#Custody epochs are won by quorum promises]] {weight: primary, since: "2026-11-12"}
+
+It is unsafe, see [[decisions#Custodian set changes use joint consensus]].
 
 ## The agent journal is stored in a journal store
 

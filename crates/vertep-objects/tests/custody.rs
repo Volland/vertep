@@ -501,6 +501,7 @@ fn forked_writer_detected() {
             after: 0,
             entries: vec![e],
             config: f.config.clone(),
+            next: None,
             keys: vec![],
             signature: String::new(),
         }
@@ -626,6 +627,7 @@ fn old_set_cannot_elect_after_a_change() {
         after: 2,
         entries: vec![],
         config: f.config.clone(),
+        next: None,
         keys: vec![],
         signature: String::new(),
     }
@@ -643,6 +645,158 @@ fn old_set_cannot_elect_after_a_change() {
     }
     // And no new effects: the writer's journal is unchanged.
     assert_eq!(a.committed(), Position::new(2));
+}
+
+/// Regression (joint consensus): shrinking the set must not let stale members of the new set
+/// elect a writer that lost a committed entry. The switch needs a quorum of the new set too.
+// @tg: verifies:: [[openspec:object-custody#Custodian Set Changes#Shrink keeps committed entries]] {level: integration}
+#[test]
+fn shrink_keeps_committed_entries() {
+    let f = CustodyFixture::new(&[A, B, C], &[K1, K2], Some(3));
+    let c = f.custody_host(C);
+    f.set_up(A, false);
+    f.set_up(B, false);
+    c.elect(1).unwrap();
+    write(&c, &f, 1, 1, "L"); // committed by C, K1, K2
+    let mut cfg = f.config.clone();
+    cfg.version = 2;
+    cfg.custodians.retain(|x| x.id != K1 && x.id != K2);
+    cfg.quorum = 2;
+    let req = ReconfigurationRequest {
+        object: f.object.as_str().into(),
+        config: cfg,
+        did_log_entry: None,
+        signature: String::new(),
+    }
+    .sign(&f.controller.signer)
+    .unwrap();
+    assert!(
+        matches!(c.reconfigure(&req), Err(CustodyError::NotAccepted(_))),
+        "no quorum of the new set holds the journal: the switch must wait"
+    );
+    // C disappears; A and B come back and one of them takes over.
+    f.set_up(C, false);
+    f.set_up(A, true);
+    f.set_up(B, true);
+    let a = f.custody_host(A);
+    a.activate().unwrap();
+    assert_eq!(notes(&a), vec!["L 1"], "the committed entry survives");
+}
+
+/// A link that answers its first `n` requests, then is unreachable.
+struct Flaky {
+    inner: Arc<LocalTransport>,
+    left: Mutex<usize>,
+}
+
+impl CustodyTransport for Flaky {
+    fn custodian(&self) -> &str {
+        self.inner.custodian()
+    }
+    fn call(&self, r: &CustodyRequest) -> Result<CustodyResponse, LinkError> {
+        let mut left = self.left.lock().unwrap();
+        if *left == 0 {
+            return Err(LinkError("gone".into()));
+        }
+        *left -= 1;
+        self.inner.call(r)
+    }
+}
+
+/// Regression (joint consensus): a change that was only started must not let a candidate win
+/// with members of the new set that never held the journal. Under the old rule (prepare again
+/// with the newer set alone) B would be elected by D, F and G with an empty chain and lose L.
+// @tg: verifies:: [[openspec:object-custody#Custodian Set Changes#Interrupted change keeps one writer]] {level: integration}
+#[test]
+fn interrupted_change_keeps_one_writer() {
+    const D: &str = "did:web:d.example.org";
+    const F: &str = "did:web:f.example.net";
+    const G: &str = "did:web:g.example.net";
+    let mut f = CustodyFixture::new(&[A, B, C], &[], Some(2));
+    for d in [D, F, G] {
+        let p = f.make_party(d);
+        f.parties.push(p);
+    }
+    let a = f.custody_host(A);
+    f.set_up(C, false);
+    a.elect(1).unwrap();
+    write(&a, &f, 1, 1, "L"); // committed by A and B
+    // A starts moving to {A, C, D, F, G} (quorum 3) but reaches only C, then dies.
+    f.set_up(C, true);
+    for d in [B, D, F, G] {
+        f.set_up(d, false);
+    }
+    let mut cfg = CustodyConfig::new(
+        vec![
+            Custodian::host(A),
+            Custodian::host(C),
+            Custodian::host(D),
+            Custodian::keeper(F),
+            Custodian::keeper(G),
+        ],
+        3,
+    )
+    .unwrap();
+    cfg.version = 2;
+    let req = ReconfigurationRequest {
+        object: f.object.as_str().into(),
+        config: cfg,
+        did_log_entry: None,
+        signature: String::new(),
+    }
+    .sign(&f.controller.signer)
+    .unwrap();
+    assert!(matches!(
+        a.reconfigure(&req),
+        Err(CustodyError::NotAccepted(_))
+    ));
+    f.set_up(A, false);
+    for d in [B, D, F, G] {
+        f.set_up(d, true);
+    }
+    // B reaches C for one prepare only: C reports the pending change, then disappears.
+    let pb = f.party(B);
+    let mut b = CustodyHost::new(
+        f.object.clone(),
+        Arc::new(pb.id.signer.clone()),
+        pb.id.keys.clone() as Arc<dyn KeyManager>,
+        pb.id.agreement.clone(),
+        pb.replica.clone(),
+        f.directory.clone(),
+    )
+    .with_backoff(vertep_objects::custody::Backoff::immediate(4));
+    for p in &f.parties {
+        if p.id.did == C {
+            b = b.with_transport(Arc::new(Flaky {
+                inner: p.transport.clone(),
+                left: Mutex::new(1),
+            }));
+        } else if p.id.did != B {
+            b = b.with_transport(p.transport.clone());
+        }
+    }
+    match b.activate() {
+        // Joint consensus: without C, the old set {A, B, C} has no quorum, so B must wait.
+        Err(CustodyError::NoQuorum { .. }) => {}
+        Ok(_) => assert_eq!(
+            notes(&b),
+            vec!["L 1"],
+            "elected only with the committed entry"
+        ),
+        Err(e) => panic!("{e}"),
+    }
+    assert_ne!(
+        b.read_committed(Position::ZERO)
+            .map(|r| r.len())
+            .unwrap_or(1),
+        0,
+        "never a writer with an empty chain"
+    );
+    // Once C is back, B is elected under both sets and keeps L.
+    b.add_transport(f.party(C).transport.clone());
+    b.resume();
+    b.activate().unwrap();
+    assert_eq!(notes(&b), vec!["L 1"]);
 }
 
 // ---- durable-objects: Single Writer Per Object ----
@@ -685,7 +839,10 @@ fn deposed_writer_does_not_count_its_own_replica() {
     let err = a
         .append_turn(Position::new(1), &[turn(&f.object.iri(), 2, "stale")])
         .unwrap_err();
-    assert!(matches!(err, AppendError::Fenced { highest: 2, .. }), "{err}");
+    assert!(
+        matches!(err, AppendError::Fenced { highest: 2, .. }),
+        "{err}"
+    );
     assert_eq!(a.writer_epoch(), None);
 }
 

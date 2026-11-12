@@ -194,6 +194,6 @@ Routed mode assumes direct relationships between neighbours on the route, includ
 
 A `did:webvh` log entry is signed by the DID's update keys and published by the web host serving the log, so a change is visible only once that host serves it.
 
-- constrains:: [[decisions#Custodian set changes are replicated, then published]] {strength: should, source: "DIF did:webvh specification"}
+- constrains:: [[decisions#Custodian set changes use joint consensus]] {strength: should, source: "DIF did:webvh specification"}
 
 Custody itself never waits on the web host; discovery of a changed set does.

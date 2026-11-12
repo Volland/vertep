@@ -12,8 +12,8 @@ pub mod replica;
 pub mod tsp_link;
 pub mod wire;
 
-pub use history::History;
 pub use config::{ConfigError, Custodian, CustodyConfig, Role};
+pub use history::History;
 pub use host::{
     Backoff, CustodyError, CustodyHost, CustodyStore, DocumentPublisher, Elected, EpochRecord,
     ReconfigurationRequest, RecordingPublisher,
