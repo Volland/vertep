@@ -15,8 +15,9 @@
 //! ([`crate::didcomm::wrap_forwards`]): the actor's DIDComm service names the mediator's
 //! endpoint and its key-agreement key as the routing key.
 
+use std::collections::VecDeque;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
@@ -24,6 +25,7 @@ use serde_json::{Value, json};
 
 use crate::did::{Did, DidDocument};
 use crate::didcomm::{DidCommAgent, DidCommError, jwe_recipients};
+use crate::live::{FrameSink, LiveNetwork};
 use crate::net::{NetError, PickupSource, RelayNetwork, StoredMessage};
 use crate::resolver::DidResolver;
 use crate::time::Clock;
@@ -49,6 +51,8 @@ pub const DELIVERY_REQUEST: &str = "https://didcomm.org/messagepickup/3.0/delive
 pub const DELIVERY: &str = "https://didcomm.org/messagepickup/3.0/delivery";
 /// `messagepickup/3.0/messages-received`.
 pub const MESSAGES_RECEIVED: &str = "https://didcomm.org/messagepickup/3.0/messages-received";
+/// `messagepickup/3.0/live-delivery-change`: turns live delivery on or off for the session.
+pub const LIVE_DELIVERY_CHANGE: &str = "https://didcomm.org/messagepickup/3.0/live-delivery-change";
 /// `report-problem/2.0/problem-report`.
 pub const PROBLEM_REPORT: &str = "https://didcomm.org/report-problem/2.0/problem-report";
 
@@ -171,6 +175,101 @@ pub struct MediatorClient {
     net: Arc<dyn RelayNetwork>,
     resolver: Arc<dyn DidResolver>,
     clock: Arc<dyn Clock>,
+    live: Option<Arc<DidCommLive>>,
+}
+
+/// The live-delivery side of a [`MediatorClient`]: the WebSocket (or in-process) session and the
+/// messages the mediator pushed on it, held until the runtime acknowledges them.
+struct DidCommLive {
+    network: Arc<dyn LiveNetwork>,
+    uri: String,
+    pushed: Arc<Mutex<VecDeque<StoredMessage>>>,
+    up: Mutex<Option<Arc<dyn FrameSink>>>,
+}
+
+fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Frames from the mediator on a live session: `delivery` messages are opened, checked to come
+/// from the mediator, and their attachments held for the next fetch.
+struct DeliveryFrames {
+    agent: DidCommAgent,
+    mediator: String,
+    resolver: Arc<dyn DidResolver>,
+    clock: Arc<dyn Clock>,
+    pushed: Arc<Mutex<VecDeque<StoredMessage>>>,
+    wake: Arc<dyn Fn(&str) + Send + Sync>,
+    live: std::sync::Weak<DidCommLive>,
+}
+
+impl FrameSink for DeliveryFrames {
+    fn send(&self, frame: &[u8]) -> Result<(), NetError> {
+        let Ok(text) = std::str::from_utf8(frame) else {
+            return Ok(());
+        };
+        let Ok(plain) = self
+            .agent
+            .decrypt(text, self.resolver.as_ref(), self.clock.now())
+        else {
+            return Ok(());
+        };
+        if plain.sender.as_ref().map(|(d, _)| d.as_str()) != Some(self.mediator.as_str()) {
+            return Ok(());
+        }
+        let m = plain.message;
+        if m.get("type").and_then(Value::as_str) != Some(DELIVERY) {
+            return Ok(());
+        }
+        let asked = m
+            .pointer("/body/recipient_did")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let mut woken = Vec::new();
+        {
+            let mut pushed = lock(&self.pushed);
+            for a in m
+                .get("attachments")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                let (Some(id), Some(bytes)) =
+                    (a.get("id").and_then(Value::as_str), attachment_bytes(a))
+                else {
+                    continue;
+                };
+                if pushed.iter().any(|p| p.id == id) {
+                    continue;
+                }
+                let recipient = asked.clone().unwrap_or_else(|| {
+                    std::str::from_utf8(&bytes)
+                        .map(jwe_recipients)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .next()
+                        .unwrap_or_default()
+                });
+                woken.push(recipient.clone());
+                pushed.push_back(StoredMessage {
+                    id: id.to_owned(),
+                    recipient,
+                    bytes,
+                });
+            }
+        }
+        woken.dedup();
+        for r in woken {
+            (self.wake)(&r);
+        }
+        Ok(())
+    }
+
+    fn closed(&self) {
+        if let Some(l) = self.live.upgrade() {
+            *lock(&l.up) = None;
+        }
+    }
 }
 
 impl fmt::Debug for MediatorClient {
@@ -219,7 +318,60 @@ impl MediatorClient {
             net,
             resolver,
             clock,
+            live: None,
         })
+    }
+
+    /// This client with live delivery (Pickup 3.0 `live-delivery-change`) over `network`, at the
+    /// mediator's live endpoint ([`crate::live::live_uri`] of its DIDComm endpoint).
+    #[must_use]
+    pub fn with_live(mut self, network: Arc<dyn LiveNetwork>) -> Self {
+        self.live = Some(Arc::new(DidCommLive {
+            uri: crate::live::live_uri(&self.endpoint),
+            network,
+            pushed: Arc::new(Mutex::new(VecDeque::new())),
+            up: Mutex::new(None),
+        }));
+        self
+    }
+
+    /// True when a live session is open.
+    pub fn is_live(&self) -> bool {
+        self.live.as_ref().is_some_and(|l| lock(&l.up).is_some())
+    }
+
+    /// Opens a live session and asks the mediator to push deliveries on it
+    /// (`live-delivery-change` with `live_delivery: true`).
+    ///
+    /// # Errors
+    ///
+    /// [`MediatorError`] when no live network is configured, the connection fails or the
+    /// request cannot be sealed.
+    pub fn go_live(&self, wake: Arc<dyn Fn(&str) + Send + Sync>) -> Result<(), MediatorError> {
+        let Some(live) = &self.live else {
+            return Err(MediatorError::Unexpected("no live network".into()));
+        };
+        let frames = Arc::new(DeliveryFrames {
+            agent: self.agent.clone(),
+            mediator: self.mediator.id.clone(),
+            resolver: self.resolver.clone(),
+            clock: self.clock.clone(),
+            pushed: live.pushed.clone(),
+            wake,
+            live: Arc::downgrade(live),
+        });
+        let up = live.network.connect(&live.uri, frames)?;
+        let msg = protocol_message(
+            &new_id(),
+            LIVE_DELIVERY_CHANGE,
+            &self.agent.identity().did,
+            &self.mediator.id,
+            json!({ "live_delivery": true }),
+        );
+        let jwe = self.agent.seal_message(&msg, &self.mediator)?;
+        up.send(jwe.as_bytes())?;
+        *lock(&live.up) = Some(up);
+        Ok(())
     }
 
     /// The mediator's DID.
@@ -465,9 +617,24 @@ impl MediatorClient {
     }
 }
 
+// @tg: implements:: [[openspec:relay-mailboxes#Live Delivery Over WebSocket]] {note: "DIDComm Pickup 3.0 live mode"}
 impl PickupSource for MediatorClient {
     fn fetch(&self, recipients: &[String], limit: usize) -> Result<Vec<StoredMessage>, NetError> {
-        let mut out = Vec::new();
+        let mut out: Vec<StoredMessage> = self
+            .live
+            .as_ref()
+            .map(|l| {
+                lock(&l.pushed)
+                    .iter()
+                    .filter(|m| recipients.contains(&m.recipient))
+                    .take(limit)
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !out.is_empty() {
+            return Ok(out);
+        }
         for r in recipients {
             if out.len() >= limit {
                 break;
@@ -481,6 +648,13 @@ impl PickupSource for MediatorClient {
         if !ids.is_empty() {
             self.messages_received(ids)?;
         }
+        if let Some(l) = &self.live {
+            lock(&l.pushed).retain(|p| !ids.contains(&p.id));
+        }
         Ok(())
+    }
+
+    fn live(&self, _recipients: &[String], wake: Arc<dyn Fn(&str) + Send + Sync>) -> bool {
+        self.live.is_some() && (self.is_live() || self.go_live(wake).is_ok())
     }
 }

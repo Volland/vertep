@@ -227,6 +227,7 @@ pub struct Plaintext {
 
 /// One actor's DIDComm side: its identity and key manager.
 // @tg: implements:: [[openspec:relay-mailboxes#DIDComm Forward Routing]]
+#[derive(Clone)]
 pub struct DidCommAgent {
     identity: ActorIdentity,
     km: Arc<dyn KeyManager>,

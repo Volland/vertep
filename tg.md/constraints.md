@@ -170,3 +170,30 @@ The linuxkit kernel of Docker Desktop has neither the `netem` queueing disciplin
 
 CI runners on Linux have netem; the harness uses it where it works.
 
+
+## TSP provides no delivery guarantee
+
+TSP 1.0 defines direct, nested and routed messages but no store-and-forward, mailbox, pickup or acknowledgement; intermediaries serve asynchronous delivery by means it leaves open.
+
+- constrains:: [[decisions#Vertep ships its own TSP mediator]] {strength: must, source: "ToIP TSP Release 1.0, section 5 and Metadata Exposure and Intermediaries"}
+- constrains:: [[decisions#TSP pickup is a versioned protocol inside TSP]] {strength: must, source: "ToIP TSP Release 1.0"}
+
+## TSP intermediaries do not persist inner VIDs
+
+An intermediary must not store the VIDs of a nested inner relationship in persistent storage; TSP enforces this only as an operator commitment.
+
+- constrains:: [[decisions#The mediator stores opaque sealed bytes in its own journal]] {strength: must, source: "ToIP TSP Release 1.0, section 5.4"}
+
+## TSP routing needs neighbour relationships
+
+Routed mode assumes direct relationships between neighbours on the route, including the last intermediary and the receiver; a last hop without one treats the message as an error.
+
+- constrains:: [[decisions#TSP pickup is a versioned protocol inside TSP]] {strength: must, source: "ToIP TSP Release 1.0, section 5.3"}
+
+## did:webvh updates need the web host
+
+A `did:webvh` log entry is signed by the DID's update keys and published by the web host serving the log, so a change is visible only once that host serves it.
+
+- constrains:: [[decisions#Custodian set changes are replicated, then published]] {strength: should, source: "DIF did:webvh specification"}
+
+Custody itself never waits on the web host; discovery of a changed set does.

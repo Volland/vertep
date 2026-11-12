@@ -11,3 +11,4 @@ Architecture views of Vertep, typed `View`: each explains a slice of the system 
 - [[agents]] — deciders, LLM and tool actors, grants and plan charts
 - [[distribution]] — cluster membership, shards, QUIC, worker pools and DID federation
 - [[browser]] — WebAssembly core, browser shell, OPFS journal and TypeScript API
+- [[durable-objects]] — DID-addressed durable objects, custody epochs over TSP, keepers and failover

@@ -1,7 +1,7 @@
 ---
 type: Capability
 status: draft
-openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings]
+openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator]
 ---
 # Capabilities
 
@@ -170,11 +170,39 @@ Implemented in [[components#vertep-federation]]: every `did-identity` requiremen
 DIDComm v2 and TSP mediators as mailboxes and transports, with routed envelopes through intermediaries and end-to-end encryption. OpenSpec: `relay-mailboxes`.
 
 - scheduled_in:: [[roadmap#M5 Federation]]
+- scheduled_in:: [[roadmap#M7 Durable objects]] {note: "TSP Mediator Mailbox and Live Delivery Over WebSocket"}
 
-Implemented in [[components#vertep-federation]] on the runtime's `Resolver`, `Mailbox` and `Transport` traits, with TSP interop against the reference wallet; interop with a third-party DIDComm mediator is still open in the change's tasks.
+Implemented in [[components#vertep-federation]] on the runtime's `Resolver`, `Mailbox` and `Transport` traits, with TSP interop against the reference wallet. Interop with a third-party DIDComm mediator runs against Identus in Docker. Since M7, a TSP actor's mailbox can live at a [[components#vertep-tsp-mediator]] through `TspMailboxClient`. Both DIDComm and TSP mailboxes take live sessions (`vertep_federation::live`), and acknowledgement follows the journal append either way.
 
 ## WASM bindings
 
 The core and a browser shell in WebAssembly with a TypeScript API, generated typings and a tiramemsu journal in OPFS. OpenSpec: `wasm-bindings`.
 
 - scheduled_in:: [[roadmap#M6 WASM and JS]]
+
+## Durable objects
+
+DID-addressed, single-writer virtual actors whose hash-chained, signed journal outlives any host; durable alarms, activation from verified replicas, the durable agent journal and lineage. OpenSpec: `durable-objects`.
+
+- scheduled_in:: [[roadmap#M7 Durable objects]]
+
+## Object custody
+
+Custodian sets of hosts and keepers named in the DID document, epochs won by quorum promises, replication over TSP, encrypted keeper replicas, handoff, failover and equivocation evidence. OpenSpec: `object-custody`.
+
+- scheduled_in:: [[roadmap#M7 Durable objects]]
+
+## TSP mediator
+
+A TSP 1.0 routed-mode intermediary with durable store-and-forward mailboxes, a pickup protocol inside TSP, live WebSocket sessions, quotas and metadata minimisation. OpenSpec: `tsp-mediator`.
+
+- scheduled_in:: [[roadmap#M7 Durable objects]]
+
+Implemented in [[components#vertep-tsp-mediator]] (library and `vt-mediator` binary) with the client in [[components#vertep-federation]] (`tsp_mailbox`, `live`). Every requirement carries `@tg: implements::` and every scenario a `@tg: verifies::` test. The tests cover:
+
+- interop with the reference wallet in process;
+- a replicated deployment on M4 standby replication;
+- the binary over real HTTP and WebSocket sockets;
+- an opt-in Docker test of two mediators in a route.
+
+The architecture is in [[views/distribution#Distribution#TSP mediator]].

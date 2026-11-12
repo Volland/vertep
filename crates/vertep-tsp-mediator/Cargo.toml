@@ -1,0 +1,57 @@
+[package]
+name = "vertep-tsp-mediator"
+description = "A TSP mailbox mediator: routed-mode intermediary with durable store-and-forward mailboxes and pickup"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+homepage = "https://volland.github.io/vertep/"
+documentation = "https://docs.rs/vertep-tsp-mediator"
+keywords = ["tsp", "mediator", "mailbox", "did", "trust-spanning"]
+categories = ["network-programming", "cryptography"]
+
+[features]
+default = ["server"]
+# The HTTP and WebSocket server (axum on tokio), the HTTP relay network, the WebSocket live
+# network and the `vt-mediator` binary.
+server = ["dep:axum", "dep:tokio", "dep:tokio-tungstenite", "dep:futures", "dep:ureq", "dep:toml"]
+
+[[bin]]
+name = "vt-mediator"
+path = "src/bin/vt_mediator.rs"
+required-features = ["server"]
+
+[dependencies]
+vertep-federation = { workspace = true, features = ["tsp"] }
+vertep-store = { workspace = true }
+vertep-tiramemsu = { workspace = true }
+oxrdf = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+base64 = "0.22"
+url = "2"
+# Relationship forming at the TSP layer (the same pinned version vertep-federation uses).
+tsp_sdk = { version = "0.16.0", default-features = false, features = ["nacl"] }
+axum = { version = "0.7.9", default-features = false, features = ["http1", "tokio", "ws"], optional = true }
+tokio = { workspace = true, optional = true, features = ["rt-multi-thread", "net", "macros", "time", "sync", "signal"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake"], optional = true }
+futures = { workspace = true, optional = true }
+ureq = { version = "2.12.1", default-features = false, optional = true }
+toml = { version = "0.8.23", optional = true }
+
+[dev-dependencies]
+vertep-federation = { workspace = true, features = ["tsp", "testkit"] }
+vertep-cluster = { workspace = true, features = ["testkit"] }
+vertep-runtime = { workspace = true }
+vertep-core = { workspace = true }
+vertep-scxml = { workspace = true }
+vertep-dm-ecma = { workspace = true }
+tempfile = "3"
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "macros", "time", "sync"] }
+
+[lints]
+workspace = true

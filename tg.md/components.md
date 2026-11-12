@@ -12,6 +12,8 @@ flowchart TD
     cli["vertep-cli"]
     wasm["vertep-wasm"]
     agent["vertep-agent"]
+    objects["vertep-objects"]
+    mediator["vertep-tsp-mediator"]
     cluster["vertep-cluster"]
     fed["vertep-federation"]
     runtime["vertep-runtime"]
@@ -34,6 +36,8 @@ flowchart TD
     cli --> scxml & yaml & rdf & lean
     wasm --> runtime & tira
     agent --> runtime & cel & rdf
+    objects --> runtime & store & fed & cluster
+    mediator --> fed & store & tira
     cluster --> runtime & store
     fed --> runtime
     runtime --> core & store & rdf
@@ -131,6 +135,20 @@ Second phase landed 2026-11-11: Lean projection, canonical N-Quads, SHA-256 and 
 Third phase landed 2026-11-11. The oracle charges idle internal events against the microstep budget like `vertep-core` and writes the partial trace with the budget error, so regression `5cbfa3338d26b03f` terminates and the harness lost its budget special case. Three protocol models with proofs over every interleaving, no `sorry`, axioms pinned: the journal protocol (`Journal`, `JournalTheorems`: replay determinism, deduplication, outbox safety and completeness, compare-and-set single activation), decide states and grants over an abstract SCXML core (`Agent`, `AgentTheorems`: decider safety, replay without deciders, grant intersection and enforcement), and leases and fencing (`Lease`, `LeaseTheorems`: one writer per shard and epoch, epochs ordered along every journal, stale appends and frames fenced). Each has an oracle executable: `vertep-journal`, `vertep-decide`, `vertep-lease`.
 
 Typed charts certify since 2026-11-12: `vt-certify` reads a chart's `vt:types` block and derives its type triples as `vertep-rdf` does, see [[decisions#The Lean checker recomputes a chart's type triples]]. The SHACL projection of types is proven to agree with `HasType` under LeanRDF's SHACL semantics (`Types/Shacl.lean`, `shacl_agrees`).
+
+The custody model landed 2026-11-12 (M7), with every proof complete:
+
+- **Model** (`Custody`, `CustodyTheorems`): Paxos over the whole log for durable objects, under a majority quorum and over every interleaving of prepares, elections, writes, appends, refusals, lost messages and restarts.
+- **Theorems:**
+  - `one_writer_per_epoch` and `one_adoption_per_epoch`;
+  - `committed_survives_election` and `committed_survives_accept`: a log committed in one epoch is a prefix of every later adoption and every later accepted log;
+  - `committed_in_custodian` and `committed_in_writer_log`.
+- **Axioms:** pinned to `propext`, `Classical.choice` and `Quot.sound`.
+- **Oracle:** `vertep-custody --history` replays the fault histories of `vertep-objects` in strict mode. `adoptsB_sound` proves that its adoption check implies the model's max rule.
+- **Not modelled:** custodian-set changes, keeper encryption and equivocation evidence; Rust records their refusals as `failed`, a no-op.
+
+- realizes:: [[decisions#Custody epochs are won by quorum promises]] {confidence: partial, note: "proven for a fixed custodian set; reconfiguration is not modelled"}
+- scheduled_in:: [[roadmap#M7 Durable objects]] {note: "the custody model"}
 
 ## vertep-conformance
 
@@ -300,7 +318,10 @@ Agents on charts: `vt:decide` and the `Decider` trait, LLM and tool actors, capa
 - realizes:: [[decisions#LLM decisions count as LLM calls]]
 - realizes:: [[decisions#Agent error events extend the error payload]]
 - realizes:: [[decisions#Hosts instantiate CEL charts typed]]
+- realizes:: [[decisions#The agent journal is stored in a journal store]]
+- uses:: [[components#vertep-store]] {kind: required, note: "StoreAgentJournal"}
 - scheduled_in:: [[roadmap#M3 Agents]]
+- scheduled_in:: [[roadmap#M7 Durable objects]] {note: "the durable agent journal"}
 
 `AgentMachine` is the pure step over journaled agent inputs and `AgentHost` its shell; since 2026-11-12 it creates actor, probe and plan datamodels with `create_datamodel_for`, so a typed CEL chart runs typed and one with CEL type errors fails `spawn` with `InstantiateError::Start`, and it passes each input event through `admit`. `plan::cel_env` delegates to `vertep_dm_cel::type_env`; the reference provider (the Anthropic Messages API over an application-supplied HTTP client) is the `anthropic` feature, and `ScriptedProvider` is the deterministic mock. The `agent` feature of the facade re-exports the crate.
 
@@ -359,9 +380,84 @@ Trust-boundary actors: DID identities and resolution, authenticated senders, gra
 - realizes:: [[decisions#Transport selection follows the DID document]]
 - realizes:: [[decisions#Relay outbox owns cross-trust retries]]
 - realizes:: [[decisions#Pinned relay protocol libraries]]
+- realizes:: [[decisions#TSP pickup is a versioned protocol inside TSP]] {note: "the protocol and its client, tsp_mailbox::TspMailboxClient"}
+- realizes:: [[decisions#Live delivery is a WebSocket binding of pickup]] {note: "the live seam, and Pickup 3.0 live mode in MediatorClient"}
 - scheduled_in:: [[roadmap#M5 Federation]]
+- scheduled_in:: [[roadmap#M7 Durable objects]] {note: "the TSP mailbox client and live delivery"}
 
-Cargo features `didcomm`, `tsp` and `webvh` select the protocol libraries; `testkit` adds an in-process DIDComm mediator and TSP intermediary for tests. The runtime gained two additive hooks for it: address binding (a DID as a virtual actor's address) and `NodeHandle::notify` (a relay pickup wakes the actor).
+Cargo features `didcomm`, `tsp` and `webvh` select the protocol libraries; `testkit` adds an in-process DIDComm mediator and TSP intermediary for tests. Since M7:
+
+- `tsp_mailbox` (feature `tsp`) holds the mailbox protocol of `vt-mediator` and its client.
+- `live` is the seam of live sessions, with an in-process network.
+- `MediatorClient::with_live` and the test mediator speak Pickup 3.0 `live-delivery-change`. The runtime gained two additive hooks for it: address binding (a DID as a virtual actor's address) and `NodeHandle::notify` (a relay pickup wakes the actor).
+
+## vertep-objects
+
+Durable objects: DID-addressed virtual actors with hash-chained, signed journals, and the custody protocol that replicates them over TSP across organisations.
+
+- provides:: [[capabilities#Durable objects]] {confidence: full}
+- provides:: [[capabilities#Object custody]] {confidence: full}
+- uses:: [[components#vertep-runtime]] {kind: required}
+- uses:: [[components#vertep-store]] {kind: required}
+- uses:: [[components#vertep-federation]] {kind: required, note: "DID documents, key manager, TSP sessions"}
+- uses:: [[components#vertep-cluster]] {kind: required, note: "replication behind the replica link"}
+- uses:: [[components#vertep-agent]] {kind: dev, note: "the three_orgs example: an agent as a durable object"}
+- realizes:: [[decisions#Durable objects are DID virtual actors with verifiable journals]]
+- realizes:: [[decisions#Journal entries are hash-chained and host-signed]]
+- realizes:: [[decisions#Custody epochs are won by quorum promises]]
+- realizes:: [[decisions#Replication rides TSP through a replica link]]
+- realizes:: [[decisions#Keepers store ciphertext under a per-object content key]]
+- realizes:: [[decisions#Equivocation is kept as evidence]]
+- realizes:: [[decisions#Custodian set changes are replicated, then published]]
+- realizes:: [[decisions#Hosts share the object VID and only the writer acknowledges]]
+- scheduled_in:: [[roadmap#M7 Durable objects]]
+
+Modules: `chain` (sealing and verifying entries), `identity` (`DurableObjectId`, `did:webvh` or `did:web` only), `custody` (`config`, `wire`, `replica`, `host`, `link`, `keys`, `history`, and `tsp_link` with feature `tsp`), `runtime` (`ObjectStorage`, `serve_object`), and `testkit` (feature `testkit`). The ontology module is `ontology/custody.ttl`.
+
+What runs: 45 tests in the crate (and 3 in vertep-agent) cover every scenario of `durable-objects` and `object-custody`, custody over real TSP through a store-and-forward intermediary, durable objects in the runtime, and a randomised fault run. The fault run covers partitions, colliding elections, crash recovery and late duplicate batches, and exports histories for the Lean custody model. The `three_orgs` example runs an agent across three organisations.
+
+Found while building it:
+
+- A deposed writer counted its own replica toward a quorum it had lost. It is now fenced when its replica has promised a higher epoch; a regression test covers this.
+- Keeper headers carry the writer's signature over the content hash, so a new writer can re-ship inherited entries to keepers.
+
+Known limits:
+
+- Outbox progress is per node, so a new host re-dispatches recent sends with their original message ids, and receivers deduplicate them.
+- A removed host can still read entries written before its removal.
+- Custody tolerates crashed hosts, not Byzantine ones: equivocation is detected and kept as evidence, not prevented.
+
+## vertep-tsp-mediator
+
+A TSP mailbox mediator: routed-mode intermediary, durable store-and-forward mailboxes, the pickup protocol and live WebSocket sessions, as a library and the `vt-mediator` binary.
+
+- provides:: [[capabilities#TSP mediator]] {confidence: full}
+- provides:: [[capabilities#Relay mailboxes]] {confidence: partial, note: "the mediator side of TSP Mediator Mailbox and live delivery"}
+- uses:: [[components#vertep-federation]] {kind: required, note: "TSP sealing, forward_routed, the mailbox protocol and the live seam"}
+- uses:: [[components#vertep-store]] {kind: required}
+- uses:: [[components#vertep-tiramemsu]] {kind: required, note: "the mailbox store"}
+- uses:: [[components#vertep-cluster]] {kind: dev, note: "the replicated deployment test on ReplicatedJournal"}
+- uses:: [[components#vertep-runtime]] {kind: dev, note: "runtime nodes picking up from the mediator"}
+- realizes:: [[decisions#Vertep ships its own TSP mediator]]
+- realizes:: [[decisions#TSP pickup is a versioned protocol inside TSP]]
+- realizes:: [[decisions#The mediator stores opaque sealed bytes in its own journal]]
+- realizes:: [[decisions#Live delivery is a WebSocket binding of pickup]]
+- scheduled_in:: [[roadmap#M7 Durable objects]]
+
+The library has four parts:
+
+- `Mediator`, the core: routing, mailbox requests and live sessions over the federation `RelayEndpoint` and `LiveEndpoint` seams.
+- `MailboxStore`: event-sourced mailbox journals over any `JournalStore`.
+- `server` and `http` (feature `server`, default): the axum routes, a blocking HTTP `RelayNetwork` and `did:web` fetcher, and a WebSocket `LiveNetwork`.
+- `config`: TOML plus `VT_MEDIATOR_*` variables, and an identity created on first start.
+
+The `vt-mediator` binary has `serve`, `did`, `compact` and `revoke`. `docker/` holds the image and a two-mediator compose file.
+
+Known limits:
+
+- The WebSocket client speaks `ws://` only, so TLS needs a terminating proxy.
+- A replicated deployment is assembled in code (a `ReplicatedJournal` under the store); the binary runs one node.
+- Acknowledged ciphertext stays in the journal history until `compact`.
 
 ## vertep-wasm
 

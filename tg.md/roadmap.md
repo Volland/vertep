@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in seven milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in eight milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -14,6 +14,9 @@ flowchart LR
     M2 --> M4["M4 Cluster<br/>m4-cluster"]
     M4 --> M5["M5 Federation<br/>m5-federation"]
     M2 --> M6["M6 WASM and JS<br/>m6-wasm-js"]
+    M3 --> M7["M7 Durable objects<br/>m7-durable-objects"]
+    M4 --> M7
+    M5 --> M7
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
@@ -53,6 +56,8 @@ Archived 2026-11-11 with 68 requirements. The Lean journal-protocol proofs moved
 
 Deciders at choice points, LLM actors with journaled results and tool actors, and LLM-written plan charts run as sandboxed children.
 
+- precedes:: [[roadmap#M7 Durable objects]] {note: "the durable agent journal"}
+
 Delivered by the OpenSpec change `m3-agents`.
 
 Archived 2026-11-11 with 33 requirements; decider safety, grant enforcement and replay without deciders are proven in `vertep-lean`, and agent runs replay through the Lean oracle.
@@ -62,6 +67,7 @@ Archived 2026-11-11 with 33 requirements; decider safety, grant enforcement and 
 Trusted multi-node clusters: pluggable membership with leases, shard placement, the QUIC cluster transport and pooled stateless workers.
 
 - precedes:: [[roadmap#M5 Federation]]
+- precedes:: [[roadmap#M7 Durable objects]] {note: "replication behind a replica link"}
 
 Delivered by the OpenSpec change `m4-cluster`.
 
@@ -70,6 +76,8 @@ Archived 2026-11-11 with 36 requirements. etcd and Kubernetes Lease membership a
 ## M5 Federation
 
 Actors across trust boundaries: DID identities, authenticated senders, capability grants, and DIDComm and TSP relay mailboxes and transports.
+
+- precedes:: [[roadmap#M7 Durable objects]] {note: "TSP, DID identities and relay mailboxes"}
 
 Delivered by the OpenSpec change `m5-federation`.
 
@@ -80,3 +88,9 @@ Archived 2026-11-11 with 27 requirements. Interop with a third-party mediator (H
 The core and a browser shell compiled to WebAssembly, with a TypeScript API and a tiramemsu journal in OPFS.
 
 Delivered by the OpenSpec change `m6-wasm-js`.
+
+## M7 Durable objects
+
+DID-addressed durable objects with verifiable journals, decentralised custody over TSP with quorum-promised epochs, the durable agent journal, and a TSP mailbox mediator.
+
+Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Proposed 2026-11-12.

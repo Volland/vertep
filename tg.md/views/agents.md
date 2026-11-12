@@ -1,7 +1,7 @@
 ---
 type: View
 status: draft
-openspec: [deciders, llm-actors, plan-charts]
+openspec: [deciders, llm-actors, plan-charts, durable-objects]
 ---
 # Agents
 
@@ -684,6 +684,8 @@ flowchart LR
 
 Every answer from outside — a decision, a model result, a tool result, a fired timer — is an input that the host journals before the machine applies it, so replaying a journal (or a prefix of it, for a fork) rebuilds the actor without consulting anything. The machine wraps the core's `step`: after each macrostep it recomputes the candidate sets of active decide states, re-offers when a fingerprint changes and closes offers of exited states. Plans run inside the parent's machine as bounded child sessions, so their state is rebuilt by the parent's replay and their duration bound is a durable timer of the parent.
 
-**Current limitation: no durable agent journal.** The input kinds are those of `AgentInput` in `crates/vertep-agent/src/journal.rs`, but `MemoryJournal` is the only implementation of the `AgentJournal` trait, and `AgentHost::builder` defaults to it. An agent's journal therefore lives as long as the host process; replay and forks work within it, and a durable implementation over `JournalStore` is still to come.
+**Durable agent journal.** The input kinds are those of `AgentInput` in `crates/vertep-agent/src/journal.rs`. `MemoryJournal` is the default for tests. `StoreAgentJournal` keeps each input as one entry of the agent's journal in any `JournalStore` (`<actor>/agent-input/<n>` holding the JSON text as `vt:agentInput`), appended compare-and-set at the head. On tiramemsu an agent survives restarts: the restarted host replays without calling a provider, and open offers keep their correlation ids. It can also be forked from storage. The host reads through `AgentJournal::try_read`, so a failing store is a `HostError::Journal`, never an empty journal. An agent that is a durable object journals into its custody journal, which is a `JournalStore` too. Every agent suite runs against both journals (`VERTEP_AGENT_JOURNAL=store`).
+
+- describes:: [[decisions#The agent journal is stored in a journal store]]
 
 Runtime actors invoked from ordinary charts are restricted by `GrantedActor`, a wrapper around their factory: an ungranted send becomes `error.communication` (reason `not-granted`) to the sender and `vt.grant.denied` to the parent, which journals it.
