@@ -197,6 +197,11 @@ def absent : Value → Bool
   | .undefined | .null => true
   | _ => false
 
+/-- `undefined`: an object entry holding it is absent (Rust `matches!(v, Value::Undefined)`). -/
+def isUndef : Value → Bool
+  | .undefined => true
+  | _ => false
+
 /-- The value of field `k` of an object's entries: the first entry named `k`, unless it is
 `undefined` (Rust: `find(...).filter(|v| !matches!(v, Value::Undefined))`). -/
 def present (entries : List (String × Value)) (k : String) : Option Value :=

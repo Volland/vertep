@@ -405,6 +405,29 @@ impl Datamodel for CelDatamodel {
         self.last = None;
     }
 
+    /// A payload sent with an event the chart declares must convert to the declared payload
+    /// type ([[openspec:type-system#Opt-In Chart Typing]]); undeclared events and untyped
+    /// charts accept any payload. Platform events (`error.*`, `done.*` and the hosts' own) are
+    /// not checked: the platform defines their payload, and a chart's declaration of one is a
+    /// view of it ([[decisions#Agent error events extend the error payload]]).
+    // @tg: implements:: [[openspec:type-system#Opt-In Chart Typing]]
+    fn check_event(&self, event: &Event) -> Result<(), EvalError> {
+        if event.type_ == EventType::Platform {
+            return Ok(());
+        }
+        let Some(t) = self.env.event_payload(&event.name) else {
+            return Ok(());
+        };
+        coerce(from_value(&event.data), t, "ev.data")
+            .map(|_| ())
+            .map_err(|e| {
+                EvalError::new(format!(
+                    "cel: the payload of event `{}` does not have its declared type {t}: {}",
+                    event.name, e.message
+                ))
+            })
+    }
+
     // @tg: implements:: [[openspec:datamodel#Guard Purity]]
     fn eval_cond(&mut self, expr: &str, states: &dyn StateQuery) -> Result<bool, EvalError> {
         self.last = None;

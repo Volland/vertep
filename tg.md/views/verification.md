@@ -254,7 +254,8 @@ flowchart LR
 What the model leaves out, and what remains:
 
 - `pattern` is read as the lexical rule its regular expression encodes; the regular expressions themselves are not proven equal to those rules. `int` is decided on the exact decimal, Rust decides it on the `f64`, so the differential cases stay away from the edges of the signed 64-bit range.
-- The SHACL projection (backlog 4.2) and typed step soundness (4.4: the Lean `step` has no expression typer, so the values it assigns come from the untyped answer tape) are open.
+- Typed step soundness (4.4: the Lean `step` has no expression typer, so the values it assigns come from the untyped answer tape) is open.
+- The SHACL projection is proven (4.2, 2026-11-12): `Types/Shacl.lean` encodes values as LeanRDF graphs and types as LeanRDF shapes with named types unfolded `k` times, and `shacl_agrees` gives `HasType` exactly when the encoding conforms to some unfolding, for distinct union tags and object keys, assuming `PatternsAgree` (LeanRDF's XPath regular expressions decide the three `sh:pattern`s as the lexical rules do; tested on samples). The proof found that `undefined` entries made the checker and the shapes disagree (fixed, [[decisions#Undefined object entries are absent]]), that the IRI pattern used `\x` escapes XPath lacks (fixed: `SHACL_IRI_PATTERN`), and that the published shapes of `list<T>` name their member path nodes by IRI, which SHACL reads as predicate paths, so standard engines skip list members (open, backlog 4.7).
 - Typed charts certify (4.5, 2026-11-12): `Types/Syntax.lean` reads a chart's `vt:types` block as Rust does and `Rdf/Types.lean` derives its type triples (type IRIs, definitions, shapes), which the chart version covers, see [[decisions#The Lean checker recomputes a chart's type triples]].
 
 ## Differential oracle loop

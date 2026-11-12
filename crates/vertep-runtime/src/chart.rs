@@ -411,6 +411,14 @@ pub enum RegisterError {
         /// The `src` naming a virtual actor.
         src: String,
     },
+    /// The chart's datamodel refuses to instantiate it, such as a typed CEL chart with type
+    /// errors.
+    Refused {
+        /// The datamodel name.
+        datamodel: String,
+        /// Every problem, each with its location in the chart.
+        problems: Vec<String>,
+    },
 }
 
 impl core::fmt::Display for RegisterError {
@@ -422,6 +430,14 @@ impl core::fmt::Display for RegisterError {
             RegisterError::InvokesVirtualActor { state, src } => write!(
                 f,
                 "state {state} invokes the virtual actor {src}; virtual actors are not invokable"
+            ),
+            RegisterError::Refused {
+                datamodel,
+                problems,
+            } => write!(
+                f,
+                "the {datamodel} datamodel refuses the chart: {}",
+                problems.join("; ")
             ),
         }
     }

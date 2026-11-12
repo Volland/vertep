@@ -383,8 +383,9 @@ impl<'a> Walker<'a> {
                         }
                     }
                 }
-                for (k, _) in entries {
-                    if !fields.iter().any(|f| f.name == *k) {
+                // An entry holding `undefined` is absent, so it is no unknown field either.
+                for (k, fv) in entries {
+                    if !matches!(fv, Value::Undefined) && !fields.iter().any(|f| f.name == *k) {
                         self.err(TypeErrorKind::UnknownField(k.clone()));
                     }
                 }
@@ -401,8 +402,8 @@ impl<'a> Walker<'a> {
                     self.err(TypeErrorKind::MissingTag);
                     return None;
                 };
-                for (k, _) in entries {
-                    if k != "tag" && k != "value" {
+                for (k, fv) in entries {
+                    if k != "tag" && k != "value" && !matches!(fv, Value::Undefined) {
                         self.err(TypeErrorKind::UnknownField(k.clone()));
                     }
                 }

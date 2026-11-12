@@ -8,6 +8,9 @@ import VertepLean.Theorems
 import VertepLean.Vocab
 import VertepLean.Sha256
 import VertepLean.Rdf.Project
+import VertepLean.Rdf.NQuads
+import VertepLean.Types.Syntax
+import VertepLean.Rdf.Types
 import VertepLean.Rdf.Canon
 import VertepLean.Rdf.Reconstruct
 import VertepLean.Json
@@ -38,6 +41,7 @@ import VertepLean.Types.Basic
 import VertepLean.Types.Check
 import VertepLean.Types.JsonSchema
 import VertepLean.Types.Oracle
+import VertepLean.Types.Shacl
 import VertepLean.Config.Basic
 import VertepLean.Config.Tree
 import VertepLean.Config.Hoare

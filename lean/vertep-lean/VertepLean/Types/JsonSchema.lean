@@ -276,6 +276,14 @@ theorem jsonValue_present {entries : List (String × Value)} (h : jsonValue (.ob
   · rename_i hl; have := jsonValue_lookup h hl; simp [jsonValue] at this
   · rfl
 
+theorem jsonValue_undef {entries : List (String × Value)} (h : jsonValue (.object entries) = true)
+    (e : String × Value) (he : e ∈ entries) : isUndef e.2 = false := by
+  rw [jsonValue] at h
+  simp only [List.all_eq_true] at h
+  have := h ⟨e, he⟩ (List.mem_attach _ _)
+  obtain ⟨k, x⟩ := e
+  cases x <;> simp_all [jsonValue, isUndef]
+
 theorem jsonValue_absent {v : Value} (h : jsonValue v = true) : absent v = typeOk .null v := by
   cases v <;> simp_all [absent, typeOk, jsonValue]
 
@@ -480,11 +488,11 @@ end
 theorem check_record_iff {D : Decls} {seen : List String} {fs : List (String × Ty)}
     {entries : List (String × Value)} :
     check D seen (.record fs) (.object entries) = true ↔
-      (∀ e ∈ entries, ∃ f ∈ fs, f.1 = e.1) ∧
+      (∀ e ∈ entries, isUndef e.2 = true ∨ ∃ f ∈ fs, f.1 = e.1) ∧
       (∀ f ∈ fs, present entries f.1 = none → optish D f.2 = true) ∧
       (∀ f ∈ fs, ∀ fv, present entries f.1 = some fv → check D [] f.2 fv = true) := by
   rw [check]
-  simp only [Bool.and_eq_true, List.all_eq_true, List.any_eq_true, beq_iff_eq]
+  simp only [Bool.and_eq_true, List.all_eq_true, Bool.or_eq_true, List.any_eq_true, beq_iff_eq]
   constructor
   · rintro ⟨hk, hf⟩
     refine ⟨hk, fun f hf' hp => ?_, fun f hf' fv hp => ?_⟩
@@ -506,7 +514,7 @@ theorem check_union_iff {D : Decls} {seen : List String} {vs : List (String × O
     {entries : List (String × Value)} :
     check D seen (.union vs) (.object entries) = true ↔
       ∃ tag, entries.lookup "tag" = some (.str tag) ∧
-        (∀ e ∈ entries, e.1 = "tag" ∨ e.1 = "value") ∧
+        (∀ e ∈ entries, e.1 = "tag" ∨ e.1 = "value" ∨ isUndef e.2 = true) ∧
         ((vs.lookup tag = some none ∧ present entries "value" = none) ∨
           ∃ pt, vs.lookup tag = some (some pt) ∧
             ((present entries "value" = none ∧ optish D pt = true) ∨
@@ -609,7 +617,7 @@ theorem validate_proj (D : Decls) (hD : ∀ d ∈ D, tagsOk d.2 = true) (seen : 
       refine ⟨fun e he => ?_, fun f hf hn => ?_, fun f hf fv hl => ?_⟩
       · obtain ⟨p, hp', hpe⟩ := hc trivial e he
         obtain ⟨f, hf, rfl⟩ := List.mem_map.1 hp'
-        exact ⟨f, hf, hpe⟩
+        exact .inr ⟨f, hf, hpe⟩
       · cases ho : optish D f.2
         · have := hr f.1 (List.mem_map.2 ⟨f, List.mem_filter.2 ⟨hf, by simp [ho]⟩, rfl⟩)
           simp [hn] at this
@@ -620,8 +628,9 @@ theorem validate_proj (D : Decls) (hD : ∀ d ∈ D, tagsOk d.2 = true) (seen : 
       refine ⟨⟨fun p hp x hl => ?_, fun _ e he => ?_⟩, fun r hr => ?_⟩
       · obtain ⟨f, hf, rfl⟩ := List.mem_map.1 hp
         rw [ihf f hf x hl]; exact hk f hf x hl
-      · obtain ⟨f, hf, hfe⟩ := hc e he
-        exact ⟨(f.1, proj D f.2), List.mem_map.2 ⟨f, hf, rfl⟩, hfe⟩
+      · rcases hc e he with hu | ⟨f, hf, hfe⟩
+        · simp [jsonValue_undef hj e he] at hu
+        · exact ⟨(f.1, proj D f.2), List.mem_map.2 ⟨f, hf, rfl⟩, hfe⟩
       · obtain ⟨f, hf, rfl⟩ := List.mem_map.1 hr
         obtain ⟨hf, hno⟩ := List.mem_filter.1 hf
         cases hl : entries.lookup f.1
@@ -651,7 +660,7 @@ theorem validate_proj (D : Decls) (hD : ∀ d ∈ D, tagsOk d.2 = true) (seen : 
       refine ⟨tag, htag, ?_, ?_⟩
       · cases p with
         | none => intro e he; exact .inl (hrest e he)
-        | some pt => exact hrest.1
+        | some pt => exact fun e he => (hrest.1 e he).imp_right .inl
       · cases p with
         | none =>
           refine .inl ⟨hlk, ?_⟩
@@ -679,14 +688,20 @@ theorem validate_proj (D : Decls) (hD : ∀ d ∈ D, tagsOk d.2 = true) (seen : 
       · refine ⟨_, ⟨(tag, none), lookup_mem' hv, rfl⟩, ?_⟩
         rw [validate_variant]
         refine ⟨⟨_, htag⟩, hval, fun e he => ?_⟩
-        rcases hk e he with h | h
+        rcases hk e he with h | h | h
         · exact h
         · obtain ⟨k, x⟩ := e; simp only at h; subst h
           obtain ⟨y, hy⟩ := lookup_some_of_mem he
           simp_all
+        · simp [jsonValue_undef hj e he] at h
       · refine ⟨_, ⟨(tag, some pt), lookup_mem' hv, rfl⟩, ?_⟩
         rw [validate_variant]
-        refine ⟨⟨_, htag⟩, hval, hk, fun y hy => ?_, fun ho => ?_⟩
+        have hk' : ∀ e ∈ entries, e.1 = "tag" ∨ e.1 = "value" := fun e he => by
+          rcases hk e he with h | h | h
+          · exact .inl h
+          · exact .inr h
+          · simp [jsonValue_undef hj e he] at h
+        refine ⟨⟨_, htag⟩, hval, hk', fun y hy => ?_, fun ho => ?_⟩
         · rw [ih pt y (by rw [hpres]; exact hy) (hpt _ (lookup_mem' hv) pt rfl)
             (jsonValue_lookup hj hy)]
           rcases hm with ⟨hp, _⟩ | ⟨pv, hp, hc⟩

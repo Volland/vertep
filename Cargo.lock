@@ -4949,6 +4949,7 @@ version = "0.1.0"
 dependencies = [
  "regex-automata",
  "vertep-core",
+ "vertep-yaml",
 ]
 
 [[package]]
@@ -5072,6 +5073,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "vertep-core",
+ "vertep-dm-cel",
  "vertep-dm-ecma",
  "vertep-rdf",
  "vertep-runtime",

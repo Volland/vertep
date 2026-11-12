@@ -17,5 +17,8 @@ std = ["vertep-core/std"]
 vertep-core = { workspace = true }
 regex-automata = { workspace = true }
 
+[dev-dependencies]
+vertep-yaml = { workspace = true }
+
 [lints]
 workspace = true

@@ -136,6 +136,94 @@ def noCertificate : Bool :=
 
 #guard noCertificate
 
+/-! ## Typed charts -/
+
+open Vertep.Types in
+/-- The declaration syntax of `vt:types` (Rust `parse_declarations`). -/
+def parsesTo (src : String) (expected : Decls) : Bool :=
+  match Types.Syntax.parseDeclarations src with
+  | .ok b => reprStr b.types == reprStr expected
+  | .error _ => false
+
+def rejects (src : String) : Bool :=
+  match Types.Syntax.parseDeclarations src with
+  | .ok _ => false
+  | .error _ => true
+
+#guard parsesTo "type Pay = { amount: decimal };\nevent pay: Pay; event start"
+  [("Pay", .record [("amount", .prim .decimal)])]
+#guard parsesTo "# a comment\ntype S = | \"a b\" { \"\\u{fc}\": list<optional<S>> } | Done;"
+  [("S", .union [("a b", some (.record [("ü", .list (.optional (.named "S")))])), ("Done", none)])]
+#guard parsesTo "type T = Card { last4: string } | Cash; type U = (T);"
+  [("T", .union [("Card", some (.record [("last4", .prim .string)])), ("Cash", none)]),
+   ("U", .named "T")]
+#guard parsesTo "type R = {a: int, b: value,}" [("R", .record [("a", .prim .int), ("b", .value)])]
+#guard parsesTo "event \"a b\": { x: int }; event ns.e" []
+#guard rejects "type list = int;"
+#guard rejects "type A = X | int;"
+#guard rejects "type A = int | X;"
+#guard rejects "type A = B<int>;"
+#guard rejects "type A = int type B = int;"
+#guard rejects "type A = \"\\q\";"
+#guard rejects "type A = { a int };"
+#guard rejects "event ;"
+
+-- The text of a `vt:types` element: entities, CDATA, attributes holding `>`, empty elements.
+#guard (Types.Syntax.typesElementText "<vt:types a='x>y'>type A = int;&#10;&lt;&#x3E;</vt:types>").toOption ==
+  some (some "type A = int;\n<>")
+#guard (Types.Syntax.typesElementText " <vt:types><![CDATA[type A = list<int>;]]> &amp;</vt:types>\n").toOption ==
+  some (some "type A = list<int>; &")
+#guard (Types.Syntax.typesElementText "<vt:types/>").toOption == some none
+#guard (Types.Syntax.typesElementText "<vt:types>a<b/></vt:types>").toOption.isNone
+#guard (Types.Syntax.typesElementText "<vt:types>&bogus;</vt:types>").toOption.isNone
+
+-- Type IRIs are the Rust ones (`crates/vertep-dm-rust/tests/charts/order.scxml`).
+#guard (typeIris [("Pay", .record [("amount", .prim .decimal)])]).lookup "Pay" ==
+  some "urn:vertep:type:sha256:41b1c80782c0edf4c066dd3ac0c6235285690642f6ec20b1bb77e8e7e1bd632f"
+-- Unknown names leave a type, and every type using it, without an IRI; a recursive group
+-- through a list gets one IRI per member.
+#guard (typeIris [("A", .named "Missing"), ("B", .list (.named "A")), ("C", .prim .int)]).map (·.1) ==
+  ["C"]
+#guard (typeIris [("A", .list (.named "B")), ("B", .optional (.named "A"))]).length == 2
+
+/-- The typed `order` chart as Rust publishes it: decoding and re-projecting in Lean, with the
+type triples recomputed from its `vt:types` block, gives Rust's canonical N-Quads and version,
+and the graph is certified under that version. -/
+-- @tg: verifies:: [[openspec:formal-model#Chart Certificates#Typed chart certified]] {level: integration}
+def typedChartCertified : IO Bool := do
+  let nq ← IO.FS.readFile "VertepTests/data/order-rust.nq"
+  let canon ← IO.FS.readFile "VertepTests/data/order-rust.canon.nq"
+  let version := (← IO.FS.readFile "VertepTests/data/order-rust.version").trimAscii.toString
+  match Oracle.loadChart nq with
+  | .error _ => pure false
+  | .ok (c, _) =>
+    let certified := match Certify.check nq with
+      | .certified v => v == version
+      | _ => false
+    pure (canonicalNQuads c == canon && chartVersion c == version && certified &&
+      !(chartTypes c version).isEmpty)
+
+#eval show IO Unit from do
+  unless (← typedChartCertified) do throw (IO.userError "the typed order chart is not certified")
+
+/-- A graph missing a type triple of the chart's `vt:types` block (a declaration or a shape) is
+not the projection of the chart, and gets no certificate. -/
+def typeTripleMissing : IO Bool := do
+  let nq ← IO.FS.readFile "VertepTests/data/order-rust.nq"
+  let lines := nq.splitOn "\n"
+  let without := fun (s : String) =>
+    let ls := lines.filter fun l => (l.splitOn s).length ≤ 1
+    (decide (ls.length < lines.length), String.intercalate "\n" ls)
+  let refused := fun (s : String) =>
+    let (dropped, src) := without s
+    dropped && match Certify.check src with
+      | .notAChart _ => true
+      | _ => false
+  pure (refused "declaresType" && refused "#s.f.amount> <http://www.w3.org/ns/shacl#path>")
+
+#eval show IO Unit from do
+  unless (← typeTripleMissing) do throw (IO.userError "a graph without its type triples was certified")
+
 -- The LeanRDF revision a certificate names is the one the manifest pins.
 #eval show IO Unit from do
   let man ← IO.FS.readFile "lake-manifest.json"

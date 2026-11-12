@@ -89,19 +89,16 @@ fn browser_js() {
 }
 
 /// The typed-order chart is not only well-typed: it runs. A short session through the core
-/// interpreter on the CEL datamodel.
-///
-/// It needs a *typed* CEL datamodel, built from the chart's type environment: the untyped one
-/// that `CelRegistry` creates (and that the actor runtime, the agent host and the WebAssembly
-/// worker use) initializes `total: decimal = "0"` as an int and leaves decimal payload fields
-/// as strings, so `ctx.total + ev.data.price * ...` raises `error.execution` there. The type
-/// environment projection lives in `vertep-cli` (`vertep_cli::cel::type_env`).
+/// interpreter on the CEL datamodel that `CelRegistry` creates for the chart, as the actor
+/// runtime, the agent host and the WebAssembly worker do: typed, from the chart's projected
+/// type environment, so `total: decimal = "0"` is a decimal and decimal payload fields arrive
+/// as decimals.
 #[test]
 fn typed_order_runs() {
     use vertep::core::compile::CompiledChart;
     use vertep::core::datamodel::{Environment, Event, SessionInfo, Value};
+    use vertep::core::null::create_datamodel_for;
     use vertep::core::session::{Input, StartInput, start, step};
-    use vertep::core::types::{BasicTyper, check_chart};
 
     let text = std::fs::read_to_string(examples_dir().join("typed-order/order.yaml")).unwrap();
     let chart = CompiledChart::new(vertep_yaml::read_str(&text).unwrap()).unwrap();
@@ -112,13 +109,8 @@ fn typed_order_runs() {
         },
         ..StartInput::default()
     };
-    let types = check_chart(chart.chart(), &BasicTyper::for_datamodel("cel")).unwrap();
-    let options = vertep_dm_cel::LoadOptions {
-        env: vertep_cli::cel::type_env(&types),
-        ..vertep_dm_cel::LoadOptions::default()
-    };
-    let mut dm = vertep_dm_cel::load(chart.chart(), &options).unwrap();
-    let outcome = start(&chart, start_input, &mut dm).unwrap();
+    let mut dm = create_datamodel_for(&vertep_dm_cel::CelRegistry, chart.chart()).unwrap();
+    let outcome = start(&chart, start_input, dm.as_mut()).unwrap();
     let mut session = outcome.session;
     let obj = |fields: &[(&str, Value)]| {
         Value::Object(
@@ -160,7 +152,7 @@ fn typed_order_runs() {
             ..Event::default()
         };
         let input = Input::event(event, Environment::default());
-        let outcome = step(&chart, session, input, &mut dm).unwrap();
+        let outcome = step(&chart, session, input, dm.as_mut()).unwrap();
         let failed = (outcome.trace.microsteps.iter())
             .any(|m| m.event.as_deref() == Some("error.execution"));
         assert!(!failed, "{name} raised error.execution");

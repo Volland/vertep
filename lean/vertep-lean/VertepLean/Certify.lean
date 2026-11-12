@@ -8,7 +8,10 @@ A Lean-compiled checker (formal-model, *Chart Certificates*): given a chart as N
 projection, it decodes it with `Rdf.fromRDF` (whose result the graph provably contains,
 `Rdf.fromRDF_sound`), decides `WellFormed` (`checkWF_iff`, with the violated rules named by
 `violations`, `violations_eq_nil_iff`), recomputes the chart version IRI from the canonical
-N-Quads, and, when the chart is well-formed, writes a certificate as N-Triples:
+N-Quads, and, when the chart is well-formed, writes a certificate as N-Triples. A typed chart's
+`vt:types` block is read back too (`Rdf.chartDecls`): the type triples it projects to
+(`Rdf.chartTypes`: `vt:declaresType`, definitions and SHACL shapes under content-addressed type
+IRIs) must be in the graph, and they take part in the version as in Rust:
 
 ```
 <urn:vertep:chart:sha256:H> vt:certifiedBy <urn:vertep:cert:sha256:C> .
@@ -85,16 +88,20 @@ def check (src : String) : Outcome :=
       let version := Rdf.chartVersion c
       if base != version && base != Rdf.placeholderBase then
         .notAChart s!"node IRIs are minted under <{base}>, but the chart's version is <{version}>"
+      else if !Rdf.closedWorld' (Graph.ofList (ds.toList.map (·.triple))) (Rdf.chartTypes c base) then
+        .notAChart "graph lacks a type triple (declaration, definition or shape) of the chart's vt:types block"
       else match violations c with
         | [] => .certified version
         | vs => .illFormed version vs
 
-/-- A certified chart is well-formed. -/
+/-- A certified chart is well-formed, its version is the certificate's subject, and the graph
+holds its whole projection: the chart triples and the type triples of its `vt:types` block. -/
 -- @tg: implements:: [[openspec:formal-model#Chart Certificates]]
 theorem check_certified_wellFormed (src : String) (v : String) (h : check src = .certified v) :
     ∃ ds c base, LeanRDF.NQuads.parse src = .ok ds ∧
       Rdf.fromRDF (ds.toList.map (·.triple)) = .ok (c, base) ∧ WellFormed c ∧
-      v = Rdf.chartVersion c := by
+      v = Rdf.chartVersion c ∧
+      ∀ t ∈ Rdf.projectFull c base, t ∈ Graph.ofList (ds.toList.map (·.triple)) := by
   unfold check at h
   cases hp : LeanRDF.NQuads.parse src with
   | error e => rw [hp] at h; cases h
@@ -109,12 +116,21 @@ theorem check_certified_wellFormed (src : String) (v : String) (h : check src = 
       simp only at h
       split at h
       · cases h
-      · cases hv : violations c with
-        | nil =>
-          rw [hv] at h
-          cases h
-          exact ⟨ds, c, base, rfl, hr, (violations_eq_nil_iff c).1 hv, rfl⟩
-        | cons x xs => rw [hv] at h; cases h
+      · split at h
+        · cases h
+        · rename_i hct
+          cases hv : violations c with
+          | nil =>
+            rw [hv] at h
+            cases h
+            refine ⟨ds, c, base, rfl, hr, (violations_eq_nil_iff c).1 hv, rfl, ?_⟩
+            intro t ht
+            rcases List.mem_append.1 ht with ht | ht
+            · exact Rdf.fromRDF_sound _ c base hr t ht
+            · have hc : Rdf.closedWorld' (Graph.ofList (ds.toList.map (·.triple)))
+                  (Rdf.chartTypes c base) = true := by simpa using hct
+              simpa using List.all_eq_true.1 hc t ht
+          | cons x xs => rw [hv] at h; cases h
 
 /-- The command line. -/
 -- @tg: implements:: [[openspec:formal-model#Chart Certificates]]

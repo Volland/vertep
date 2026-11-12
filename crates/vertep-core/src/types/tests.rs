@@ -133,6 +133,22 @@ fn record_with_unknown_field() {
     assert!(errs[0].to_string().contains("`note`"));
 }
 
+/// An entry holding `undefined` is absent, so it is no unknown field (the SHACL encoding leaves
+/// it out; verification-backlog 4.2).
+#[test]
+fn undefined_entry_is_no_unknown_field() {
+    let v = obj(&[("id", s("o-1")), ("amount", s("3")), ("note", Value::Undefined)]);
+    assert!(check_value(&order(), &v).is_ok());
+    let payment = parse_type("Card { last4: string } | Cash").unwrap();
+    let w = obj(&[("tag", s("Cash")), ("note", Value::Undefined)]);
+    assert!(check_value(&payment, &w).is_ok());
+    let u = obj(&[("tag", s("Cash")), ("note", s("x"))]);
+    assert_eq!(
+        kinds(check_value(&payment, &u)),
+        vec![TypeErrorKind::UnknownField("note".into())]
+    );
+}
+
 // @tg: verifies:: [[openspec:type-system#Composite Types#Tagged union selects its variant by tag]] {level: unit}
 #[test]
 fn tagged_union_selects_its_variant_by_tag() {

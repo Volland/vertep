@@ -284,4 +284,19 @@ impl DatamodelRegistry for Datamodels {
             _ => None,
         }
     }
+
+    /// A CEL chart is instantiated typed and refused with its type errors, as natively.
+    fn create_for(
+        &self,
+        chart: &vertep_core::ir::Chart,
+    ) -> Option<Result<Box<dyn Datamodel>, Vec<String>>> {
+        match chart.datamodel.as_str() {
+            vertep_dm_cel::CEL => vertep_dm_cel::CelRegistry.create_for(chart),
+            name => self.create(name).map(Ok),
+        }
+    }
+
+    fn check(&self, chart: &vertep_core::ir::Chart) -> Result<(), Vec<String>> {
+        vertep_dm_cel::CelRegistry.check(chart)
+    }
 }

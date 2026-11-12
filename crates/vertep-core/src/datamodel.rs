@@ -5,6 +5,8 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use crate::ir::Chart;
+
 /// A datamodel-independent value, used for event data, snapshots and traces.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -166,6 +168,13 @@ pub trait Datamodel {
     /// Bind `_event` to the event currently being processed.
     fn set_event(&mut self, event: &Event);
 
+    /// Whether `event`'s payload has the type the chart declares for it. A datamodel without
+    /// declared event types accepts every payload (the default). The interpreter does not call
+    /// this: a host calls it, through [`admit`], before it hands an event to the session.
+    fn check_event(&self, _event: &Event) -> Result<(), EvalError> {
+        Ok(())
+    }
+
     /// Evaluate a condition. Must not change the datamodel ([[openspec:datamodel#Guard Purity]]).
     fn eval_cond(&mut self, expr: &str, states: &dyn StateQuery) -> Result<bool, EvalError>;
 
@@ -214,4 +223,45 @@ pub trait Datamodel {
 pub trait DatamodelRegistry {
     /// A fresh datamodel instance for `name`, or `None` when it is not registered.
     fn create(&self, name: &str) -> Option<Box<dyn Datamodel>>;
+
+    /// A fresh datamodel instance for `chart`, prepared from the whole chart: `None` when the
+    /// chart's datamodel is not registered, and `Some(Err(problems))` when the datamodel
+    /// refuses to instantiate the chart (a statically checked datamodel refuses a chart with
+    /// type errors). The default creates the datamodel by name and refuses nothing.
+    ///
+    /// Hosts create session datamodels through [`crate::null::create_datamodel_for`], which
+    /// calls this.
+    fn create_for(&self, chart: &Chart) -> Option<Result<Box<dyn Datamodel>, Vec<String>>> {
+        self.create(&chart.datamodel).map(Ok)
+    }
+
+    /// Every reason the chart's datamodel would refuse to instantiate `chart` (as
+    /// [`DatamodelRegistry::create_for`] would), without creating an instance; hosts call it
+    /// when a chart is registered. The default refuses nothing.
+    fn check(&self, _chart: &Chart) -> Result<(), Vec<String>> {
+        Ok(())
+    }
+}
+
+/// The event a host hands the interpreter for `event`: `event` itself when the datamodel
+/// accepts its payload ([`Datamodel::check_event`]), otherwise an `error.execution` platform
+/// event whose `message` names the event and the mismatch, so an event whose payload fails
+/// its declared type is never delivered.
+pub fn admit(dm: &dyn Datamodel, event: Event) -> Event {
+    match dm.check_event(&event) {
+        Ok(()) => event,
+        Err(e) => Event {
+            name: String::from("error.execution"),
+            type_: EventType::Platform,
+            sendid: event.sendid,
+            data: Value::Object(Vec::from([
+                (
+                    String::from("kind"),
+                    Value::String(String::from("execution")),
+                ),
+                (String::from("message"), Value::String(e.message)),
+            ])),
+            ..Event::default()
+        },
+    }
 }

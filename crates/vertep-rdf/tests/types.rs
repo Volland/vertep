@@ -692,3 +692,119 @@ fn near_miss_corpus_has_both_verdicts() {
     );
     assert!(accepted > 0, "{rejected} rejected, {accepted} accepted");
 }
+
+/// An object entry whose value is `undefined` is absent, for the checker as for the SHACL
+/// encoding (which leaves such entries out): a record or union value with an unknown field
+/// holding `undefined` has no unknown field. Before verification-backlog 4.2 the checker
+/// reported `UnknownField` here while the shapes conformed.
+// @tg: verifies:: [[openspec:type-system#SHACL Projection#SHACL agrees with the checker]] {level: unit}
+#[test]
+fn undefined_entries_are_absent_for_the_checker_and_the_shapes() {
+    let d = decls(NAMED);
+    let record = Type::record([("a", Type::INT)]);
+    let union = Type::Union(vec![
+        Variant::new("X", None),
+        Variant::new("Y", Some(Type::INT)),
+    ]);
+    let cases: Vec<(Type, Value, bool)> = vec![
+        (
+            record.clone(),
+            Value::Object(vec![
+                ("a".into(), Value::Number(1.0)),
+                ("q".into(), Value::Undefined),
+            ]),
+            true,
+        ),
+        (
+            record.clone(),
+            Value::Object(vec![("a".into(), Value::Undefined)]),
+            false,
+        ),
+        (
+            union.clone(),
+            Value::Object(vec![("tag".into(), s("X")), ("q".into(), Value::Undefined)]),
+            true,
+        ),
+        (
+            union.clone(),
+            Value::Object(vec![("tag".into(), s("X")), ("value".into(), Value::Undefined)]),
+            true,
+        ),
+        (
+            union,
+            Value::Object(vec![("tag".into(), s("Y")), ("value".into(), Value::Undefined)]),
+            false,
+        ),
+    ];
+    for (ty, v, expected) in cases {
+        let checker = d.check(&ty, &v).is_ok();
+        let shapes = validate_value(&d, &ty, &v).expect("shapes").conforms();
+        assert_eq!((checker, shapes), (expected, expected), "{v:?} : {ty}");
+    }
+}
+
+/// The `sh:pattern`s of the type shapes are XPath regular expressions (SHACL §4.6.1), so any
+/// SHACL engine compiles them: no `\x` or `\u` escapes, which XPath lacks. Before
+/// verification-backlog 4.2 the IRI pattern used `\x00-\x20\x7F`, which LeanRDF's SHACL validator
+/// (XPath regular expressions) rejects. The patterns still agree with the checker, control
+/// characters included.
+// @tg: verifies:: [[openspec:type-system#SHACL Projection#SHACL agrees with the checker]] {level: unit}
+#[test]
+fn shacl_patterns_use_the_xpath_syntax() {
+    use vertep_rdf::types::shapes::{DATETIME_PATTERN, DECIMAL_PATTERN, SHACL_IRI_PATTERN};
+    for p in [DATETIME_PATTERN, DECIMAL_PATTERN, SHACL_IRI_PATTERN] {
+        assert!(!p.contains("\\x") && !p.contains("\\u"), "{p}");
+    }
+    let d = decls(NAMED);
+    for (v, ok) in [
+        ("a:\u{85}", true),
+        ("a:\u{9f}", true),
+        ("a:\u{a0}", true),
+        ("a:\u{7f}", false),
+        ("a:\u{1}", false),
+        ("a:\u{0}", false),
+        ("a:\u{1f}", false),
+        ("a: ", false),
+        ("a:%41", true),
+        ("a:%4", false),
+        ("a:x^y", false),
+        ("urn:vertep:order:42", true),
+    ] {
+        let checker = d.check(&Type::IRI, &s(v)).is_ok();
+        let shapes = validate_value(&d, &Type::IRI, &s(v))
+            .expect("shapes")
+            .conforms();
+        assert_eq!((checker, shapes), (ok, ok), "{v:?}");
+    }
+}
+
+/// Every `sh:path` of the type shapes is a well-formed SHACL property path (SHACL §2.3.1): an
+/// IRI is a predicate path, so the nodes of sequence and `sh:zeroOrMorePath` paths must be blank
+/// nodes. Found by the Lean cross-check (verification backlog 4.2, `VertepTests/Shacl.lean`):
+/// the member property of `list<T>` mints `<…#t.rest*>` and `<…#t.members.0>` as IRIs, so a
+/// standard SHACL engine reads the path as a predicate and never checks the members (LeanRDF's
+/// validator accepts `[1, "2"]` as a `list<int>`). Fixing it needs a design decision: blank
+/// nodes in shape paths (against "Persistent vt namespace and blank-node-free charts") or a
+/// member predicate in the value encoding.
+#[test]
+#[ignore = "known: list member paths are IRIs, not well-formed SHACL paths (verification-backlog 4.2)"]
+fn type_shape_paths_are_well_formed_shacl() {
+    let d = decls(NAMED);
+    let g = vertep_rdf::types::shapes::value_shapes(&d, &Type::list(Type::INT)).expect("shapes");
+    let path = NamedNodeRef::new_unchecked("http://www.w3.org/ns/shacl#path");
+    let complex = [
+        "http://www.w3.org/1999/02/22-rdf-syntax-ns#first",
+        "http://www.w3.org/ns/shacl#zeroOrMorePath",
+    ];
+    for t in g.triples_for_predicate(path) {
+        if let TermRef::NamedNode(n) = t.object {
+            for p in complex {
+                assert!(
+                    g.object_for_subject_predicate(n, NamedNodeRef::new_unchecked(p))
+                        .is_none(),
+                    "sh:path {n} is an IRI with {p}: read as a predicate path"
+                );
+            }
+        }
+    }
+}

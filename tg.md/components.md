@@ -65,11 +65,14 @@ The `no_std` heart: the chart IR, the type language, the `Datamodel` trait and t
 - realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the core half"}
 - realizes:: [[decisions#Type checking stops on non-contractive recursion]] {confidence: full}
 - realizes:: [[decisions#Verified origin flag in the event]] {note: "Event::originverified, set only by the federation shell"}
+- realizes:: [[decisions#Hosts instantiate CEL charts typed]] {confidence: partial, note: "the registry's create_for and check, create_datamodel_for, Datamodel::check_event and admit"}
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
 Implemented 2026-11-11: `validate`, `order`, `compile` (states numbered in document order, root 0, an in-crate bitset), the pure Appendix D `kernel`, `session::{start, step}` with effects, the `null` datamodel and registry, and the `tape`/`trace` exchange format for the Lean oracle, following [[decisions#Appendix D readings in the Rust core]].
 
 M1 type language added 2026-11-11 in `types`: a value checker with path-located errors, declarations validated for unknown names and unguarded cycles, event payload tables, and `check_chart`/`compile_checked` per [[decisions#Types ride on vt extension nodes]] and [[decisions#Datamodel typers plug into one core checker]]. Projections to RDF, JSON Schema, SHACL and CEL and content-addressed type IRIs are still open.
+
+Added 2026-11-12 per [[decisions#Hosts instantiate CEL charts typed]]: `DatamodelRegistry::create_for(chart)` and `check(chart)` (defaults: create by name, refuse nothing; `WithNull` forwards both), `null::create_datamodel_for`, which hosts and `start_with_registry` use and which reports a refusal as `StartError::ChartRefused`, and `Datamodel::check_event` with `datamodel::admit`, which hosts call before stepping so an event whose payload fails its declared type becomes `error.execution`. The kernel does not call them, so the answer tape is unchanged.
 
 ## vertep-scxml
 
@@ -127,6 +130,8 @@ Second phase landed 2026-11-11: Lean projection, canonical N-Quads, SHA-256 and 
 
 Third phase landed 2026-11-11. The oracle charges idle internal events against the microstep budget like `vertep-core` and writes the partial trace with the budget error, so regression `5cbfa3338d26b03f` terminates and the harness lost its budget special case. Three protocol models with proofs over every interleaving, no `sorry`, axioms pinned: the journal protocol (`Journal`, `JournalTheorems`: replay determinism, deduplication, outbox safety and completeness, compare-and-set single activation), decide states and grants over an abstract SCXML core (`Agent`, `AgentTheorems`: decider safety, replay without deciders, grant intersection and enforcement), and leases and fencing (`Lease`, `LeaseTheorems`: one writer per shard and epoch, epochs ordered along every journal, stale appends and frames fenced). Each has an oracle executable: `vertep-journal`, `vertep-decide`, `vertep-lease`.
 
+Typed charts certify since 2026-11-12: `vt-certify` reads a chart's `vt:types` block and derives its type triples as `vertep-rdf` does, see [[decisions#The Lean checker recomputes a chart's type triples]]. The SHACL projection of types is proven to agree with `HasType` under LeanRDF's SHACL semantics (`Types/Shacl.lean`, `shacl_agrees`).
+
 ## vertep-conformance
 
 A dev-only harness that runs the W3C SCXML IRP suite on the Rust core and on the Lean model, and the property-based differential tests between them.
@@ -182,9 +187,13 @@ The CEL datamodel: side-effect-free, terminating expressions type-checked agains
 - provides:: [[capabilities#CEL datamodel]] {confidence: full}
 - uses:: [[components#vertep-core]] {kind: required}
 - realizes:: [[decisions#Pluggable datamodel]] {confidence: partial}
+- realizes:: [[decisions#Hosts instantiate CEL charts typed]]
+- uses:: [[components#vertep-yaml]] {kind: dev, note: "typed instantiation tests read YAML charts"}
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
 
 Implemented 2026-11-11 per [[decisions#Own CEL interpreter in vertep-dm-cel]]: data items are fields of `ctx`, `<script>` is refused, `foreach` walks lists by index and maps by key, and every expression has step, size, depth and length limits. A 130-expression golden corpus gives identical results natively and on wasm32. The IRP suite under CEL is still open.
+
+Added 2026-11-12: the CEL type environment projection (`cel_type`, `type_env`, moved from `vertep-cli`) and `instantiate`, the typed load every host goes through. `CelRegistry::create_for` instantiates a chart that declares types typed (initial values, assignments and payloads converted to their declared types) and refuses one with type errors; an untyped chart gets the untyped datamodel as before. `CelDatamodel::check_event` refuses a non-platform payload that does not convert to its declared event type.
 
 ## vertep-macros
 
@@ -255,6 +264,8 @@ The tokio shell: actors and lifecycle classes, mailboxes, transports, the direct
 - realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the shell half"}
 - realizes:: [[decisions#WebSocket is a transport and an Event I/O Processor]] {confidence: partial, note: "the frames, the link and the server end"}
 - realizes:: [[decisions#WebSocket sends stay owed until the peer acknowledges them]]
+- realizes:: [[decisions#Hosts instantiate CEL charts typed]]
+- uses:: [[components#vertep-dm-cel]] {kind: dev, note: "typed CEL actor tests"}
 - provides:: [[capabilities#WASM bindings]] {confidence: partial, note: "the server end of the WebSocket Event I/O Processor"}
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
@@ -263,6 +274,8 @@ Implemented 2026-11-11: a `Node` per [[decisions#A node runs its actors on one t
 Fixed 2026-11-11 after the Lean journal model's findings: store-mailbox row IRIs are `<address>/mailbox/<seq>-<digest of the envelope>`, so mailboxes of two nodes sharing a store no longer overwrite each other's rows; and the outbox mark (`vt:dispatchedThrough`) moves only over entries whose sends were all delivered, never backwards, so a send a transport refused is owed until a retry delivers it and is dispatched again after a crash. A retry keeps the send's original transport.
 
 Added 2026-11-11 for M6: `websocket` holds the WebSocket Event I/O Processor's frames, the per-peer `Link`, the `LinkMailbox` and `ClientResolver`, and the `WebSocketTransport`. The browser shell uses them. The server end, `websocket::server::WebSocketServer` on tokio-tungstenite, is behind the `websocket` feature, so the default build does not grow. It checks the credential in `hello` and routes server sends to client actors by learned origin or announced prefix. It also has fault injection for tests: held acknowledgements, duplicated frames and forced disconnects.
+
+Typed CEL since 2026-11-12 per [[decisions#Hosts instantiate CEL charts typed]]: machines and invoked chart actors create their datamodel with `create_datamodel_for`, `register_type` and `register_chart` refuse a chart the registry's `check` refuses (`RegisterError::Refused`, every problem listed), and `Machine::apply`, `can` and chart actors pass each event through `admit`, so a payload that fails its declared type reaches the chart as `error.execution`.
 
 ## vertep-agent
 
@@ -286,9 +299,10 @@ Agents on charts: `vt:decide` and the `Decider` trait, LLM and tool actors, capa
 - realizes:: [[decisions#vt:retry lowers to journaled retry timers]]
 - realizes:: [[decisions#LLM decisions count as LLM calls]]
 - realizes:: [[decisions#Agent error events extend the error payload]]
+- realizes:: [[decisions#Hosts instantiate CEL charts typed]]
 - scheduled_in:: [[roadmap#M3 Agents]]
 
-`AgentMachine` is the pure step over journaled agent inputs and `AgentHost` its shell; the reference provider (the Anthropic Messages API over an application-supplied HTTP client) is the `anthropic` feature, and `ScriptedProvider` is the deterministic mock. The `agent` feature of the facade re-exports the crate.
+`AgentMachine` is the pure step over journaled agent inputs and `AgentHost` its shell; since 2026-11-12 it creates actor, probe and plan datamodels with `create_datamodel_for`, so a typed CEL chart runs typed and one with CEL type errors fails `spawn` with `InstantiateError::Start`, and it passes each input event through `admit`. `plan::cel_env` delegates to `vertep_dm_cel::type_env`; the reference provider (the Anthropic Messages API over an application-supplied HTTP client) is the `anthropic` feature, and `ScriptedProvider` is the deterministic mock. The `agent` feature of the facade re-exports the crate.
 
 Known cost: `enabled_events` restores a probe datamodel from the actor's snapshot for every candidate event after every macrostep, so ECMAScript charts with large contexts spend most of a turn encoding snapshots; the decide differential smoke sample takes about 5 s in release and 4 minutes in debug.
 
@@ -370,17 +384,20 @@ The WebAssembly build of the core and a browser shell with a TypeScript API and 
 - realizes:: [[decisions#Browser storage is explicit, exclusive and native-format]]
 - realizes:: [[decisions#TypeScript is one more projection of the type language]] {note: "the projection lives in vertep-rdf, the command in vertep-cli"}
 - realizes:: [[decisions#JavaScript ergonomics follow XState and semantics follow SCXML]]
-- realizes:: [[decisions#Separate packages keep the bundle budget]] {note: "core 1,159.7 KB gzip within the 1.2 MB budget"}
+- realizes:: [[decisions#Separate packages keep the bundle budget]] {note: "core 1,170.3 KB gzip within the 1.2 MB budget"}
 - realizes:: [[decisions#WebSocket is a transport and an Event I/O Processor]] {confidence: partial, note: "the browser and Node.js end"}
 - realizes:: [[decisions#WebSocket sends stay owed until the peer acknowledges them]]
 - realizes:: [[decisions#Test-only WebAssembly exports live in a test build]]
 - uses:: [[components#vertep-conformance]] {kind: optional, note: "feature conformance: the IRP suite runner of the test build"}
+- realizes:: [[decisions#Hosts instantiate CEL charts typed]]
 - scheduled_in:: [[roadmap#M6 WASM and JS]]
 
 Implemented 2026-11-11: the crate (`System` and its JSON command bridge, the browser shell, explicit storage on `tm-wasm`, JavaScript implementations bound by IRI, step and differential traces, the native helper `vertep-wasm-native`) and the npm workspace `bindings/js` with `@vertep/web` (client, worker entry, core and journal builds) and `@vertep/dm-ecma`. Built by `bindings/js/scripts/build.sh` with the `wasm-bindgen` CLI pinned to the crate; tested natively, in Node.js worker threads and in headless Chrome (OPFS). Added the same day: the WebSocket Event I/O Processor and the W3C IRP suite in WebAssembly.
 
 - The WebSocket end is `ws` on the platform `WebSocket`, with the `transports.websocket` option and a credential provider on the main thread. It is tested end to end against the native server in `vertep-wasm-native ws-server`, in Node.js and in headless Chrome, across forced disconnects.
 - The IRP suite runs from in-memory documents in the test build. Its verdicts equal the native harness's on all 386 non-manual variants, in Node.js and headless Chrome.
+
+Typed CEL since 2026-11-12: the worker's `Datamodels` registry forwards `create_for` and `check` for `cel` to `CelRegistry`, so typed charts run typed and a chart with CEL type errors is rejected at `register`/`spawn` with `ChartInvalid`, one violation per type error.
 
 Open: publishing. A smaller storage-free build (the original 600 KB target) needs a non-SPARQL `GraphStore` read path and is follow-up work.
 
@@ -391,6 +408,7 @@ The `vt` command: convert between SCXML, YAML and RDF, validate and hash charts,
 - uses:: [[components#vertep-scxml]] {kind: required}
 - uses:: [[components#vertep-yaml]] {kind: required}
 - uses:: [[components#vertep-rdf]] {kind: required}
+- uses:: [[components#vertep-dm-cel]] {kind: required, note: "CEL checking in vt typecheck; vertep_cli::cel re-exports the CEL type environment projection"}
 - uses:: [[components#vertep-lean]] {kind: optional, note: "vt certify"}
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
 

@@ -272,6 +272,65 @@ fn certify_runs_the_lean_checker() {
     );
 }
 
+/// The Lean checker of `lean/vertep-lean`, when it is built.
+fn lean_checker() -> Option<PathBuf> {
+    let p = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../lean/vertep-lean/.lake/build/bin")
+        .join("vt-certify");
+    p.is_file().then_some(p)
+}
+
+/// Typed charts certify with the real Lean checker: the YAML and SCXML `order` charts and every
+/// chart under `crates/*/tests/charts/`. The checker certifies only when its chart version,
+/// which covers the type triples it derives from the chart's `vt:types` block, is the version
+/// `vt hash` prints.
+// @tg: verifies:: [[openspec:formal-model#Chart Certificates#Typed chart certified]] {level: e2e}
+#[test]
+fn certify_typed_charts_with_the_lean_checker() {
+    let Some(checker) = lean_checker() else {
+        eprintln!("skipped: lean/vertep-lean is not built (lake build vt-certify)");
+        return;
+    };
+    let d = Dir::new();
+    let mut files = vec![
+        d.file("order.yaml", ORDER_YAML),
+        d.file("order.scxml", ORDER_SCXML),
+    ];
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    for krate in std::fs::read_dir(&crates).expect("crates") {
+        let Ok(charts) = std::fs::read_dir(krate.expect("crate").path().join("tests/charts")) else {
+            continue;
+        };
+        for f in charts {
+            let path = f.expect("chart").path();
+            if matches!(
+                path.extension().and_then(|e| e.to_str()),
+                Some("scxml" | "yaml")
+            ) {
+                files.push(path);
+            }
+        }
+    }
+    assert!(files.len() > 2, "no chart under crates/*/tests/charts");
+    for f in &files {
+        let o = Command::new(VT)
+            .args(["certify", p(f)])
+            .env("VT_CERTIFY", &checker)
+            .output()
+            .unwrap();
+        assert_eq!(o.status.code(), Some(0), "{}: {}", f.display(), stderr(&o));
+        let version = stdout(&vt(&["hash", p(f)])).trim().to_owned();
+        assert!(
+            stdout(&o).starts_with(&format!(
+                "<{version}> <https://w3id.org/vertep/vt#certifiedBy> <urn:vertep:cert:sha256:"
+            )),
+            "{}: {}",
+            f.display(),
+            stdout(&o)
+        );
+    }
+}
+
 #[test]
 fn validate_reports_well_formedness_and_conformance() {
     let d = Dir::new();

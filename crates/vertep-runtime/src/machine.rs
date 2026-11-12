@@ -118,7 +118,7 @@ impl Machine {
     }
 
     fn new_dm(info: &ChartInfo, ctx: &Ctx<'_>) -> Result<Box<dyn Datamodel>, MachineError> {
-        vertep_core::null::create_datamodel(ctx.registry, info.compiled.datamodel())
+        vertep_core::null::create_datamodel_for(ctx.registry, info.compiled.chart())
             .map_err(|e| MachineError::Step(format!("{e:?}")))
     }
 
@@ -217,7 +217,7 @@ impl Machine {
             return true;
         }
         let Ok(mut dm) =
-            vertep_core::null::create_datamodel(registry, self.info.compiled.datamodel())
+            vertep_core::null::create_datamodel_for(registry, self.info.compiled.chart())
         else {
             return false;
         };
@@ -226,7 +226,10 @@ impl Machine {
             name: self.info.ir.name.clone(),
             ioprocessors: Value::Undefined,
         };
-        if dm.init_session(&info).is_err() || dm.restore(&self.dm.snapshot()).is_err() {
+        if dm.init_session(&info).is_err()
+            || dm.restore(&self.dm.snapshot()).is_err()
+            || dm.check_event(event).is_err()
+        {
             return false;
         }
         dm.set_event(event);
@@ -360,7 +363,10 @@ impl Machine {
                 other => MachineError::Step(format!("{other:?}")),
             })
         };
-        let o = step(self, ev.clone())?;
+        // A payload that fails its declared type is not delivered: the chart gets
+        // `error.execution` instead ([[openspec:type-system#Opt-In Chart Typing]]).
+        let admitted = vertep_core::datamodel::admit(self.dm.as_ref(), ev.clone());
+        let o = step(self, admitted)?;
         let unhandled = o
             .trace
             .microsteps

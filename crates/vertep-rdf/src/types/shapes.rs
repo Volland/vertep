@@ -9,7 +9,7 @@
 //! |---|---|
 //! | `bool`, `int`, `string` | `sh:datatype` `xsd:boolean`, `xsd:long`, `xsd:string` |
 //! | `decimal` | `sh:or` of `xsd:long`, `xsd:decimal` and an `xsd:string` matching the decimal pattern |
-//! | `datetime`, `iri` | `xsd:string` with the RFC 3339 (offset required) or IRI `sh:pattern` |
+//! | `datetime`, `iri` | `xsd:string` with the RFC 3339 (offset required) or IRI `sh:pattern` (XPath regular expression syntax) |
 //! | `value` | none |
 //! | named type | `sh:node` its type IRI |
 //! | `optional<T>` | `sh:or` of `sh:hasValue vt:Null` and the shape of `T` |
@@ -44,6 +44,14 @@ pub const DATETIME_PATTERN: &str = concat!(
 /// backquote, and well-formed percent-encodings.
 pub const IRI_PATTERN: &str =
     r#"^[A-Za-z][A-Za-z0-9+.\-]*:(?:[^\x00-\x20\x7F<>"{}|\\^`%]|%[0-9A-Fa-f]{2})*$"#;
+
+/// [`IRI_PATTERN`] in the regular expression syntax of `sh:pattern` (SHACL §4.6.1: XPath
+/// `fn:matches`, XML Schema regular expressions), which has no `\x` escapes: the control
+/// characters are `\p{Cc}` (U+0000 to U+001F and U+007F to U+009F) and the C1 controls U+0080
+/// to U+009F, which an IRI may hold, are allowed again by a second branch. The same language
+/// as [`IRI_PATTERN`], which stays the JSON Schema (ECMA-262) form.
+pub const SHACL_IRI_PATTERN: &str =
+    "^[A-Za-z][A-Za-z0-9+.\\-]*:(?:[^\\p{Cc} <>\"{}|\\\\^`%]|[\u{80}-\u{9F}]|%[0-9A-Fa-f]{2})*$";
 
 fn sh(local: &str) -> NamedNode {
     NamedNode::new_unchecked(format!("{}{local}", vt::SH))
@@ -219,7 +227,7 @@ impl<'a> TypeShapes<'a> {
                 Primitive::Datetime => {
                     self.datatype(node, vt::XSD_STRING, Some(DATETIME_PATTERN));
                 }
-                Primitive::Iri => self.datatype(node, vt::XSD_STRING, Some(IRI_PATTERN)),
+                Primitive::Iri => self.datatype(node, vt::XSD_STRING, Some(SHACL_IRI_PATTERN)),
                 Primitive::Decimal => {
                     let mut alts = Vec::new();
                     for (i, (dt, pat)) in [

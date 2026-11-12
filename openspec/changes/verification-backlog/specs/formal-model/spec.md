@@ -15,6 +15,21 @@ The Lean package SHALL build an oracle executable that reads a chart, an input s
 - **WHEN** a chart exhausts the microstep budget in the Rust core
 - **THEN** the oracle stops at the same microstep and writes the same partial trace and budget error
 
+### Requirement: Chart Certificates
+The project SHALL provide a Lean-compiled checker, invoked as `vt certify`, that decides `WellFormed` for a chart given as RDF and, when it holds, emits a certificate as RDF stating `vt:certifiedBy` on the chart version IRI with the theorem names relied on, the Lean toolchain, the LeanRDF revision and the hash of the checker binary. For a typed chart the checker SHALL read the chart's `vt:types` block, derive its type triples (`vt:declaresType`, the definitions and the SHACL shapes under content-addressed type IRIs) as the Rust projection does, require them in the graph and include them in the chart version.
+
+#### Scenario: Certificate for a well-formed chart
+- **WHEN** `vt certify` is run on the RDF of a well-formed chart
+- **THEN** it emits a certificate whose subject is the chart's version IRI and which lists the toolchain, the LeanRDF revision and the checker hash
+
+#### Scenario: No certificate for an ill-formed chart
+- **WHEN** `vt certify` is run on a graph that is not the projection of a well-formed chart
+- **THEN** it emits no certificate and exits with an error naming the violated rule
+
+#### Scenario: Typed chart certified
+- **WHEN** `vt certify` is run on the RDF of a well-formed chart with a `vt:types` block
+- **THEN** it emits a certificate whose subject is the version IRI Rust computes for the chart, types included, and refuses a graph that lacks one of the chart's type triples
+
 ## ADDED Requirements
 
 ### Requirement: Type Checker Correctness
@@ -34,3 +49,14 @@ The Lean package SHALL define the JSON Schema projection of types for the keywor
 #### Scenario: Schema agrees with the checker
 - **WHEN** a JSON value is validated against the projected schema of a type with the block's `$defs`
 - **THEN** it is valid exactly when `HasType` holds, by a theorem whose axioms are pinned
+
+### Requirement: SHACL Projection Agreement
+The Lean package SHALL define the RDF encoding of values and the SHACL Core projection of types as LeanRDF shapes, mirroring `vertep-rdf`, and SHALL prove with LeanRDF's SHACL Core semantics, which its validator is proven to decide, that the encoding of a value conforms to the projection of a type exactly when the value has the type, for declaration blocks whose unions have distinct tags and values whose objects have distinct keys. Recursion through named types SHALL be unfolded, since SHACL leaves recursive shapes undefined. The agreement of LeanRDF's XPath regular expressions with the lexical rules of `decimal`, `datetime` and `iri` MAY be an explicit, tested hypothesis.
+
+#### Scenario: Encoding conforms exactly when typed
+- **WHEN** the encoding of a value is validated against the unfolded shapes of a type
+- **THEN** it conforms to some unfolding exactly when `HasType` holds, by a theorem whose axioms are pinned
+
+#### Scenario: Unfolding is monotone
+- **WHEN** the encoding of a value conforms to the shapes of a type unfolded `k` times
+- **THEN** it conforms to the shapes unfolded `k + 1` times

@@ -447,7 +447,17 @@ The SCXML reader rewrites every `vt:type` annotation and `vt:types` block into c
 
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-11"}
 
-The Lean projection mirrors untyped charts only, so typed charts cannot be certified until the Lean type language (M1 group 9) mirrors `vt-types` projection.
+Since 2026-11-12 typed charts certify too, see [[decisions#The Lean checker recomputes a chart's type triples]].
+
+## The Lean checker recomputes a chart's type triples
+
+`vt-certify` reads a typed chart's `vt:types` block from the decoded chart, derives its type triples as `vertep-rdf` does, requires them in the graph and hashes them into the chart version, so typed charts certify under the version Rust computes.
+
+- motivated_by:: [[decisions#vt certify runs the Lean checker as a process]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#Persistent vt namespace and blank-node-free charts]] {weight: secondary, note: "type cells and shapes are minted under the type IRI, so the canonical form stays a sorted line set"}
+- motivated_by:: [[decisions#Types ride on vt extension nodes]] {weight: secondary}
+
+The type triples are ground (no blank nodes), so certifying them needs no RDFC-1.0 in Lean: the earlier belief that it did was wrong. `VertepLean/Types/Syntax.lean` mirrors the declaration parser and the `vt:types` text reading, and `VertepLean/Rdf/Types.lean` mirrors `project_chart_types`: content-addressed type IRIs (strongly connected groups hashed together under `urn:vertep:type:self`), definitions and SHACL node shapes. A graph without one of these triples is refused, and `Certify.check_certified_wellFormed` states that the graph holds the chart's whole projection. 1,000 generated declaration blocks (random layouts, CDATA, entities, quoted names, recursive groups, unknown names and corrupted text, about a fifth of which do not parse) certify under the Rust version, as do the typed charts of the test suites.
 
 ## Rust actions lower to a foreach over the action IRI
 
@@ -500,6 +510,15 @@ The RDF, SHACL, JSON Schema and CEL projections of a type are tested to give the
 
 - motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary}
+
+## Undefined object entries are absent
+
+An object entry whose value is `undefined` is absent for every check of the type checker, the unknown-field check of records and unions included, as the SHACL encoding of values leaves such entries out.
+
+- motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary, note: "counterexample found by the SHACL projection proof, verification backlog 4.2"}
+
+Before, `{a: 1, q: undefined}` failed `{a: int}` with `UnknownField` while its RDF encoding conformed to the type's shapes, so the SHACL projection disagreed with the checker. A declared field holding `undefined` was already absent; the unknown-field check now reads entries the same way, in `crates/vertep-core/src/types/check.rs` and in the Lean `check` and `HasType`. Rejected: encoding `undefined` entries as `vt:Null`, which makes a payload-free union variant with `value: undefined` fail its `sh:maxCount 0`.
 
 ## Type checking stops on non-contractive recursion
 
@@ -1114,3 +1133,15 @@ The website in `site/` is hand-written HTML with one stylesheet and SVG marks: n
 - motivated_by:: [[glossary#Vertep]] {weight: secondary, since: "2026-11-12", note: "the Alatyr star and the vertep goat are its marks"}
 
 The look is woodcut gravure in three inks, black, white and orange, with paper and ink swapped in dark mode; the tokens and components are in `site/assets/css/vertep.css`. Code on the pages is taken from files in the repository, and command output is pasted from real runs, so a page that disagrees with the code is a bug in the page. The example pages are written by `site/tools/sync-examples.py` from the sources and recorded outputs that `cargo test -p vertep-examples` checks; the pages are committed, so viewing the site still needs no build.
+
+## Hosts instantiate CEL charts typed
+
+Every host creates a chart's datamodel through `DatamodelRegistry::create_for`, and `CelRegistry` instantiates a chart that declares types with its projected CEL type environment, refusing one with CEL type errors.
+
+- motivated_by:: [[decisions#Datamodel typers plug into one core checker]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#Own CEL interpreter in vertep-dm-cel]] {weight: secondary}
+- motivated_by:: [[decisions#The Lean model sees the datamodel as an answer tape]] {weight: secondary, note: "the payload check stays outside the kernel and its tape"}
+
+Before, only `vt typecheck` checked CEL against the chart's types: the actor runtime, the agent host and the WebAssembly worker created an untyped CEL datamodel by name, so a `decimal` field initialised to `"0"` held an int, decimal payload fields stayed strings, and a chart with CEL type errors ran anyway. Now the projection (`cel_type`, `type_env`) and the typed load (`instantiate`: the core checker, then every CEL expression against the environment) live in `vertep-dm-cel`, and `vertep-cli` re-exports them. `vertep-core` gives the registry a `create_for(chart)` and a `check(chart)` with name-based defaults, and `create_datamodel_for` turns a refusal into `StartError::ChartRefused`. The runtime refuses such a chart when it is registered (`RegisterError::Refused`, `ChartInvalid` in JavaScript) and the agent host when an actor is spawned (`InstantiateError::Start`). A chart without type declarations still gets a fresh untyped datamodel, so it runs exactly as before typing.
+
+A payload sent with a declared event must convert to the declared type: hosts pass each event through `datamodel::admit`, which asks `Datamodel::check_event` and delivers `error.execution` instead of an event whose payload fails, such as a union value without the payload its tag requires. Platform events are not checked, because the platform defines their payloads ([[decisions#Agent error events extend the error payload]]). The check is a host step rather than part of the kernel, so the interpreter, its datamodel answer tape and the Lean model are unchanged.

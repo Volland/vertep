@@ -323,6 +323,14 @@ pub enum StartError {
     },
     /// The datamodel refused to initialize the session.
     Datamodel(EvalError),
+    /// The datamodel refused to instantiate the chart, with every problem it found (a
+    /// statically checked datamodel refuses a chart with type errors).
+    ChartRefused {
+        /// The datamodel name.
+        datamodel: String,
+        /// Every problem, each with its location in the chart.
+        problems: Vec<String>,
+    },
     /// The start macrostep did not stabilize within the microstep budget.
     BudgetExceeded {
         /// The budget.
@@ -525,6 +533,9 @@ impl Datamodel for Capture<'_> {
     }
     fn set_event(&mut self, event: &Event) {
         self.inner.set_event(event)
+    }
+    fn check_event(&self, event: &Event) -> Result<(), EvalError> {
+        self.inner.check_event(event)
     }
     fn eval_cond(&mut self, expr: &str, states: &dyn StateQuery) -> Result<bool, EvalError> {
         let r = self.inner.eval_cond(expr, states);

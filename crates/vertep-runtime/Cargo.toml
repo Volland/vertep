@@ -34,6 +34,7 @@ tokio-tungstenite = { version = "0.30", default-features = false, features = ["h
 vertep-runtime = { path = ".", features = ["tiramemsu"] }
 vertep-dm-ecma = { workspace = true }
 vertep-yaml = { workspace = true }
+vertep-dm-cel = { workspace = true }
 vertep-tiramemsu = { workspace = true }
 vertep-store = { workspace = true, features = ["testkit"] }
 tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }

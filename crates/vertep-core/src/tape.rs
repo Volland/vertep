@@ -222,6 +222,11 @@ impl Datamodel for TapeDatamodel<'_> {
         self.log(Request::SetEvent(event.clone()), Answer::Unit);
     }
 
+    /// Not an interpreter request (hosts call it before stepping), so it is not recorded.
+    fn check_event(&self, event: &Event) -> Result<(), EvalError> {
+        self.inner.check_event(event)
+    }
+
     fn eval_cond(&mut self, expr: &str, states: &dyn StateQuery) -> Result<bool, EvalError> {
         let r = self.inner.eval_cond(expr, states);
         let a = match &r {

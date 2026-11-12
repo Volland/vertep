@@ -77,6 +77,9 @@ def order : Ty := .record [("id", STRING), ("amount", DECIMAL)]
 #guard !ok order (obj [("id", s "o-1"), ("amount", s "3"), ("note", s "x")])
 #guard ok order (obj [("amount", s "3"), ("id", s "o-1")])
 #guard !ok order (s "o-1")
+-- undefined_entry_is_no_unknown_field: an entry holding `undefined` is absent
+#guard ok order (obj [("id", s "o-1"), ("amount", s "3"), ("note", .undefined)])
+#guard !ok order (obj [("id", s "o-1"), ("amount", .undefined)])
 
 /-- `Card { last4: string } | Cash`. -/
 def payment : Ty := .union [("Card", some (.record [("last4", STRING)])), ("Cash", none)]

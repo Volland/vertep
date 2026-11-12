@@ -583,6 +583,9 @@ impl Datamodel for AgentDm {
         }
         self.inner.declare(id)
     }
+    fn check_event(&self, event: &Event) -> Result<(), EvalError> {
+        self.inner.check_event(event)
+    }
     fn set_event(&mut self, event: &Event) {
         self.inner.set_event(event);
     }
@@ -758,7 +761,7 @@ impl AgentMachine {
         let record = options.record_core;
         let options_budget = options.microstep_budget;
         let inner =
-            vertep_core::null::create_datamodel(registry.as_ref(), chart.compiled.datamodel())
+            vertep_core::null::create_datamodel_for(registry.as_ref(), chart.compiled.chart())
                 .map_err(|e| MachineError::Datamodel(format!("{e:?}")))?;
         let mut dm = AgentDm { inner };
         let env = Environment {
@@ -1139,6 +1142,9 @@ impl AgentMachine {
                 return Err(MachineError::Livelock);
             }
             self.bind_usage();
+            // A payload that fails its declared type is not delivered: the chart gets
+            // `error.execution` instead ([[openspec:type-system#Opt-In Chart Typing]]).
+            let ev = vertep_core::datamodel::admit(&self.dm, ev);
             let input = Input::event(ev.clone(), cx.env);
             let r = match self.core.as_mut() {
                 None => session::step(
@@ -1251,9 +1257,9 @@ impl AgentMachine {
     // ----- decide states -----------------------------------------------------------------
 
     fn probe(&self) -> Option<Box<dyn Datamodel>> {
-        let mut p = vertep_core::null::create_datamodel(
+        let mut p = vertep_core::null::create_datamodel_for(
             self.registry.as_ref(),
-            self.chart.compiled.datamodel(),
+            self.chart.compiled.chart(),
         )
         .ok()?;
         p.init_session(&SessionInfo {
@@ -2282,7 +2288,7 @@ impl AgentMachine {
         let grant = grant::effective(declared.as_ref(), plan.needs.as_ref())
             .unwrap_or_else(Grant::parent_only);
         let Ok(mut dm) =
-            vertep_core::null::create_datamodel(self.registry.as_ref(), compiled.datamodel())
+            vertep_core::null::create_datamodel_for(self.registry.as_ref(), compiled.chart())
         else {
             self.deliver(
                 platform(
@@ -2380,6 +2386,7 @@ impl AgentMachine {
                 return;
             }
             p.macrosteps += 1;
+            let ev = vertep_core::datamodel::admit(p.dm.as_ref(), ev);
             let r = session::step(
                 &p.compiled,
                 p.session.clone(),

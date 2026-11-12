@@ -577,6 +577,17 @@ impl System {
                 vertep_runtime::RegisterError::BadType(t) => {
                     ApiError::arg(format!("chart type {t:?} is not an absolute IRI"))
                 }
+                vertep_runtime::RegisterError::Refused { problems, .. } => ApiError::chart(
+                    problems
+                        .into_iter()
+                        .map(|message| crate::error::Violation {
+                            message,
+                            line: 0,
+                            column: 0,
+                            path: None,
+                        })
+                        .collect(),
+                ),
                 other => ApiError::chart(vec![crate::error::Violation {
                     message: other.to_string(),
                     line: 0,
@@ -608,9 +619,9 @@ impl System {
             .node
             .latest(ty)
             .ok_or_else(|| ApiError::new(Code::NotFound, format!("no chart type for {a}")))?;
-        let mut dm = vertep_core::null::create_datamodel(
+        let mut dm = vertep_core::null::create_datamodel_for(
             self.node.datamodels().as_ref(),
-            info.compiled.datamodel(),
+            info.compiled.chart(),
         )
         .map_err(|e| ApiError::new(Code::Activation, format!("{e:?}")))?;
         let start = StartInput {

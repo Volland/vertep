@@ -54,7 +54,7 @@ def check (D : Decls) (seen : List String) (t : Ty) (v : Value) : Bool :=
   | .record fs =>
     match v with
     | .object entries =>
-      entries.all (fun e => fs.any (·.1 == e.1)) &&
+      entries.all (fun e => isUndef e.2 || fs.any (·.1 == e.1)) &&
       fs.all fun f =>
         match _hp : present entries f.1 with
         | none => optish D f.2
@@ -65,7 +65,7 @@ def check (D : Decls) (seen : List String) (t : Ty) (v : Value) : Bool :=
     | .object entries =>
       match entries.lookup "tag" with
       | some (.str tag) =>
-        entries.all (fun e => e.1 == "tag" || e.1 == "value") &&
+        entries.all (fun e => e.1 == "tag" || (e.1 == "value" || isUndef e.2)) &&
         match vs.lookup tag with
         | none => false
         | some none => (present entries "value").isNone
@@ -87,7 +87,7 @@ decreasing_by
 
 
 /-- The typing relation: `HasType D v t` when the value `v` has type `t`, named types resolved
-in `D`. Records are closed, fields of an optional or `value` type may be absent, a union value
+in `D`. Records are closed (an entry holding `undefined` is absent, so it is no unknown field), fields of an optional or `value` type may be absent, a union value
 is `{"tag": …, "value": …}` with the payload checked against the first variant of that tag,
 and `undefined` and `null` are absent. -/
 -- @tg: implements:: [[openspec:formal-model#Type Checker Correctness]]
@@ -101,22 +101,22 @@ inductive HasType (D : Decls) : Value → Ty → Prop where
   | list (t : Ty) (items : List Value) :
       (∀ x ∈ items, HasType D x t) → HasType D (.array items) (.list t)
   | record (fs : List (String × Ty)) (entries : List (String × Value)) :
-      (∀ e ∈ entries, ∃ f ∈ fs, f.1 = e.1) →
+      (∀ e ∈ entries, isUndef e.2 = true ∨ ∃ f ∈ fs, f.1 = e.1) →
       (∀ f ∈ fs, present entries f.1 = none → optish D f.2 = true) →
       (∀ f ∈ fs, ∀ fv, present entries f.1 = some fv → HasType D fv f.2) →
       HasType D (.object entries) (.record fs)
   | tagOnly (vs : List (String × Option Ty)) (entries : List (String × Value)) (tag : String) :
-      entries.lookup "tag" = some (.str tag) → (∀ e ∈ entries, e.1 = "tag" ∨ e.1 = "value") →
+      entries.lookup "tag" = some (.str tag) → (∀ e ∈ entries, e.1 = "tag" ∨ e.1 = "value" ∨ isUndef e.2 = true) →
       vs.lookup tag = some none → present entries "value" = none →
       HasType D (.object entries) (.union vs)
   | payloadAbsent (vs : List (String × Option Ty)) (entries : List (String × Value))
       (tag : String) (pt : Ty) :
-      entries.lookup "tag" = some (.str tag) → (∀ e ∈ entries, e.1 = "tag" ∨ e.1 = "value") →
+      entries.lookup "tag" = some (.str tag) → (∀ e ∈ entries, e.1 = "tag" ∨ e.1 = "value" ∨ isUndef e.2 = true) →
       vs.lookup tag = some (some pt) → present entries "value" = none → optish D pt = true →
       HasType D (.object entries) (.union vs)
   | payload (vs : List (String × Option Ty)) (entries : List (String × Value)) (tag : String)
       (pt : Ty) (pv : Value) :
-      entries.lookup "tag" = some (.str tag) → (∀ e ∈ entries, e.1 = "tag" ∨ e.1 = "value") →
+      entries.lookup "tag" = some (.str tag) → (∀ e ∈ entries, e.1 = "tag" ∨ e.1 = "value" ∨ isUndef e.2 = true) →
       vs.lookup tag = some (some pt) → present entries "value" = some pv → HasType D pv pt →
       HasType D (.object entries) (.union vs)
 
@@ -168,7 +168,7 @@ theorem check_sound (D : Decls) (seen : List String) (t : Ty) (v : Value) :
   | case9 seen fs entries ih =>
     intro h
     rw [check] at h
-    simp only [Bool.and_eq_true, List.all_eq_true, List.any_eq_true, beq_iff_eq] at h
+    simp only [Bool.and_eq_true, List.all_eq_true, Bool.or_eq_true, List.any_eq_true, beq_iff_eq] at h
     obtain ⟨hk, hf⟩ := h
     refine .record fs entries hk (fun f hf' hp => ?_) (fun f hf' fv hp => ?_)
     · have := hf f hf'
@@ -299,7 +299,7 @@ theorem hasType_chain {D : Decls} {v : Value} {t : Ty} (h : HasType D v t) :
   | record fs entries hk hopt _ ih =>
     refine ⟨[], _, .refl _, fun s => ?_⟩
     rw [check]
-    simp only [Bool.and_eq_true, List.all_eq_true, List.any_eq_true, beq_iff_eq]
+    simp only [Bool.and_eq_true, List.all_eq_true, Bool.or_eq_true, List.any_eq_true, beq_iff_eq]
     refine ⟨hk, fun f hf => ?_⟩
     split
     · rename_i hp; exact hopt f hf hp

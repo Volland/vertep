@@ -16,10 +16,8 @@ use std::collections::BTreeSet;
 
 use vertep_core::compile::CompiledChart;
 use vertep_core::ir::{Block, Chart, ExecKind, Extension, ExtensionValue, State, VT_NS};
-use vertep_core::types::{
-    BasicTyper, ChartTypes, Declarations, Primitive, Type, check_chart, parse_type,
-};
-use vertep_dm_cel::{CelType, LoadOptions, Policy, TypeEnv, function_iris};
+use vertep_core::types::{BasicTyper, ChartTypes, Declarations, Type, check_chart, parse_type};
+use vertep_dm_cel::{LoadOptions, Policy, TypeEnv, function_iris};
 use vertep_rdf::ChartVersion;
 use vertep_runtime::chart::{element_attributes, parse_duration};
 use vertep_runtime::{Address, MigrateError, Migration, Node};
@@ -267,68 +265,11 @@ impl Refs<'_> {
     }
 }
 
-fn cel_type(decls: &Declarations, ty: &Type, stack: &mut Vec<String>) -> CelType {
-    match ty {
-        Type::Value => CelType::Dyn,
-        Type::Primitive(p) => match p {
-            Primitive::Bool => CelType::Bool,
-            Primitive::Int => CelType::Int,
-            Primitive::Decimal => CelType::Decimal,
-            Primitive::String | Primitive::Iri => CelType::String,
-            Primitive::Datetime => CelType::Timestamp,
-        },
-        Type::Named(n) => {
-            if stack.iter().any(|s| s == n) {
-                return CelType::Dyn;
-            }
-            let Some(def) = decls.lookup(n) else {
-                return CelType::Dyn;
-            };
-            stack.push(n.clone());
-            let t = cel_type(decls, def, stack);
-            stack.pop();
-            t
-        }
-        Type::List(item) => CelType::list(cel_type(decls, item, stack)),
-        Type::Optional(inner) => CelType::optional(cel_type(decls, inner, stack)),
-        Type::Record(fields) => {
-            let fs: Vec<(String, CelType)> = fields
-                .iter()
-                .map(|f| (f.name.clone(), cel_type(decls, &f.ty, stack)))
-                .collect();
-            CelType::record(None, fs.iter().map(|(n, t)| (n.as_str(), t.clone())))
-        }
-        Type::Union(variants) => {
-            let vs: Vec<(String, Option<CelType>)> = variants
-                .iter()
-                .map(|v| {
-                    (
-                        v.tag.clone(),
-                        v.payload.as_ref().map(|p| cel_type(decls, p, stack)),
-                    )
-                })
-                .collect();
-            CelType::union(None, vs.iter().map(|(n, t)| (n.as_str(), t.clone())))
-        }
-    }
-}
-
 /// The CEL type environment of a type-checked chart (context fields under `ctx`, declared
-/// events under `ev.data`).
+/// events under `ev.data`): the projection every host instantiates CEL charts with,
+/// [`vertep_dm_cel::type_env`].
 pub fn cel_env(types: &ChartTypes) -> TypeEnv {
-    if !types.typed {
-        return TypeEnv::untyped();
-    }
-    let decls = &types.declarations;
-    let mut env = TypeEnv::typed();
-    for f in &types.context {
-        env = env.with_context_field(&f.name, cel_type(decls, &f.ty, &mut Vec::new()));
-    }
-    for (name, payload) in types.events.iter() {
-        let t = payload.map_or(CelType::Null, |p| cel_type(decls, p, &mut Vec::new()));
-        env = env.with_event(name, t);
-    }
-    env
+    vertep_dm_cel::type_env(types)
 }
 
 /// Validates `chart` as a plan: the IR well-formedness checks, the SHACL chart shapes and the

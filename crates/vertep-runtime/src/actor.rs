@@ -424,17 +424,18 @@ impl Actor for ChartActor {
                 self.session = Some(s);
                 return Turn::Ready(Ok(TurnOutput::default()));
             }
+            let event = vertep_core::datamodel::admit(dm.as_ref(), input.event);
             session::step(
                 &self.info.compiled,
                 s,
-                Input::event(input.event, env),
+                Input::event(event, env),
                 dm.as_mut(),
             )
             .map_err(|e| ActorFailure(format!("{e:?}")))
         } else {
-            let mut dm = match vertep_core::null::create_datamodel(
+            let mut dm = match vertep_core::null::create_datamodel_for(
                 self.registry.as_ref(),
-                self.info.compiled.datamodel(),
+                self.info.compiled.chart(),
             ) {
                 Ok(d) => d,
                 Err(e) => return Turn::Ready(Err(ActorFailure(format!("{e:?}")))),

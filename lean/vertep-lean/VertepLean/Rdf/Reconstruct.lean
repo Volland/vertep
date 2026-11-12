@@ -258,6 +258,9 @@ def decode (ts : List Triple) : D (Chart × String) := do
 def closedWorld (g : Graph) (c : Chart) (base : String) : Bool :=
   (project c base).all (fun t => decide (t ∈ g))
 
+/-- Every triple of `ts` is in `g`. -/
+def closedWorld' (g : Graph) (ts : List Triple) : Bool := ts.all (fun t => decide (t ∈ g))
+
 /-- Reconstruction (Rust `reconstruct`, after validation): decode, then require the graph to
 contain the whole projection of what was decoded. -/
 -- @tg: implements:: [[openspec:formal-model#RDF Round Trip Theorem]] {note: "the round trip is proven: fromRDF_project"}

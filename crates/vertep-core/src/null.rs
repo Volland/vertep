@@ -8,6 +8,7 @@ use crate::compile::CompiledChart;
 use crate::datamodel::{
     Datamodel, DatamodelRegistry, Environment, EvalError, Event, SessionInfo, StateQuery, Value,
 };
+use crate::ir::Chart;
 use crate::session::{Outcome, StartError, StartInput, start};
 
 /// The name of the `null` datamodel.
@@ -149,6 +150,16 @@ impl<R: DatamodelRegistry> DatamodelRegistry for WithNull<R> {
     fn create(&self, name: &str) -> Option<Box<dyn Datamodel>> {
         self.0.create(name).or_else(|| NullRegistry.create(name))
     }
+
+    fn create_for(&self, chart: &Chart) -> Option<Result<Box<dyn Datamodel>, Vec<String>>> {
+        self.0
+            .create_for(chart)
+            .or_else(|| NullRegistry.create_for(chart))
+    }
+
+    fn check(&self, chart: &Chart) -> Result<(), Vec<String>> {
+        self.0.check(chart)
+    }
 }
 
 /// Create the datamodel a chart names (`null` when it names none) from the host's registry, or
@@ -172,6 +183,29 @@ pub fn create_datamodel(
         })
 }
 
+/// Create the datamodel for `chart` from the host's registry through
+/// [`DatamodelRegistry::create_for`], so a datamodel that checks charts statically gets the
+/// whole chart: [`StartError::ChartRefused`] when it refuses the chart, and otherwise as
+/// [`create_datamodel`] (`null` when the chart names none, `null` always available,
+/// [`StartError::UnsupportedDatamodel`] for an unregistered name).
+// @tg: implements:: [[openspec:datamodel#Datamodel Registry]]
+pub fn create_datamodel_for(
+    registry: &dyn DatamodelRegistry,
+    chart: &Chart,
+) -> Result<Box<dyn Datamodel>, StartError> {
+    if chart.datamodel.is_empty() {
+        return create_datamodel(registry, &chart.datamodel);
+    }
+    match registry.create_for(chart) {
+        Some(Ok(dm)) => Ok(dm),
+        Some(Err(problems)) => Err(StartError::ChartRefused {
+            datamodel: chart.datamodel.clone(),
+            problems,
+        }),
+        None => create_datamodel(registry, &chart.datamodel),
+    }
+}
+
 /// Select the chart's datamodel from the registry and start a session with it. Returns the
 /// outcome and the datamodel instance the session must keep using.
 pub fn start_with_registry(
@@ -179,7 +213,7 @@ pub fn start_with_registry(
     registry: &dyn DatamodelRegistry,
     input: StartInput,
 ) -> Result<(Outcome, Box<dyn Datamodel>), StartError> {
-    let mut dm = create_datamodel(registry, chart.datamodel())?;
+    let mut dm = create_datamodel_for(registry, chart.chart())?;
     let outcome = start(chart, input, dm.as_mut())?;
     Ok((outcome, dm))
 }

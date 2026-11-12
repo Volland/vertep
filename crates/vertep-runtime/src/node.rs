@@ -1085,6 +1085,7 @@ impl Node {
             }
         }
         let info = ChartInfo::new(chart, Some(chart_type.to_owned()))?;
+        self.admit_chart(&info)?;
         Ok(self.shared.charts_mut().insert(info).version.clone())
     }
 
@@ -1092,10 +1093,25 @@ impl Node {
     ///
     /// # Errors
     ///
-    /// [`RegisterError`] when the chart is invalid.
+    /// [`RegisterError`] when the chart is invalid or its datamodel refuses it.
     pub fn register_chart(&mut self, chart: Chart) -> Result<ChartVersion, RegisterError> {
         let info = ChartInfo::new(chart, None)?;
+        self.admit_chart(&info)?;
         Ok(self.shared.charts_mut().insert(info).version.clone())
+    }
+
+    /// Refuses a chart its datamodel refuses to instantiate (a typed CEL chart with type
+    /// errors, [`DatamodelRegistry::check`]), so no actor of it is ever activated. A datamodel
+    /// the node does not register is not an error here: activation reports it.
+    // @tg: implements:: [[openspec:cel-datamodel#Static Type Checking of CEL]]
+    fn admit_chart(&self, info: &ChartInfo) -> Result<(), RegisterError> {
+        let chart = info.compiled.chart();
+        self.registry
+            .check(chart)
+            .map_err(|problems| RegisterError::Refused {
+                datamodel: chart.datamodel.clone(),
+                problems,
+            })
     }
 
     /// Declares a migration.
