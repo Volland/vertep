@@ -136,18 +136,19 @@ Third phase landed 2026-11-11. The oracle charges idle internal events against t
 
 Typed charts certify since 2026-11-12: `vt-certify` reads a chart's `vt:types` block and derives its type triples as `vertep-rdf` does, see [[decisions#The Lean checker recomputes a chart's type triples]]. The SHACL projection of types is proven to agree with `HasType` under LeanRDF's SHACL semantics (`Types/Shacl.lean`, `shacl_agrees`).
 
-The custody model landed 2026-11-12 (M7), with every proof complete:
+The custody model landed 2026-11-12 (M7).
 
-- **Model** (`Custody`, `CustodyTheorems`): Paxos over the whole log for durable objects, under a majority quorum and over every interleaving of prepares, elections, writes, appends, refusals, lost messages and restarts.
-- **Theorems:**
-  - `one_writer_per_epoch` and `one_adoption_per_epoch`;
-  - `committed_survives_election` and `committed_survives_accept`: a log committed in one epoch is a prefix of every later adoption and every later accepted log;
-  - `committed_in_custodian` and `committed_in_writer_log`.
+- **Fixed custodian set** (`Custody`, `CustodyTheorems`): Paxos over the whole log under a majority quorum, over every interleaving.
+  - Proven: one writer per epoch, and a committed log is a prefix of every later adoption and every later accepted log.
+- **Custodian-set changes by joint consensus** (`CustodyJoint`):
+  - Proven: quorums of consecutive ranks intersect, and runs that start no change keep both safety properties.
+  - Not proven: the same two properties for runs that change the set. They are the open conjectures `OneWriterPerEpoch` and `CommittedSurvives`. For now they are checked by a build-time random search (400 runs) and by strict replay of every Rust fault history.
+- **Old rule** (`CustodyReconfigUnsafe`): Lean-checked counterexamples show that switching on a quorum of the old set plus every newcomer loses committed entries and can elect two writers in one epoch. That is why the Rust protocol changed to joint consensus.
+- **Oracle:** `vertep-custody --history` replays fault histories in strict mode, with the joint model for histories that carry configuration records.
 - **Axioms:** pinned to `propext`, `Classical.choice` and `Quot.sound`.
-- **Oracle:** `vertep-custody --history` replays the fault histories of `vertep-objects` in strict mode. `adoptsB_sound` proves that its adoption check implies the model's max rule.
-- **Not modelled:** custodian-set changes, keeper encryption and equivocation evidence; Rust records their refusals as `failed`, a no-op.
 
-- realizes:: [[decisions#Custody epochs are won by quorum promises]] {confidence: partial, note: "proven for a fixed custodian set; reconfiguration is not modelled"}
+- realizes:: [[decisions#Custody epochs are won by quorum promises]] {confidence: partial, note: "proven for a fixed custodian set; safety under custodian-set changes is a checked conjecture"}
+- realizes:: [[decisions#Custodian set changes use joint consensus]] {confidence: partial, note: "modelled and replayed; not yet proven"}
 - scheduled_in:: [[roadmap#M7 Durable objects]] {note: "the custody model"}
 
 ## vertep-conformance

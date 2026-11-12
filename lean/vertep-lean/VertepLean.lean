@@ -37,6 +37,12 @@ import VertepLean.AgentTheorems
 import VertepLean.Lease
 import VertepLean.LeaseTheorems
 import VertepLean.LeaseCheck
+import VertepLean.Custody
+import VertepLean.CustodyTheorems
+import VertepLean.CustodyCheck
+import VertepLean.CustodyReconfigUnsafe
+import VertepLean.CustodyJoint
+import VertepLean.CustodyJointCheck
 import VertepLean.DecideCheck
 import VertepLean.Types.Basic
 import VertepLean.Types.Check

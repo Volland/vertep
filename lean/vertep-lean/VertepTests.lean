@@ -8,5 +8,7 @@ import VertepTests.Rdf
 import VertepTests.Journal
 import VertepTests.Agent
 import VertepTests.Lease
+import VertepTests.Custody
+import VertepTests.CustodyJoint
 import VertepTests.Types
 import VertepTests.Shacl
