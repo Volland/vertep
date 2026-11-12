@@ -30,6 +30,25 @@ The project SHALL provide a Lean-compiled checker, invoked as `vt certify`, that
 - **WHEN** `vt certify` is run on the RDF of a well-formed chart with a `vt:types` block
 - **THEN** it emits a certificate whose subject is the version IRI Rust computes for the chart, types included, and refuses a graph that lacks one of the chart's type triples
 
+### Requirement: Shapes Equivalence Theorem
+The Lean package SHALL prove, using LeanRDF's proven SHACL Core validator, that validating the projection of a chart against the chart shapes conforms exactly when the chart is `WellFormed`. The chart shapes in the theorem SHALL be a Lean term (`Rdf.ShapesL.chartShapesL`), because the Turtle parser and the shapes reader are `partial` and say nothing in the logic; a test SHALL check that reading `vt-chart-shapes.ttl` gives that term up to identifiers, messages, severities and order. The part of the theorem over the node shapes (every shape with a class target, the initial-reference scope shape, the history shape without its cycle component) SHALL be proven first, for charts with unique state identifiers; the graph-wide shapes (selection, history-default cycles, unique data identifiers) and the step from conformance to unique state identifiers stay open in `Pending/ShapesEquiv.lean` until proven.
+
+#### Scenario: Forward direction
+- **WHEN** a chart is `WellFormed`
+- **THEN** the theorem gives that its projection conforms to the chart shapes
+
+#### Scenario: Backward direction
+- **WHEN** a chart's projection conforms to the chart shapes
+- **THEN** the theorem gives that the chart is `WellFormed`
+
+#### Scenario: Shapes term
+- **WHEN** `vt-chart-shapes.ttl` is read with LeanRDF's Turtle parser and shapes reader
+- **THEN** it gives the shapes of `chartShapesL`, up to identifiers, messages, severities and order
+
+#### Scenario: Node shapes
+- **WHEN** a chart has unique state identifiers
+- **THEN** the theorem gives that every node shape holds on its projection exactly when the chart satisfies every `WellFormed` rule except unique identifiers, legal target sets, unique data identifiers and acyclic history defaults
+
 ## ADDED Requirements
 
 ### Requirement: Type Checker Correctness

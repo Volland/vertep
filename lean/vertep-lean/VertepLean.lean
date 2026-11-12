@@ -28,6 +28,7 @@ import VertepLean.Rdf.RoundTrip.Transition
 import VertepLean.Rdf.RoundTrip.Nodes
 import VertepLean.Rdf.RoundTrip.State
 import VertepLean.Rdf.RoundTrip.Chart
+import VertepLean.Rdf.Equiv.Theorem
 import VertepLean.Journal
 import VertepLean.JournalTheorems
 import VertepLean.JournalCheck

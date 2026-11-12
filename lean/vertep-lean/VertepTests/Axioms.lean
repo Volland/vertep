@@ -63,7 +63,11 @@ def mainTheorems : List Name :=
     ``Vertep.Typed.typed_step_soundness, ``Vertep.Typed.typed_start_soundness,
     ``Vertep.Typed.step_typed, ``Vertep.Typed.stepFull_typed, ``Vertep.Typed.start_typed,
     ``Vertep.Typed.startFull_typed, ``Vertep.Typed.datamodel_typed,
-    ``Vertep.Typed.vertep_typed_soundness ]
+    ``Vertep.Typed.vertep_typed_soundness,
+    ``Vertep.Rdf.Equiv.nodeShapes_iff, ``Vertep.Rdf.Equiv.shapes_equiv_nodes,
+    ``Vertep.Rdf.Equiv.wellFormed_iff, ``Vertep.Rdf.Equiv.uniqueStateId_ok,
+    ``Vertep.Rdf.Equiv.goodAll_iff, ``Vertep.Rdf.Equiv.reg_exec, ``Vertep.Rdf.Equiv.reg_state,
+    ``Vertep.Rdf.Equiv.mem_descIds_iff ]
 
 /-- The axioms of `n` outside the allowed set. -/
 def disallowed (n : Name) : CoreM (Array Name) := do
