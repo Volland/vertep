@@ -41,6 +41,7 @@
       <li><a href="runtime.html" aria-current="page">The actor runtime</a></li>
       <li><a href="agents.html">Agents and deciders</a></li>
       <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -123,28 +124,28 @@
 
     <h2 id="first-node">A first node</h2>
     <p>The facade crate <code>vertep</code> re-exports the runtime and the tiramemsu backend under its default features (<code>runtime</code>, <code>tiramemsu</code>, <code>scxml</code>). Its quickstart, <code>crates/vertep/examples/quickstart.rs</code>, opens a tiramemsu directory, registers an order chart as a chart type, and sends one event to a virtual actor. Abridged:</p>
-<pre data-lang="Rust"><code>const ORDER: &amp;str = r#"&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="open"&gt;
+<pre data-lang="Rust"><code><span class="k">const</span> ORDER: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span> <span class="s">r#"&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="open"&gt;
   &lt;state id="open"&gt;
     &lt;transition event="pay" target="paid"&gt;&lt;send event="ship" delay="200ms"/&gt;&lt;/transition&gt;
   &lt;/state&gt;
   &lt;state id="paid"&gt;&lt;transition event="ship" target="shipped"/&gt;&lt;/state&gt;
   &lt;state id="shipped"/&gt;
-&lt;/scxml&gt;"#;
+&lt;/scxml&gt;"#</span>;
 
-const ORDER_TYPE: &amp;str = "https://example.org/charts/order";
+<span class="k">const</span> ORDER_TYPE: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span> <span class="s">"https://example.org/charts/order"</span>;
 
-let backend = Arc::new(TiramemsuBackend::open(&amp;dir, 1)?);
-let mut node = Node::builder(backend.clone(), Shell::tokio()).build();
-let chart = vertep::scxml::read_str(ORDER).map_err(|e| format!("{e:?}"))?.chart;
-let version = node.register_type(ORDER_TYPE, chart)?;
+<span class="kd">let</span> backend <span class="o">=</span> Arc::new(TiramemsuBackend::open(<span class="o">&amp;</span>dir, <span class="mi">1</span>)<span class="o">?</span>);
+<span class="kd">let</span> <span class="k">mut</span> node <span class="o">=</span> Node::builder(backend.clone(), Shell::tokio()).build();
+<span class="kd">let</span> chart <span class="o">=</span> vertep::scxml::read_str(ORDER).map_err(<span class="o">|</span>e<span class="o">|</span> <span class="fm">format!</span>(<span class="s">"{e:?}"</span>))<span class="o">?</span>.chart;
+<span class="kd">let</span> version <span class="o">=</span> node.register_type(ORDER_TYPE, chart)<span class="o">?</span>;
 
-// A virtual actor exists for every key: no create call, the first message activates it.
-let order = Address::virtual_actor(ORDER_TYPE, "42")?;
-node.send(&amp;order, Event::named("pay", EventType::External))?;
+<span class="c1">// A virtual actor exists for every key: no create call, the first message activates it.
+</span><span class="kd">let</span> order <span class="o">=</span> Address::virtual_actor(ORDER_TYPE, <span class="s">"42"</span>)<span class="o">?</span>;
+node.send(<span class="o">&amp;</span>order, Event::named(<span class="s">"pay"</span>, EventType::External))<span class="o">?</span>;
 
-// ... run the node for 400 ms on a LocalSet, then:
-let now = node.state(&amp;order)?;
-let then = node.state_at(&amp;order, 1)?;   // time travel by replay</code></pre>
+<span class="c1">// ... run the node for 400 ms on a LocalSet, then:
+</span><span class="kd">let</span> now <span class="o">=</span> node.state(<span class="o">&amp;</span>order)<span class="o">?</span>;
+<span class="kd">let</span> then <span class="o">=</span> node.state_at(<span class="o">&amp;</span>order, <span class="mi">1</span>)<span class="o">?</span>;   <span class="o">//</span> time travel by replay</code></pre>
     <p>Run it with <code>cargo run -p vertep --example quickstart</code>:</p>
 <pre class="output" data-lang="Output"><code>chart version urn:vertep:chart:sha256:6b74f6c5d780053619e9d360bbd73331f41fd52709d0bb7f5310d175b1272b08
 now: ["shipped"] after 2 entries
@@ -190,20 +191,20 @@ as of entry 1: ["paid"]
     <h2 id="sending">Sending and requests</h2>
     <p>From outside the actor system, <code>node.send(&amp;to, event)</code> or <code>handle.send(&amp;to, event)</code> delivers an event and returns its message id. Inside a chart, <code>&lt;send&gt;</code> does the same, with <code>_event.origin</code> set to the sender's address so <code>&lt;send targetexpr="_event.origin"&gt;</code> always replies to the right actor.</p>
     <p>A chart never blocks. To ask and wait for an answer, a state declares a <code>&lt;vt:request&gt;</code> element. This chart is from <code>crates/vertep-runtime/tests/messaging.rs</code>:</p>
-<pre data-lang="SCXML"><code>&lt;state id="idle"&gt;&lt;transition event="quote" target="quoting"/&gt;&lt;/state&gt;
-&lt;state id="quoting"&gt;
-  &lt;vt:request target="https://example.org/charts/pricer/b" event="price.get"
-              timeout="5s" reply="priced" ontimeout="failed"/&gt;
-  &lt;transition event="ping"/&gt;
-&lt;/state&gt;
-&lt;state id="priced"/&gt;
-&lt;state id="failed"/&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"idle"</span><span class="nt">&gt;&lt;transition</span> <span class="na">event=</span><span class="s">"quote"</span> <span class="na">target=</span><span class="s">"quoting"</span><span class="nt">/&gt;&lt;/state&gt;</span>
+<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"quoting"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;vt:request</span> <span class="na">target=</span><span class="s">"https://example.org/charts/pricer/b"</span> <span class="na">event=</span><span class="s">"price.get"</span>
+              <span class="na">timeout=</span><span class="s">"5s"</span> <span class="na">reply=</span><span class="s">"priced"</span> <span class="na">ontimeout=</span><span class="s">"failed"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"ping"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/state&gt;</span>
+<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"priced"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"failed"</span><span class="nt">/&gt;</span></code></pre>
     <p>Before compiling, the runtime lowers this into plain SCXML: a <code>&lt;send&gt;</code> on entry, a generated waiting substate, a transition on <code>vt:reply</code> to <code>priced</code> and one on <code>error.timeout</code> to <code>failed</code>. Other events are handled normally while the request is open. The replier answers with an ordinary send of the event <code>vt:reply</code>:</p>
-<pre data-lang="SCXML"><code>&lt;state id="s"&gt;
-  &lt;transition event="price.get"&gt;
-    &lt;send event="vt:reply" targetexpr="_event.origin"&gt;&lt;content expr="({price: 42})"/&gt;&lt;/send&gt;
-  &lt;/transition&gt;
-&lt;/state&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"s"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"price.get"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;send</span> <span class="na">event=</span><span class="s">"vt:reply"</span> <span class="na">targetexpr=</span><span class="s">"_event.origin"</span><span class="nt">&gt;&lt;content</span> <span class="na">expr=</span><span class="s">"({price: 42})"</span><span class="nt">/&gt;&lt;/send&gt;</span>
+  <span class="nt">&lt;/transition&gt;</span>
+<span class="nt">&lt;/state&gt;</span></code></pre>
     <ul>
       <li><strong>Correlation ids</strong> are computed from the actor's IRI, the journal position of the macrostep that issued the request, and the request's index in it. Replay rebuilds the same id without storing it separately.</li>
       <li><strong>The timeout</strong> is a durable timer recorded in the same journal entry, so it survives deactivation and restarts.</li>
@@ -213,9 +214,9 @@ as of entry 1: ["paid"]
 
     <h3 id="defer">Deferred and unhandled events</h3>
     <p>SCXML discards an external event that enables no transition. Actors must not lose messages that way, so a state can defer events by descriptor, and each chart chooses what happens to the rest. From <code>tests/messaging.rs</code>:</p>
-<pre data-lang="SCXML"><code>&lt;state id="busy" vt:defer="order.*"&gt;
-  &lt;transition event="finish" target="idle"/&gt;
-&lt;/state&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"busy"</span> <span class="na">vt:defer=</span><span class="s">"order.*"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"finish"</span> <span class="na">target=</span><span class="s">"idle"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/state&gt;</span></code></pre>
     <p>While <code>busy</code> is active, an <code>order.cancel</code> message stays in the mailbox, in order, and is offered again once the actor leaves <code>busy</code>. Deferral lives in the mailbox, not in <code>step</code>, so the SCXML core and its conformance suite are unchanged.</p>
     <p>The <code>vt:unhandled</code> attribute on <code>&lt;scxml&gt;</code> sets the policy for events that enable nothing and are not deferred:</p>
     <table>
@@ -231,16 +232,16 @@ as of entry 1: ["paid"]
     <h2 id="mailboxes">Mailboxes, transports and the directory</h2>
     <p>An address resolves through a directory to a mailbox, and transports deliver into mailboxes. Each of the three is a trait with several implementations, which is what lets the same <code>&lt;send&gt;</code> reach a local actor, an actor on another cluster node, or an actor behind a DID relay.</p>
     <p>The mailbox contract, from <code>crates/vertep-runtime/src/mailbox.rs</code> (helper methods omitted):</p>
-<pre data-lang="Rust"><code>pub trait Mailbox: Send + Sync {
-    fn enqueue(&amp;self, env: Envelope) -&gt; Result&lt;(), MailboxError&gt;;
-    /// The oldest message that is neither in flight nor deferred, now marked in flight.
-    fn receive(&amp;self, deferred: &amp;[String]) -&gt; Option&lt;Envelope&gt;;
-    /// Removes the in-flight message (its turn is durable).
-    fn ack(&amp;self, message_id: &amp;str) -&gt; Result&lt;(), MailboxError&gt;;
-    fn release(&amp;self, message_id: &amp;str);
-    fn release_all(&amp;self);
-    fn pending(&amp;self) -&gt; Vec&lt;Envelope&gt;;
-    fn pending_deliverable(&amp;self, deferred: &amp;[String]) -&gt; usize;
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">trait</span> Mailbox: <span class="nb">Send</span> <span class="o">+</span> <span class="nb">Sync</span> {
+    <span class="k">fn</span> <span class="nf">enqueue</span>(<span class="o">&amp;</span><span class="bp">self</span>, env: <span class="nc">Envelope</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), MailboxError<span class="o">&gt;</span>;
+    <span class="sd">/// The oldest message that is neither in flight nor deferred, now marked in flight.
+</span>    <span class="k">fn</span> <span class="nf">receive</span>(<span class="o">&amp;</span><span class="bp">self</span>, deferred: <span class="kp">&amp;</span>[<span class="nb">String</span>]) -&gt; <span class="nb">Option</span><span class="o">&lt;</span>Envelope<span class="o">&gt;</span>;
+    <span class="sd">/// Removes the in-flight message (its turn is durable).
+</span>    <span class="k">fn</span> <span class="nf">ack</span>(<span class="o">&amp;</span><span class="bp">self</span>, message_id: <span class="kp">&amp;</span><span class="kt">str</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), MailboxError<span class="o">&gt;</span>;
+    <span class="k">fn</span> <span class="nf">release</span>(<span class="o">&amp;</span><span class="bp">self</span>, message_id: <span class="kp">&amp;</span><span class="kt">str</span>);
+    <span class="k">fn</span> <span class="nf">release_all</span>(<span class="o">&amp;</span><span class="bp">self</span>);
+    <span class="k">fn</span> <span class="nf">pending</span>(<span class="o">&amp;</span><span class="bp">self</span>) -&gt; <span class="nb">Vec</span><span class="o">&lt;</span>Envelope<span class="o">&gt;</span>;
+    <span class="k">fn</span> <span class="nf">pending_deliverable</span>(<span class="o">&amp;</span><span class="bp">self</span>, deferred: <span class="kp">&amp;</span>[<span class="nb">String</span>]) -&gt; <span class="kt">usize</span>;
 }</code></pre>
     <table>
       <thead><tr><th>Piece</th><th>Implementations</th><th>Notes</th></tr></thead>
@@ -279,22 +280,22 @@ as of entry 1: ["paid"]
 
     <h2 id="storage">Storage</h2>
     <p>Storage is two RDF-agnostic traits in <code>vertep-store</code>, so no backend is asked for a guarantee it cannot give. A journal store must append linearizably per actor; a graph store only promises quads in and SPARQL out.</p>
-<pre data-lang="Rust"><code>pub trait JournalStore: Send + Sync {
-    fn capabilities(&amp;self) -&gt; JournalCapabilities;   // fencing, state_in_append
-    /// Appends `entries` if, and only if, the last entry is at `expected`.
-    fn append(&amp;self, actor: &amp;NamedNode, expected: Position, entries: &amp;[Entry],
-              meta: &amp;AppendMeta) -&gt; Result&lt;Position, AppendError&gt;;
-    fn read(&amp;self, actor: &amp;NamedNode, from: Position) -&gt; Result&lt;Vec&lt;JournalRecord&gt;, StoreError&gt;;
-    fn head(&amp;self, actor: &amp;NamedNode) -&gt; Result&lt;Position, StoreError&gt;;
-    fn actors(&amp;self) -&gt; Result&lt;Vec&lt;NamedNode&gt;, StoreError&gt;;
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">trait</span> JournalStore: <span class="nb">Send</span> <span class="o">+</span> <span class="nb">Sync</span> {
+    <span class="k">fn</span> <span class="nf">capabilities</span>(<span class="o">&amp;</span><span class="bp">self</span>) -&gt; <span class="nc">JournalCapabilities</span>;   <span class="c1">// fencing, state_in_append
+</span>    <span class="sd">/// Appends `entries` if, and only if, the last entry is at `expected`.
+</span>    <span class="k">fn</span> <span class="nf">append</span>(<span class="o">&amp;</span><span class="bp">self</span>, actor: <span class="kp">&amp;</span><span class="nc">NamedNode</span>, expected: <span class="nc">Position</span>, entries: <span class="kp">&amp;</span>[Entry],
+              meta: <span class="kp">&amp;</span><span class="nc">AppendMeta</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Position, AppendError<span class="o">&gt;</span>;
+    <span class="k">fn</span> <span class="nf">read</span>(<span class="o">&amp;</span><span class="bp">self</span>, actor: <span class="kp">&amp;</span><span class="nc">NamedNode</span>, from: <span class="nc">Position</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span><span class="nb">Vec</span><span class="o">&lt;</span>JournalRecord<span class="o">&gt;</span>, StoreError<span class="o">&gt;</span>;
+    <span class="k">fn</span> <span class="nf">head</span>(<span class="o">&amp;</span><span class="bp">self</span>, actor: <span class="kp">&amp;</span><span class="nc">NamedNode</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Position, StoreError<span class="o">&gt;</span>;
+    <span class="k">fn</span> <span class="nf">actors</span>(<span class="o">&amp;</span><span class="bp">self</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span><span class="nb">Vec</span><span class="o">&lt;</span>NamedNode<span class="o">&gt;</span>, StoreError<span class="o">&gt;</span>;
 }
 
-pub trait GraphStore: Send + Sync {
-    fn capabilities(&amp;self) -&gt; GraphCapabilities;     // RDF 1.2 or the RDF 1.1 fallback
-    fn insert_quads(&amp;self, quads: &amp;[Quad]) -&gt; Result&lt;(), StoreError&gt;;
-    fn remove_quads(&amp;self, quads: &amp;[Quad]) -&gt; Result&lt;(), StoreError&gt;;
-    fn clear_graph(&amp;self, graph: &amp;NamedNode) -&gt; Result&lt;(), StoreError&gt;;
-    fn query(&amp;self, sparql: &amp;str) -&gt; Result&lt;QueryResults, StoreError&gt;;
+<span class="k">pub</span> <span class="k">trait</span> GraphStore: <span class="nb">Send</span> <span class="o">+</span> <span class="nb">Sync</span> {
+    <span class="k">fn</span> <span class="nf">capabilities</span>(<span class="o">&amp;</span><span class="bp">self</span>) -&gt; <span class="nc">GraphCapabilities</span>;     <span class="c1">// RDF 1.2 or the RDF 1.1 fallback
+</span>    <span class="k">fn</span> <span class="nf">insert_quads</span>(<span class="o">&amp;</span><span class="bp">self</span>, quads: <span class="kp">&amp;</span>[Quad]) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), StoreError<span class="o">&gt;</span>;
+    <span class="k">fn</span> <span class="nf">remove_quads</span>(<span class="o">&amp;</span><span class="bp">self</span>, quads: <span class="kp">&amp;</span>[Quad]) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), StoreError<span class="o">&gt;</span>;
+    <span class="k">fn</span> <span class="nf">clear_graph</span>(<span class="o">&amp;</span><span class="bp">self</span>, graph: <span class="kp">&amp;</span><span class="nc">NamedNode</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), StoreError<span class="o">&gt;</span>;
+    <span class="k">fn</span> <span class="nf">query</span>(<span class="o">&amp;</span><span class="bp">self</span>, sparql: <span class="kp">&amp;</span><span class="kt">str</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>QueryResults, StoreError<span class="o">&gt;</span>;
 }</code></pre>
     <p><code>AppendError</code> is <code>Conflict</code>, <code>Fenced</code>, <code>Unsupported</code>, <code>Invalid</code> or <code>Storage</code>. <code>AppendMeta</code> carries an optional fencing token (a scope IRI and an epoch) and an optional state delta. A store that does not enforce fencing refuses a token rather than ignoring it. A node's <code>Storage</code> pairs one journal store with the graph stores that hold each actor's current state, snapshots, outbox marks, dead letters and store-backed mailbox.</p>
     <table>
@@ -312,12 +313,12 @@ pub trait GraphStore: Send + Sync {
     <h2 id="timers">Durable timers</h2>
     <p>A delayed <code>&lt;send&gt;</code> is recorded in the journal entry that scheduled it and fired later as an ordinary input, with a message id derived from its send id. A deactivated actor needs no running process to keep its timers. Due times are computed from the scheduling entry's journaled timestamp, so replay never reads a clock. A <code>&lt;cancel&gt;</code> is journaled too, and a cancelled timer never fires.</p>
     <p>Recurring reminders use the <code>&lt;vt:reminder&gt;</code> element in executable content. From <code>crates/vertep-runtime/tests/durable_timers.rs</code>:</p>
-<pre data-lang="SCXML"><code>&lt;state id="polling"&gt;
-  &lt;onentry&gt;&lt;vt:reminder name="poll" period="10min" event="poll.tick"/&gt;&lt;/onentry&gt;
-  &lt;transition event="poll.tick"/&gt;
-  &lt;transition event="stop" target="done"/&gt;
-&lt;/state&gt;
-&lt;final id="done"/&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"polling"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;onentry&gt;&lt;vt:reminder</span> <span class="na">name=</span><span class="s">"poll"</span> <span class="na">period=</span><span class="s">"10min"</span> <span class="na">event=</span><span class="s">"poll.tick"</span><span class="nt">/&gt;&lt;/onentry&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"poll.tick"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"stop"</span> <span class="na">target=</span><span class="s">"done"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/state&gt;</span>
+<span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"done"</span><span class="nt">/&gt;</span></code></pre>
     <p>A reminder fires every period until it is cancelled by name (<code>&lt;vt:reminder name="poll" cancel="true"/&gt;</code>) or the actor reaches a top-level final state. After downtime, every overdue timer fires in due order, and a reminder fires once for all the occurrences it missed. Durations accept <code>ms</code>, <code>s</code>, <code>min</code>, <code>h</code> and <code>d</code>, or a bare number of milliseconds. <code>node.pending_timers()</code> lists the armed timers in due order.</p>
 
     <h2 id="time-travel">Time travel</h2>
@@ -336,14 +337,14 @@ pub trait GraphStore: Send + Sync {
       <li><strong>The registry keeps what journals need.</strong> <code>node.remove_version(iri)</code> is refused with <code>RemoveError::InUse</code> while a non-final actor runs that version.</li>
     </ul>
     <p>Moving a running actor to a new version is an explicit migration, written as a journal entry that holds the snapshot before, the migration IRI and the snapshot after. From <code>crates/vertep-runtime/tests/chart_versioning.rs</code>:</p>
-<pre data-lang="Rust"><code>let v1 = node.register_type(&amp;ty("pay"), scxml("Idle", V1)).unwrap();
-// ... the actor runs on v1 ...
-let v2 = node.register_type(&amp;ty("pay"), scxml("Idle", V2_RENAMED)).unwrap();
+<pre data-lang="Rust"><code><span class="kd">let</span> v1 <span class="o">=</span> node.register_type(<span class="o">&amp;</span>ty(<span class="s">"pay"</span>), scxml(<span class="s">"Idle"</span>, V1)).unwrap();
+<span class="c1">// ... the actor runs on v1 ...
+</span><span class="kd">let</span> v2 <span class="o">=</span> node.register_type(<span class="o">&amp;</span>ty(<span class="s">"pay"</span>), scxml(<span class="s">"Idle"</span>, V2_RENAMED)).unwrap();
 node.register_migration(
-    Migration::identity("urn:vertep:migration:card2", v1.clone(), v2.clone())
-        .rename_state("Paying.Card", "Paying.Card2"),
+    Migration::identity(<span class="s">"urn:vertep:migration:card2"</span>, v1.clone(), v2.clone())
+        .rename_state(<span class="s">"Paying.Card"</span>, <span class="s">"Paying.Card2"</span>),
 );
-node.migrate(&amp;a, "urn:vertep:migration:card2").unwrap();</code></pre>
+node.migrate(<span class="o">&amp;</span>a, <span class="s">"urn:vertep:migration:card2"</span>).unwrap();</code></pre>
     <p>A <code>Migration</code> maps configurations (explicitly with <code>map_configuration</code>, or by state renames) and may transform the datamodel with <code>with_transform</code>. Before applying it, the runtime enumerates every configuration reachable in the old chart, ignoring guards, and refuses the migration with <code>MigrateError::Unmapped</code> if any is not mapped. A failed transform appends nothing.</p>
     <p>Rolling back is a fork, not a rewrite: <code>node.fork(&amp;source, position, &amp;new_address)</code> starts a new actor from the source's state at that position, under the version it had then. The source's journal is unchanged. A chart can also request its own migration with <code>&lt;vt:migrate to="…" migration="…"/&gt;</code> in executable content; the request is processed at the start of a later turn, never inside the requesting macrostep.</p>
 

@@ -50,7 +50,7 @@
     <p>Files: <code>examples/rust-macro/main.rs</code>, <code>examples/rust-macro/expected-output.txt</code>. All commands run from the repository root.</p>
     <h2 id="the-program">The program</h2>
     <p>Guards are <code>fn(&amp;Ctx, &amp;P) -&gt; bool</code> and actions are <code>fn(&amp;mut Ctx, &amp;P, &amp;mut Emit)</code> or <code>fn(&amp;mut Ctx, &amp;P)</code>, bound by name. A targetless <code>on coin / add_credit</code> counts coins without leaving the state, and an eventless <code>always if paid =&gt; unlocked</code> opens the turnstile once there is enough credit.</p>
-<pre data-lang="Rust"><code>//! Rust macro: a chart written with `statechart!` on the `rust` datamodel.
+<pre data-lang="Rust"><code><span class="sd">//! Rust macro: a chart written with `statechart!` on the `rust` datamodel.
 //!
 //! The macro builds the chart IR at compile time, validates and type-checks it there (a typo in
 //! a target or an action with the wrong payload type is a compile error), and generates a typed
@@ -62,78 +62,78 @@
 //! Guard and Action Signature Checking).
 //!
 //! Run with `cargo run -p vertep-examples --bin rust-macro`.
+</span>
+<span class="k">use</span> vertep_dm_rust::{MachineError, statechart};
 
-use vertep_dm_rust::{MachineError, statechart};
-
-statechart! {
-    name: turnstile,
-    types { Coin = { cents: int } }
-    context { credit: int = 0, price: int = 50, passes: int = 0 }
-    events { coin: Coin, push, shutdown }
+statechart<span class="o">!</span> {
+    name: <span class="nc">turnstile</span>,
+    types { Coin <span class="o">=</span> { cents: <span class="nc">int</span> } }
+    context { credit: <span class="nc">int</span> <span class="o">=</span> <span class="mi">0</span>, price: <span class="nc">int</span> <span class="o">=</span> <span class="mi">50</span>, passes: <span class="nc">int</span> <span class="o">=</span> <span class="mi">0</span> }
+    events { coin: <span class="nc">Coin</span>, push, shutdown }
 
     initial service;
     state service {
         initial locked;
-        on shutdown =&gt; off;
+        on shutdown <span class="o">=&gt;</span> off;
         state locked {
-            // Targetless: stay locked and count the coin.
-            on coin / add_credit;
-            // Eventless: unlock as soon as there is enough credit.
-            always if paid =&gt; unlocked;
+            <span class="c1">// Targetless: stay locked and count the coin.
+</span>            on coin <span class="o">/</span> add_credit;
+            <span class="c1">// Eventless: unlock as soon as there is enough credit.
+</span>            always <span class="k">if</span> paid <span class="o">=&gt;</span> unlocked;
         }
         state unlocked {
-            on coin / add_credit;
-            on push =&gt; locked / let_through;
+            on coin <span class="o">/</span> add_credit;
+            on push <span class="o">=&gt;</span> locked <span class="o">/</span> let_through;
         }
     }
-    final off;
+    <span class="kr">final</span> off;
 }
 
-/// Guard: guards get the context and the payload read-only, and return a bool.
-fn paid(ctx: &amp;Ctx, _: &amp;()) -&gt; bool {
-    ctx.credit &gt;= ctx.price
+<span class="sd">/// Guard: guards get the context and the payload read-only, and return a bool.
+</span><span class="k">fn</span> <span class="nf">paid</span>(ctx: <span class="kp">&amp;</span><span class="nc">Ctx</span>, _: <span class="kp">&amp;</span>()) -&gt; <span class="kt">bool</span> {
+    ctx.credit <span class="o">&gt;=</span> ctx.price
 }
 
-/// Action: actions may change the context; `Emit` would let them raise or send events.
-fn add_credit(ctx: &amp;mut Ctx, coin: &amp;Coin, _: &amp;mut Emit) {
-    ctx.credit += coin.cents;
+<span class="sd">/// Action: actions may change the context; `Emit` would let them raise or send events.
+</span><span class="k">fn</span> <span class="nf">add_credit</span>(ctx: <span class="kp">&amp;</span><span class="nc">mut</span> Ctx, coin: <span class="kp">&amp;</span><span class="nc">Coin</span>, _: <span class="kp">&amp;</span><span class="nc">mut</span> Emit) {
+    ctx.credit <span class="o">+=</span> coin.cents;
 }
 
-/// Action without an emitter: the shorter signature is accepted too.
-fn let_through(ctx: &amp;mut Ctx, _: &amp;()) {
-    ctx.credit -= ctx.price;
-    ctx.passes += 1;
+<span class="sd">/// Action without an emitter: the shorter signature is accepted too.
+</span><span class="k">fn</span> <span class="nf">let_through</span>(ctx: <span class="kp">&amp;</span><span class="nc">mut</span> Ctx, _: <span class="kp">&amp;</span>()) {
+    ctx.credit <span class="o">-=</span> ctx.price;
+    ctx.passes <span class="o">+=</span> <span class="mi">1</span>;
 }
 
-fn main() -&gt; Result&lt;(), MachineError&gt; {
-    println!(&quot;chart version {}&quot;, *VERSION);
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), MachineError<span class="o">&gt;</span> {
+    <span class="fm">println!</span>(<span class="s">"chart version {}"</span>, <span class="o">*</span>VERSION);
 
-    // `Machine::start` runs the start macrostep; the effects (none here) are returned.
-    let (mut m, _effects) = Machine::start(&quot;turnstile-1&quot;)?;
-    show(&quot;(start)&quot;, &amp;m);
+    <span class="c1">// `Machine::start` runs the start macrostep; the effects (none here) are returned.
+</span>    <span class="kd">let</span> (<span class="k">mut</span> m, _effects) <span class="o">=</span> Machine::start(<span class="s">"turnstile-1"</span>)<span class="o">?</span>;
+    show(<span class="s">"(start)"</span>, <span class="o">&amp;</span>m);
 
-    let script = [
-        Event::Coin { cents: 20 },
-        Event::Push, // nothing happens: the turnstile is locked
-        Event::Coin { cents: 50 },
+    <span class="kd">let</span> script <span class="o">=</span> [
+        Event::Coin { cents: <span class="mi">20</span> },
+        Event::Push, <span class="c1">// nothing happens: the turnstile is locked
+</span>        Event::Coin { cents: <span class="mi">50</span> },
         Event::Push,
         Event::Push,
         Event::Shutdown,
     ];
-    for event in script {
-        let label = format!(&quot;{event:?}&quot;);
-        m.send(event)?;
-        show(&amp;label, &amp;m);
+    <span class="k">for</span> event <span class="k">in</span> script {
+        <span class="kd">let</span> label <span class="o">=</span> <span class="fm">format!</span>(<span class="s">"{event:?}"</span>);
+        m.send(event)<span class="o">?</span>;
+        show(<span class="o">&amp;</span>label, <span class="o">&amp;</span>m);
     }
-    assert!(m.is_terminated(), &quot;`off` is a top-level final state&quot;);
-    Ok(())
+    <span class="fm">assert!</span>(m.is_terminated(), <span class="s">"`off` is a top-level final state"</span>);
+    <span class="nb">Ok</span>(())
 }
 
-fn show(label: &amp;str, m: &amp;Machine) {
-    let ctx = m.context();
-    println!(
-        &quot;{label:&lt;22} -&gt; {:&lt;20} credit={:&lt;3} passes={}&quot;,
-        format!(&quot;{:?}&quot;, m.active()),
+<span class="k">fn</span> <span class="nf">show</span>(label: <span class="kp">&amp;</span><span class="kt">str</span>, m: <span class="kp">&amp;</span><span class="nc">Machine</span>) {
+    <span class="kd">let</span> ctx <span class="o">=</span> m.context();
+    <span class="fm">println!</span>(
+        <span class="s">"{label:&lt;22} -&gt; {:&lt;20} credit={:&lt;3} passes={}"</span>,
+        <span class="fm">format!</span>(<span class="s">"{:?}"</span>, m.active()),
         ctx.credit,
         ctx.passes
     );

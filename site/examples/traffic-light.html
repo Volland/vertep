@@ -50,68 +50,68 @@
     <p>Files: <code>examples/traffic-light/traffic-light.scxml</code>, <code>examples/traffic-light/main.rs</code>, <code>examples/traffic-light/expected-output.txt</code>, <code>examples/traffic-light/vt/</code>. All commands run from the repository root.</p>
     <h2 id="the-chart">The chart</h2>
     <p><code>operating</code> is a parallel state. Its <code>light</code> region cycles red, green and yellow on delayed <code>&lt;send&gt;</code>s named <code>light-timer</code>, and cancels the pending one on exit. Its <code>crossing</code> region follows the light with eventless <code>In('red')</code> transitions. A pedestrian <code>button</code> cuts green short, and <code>fault</code> leaves the whole parallel state for <code>flashing</code>.</p>
-<pre data-lang="SCXML"><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
-&lt;!--
+<pre data-lang="SCXML"><code><span class="cp">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="cm">&lt;!--
   A traffic light with a pedestrian crossing, on the `null` datamodel.
 
   `operating` is a parallel state with two regions that run side by side:
   - `light` cycles red -&gt; green -&gt; yellow -&gt; red. Each colour schedules its own end with a
     delayed &lt;send&gt; of `tick`, and cancels it on exit, so leaving a colour early (a pedestrian
     pressing the button) never lets a stale timer fire later.
-  - `crossing` shows walk / don&#x27;t walk. It has no events of its own: eventless transitions
+  - `crossing` shows walk / don't walk. It has no events of its own: eventless transitions
     follow the light with the `In()` predicate, the one condition the null datamodel supports.
 
   `fault` leaves the whole parallel state for `flashing`; `reset` brings the light back to red.
   Illustrates the scxml-interpretation capability (parallel states, eventless transitions,
   delayed send and cancel) and scxml-format (reading an SCXML 1.0 document).
---&gt;
-&lt;scxml xmlns=&quot;http://www.w3.org/2005/07/scxml&quot; version=&quot;1.0&quot; datamodel=&quot;null&quot;
-       name=&quot;traffic-light&quot; initial=&quot;operating&quot;&gt;
+--&gt;</span>
+<span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">datamodel=</span><span class="s">"null"</span>
+       <span class="na">name=</span><span class="s">"traffic-light"</span> <span class="na">initial=</span><span class="s">"operating"</span><span class="nt">&gt;</span>
 
-  &lt;parallel id=&quot;operating&quot;&gt;
-    &lt;transition event=&quot;fault&quot; target=&quot;flashing&quot;/&gt;
+  <span class="nt">&lt;parallel</span> <span class="na">id=</span><span class="s">"operating"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"fault"</span> <span class="na">target=</span><span class="s">"flashing"</span><span class="nt">/&gt;</span>
 
-    &lt;state id=&quot;light&quot; initial=&quot;red&quot;&gt;
-      &lt;state id=&quot;red&quot;&gt;
-        &lt;onentry&gt;&lt;send id=&quot;light-timer&quot; event=&quot;tick&quot; delay=&quot;30s&quot;/&gt;&lt;/onentry&gt;
-        &lt;onexit&gt;&lt;cancel sendid=&quot;light-timer&quot;/&gt;&lt;/onexit&gt;
-        &lt;transition event=&quot;tick&quot; target=&quot;green&quot;/&gt;
-      &lt;/state&gt;
-      &lt;state id=&quot;green&quot;&gt;
-        &lt;onentry&gt;&lt;send id=&quot;light-timer&quot; event=&quot;tick&quot; delay=&quot;25s&quot;/&gt;&lt;/onentry&gt;
-        &lt;onexit&gt;&lt;cancel sendid=&quot;light-timer&quot;/&gt;&lt;/onexit&gt;
-        &lt;transition event=&quot;tick&quot; target=&quot;yellow&quot;/&gt;
-        &lt;!-- a pedestrian cuts the green phase short --&gt;
-        &lt;transition event=&quot;button&quot; target=&quot;yellow&quot;/&gt;
-      &lt;/state&gt;
-      &lt;state id=&quot;yellow&quot;&gt;
-        &lt;onentry&gt;&lt;send id=&quot;light-timer&quot; event=&quot;tick&quot; delay=&quot;5s&quot;/&gt;&lt;/onentry&gt;
-        &lt;onexit&gt;&lt;cancel sendid=&quot;light-timer&quot;/&gt;&lt;/onexit&gt;
-        &lt;transition event=&quot;tick&quot; target=&quot;red&quot;/&gt;
-      &lt;/state&gt;
-    &lt;/state&gt;
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"light"</span> <span class="na">initial=</span><span class="s">"red"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"red"</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;onentry&gt;&lt;send</span> <span class="na">id=</span><span class="s">"light-timer"</span> <span class="na">event=</span><span class="s">"tick"</span> <span class="na">delay=</span><span class="s">"30s"</span><span class="nt">/&gt;&lt;/onentry&gt;</span>
+        <span class="nt">&lt;onexit&gt;&lt;cancel</span> <span class="na">sendid=</span><span class="s">"light-timer"</span><span class="nt">/&gt;&lt;/onexit&gt;</span>
+        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"tick"</span> <span class="na">target=</span><span class="s">"green"</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;/state&gt;</span>
+      <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"green"</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;onentry&gt;&lt;send</span> <span class="na">id=</span><span class="s">"light-timer"</span> <span class="na">event=</span><span class="s">"tick"</span> <span class="na">delay=</span><span class="s">"25s"</span><span class="nt">/&gt;&lt;/onentry&gt;</span>
+        <span class="nt">&lt;onexit&gt;&lt;cancel</span> <span class="na">sendid=</span><span class="s">"light-timer"</span><span class="nt">/&gt;&lt;/onexit&gt;</span>
+        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"tick"</span> <span class="na">target=</span><span class="s">"yellow"</span><span class="nt">/&gt;</span>
+        <span class="cm">&lt;!-- a pedestrian cuts the green phase short --&gt;</span>
+        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"button"</span> <span class="na">target=</span><span class="s">"yellow"</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;/state&gt;</span>
+      <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"yellow"</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;onentry&gt;&lt;send</span> <span class="na">id=</span><span class="s">"light-timer"</span> <span class="na">event=</span><span class="s">"tick"</span> <span class="na">delay=</span><span class="s">"5s"</span><span class="nt">/&gt;&lt;/onentry&gt;</span>
+        <span class="nt">&lt;onexit&gt;&lt;cancel</span> <span class="na">sendid=</span><span class="s">"light-timer"</span><span class="nt">/&gt;&lt;/onexit&gt;</span>
+        <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"tick"</span> <span class="na">target=</span><span class="s">"red"</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;/state&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
 
-    &lt;state id=&quot;crossing&quot; initial=&quot;dont_walk&quot;&gt;
-      &lt;state id=&quot;dont_walk&quot;&gt;
-        &lt;transition cond=&quot;In(&#x27;red&#x27;)&quot; target=&quot;walk&quot;/&gt;
-      &lt;/state&gt;
-      &lt;state id=&quot;walk&quot;&gt;
-        &lt;transition cond=&quot;In(&#x27;green&#x27;)&quot; target=&quot;dont_walk&quot;/&gt;
-      &lt;/state&gt;
-    &lt;/state&gt;
-  &lt;/parallel&gt;
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"crossing"</span> <span class="na">initial=</span><span class="s">"dont_walk"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"dont_walk"</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;transition</span> <span class="na">cond=</span><span class="s">"In('red')"</span> <span class="na">target=</span><span class="s">"walk"</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;/state&gt;</span>
+      <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"walk"</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;transition</span> <span class="na">cond=</span><span class="s">"In('green')"</span> <span class="na">target=</span><span class="s">"dont_walk"</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;/state&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;/parallel&gt;</span>
 
-  &lt;state id=&quot;flashing&quot;&gt;
-    &lt;transition event=&quot;reset&quot; target=&quot;operating&quot;/&gt;
-  &lt;/state&gt;
-&lt;/scxml&gt;</code></pre>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"flashing"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"reset"</span> <span class="na">target=</span><span class="s">"operating"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
     <h2 id="the-host">The host</h2>
     <p><code>session::start</code> and <code>session::step</code> return the next session and a list of effects such as “deliver <code>tick</code> in 30 s” or “cancel <code>light-timer</code>”. They never sleep or read a clock. The program keeps the timers on a virtual clock and feeds them back as events, so the run is the same every time.</p>
-<pre data-lang="Rust"><code>//! Traffic light: load an SCXML chart and drive it through the pure core interpreter.
+<pre data-lang="Rust"><code><span class="sd">//! Traffic light: load an SCXML chart and drive it through the pure core interpreter.
 //!
 //! The core never reads a clock or sleeps. `session::start` and `session::step` take the
 //! session as a value plus one input and return the next session and a list of *effects*:
-//! &quot;deliver `tick` in 30 s&quot;, &quot;cancel `light-timer`&quot;. This program is the smallest possible host
+//! "deliver `tick` in 30 s", "cancel `light-timer`". This program is the smallest possible host
 //! for those effects: a virtual clock, a list of pending timers and a script of external events.
 //! It prints the configuration (the active states) after every macrostep.
 //!
@@ -119,125 +119,125 @@
 //! Send And Cancel Effects) on a chart read by `scxml-format`.
 //!
 //! Run with `cargo run -p vertep-examples --bin traffic-light`.
+</span>
+<span class="k">use</span> vertep::core::compile::CompiledChart;
+<span class="k">use</span> vertep::core::datamodel::{Environment, Event, EventType, SessionInfo};
+<span class="k">use</span> vertep::core::null::NullDatamodel;
+<span class="k">use</span> vertep::core::session::{<span class="bp">self</span>, Effect, Input, Outcome, StartInput};
 
-use vertep::core::compile::CompiledChart;
-use vertep::core::datamodel::{Environment, Event, EventType, SessionInfo};
-use vertep::core::null::NullDatamodel;
-use vertep::core::session::{self, Effect, Input, Outcome, StartInput};
+<span class="sd">/// The chart, next to this file.
+</span><span class="k">const</span> CHART: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span> <span class="fm">include_str!</span>(<span class="s">"traffic-light.scxml"</span>);
 
-/// The chart, next to this file.
-const CHART: &amp;str = include_str!(&quot;traffic-light.scxml&quot;);
+<span class="sd">/// External events, by the virtual time (in seconds) at which they arrive.
+</span><span class="k">const</span> SCRIPT: <span class="kp">&amp;</span>[(<span class="kt">u64</span>, <span class="o">&amp;</span><span class="kt">str</span>)] <span class="o">=</span> <span class="o">&amp;</span>[(<span class="mi">40</span>, <span class="s">"button"</span>), (<span class="mi">50</span>, <span class="s">"fault"</span>), (<span class="mi">60</span>, <span class="s">"reset"</span>)];
 
-/// External events, by the virtual time (in seconds) at which they arrive.
-const SCRIPT: &amp;[(u64, &amp;str)] = &amp;[(40, &quot;button&quot;), (50, &quot;fault&quot;), (60, &quot;reset&quot;)];
+<span class="sd">/// The virtual time at which the program stops.
+</span><span class="k">const</span> END_S: <span class="kt">u64</span> <span class="o">=</span> <span class="mi">120</span>;
 
-/// The virtual time at which the program stops.
-const END_S: u64 = 120;
-
-/// A delayed `&lt;send&gt;` the host must deliver later.
-struct Timer {
-    due_ms: u64,
-    sendid: String,
-    event: Event,
+<span class="sd">/// A delayed `&lt;send&gt;` the host must deliver later.
+</span><span class="k">struct</span> <span class="nc">Timer</span> {
+    due_ms: <span class="kt">u64</span>,
+    sendid: <span class="nb">String</span>,
+    event: <span class="nc">Event</span>,
 }
 
-fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
-    // 1. Read the SCXML document into the chart IR, then validate and compile it.
-    let parsed = vertep::scxml::read_str(CHART)?;
-    let chart = CompiledChart::new(parsed.chart).map_err(|v| format!(&quot;invalid chart: {v:?}&quot;))?;
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), <span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;&gt;</span> {
+    <span class="c1">// 1. Read the SCXML document into the chart IR, then validate and compile it.
+</span>    <span class="kd">let</span> parsed <span class="o">=</span> vertep::scxml::read_str(CHART)<span class="o">?</span>;
+    <span class="kd">let</span> chart <span class="o">=</span> CompiledChart::new(parsed.chart).map_err(<span class="o">|</span>v<span class="o">|</span> <span class="fm">format!</span>(<span class="s">"invalid chart: {v:?}"</span>))<span class="o">?</span>;
 
-    // 2. Start a session. The chart names the `null` datamodel (no data, only `In()` guards).
-    let mut dm = NullDatamodel::new();
-    let mut timers: Vec&lt;Timer&gt; = Vec::new();
-    let mut now_ms = 0;
-    let start = StartInput {
-        info: SessionInfo {
-            sessionid: &quot;light-1&quot;.into(),
-            ..SessionInfo::default()
+    <span class="c1">// 2. Start a session. The chart names the `null` datamodel (no data, only `In()` guards).
+</span>    <span class="kd">let</span> <span class="k">mut</span> dm <span class="o">=</span> NullDatamodel::new();
+    <span class="kd">let</span> <span class="k">mut</span> timers: <span class="nb">Vec</span><span class="o">&lt;</span>Timer<span class="o">&gt;</span> <span class="o">=</span> <span class="nb">Vec</span>::new();
+    <span class="kd">let</span> <span class="k">mut</span> now_ms <span class="o">=</span> <span class="mi">0</span>;
+    <span class="kd">let</span> start <span class="o">=</span> StartInput {
+        info: <span class="nc">SessionInfo</span> {
+            sessionid: <span class="s">"light-1"</span>.into(),
+            <span class="o">..</span>SessionInfo::default()
         },
-        ..StartInput::default()
+        <span class="o">..</span>StartInput::default()
     };
-    let outcome = session::start(&amp;chart, start, &amp;mut dm).map_err(|e| format!(&quot;{e:?}&quot;))?;
-    let mut session = report(now_ms, &quot;(start)&quot;, outcome, &amp;mut timers);
+    <span class="kd">let</span> outcome <span class="o">=</span> session::start(<span class="o">&amp;</span>chart, start, <span class="o">&amp;</span><span class="k">mut</span> dm).map_err(<span class="o">|</span>e<span class="o">|</span> <span class="fm">format!</span>(<span class="s">"{e:?}"</span>))<span class="o">?</span>;
+    <span class="kd">let</span> <span class="k">mut</span> session <span class="o">=</span> report(now_ms, <span class="s">"(start)"</span>, outcome, <span class="o">&amp;</span><span class="k">mut</span> timers);
 
-    // 3. The event loop: deliver whichever comes first, a due timer or a scripted event.
-    let mut script = SCRIPT.iter().peekable();
-    loop {
-        let next_timer = timers.iter().map(|t| t.due_ms).min();
-        let next_script = script.peek().map(|(at, _)| at * 1000);
-        let timer_first = match (next_timer, next_script) {
-            (Some(t), Some(s)) =&gt; t &lt;= s,
-            (Some(_), None) =&gt; true,
-            (None, Some(_)) =&gt; false,
-            (None, None) =&gt; break,
+    <span class="c1">// 3. The event loop: deliver whichever comes first, a due timer or a scripted event.
+</span>    <span class="kd">let</span> <span class="k">mut</span> script <span class="o">=</span> SCRIPT.iter().peekable();
+    <span class="k">loop</span> {
+        <span class="kd">let</span> next_timer <span class="o">=</span> timers.iter().map(<span class="o">|</span>t<span class="o">|</span> t.due_ms).min();
+        <span class="kd">let</span> next_script <span class="o">=</span> script.peek().map(<span class="o">|</span>(at, _)<span class="o">|</span> at <span class="o">*</span> <span class="mi">1000</span>);
+        <span class="kd">let</span> timer_first <span class="o">=</span> <span class="k">match</span> (next_timer, next_script) {
+            (<span class="nb">Some</span>(t), <span class="nb">Some</span>(s)) <span class="o">=&gt;</span> t <span class="o">&lt;=</span> s,
+            (<span class="nb">Some</span>(_), <span class="nb">None</span>) <span class="o">=&gt;</span> <span class="kc">true</span>,
+            (<span class="nb">None</span>, <span class="nb">Some</span>(_)) <span class="o">=&gt;</span> <span class="kc">false</span>,
+            (<span class="nb">None</span>, <span class="nb">None</span>) <span class="o">=&gt;</span> <span class="k">break</span>,
         };
-        let at = if timer_first { next_timer } else { next_script }.expect(&quot;a next input&quot;);
-        if at &gt; END_S * 1000 {
-            break;
+        <span class="kd">let</span> at <span class="o">=</span> <span class="k">if</span> timer_first { next_timer } <span class="k">else</span> { next_script }.expect(<span class="s">"a next input"</span>);
+        <span class="k">if</span> at <span class="o">&gt;</span> END_S <span class="o">*</span> <span class="mi">1000</span> {
+            <span class="k">break</span>;
         }
-        let event = if timer_first {
-            let i = timers
+        <span class="kd">let</span> event <span class="o">=</span> <span class="k">if</span> timer_first {
+            <span class="kd">let</span> i <span class="o">=</span> timers
                 .iter()
-                .position(|t| t.due_ms == at)
-                .expect(&quot;a due timer&quot;);
+                .position(<span class="o">|</span>t<span class="o">|</span> t.due_ms <span class="o">==</span> at)
+                .expect(<span class="s">"a due timer"</span>);
             timers.remove(i).event
-        } else {
-            let (_, name) = script.next().expect(&quot;a scripted event&quot;);
-            Event::named(*name, EventType::External)
+        } <span class="k">else</span> {
+            <span class="kd">let</span> (_, name) <span class="o">=</span> script.next().expect(<span class="s">"a scripted event"</span>);
+            Event::named(<span class="o">*</span>name, EventType::External)
         };
-        now_ms = at;
-        let name = event.name.clone();
-        // The time travels inside the input: the core sees it, but never asks for it.
-        let env = Environment {
-            now_ms: now_ms as i64,
-            seed: 0,
+        now_ms <span class="o">=</span> at;
+        <span class="kd">let</span> name <span class="o">=</span> event.name.clone();
+        <span class="c1">// The time travels inside the input: the core sees it, but never asks for it.
+</span>        <span class="kd">let</span> env <span class="o">=</span> Environment {
+            now_ms: <span class="nc">now_ms</span> <span class="k">as</span> <span class="kt">i64</span>,
+            seed: <span class="mi">0</span>,
         };
-        let outcome = session::step(&amp;chart, session, Input::event(event, env), &amp;mut dm)
-            .map_err(|e| format!(&quot;{e:?}&quot;))?;
-        session = report(now_ms, &amp;name, outcome, &amp;mut timers);
+        <span class="kd">let</span> outcome <span class="o">=</span> session::step(<span class="o">&amp;</span>chart, session, Input::event(event, env), <span class="o">&amp;</span><span class="k">mut</span> dm)
+            .map_err(<span class="o">|</span>e<span class="o">|</span> <span class="fm">format!</span>(<span class="s">"{e:?}"</span>))<span class="o">?</span>;
+        session <span class="o">=</span> report(now_ms, <span class="o">&amp;</span>name, outcome, <span class="o">&amp;</span><span class="k">mut</span> timers);
     }
 
-    for t in &amp;timers {
-        println!(
-            &quot;stopped at {END_S}s; still pending: {} due at {}s&quot;,
+    <span class="k">for</span> t <span class="k">in</span> <span class="o">&amp;</span>timers {
+        <span class="fm">println!</span>(
+            <span class="s">"stopped at {END_S}s; still pending: {} due at {}s"</span>,
             t.event.name,
-            t.due_ms / 1000
+            t.due_ms <span class="o">/</span> <span class="mi">1000</span>
         );
     }
-    Ok(())
+    <span class="nb">Ok</span>(())
 }
 
-/// Prints one macrostep and applies its effects to the timer list; returns the new session.
-fn report(now_ms: u64, input: &amp;str, outcome: Outcome, timers: &amp;mut Vec&lt;Timer&gt;) -&gt; session::Session {
-    println!(
-        &quot;[{:&gt;4}s] {:&lt;8} -&gt; {}&quot;,
-        now_ms / 1000,
+<span class="sd">/// Prints one macrostep and applies its effects to the timer list; returns the new session.
+</span><span class="k">fn</span> <span class="nf">report</span>(now_ms: <span class="kt">u64</span>, input: <span class="kp">&amp;</span><span class="kt">str</span>, outcome: <span class="nc">Outcome</span>, timers: <span class="kp">&amp;</span><span class="nc">mut</span> <span class="nb">Vec</span><span class="o">&lt;</span>Timer<span class="o">&gt;</span>) -&gt; <span class="nc">session</span>::Session {
+    <span class="fm">println!</span>(
+        <span class="s">"[{:&gt;4}s] {:&lt;8} -&gt; {}"</span>,
+        now_ms <span class="o">/</span> <span class="mi">1000</span>,
         input,
-        outcome.trace.configuration.join(&quot; &quot;)
+        outcome.trace.configuration.join(<span class="s">" "</span>)
     );
-    for effect in outcome.effects {
-        match effect {
-            // No target: the event goes back to this session&#x27;s external queue after the delay.
-            Effect::Send(send) if send.target.is_none() =&gt; {
-                println!(
-                    &quot;          schedule {} in {}s&quot;,
+    <span class="k">for</span> effect <span class="k">in</span> outcome.effects {
+        <span class="k">match</span> effect {
+            <span class="c1">// No target: the event goes back to this session's external queue after the delay.
+</span>            Effect::<span class="nb">Send</span>(send) <span class="k">if</span> send.target.is_none() <span class="o">=&gt;</span> {
+                <span class="fm">println!</span>(
+                    <span class="s">"          schedule {} in {}s"</span>,
                     send.event.name,
-                    send.delay_ms / 1000
+                    send.delay_ms <span class="o">/</span> <span class="mi">1000</span>
                 );
                 timers.push(Timer {
-                    due_ms: now_ms + send.delay_ms,
-                    sendid: send.sendid,
-                    event: send.event,
+                    due_ms: <span class="nc">now_ms</span> <span class="o">+</span> send.delay_ms,
+                    sendid: <span class="nc">send</span>.sendid,
+                    event: <span class="nc">send</span>.event,
                 });
             }
-            Effect::Cancel { sendid } =&gt; {
-                let before = timers.len();
-                timers.retain(|t| t.sendid != sendid);
-                if timers.len() &lt; before {
-                    println!(&quot;          cancel {sendid}&quot;);
+            Effect::Cancel { sendid } <span class="o">=&gt;</span> {
+                <span class="kd">let</span> before <span class="o">=</span> timers.len();
+                timers.retain(<span class="o">|</span>t<span class="o">|</span> t.sendid <span class="o">!=</span> sendid);
+                <span class="k">if</span> timers.len() <span class="o">&lt;</span> before {
+                    <span class="fm">println!</span>(<span class="s">"          cancel {sendid}"</span>);
                 }
             }
-            other =&gt; println!(&quot;          (ignored effect {other:?})&quot;),
+            other <span class="o">=&gt;</span> <span class="fm">println!</span>(<span class="s">"          (ignored effect {other:?})"</span>),
         }
     }
     outcome.session

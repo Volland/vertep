@@ -49,60 +49,60 @@
     <p class="lede">An order chart in YAML on the CEL datamodel, with a <code>types</code> block: records, a union, <code>optional</code> and <code>list</code>. The <code>vt</code> command checks every guard and assignment against the types and projects them to JSON Schema, SHACL, CEL and TypeScript.</p>
     <p>Files: <code>examples/typed-order/order.yaml</code>, <code>examples/typed-order/order-ill-typed.yaml</code>, <code>examples/typed-order/vt/</code>. All commands run from the repository root.</p>
     <h2 id="the-chart">The chart</h2>
-<pre data-lang="YAML"><code># A typed order chart in YAML on the CEL datamodel.
-#
-# `types` names record and union types, `events` gives every event its payload type and
-# `context` gives every data item a type and an initial value. Guards and assignments are CEL
-# expressions: `ctx` is the context, `ev.data` the event payload. `vt typecheck` checks every
-# expression against these declarations before the chart ever runs.
-#
-# Illustrates the type-system capability (named types, typed events and context, Command Line
-# Type Tools), yaml-format and cel-datamodel.
-vertep: 1
-name: order
-datamodel: cel
-types:
-  Item: { sku: string, qty: int, price: decimal }
-  Pay: { amount: decimal, method: { oneOf: { Card: { last4: string }, Invoice: null } } }
-  Ship: { carrier: string, tracking: &quot;optional&lt;string&gt;&quot; }
-events:
-  add: Item
-  checkout: null
-  pay: Pay
-  approve: null
-  ship: Ship
-  cancel: null
-context:
-  items: { type: &quot;list&lt;Item&gt;&quot;, init: &quot;[]&quot; }
-  total: { type: decimal, init: &quot;0&quot; }
-  limit: { type: decimal, init: &quot;500&quot; }
-initial: shopping
-states:
-  shopping:
-    on: { cancel: cancelled }
-    initial: cart
-    states:
-      cart:
-        on:
-          add:
-            - cond: &quot;ev.data.qty &gt; 0&quot;
-              actions:
-                - assign: { location: ctx.items, expr: &quot;ctx.items + [ev.data]&quot; }
-                - assign: { location: ctx.total, expr: &quot;ctx.total + ev.data.price * decimal(ev.data.qty)&quot; }
-          checkout:
-            - { cond: &quot;size(ctx.items) &gt; 0&quot;, target: payment }
-      payment:
-        on:
-          pay:
-            - { cond: &quot;ev.data.amount &lt; ctx.total&quot;, target: payment }
-            - { cond: &quot;ctx.total &gt; ctx.limit&quot;, target: review }
-            - { target: fulfilment }
-      review:
-        on: { approve: fulfilment }
-  fulfilment:
-    on: { ship: shipped }
-  shipped: { type: final }
-  cancelled: { type: final }</code></pre>
+<pre data-lang="YAML"><code><span class="c1"># A typed order chart in YAML on the CEL datamodel.</span>
+<span class="c1">#</span>
+<span class="c1"># `types` names record and union types, `events` gives every event its payload type and</span>
+<span class="c1"># `context` gives every data item a type and an initial value. Guards and assignments are CEL</span>
+<span class="c1"># expressions: `ctx` is the context, `ev.data` the event payload. `vt typecheck` checks every</span>
+<span class="c1"># expression against these declarations before the chart ever runs.</span>
+<span class="c1">#</span>
+<span class="c1"># Illustrates the type-system capability (named types, typed events and context, Command Line</span>
+<span class="c1"># Type Tools), yaml-format and cel-datamodel.</span>
+<span class="nt">vertep</span>: <span class="l">1</span>
+<span class="nt">name</span>: <span class="l">order</span>
+<span class="nt">datamodel</span>: <span class="l">cel</span>
+<span class="nt">types</span>:
+  <span class="nt">Item</span>: {<span class="nt"> sku</span>: <span class="nv">string</span>,<span class="nt"> qty</span>: <span class="nv">int</span>,<span class="nt"> price</span>: <span class="nv">decimal</span> }
+  <span class="nt">Pay</span>: {<span class="nt"> amount</span>: <span class="nv">decimal</span>,<span class="nt"> method</span>: {<span class="nt"> oneOf</span>: {<span class="nt"> Card</span>: {<span class="nt"> last4</span>: <span class="nv">string</span> },<span class="nt"> Invoice</span>: <span class="nv">null</span> } } }
+  <span class="nt">Ship</span>: {<span class="nt"> carrier</span>: <span class="nv">string</span>,<span class="nt"> tracking</span>: <span class="s">"optional&lt;string&gt;"</span> }
+<span class="nt">events</span>:
+  <span class="nt">add</span>: <span class="l">Item</span>
+  <span class="nt">checkout</span>: <span class="l">null</span>
+  <span class="nt">pay</span>: <span class="l">Pay</span>
+  <span class="nt">approve</span>: <span class="l">null</span>
+  <span class="nt">ship</span>: <span class="l">Ship</span>
+  <span class="nt">cancel</span>: <span class="l">null</span>
+<span class="nt">context</span>:
+  <span class="nt">items</span>: {<span class="nt"> type</span>: <span class="s">"list&lt;Item&gt;"</span>,<span class="nt"> init</span>: <span class="s">"[]"</span> }
+  <span class="nt">total</span>: {<span class="nt"> type</span>: <span class="nv">decimal</span>,<span class="nt"> init</span>: <span class="s">"0"</span> }
+  <span class="nt">limit</span>: {<span class="nt"> type</span>: <span class="nv">decimal</span>,<span class="nt"> init</span>: <span class="s">"500"</span> }
+<span class="nt">initial</span>: <span class="l">shopping</span>
+<span class="nt">states</span>:
+  <span class="nt">shopping</span>:
+    <span class="nt">on</span>: {<span class="nt"> cancel</span>: <span class="nv">cancelled</span> }
+    <span class="nt">initial</span>: <span class="l">cart</span>
+    <span class="nt">states</span>:
+      <span class="nt">cart</span>:
+        <span class="nt">on</span>:
+          <span class="nt">add</span>:
+            - <span class="nt">cond</span>: <span class="s">"ev.data.qty</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0"</span>
+              <span class="nt">actions</span>:
+                - <span class="nt">assign</span>: {<span class="nt"> location</span>: <span class="nv">ctx.items</span>,<span class="nt"> expr</span>: <span class="s">"ctx.items</span><span class="nv"> </span><span class="s">+</span><span class="nv"> </span><span class="s">[ev.data]"</span> }
+                - <span class="nt">assign</span>: {<span class="nt"> location</span>: <span class="nv">ctx.total</span>,<span class="nt"> expr</span>: <span class="s">"ctx.total</span><span class="nv"> </span><span class="s">+</span><span class="nv"> </span><span class="s">ev.data.price</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">decimal(ev.data.qty)"</span> }
+          <span class="nt">checkout</span>:
+            - {<span class="nt"> cond</span>: <span class="s">"size(ctx.items)</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0"</span>,<span class="nt"> target</span>: <span class="nv">payment</span> }
+      <span class="nt">payment</span>:
+        <span class="nt">on</span>:
+          <span class="nt">pay</span>:
+            - {<span class="nt"> cond</span>: <span class="s">"ev.data.amount</span><span class="nv"> </span><span class="s">&lt;</span><span class="nv"> </span><span class="s">ctx.total"</span>,<span class="nt"> target</span>: <span class="nv">payment</span> }
+            - {<span class="nt"> cond</span>: <span class="s">"ctx.total</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">ctx.limit"</span>,<span class="nt"> target</span>: <span class="nv">review</span> }
+            - {<span class="nt"> target</span>: <span class="nv">fulfilment</span> }
+      <span class="nt">review</span>:
+        <span class="nt">on</span>: {<span class="nt"> approve</span>: <span class="nv">fulfilment</span> }
+  <span class="nt">fulfilment</span>:
+    <span class="nt">on</span>: {<span class="nt"> ship</span>: <span class="nv">shipped</span> }
+  <span class="nt">shipped</span>: {<span class="nt"> type</span>: <span class="nv">final</span> }
+  <span class="nt">cancelled</span>: {<span class="nt"> type</span>: <span class="nv">final</span> }</code></pre>
     <h2 id="type-check-it">Type-check it</h2>
 <pre data-lang="Shell"><code>vt typecheck examples/typed-order/order.yaml</code></pre>
 <pre class="output" data-lang="Output"><code>examples/typed-order/order.yaml: ok: 3 named types, 6 typed events, 3 context fields</code></pre>

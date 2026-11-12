@@ -41,6 +41,7 @@
       <li><a href="runtime.html">The actor runtime</a></li>
       <li><a href="agents.html">Agents and deciders</a></li>
       <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html" aria-current="page">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -238,12 +239,12 @@ assert.equal(await b.address, await a.address);</code></pre>
       <li><code>actor.send(event, {messageId})</code> resolves to <code>{messageId}</code>. Every send carries a message id, a fresh <code>urn:uuid:</code> one by default. Pass your own to make a retry safe: a second send with the same id is processed once and journaled once.</li>
       <li><code>actor.request(event, {timeoutMs})</code> resolves with the chart's <code>vt:reply</code> event. It rejects with <code>RequestTimeout</code> after <code>timeoutMs</code> (30,000 by default), and a late reply is dropped.</li>
     </ul>
-<pre data-lang="SCXML"><code>&lt;!-- the PRICER chart from packages/web/test/helpers.mjs --&gt;
-&lt;state id="s"&gt;
-  &lt;transition event="price.get"&gt;
-    &lt;send event="vt:reply" targetexpr="ev.origin"&gt;&lt;content expr="{'price': 42}"/&gt;&lt;/send&gt;
-  &lt;/transition&gt;
-&lt;/state&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="cm">&lt;!-- the PRICER chart from packages/web/test/helpers.mjs --&gt;</span>
+<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"s"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"price.get"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;send</span> <span class="na">event=</span><span class="s">"vt:reply"</span> <span class="na">targetexpr=</span><span class="s">"ev.origin"</span><span class="nt">&gt;&lt;content</span> <span class="na">expr=</span><span class="s">"{'price': 42}"</span><span class="nt">/&gt;&lt;/send&gt;</span>
+  <span class="nt">&lt;/transition&gt;</span>
+<span class="nt">&lt;/state&gt;</span></code></pre>
 <pre data-lang="JavaScript"><code>const reply = await pricer.request({ type: "price.get" }, { timeoutMs: 2000 });
 reply.name;   // "vt:reply"
 reply.data;   // { price: 42 }</code></pre>
@@ -357,11 +358,11 @@ const b = later.virtual(ORDER_TYPE, "p");   // same state, and it resumes</code>
 
     <h2 id="websocket">Talking to server actors over WebSocket</h2>
     <p>Browser and Node.js actors reach server actors by IRI through a WebSocket transport. It is registered as an SCXML Event I/O Processor, so a chart sends with <code>type="websocket"</code>, and events from the server arrive with <code>_event.origintype</code> set to <code>https://w3id.org/vertep/vt#WebSocketEventProcessor</code>. The server end is in <code>vertep-runtime</code> behind the <code>websocket</code> feature (<code>crates/vertep-runtime/src/websocket/server.rs</code>).</p>
-<pre data-lang="SCXML"><code>&lt;!-- the CLIENT chart from packages/web/test/helpers.mjs --&gt;
-&lt;state id="c"&gt;
-  &lt;transition event="go"&gt;&lt;send type="websocket" event="ping" target="https://server.example/charts/server/s1"/&gt;&lt;/transition&gt;
-  &lt;transition event="pong"&gt;&lt;assign location="ctx.n" expr="ctx.n + 1"/&gt;&lt;assign location="ctx.ot" expr="ev.origintype"/&gt;&lt;/transition&gt;
-&lt;/state&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="cm">&lt;!-- the CLIENT chart from packages/web/test/helpers.mjs --&gt;</span>
+<span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"c"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"go"</span><span class="nt">&gt;&lt;send</span> <span class="na">type=</span><span class="s">"websocket"</span> <span class="na">event=</span><span class="s">"ping"</span> <span class="na">target=</span><span class="s">"https://server.example/charts/server/s1"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"pong"</span><span class="nt">&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"ctx.n"</span> <span class="na">expr=</span><span class="s">"ctx.n + 1"</span><span class="nt">/&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"ctx.ot"</span> <span class="na">expr=</span><span class="s">"ev.origintype"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+<span class="nt">&lt;/state&gt;</span></code></pre>
 <pre data-lang="JavaScript"><code>// from packages/web/test/websocket.test.mjs
 const system = await createActorSystem({
   storage: "memory",
@@ -448,7 +449,7 @@ journal: 2198.1 KB gzip (budget 2500 KB)</code></pre>
     <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
 
     <nav class="pager" aria-label="Pages">
-      <a href="distribution.html">← Cluster and federation</a>
+      <a href="durable-objects.html">← Durable objects</a>
       <a href="rdf.html">RDF and versions →</a>
     </nav>
   </main>

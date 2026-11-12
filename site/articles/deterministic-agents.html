@@ -54,15 +54,15 @@
 
   <p>Vertep starts from the other end. The program is a statechart. Most of its transitions are ordinary: an event arrives, a guard is checked, the chart moves. At some states, though, the chart cannot decide alone. Should this ticket be answered, escalated, or researched further? Those states are marked <code>vt:decide</code>, and they name a <em>decider</em>.</p>
 
-<pre data-lang="SCXML"><code>&lt;state id="decide" vt:decide="llm/claude" vt:fallback="human/support" vt:deadline="30s"
-       vt:maxDecisions="10" vt:candidates="call_tool finish escalate"&gt;
-  &lt;transition event="call_tool" target="tooling"&gt;...&lt;/transition&gt;
-  &lt;transition event="finish" target="done"&gt;...&lt;/transition&gt;
-  &lt;transition event="escalate" target="human"/&gt;
-  &lt;transition event="vt.agent.budget-exhausted" target="budget_out"/&gt;
-  &lt;transition event="error.decide.invalid" target="decide"/&gt;
-  &lt;transition event="vt.decide.refused" target="human"/&gt;
-&lt;/state&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"decide"</span> <span class="na">vt:decide=</span><span class="s">"llm/claude"</span> <span class="na">vt:fallback=</span><span class="s">"human/support"</span> <span class="na">vt:deadline=</span><span class="s">"30s"</span>
+       <span class="na">vt:maxDecisions=</span><span class="s">"10"</span> <span class="na">vt:candidates=</span><span class="s">"call_tool finish escalate"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"call_tool"</span> <span class="na">target=</span><span class="s">"tooling"</span><span class="nt">&gt;</span>...<span class="nt">&lt;/transition&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"finish"</span> <span class="na">target=</span><span class="s">"done"</span><span class="nt">&gt;</span>...<span class="nt">&lt;/transition&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"escalate"</span> <span class="na">target=</span><span class="s">"human"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"vt.agent.budget-exhausted"</span> <span class="na">target=</span><span class="s">"budget_out"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"error.decide.invalid"</span> <span class="na">target=</span><span class="s">"decide"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"vt.decide.refused"</span> <span class="na">target=</span><span class="s">"human"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/state&gt;</span></code></pre>
 
   <p>A decider may be a guard, a language model, a person, or another actor. They all share one contract, and it is a narrow one. A decider is shown a set of candidate events, and it may return one of them, with a payload. That is all it can do. The invariant behind it fits in one line:</p>
 

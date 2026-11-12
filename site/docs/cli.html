@@ -41,6 +41,7 @@
       <li><a href="runtime.html">The actor runtime</a></li>
       <li><a href="agents.html">Agents and deciders</a></li>
       <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -172,13 +173,13 @@ crates/vertep-agent/examples/support-agent.scxml: ok: untyped</code></pre>
 
     <p><code>examples/typed-order/order-ill-typed.yaml</code> is the same chart with one deliberate mistake: the <code>add</code> transition assigns the item's <code>sku</code>, a string, to <code>ctx.total</code>, a decimal.</p>
 
-<pre data-lang="YAML"><code>      cart:
-        on:
-          add:
-            - cond: "ev.data.qty &gt; 0"
-              actions:
-                - assign: { location: ctx.items, expr: "ctx.items + [ev.data]" }
-                - assign: { location: ctx.total, expr: "ev.data.sku" }</code></pre>
+<pre data-lang="YAML"><code>      <span class="nt">cart</span>:
+        <span class="nt">on</span>:
+          <span class="nt">add</span>:
+            - <span class="nt">cond</span>: <span class="s">"ev.data.qty</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0"</span>
+              <span class="nt">actions</span>:
+                - <span class="nt">assign</span>: {<span class="nt"> location</span>: <span class="nv">ctx.items</span>,<span class="nt"> expr</span>: <span class="s">"ctx.items</span><span class="nv"> </span><span class="s">+</span><span class="nv"> </span><span class="s">[ev.data]"</span> }
+                - <span class="nt">assign</span>: {<span class="nt"> location</span>: <span class="nv">ctx.total</span>,<span class="nt"> expr</span>: <span class="s">"ev.data.sku"</span> }</code></pre>
 
 <pre data-lang="Shell"><code>vt typecheck examples/typed-order/order-ill-typed.yaml; echo "exit $?"</code></pre>
 
@@ -225,18 +226,18 @@ Options:
 
     <p>The examples use <code>crates/vertep-dm-rust/tests/charts/order.scxml</code>, a typed chart whose types are declared in a <code>vt:types</code> block:</p>
 
-<pre data-lang="SCXML"><code>&lt;vt:types xmlns:vt="https://w3id.org/vertep/vt#"&gt;type Pay = { amount: decimal };
+<pre data-lang="SCXML"><code><span class="nt">&lt;vt:types</span> <span class="na">xmlns:vt=</span><span class="s">"https://w3id.org/vertep/vt#"</span><span class="nt">&gt;</span>type Pay = { amount: decimal };
 type Approval = { by: iri };
 event start;
 event pay: Pay;
 event authorized;
 event approve: Approval;
 event cancel;
-&lt;/vt:types&gt;
-&lt;datamodel&gt;
-  &lt;data id="total" expr="0" vt:type="decimal"/&gt;
-  &lt;data id="limit" expr="100" vt:type="decimal"/&gt;
-&lt;/datamodel&gt;</code></pre>
+<span class="nt">&lt;/vt:types&gt;</span>
+<span class="nt">&lt;datamodel&gt;</span>
+  <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"total"</span> <span class="na">expr=</span><span class="s">"0"</span> <span class="na">vt:type=</span><span class="s">"decimal"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"limit"</span> <span class="na">expr=</span><span class="s">"100"</span> <span class="na">vt:type=</span><span class="s">"decimal"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/datamodel&gt;</span></code></pre>
 
 <pre data-lang="Shell"><code>vt schema crates/vertep-dm-rust/tests/charts/order.scxml --format cel</code></pre>
 
@@ -370,10 +371,10 @@ examples/traffic-light/traffic-light.scxml: ok: urn:vertep:chart:sha256:46431c54
 
     <p>The SCXML reader's test corpus has a chart that uses every SCXML element, <code>crates/vertep-scxml/tests/corpus/all_elements.scxml</code>. One of its <code>&lt;invoke&gt;</code> elements has both <code>namelist</code> and a <code>&lt;param&gt;</code> child, which SCXML forbids:</p>
 
-<pre data-lang="SCXML"><code>&lt;invoke type="scxml" id="child" autoforward="true" namelist="counter"&gt;
-  &lt;param name="a" expr="1"/&gt;
+<pre data-lang="SCXML"><code><span class="nt">&lt;invoke</span> <span class="na">type=</span><span class="s">"scxml"</span> <span class="na">id=</span><span class="s">"child"</span> <span class="na">autoforward=</span><span class="s">"true"</span> <span class="na">namelist=</span><span class="s">"counter"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;param</span> <span class="na">name=</span><span class="s">"a"</span> <span class="na">expr=</span><span class="s">"1"</span><span class="nt">/&gt;</span>
   …
-&lt;/invoke&gt;</code></pre>
+<span class="nt">&lt;/invoke&gt;</span></code></pre>
 
 <pre data-lang="Shell"><code>vt validate crates/vertep-scxml/tests/corpus/all_elements.scxml; echo "exit $?"</code></pre>
 
@@ -385,11 +386,11 @@ exit 1</code></pre>
 
     <p>A duplicate state id is caught when the chart is read, before any other check. This two-line chart was written for this page:</p>
 
-<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="a"&gt;
-  &lt;state id="a"&gt;&lt;transition event="go" target="b"/&gt;&lt;/state&gt;
-  &lt;state id="a"/&gt;
-  &lt;final id="b"/&gt;
-&lt;/scxml&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">initial=</span><span class="s">"a"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"a"</span><span class="nt">&gt;&lt;transition</span> <span class="na">event=</span><span class="s">"go"</span> <span class="na">target=</span><span class="s">"b"</span><span class="nt">/&gt;&lt;/state&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"a"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"b"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
 
 <pre class="output" data-lang="Output"><code>$ vt validate dup.scxml; echo "exit $?"
 dup.scxml:3:3: state id `a` is already declared at 2:3
@@ -514,19 +515,19 @@ urn:vertep:chart:sha256:ae074948acdd6ec8df8096c10dabea5b2dad1cd94faab314727f02df
 
     <p>In the SCXML written from YAML, the declared types become a <code>vt:types</code> block and <code>vt:type</code> attributes on <code>&lt;data&gt;</code>:</p>
 
-<pre data-lang="SCXML (head of order.scxml)"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#" version="1.0" name="order" datamodel="cel" initial="shopping"&gt;
-  &lt;vt:types xmlns:vt="https://w3id.org/vertep/vt#"&gt;type Item = { sku: string, qty: int, price: decimal };
+<pre data-lang="SCXML (head of order.scxml)"><code><span class="cp">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">xmlns:vt=</span><span class="s">"https://w3id.org/vertep/vt#"</span> <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">name=</span><span class="s">"order"</span> <span class="na">datamodel=</span><span class="s">"cel"</span> <span class="na">initial=</span><span class="s">"shopping"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;vt:types</span> <span class="na">xmlns:vt=</span><span class="s">"https://w3id.org/vertep/vt#"</span><span class="nt">&gt;</span>type Item = { sku: string, qty: int, price: decimal };
 type Pay = { amount: decimal, method: Card { last4: string } | Invoice };
-type Ship = { carrier: string, tracking: optional&amp;lt;string&amp;gt; };
+type Ship = { carrier: string, tracking: optional<span class="ni">&amp;lt;</span>string<span class="ni">&amp;gt;</span> };
 event add: Item;
 …
-&lt;/vt:types&gt;
-  &lt;datamodel&gt;
-    &lt;data id="items" expr="[]" vt:type="list&amp;lt;Item&amp;gt;"/&gt;
-    &lt;data id="total" expr="0" vt:type="decimal"/&gt;
-    &lt;data id="limit" expr="500" vt:type="decimal"/&gt;
-  &lt;/datamodel&gt;</code></pre>
+<span class="nt">&lt;/vt:types&gt;</span>
+  <span class="nt">&lt;datamodel&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"items"</span> <span class="na">expr=</span><span class="s">"[]"</span> <span class="na">vt:type=</span><span class="s">"list&amp;lt;Item&amp;gt;"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"total"</span> <span class="na">expr=</span><span class="s">"0"</span> <span class="na">vt:type=</span><span class="s">"decimal"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"limit"</span> <span class="na">expr=</span><span class="s">"500"</span> <span class="na">vt:type=</span><span class="s">"decimal"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/datamodel&gt;</span></code></pre>
 
     <h3 id="lossy">Lossy conversions are refused</h3>
     <p><code>convert</code> writes nothing when the output would not carry everything the input says. It lists each loss and exits 1. Losses come from two places:</p>
@@ -536,12 +537,12 @@ event add: Item;
     </ul>
     <p>This chart, written for this page, has an attribute SCXML does not define:</p>
 
-<pre data-lang="SCXML (lossy.scxml)"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="a" colour="red"&gt;
-  &lt;state id="a"&gt;
-    &lt;transition event="go" target="b"/&gt;
-  &lt;/state&gt;
-  &lt;final id="b"/&gt;
-&lt;/scxml&gt;</code></pre>
+<pre data-lang="SCXML (lossy.scxml)"><code><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">initial=</span><span class="s">"a"</span> <span class="na">colour=</span><span class="s">"red"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"a"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"go"</span> <span class="na">target=</span><span class="s">"b"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"b"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
 
 <pre data-lang="Shell"><code>vt convert lossy.scxml --to yaml; echo "exit $?"</code></pre>
 

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Durable objects — Vertep docs</title>
+<meta name="description" content="Durable objects: actors with a did:webvh address whose verifiable journal is kept by custodians in several organisations, with one writer per custody epoch won over TSP, and failover without a shared authority.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html" aria-current="page">Durable objects</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
+    <h1>Durable objects</h1>
+    <p class="lede">A durable object is a virtual actor whose journal belongs to no single machine or organisation. Its address is a <code>did:webvh</code> DID, its journal is kept by several custodians that talk only over TSP, and exactly one host writes it at a time, without any shared coordinator.</p>
+
+    <h2 id="why">When to use one</h2>
+    <p>An ordinary virtual actor lives in one store; a cluster keeps it alive inside one trusted organisation. A durable object is for actors that must outlive any one operator: an agent working a case between a company and its suppliers, a contract between parties, a long-running workflow that should keep going when one organisation's data centre is gone. The chart, the runtime and the journal format do not change. What changes is where the journal lives and who may extend it.</p>
+    <table>
+      <thead><tr><th></th><th>Virtual actor</th><th>Durable object (<code>vertep-objects</code>)</th></tr></thead>
+      <tbody>
+        <tr><td>Address</td><td>an IRI</td><td>a <code>did:webvh</code> DID that never changes</td></tr>
+        <tr><td>Journal</td><td>one store</td><td>replicas at every custodian, hash-chained and signed</td></tr>
+        <tr><td>One writer</td><td>shard lease from the cluster</td><td>custody epoch won by a majority of promises</td></tr>
+        <tr><td>Effects</td><td>after the local append</td><td>after a quorum of custodians accepted the turn</td></tr>
+        <tr><td>Survives</td><td>the node's disk</td><td>any minority of custodians, any one organisation</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="custodians">Custodians</h2>
+    <p>The object's DID document names its custodians and the quorum in a <code>VertepCustody</code> service. A <em>host</em> may serve the object and write its journal. A <em>keeper</em> only stores entries; it sees a clear header (position, epoch, previous hash, signatures) and an encrypted body, so a storage provider can keep an object it cannot read. The quorum must be a majority.</p>
+    <pre data-lang="Rust"><code>let config = CustodyConfig::new(
+    vec![
+        Custodian::host("did:web:host.org1.example"),
+        Custodian::host("did:web:host.org2.example"),
+        Custodian::keeper("did:web:keeper.org3.example"),
+    ],
+    2, // a majority of three
+)?;
+doc.service.push(config.to_service(object.as_str())); // publish in the did:webvh log</code></pre>
+
+    <h2 id="epochs">One writer per epoch</h2>
+    <p>A host becomes the writer by asking every custodian to promise a new custody epoch. A custodian promises an epoch only above every epoch it promised before, and then refuses anything older. With a majority of promises, the host adopts the chain accepted in the highest epoch (then the longest), stores it, and ships it to the custodians under its own epoch. An entry counts once a majority accepted it in one epoch; only then does the runtime perform the turn's sends and timers. Two hosts can never both win an epoch, a host that lost its epoch is refused on its next append, and no clock is ever consulted.</p>
+    <pre data-lang="Rust"><code>let host = Arc::new(CustodyHost::new(object, signer, keys, agreement_key, replica, directory)
+    .with_transport(tsp_to_org2)          // direct TSP
+    .with_transport(tsp_to_keeper));       // routed through the keeper's mediator
+let storage = Arc::new(ObjectStorage::new(inner_storage));
+storage.custody().add(host.clone());
+let mut node = Node::builder(storage, shell).build();
+node.handle().bind_address(&amp;object_address, "https://example.org/charts/ticket", "8812");
+serve_object(&amp;mut node, &amp;object_address)?; // win custody, replay, re-arm timers</code></pre>
+
+    <h2 id="failover">Handoff and failover</h2>
+    <p><code>hand_off</code> moves an object on purpose: the old host brings the custodians level and stops writing, and the next host to activate wins a higher epoch. When a host disappears, any other host takes over the same way as long as a majority of custodians is reachable; with fewer, nothing is written and events wait in the object's mailbox. Timers are in the journal, so the new host re-arms them, and a timer that came due in between fires on activation. Sends of turns whose effects the old host may not have completed are dispatched again with their original message ids, which receivers deduplicate.</p>
+    <p>The controller changes the custodian set with a signed request: the writer ships the new set with the journal, switches once the old majority and every new custodian accepted it, and publishes the <code>did:webvh</code> update. Hosts that join receive the content keys; when a host leaves, a new key generation starts.</p>
+
+    <h2 id="verification">What is checked</h2>
+    <p>Every entry carries its object, position, epoch, writer, the previous entry's hash, its own hash and the writer's signature, so any party verifies a replica from genesis without trusting whoever served it. Two validly signed entries of one epoch at one position are kept as equivocation evidence and reported to the controller. A randomised fault test drives partitions, colliding elections, crashes and late duplicate messages through many seeds, checks that one writer holds each epoch and that nothing committed is ever lost, and exports each history for the Lean custody model.</p>
+
+    <h2 id="example">The example</h2>
+    <p><code>cargo run -p vertep-objects --example three_orgs --features testkit,tsp</code> runs a support agent kept by three organisations over TSP. Org 1 serves it until the agent waits for a person's approval; org 1 disappears; org 2 wins the next epoch from itself and org 3's keeper (reached through its mediator), replays the agent without calling the model again, and the person approves the very decision org 1 had opened.</p>
+    <pre data-lang="Text"><code>org 1: agent in ["review"], custody epoch Some(1), 3 entries committed, model calls 1
+       keeper K holds 3 encrypted entries
+org 2: won custody epoch Some(2), replayed ["review"], model calls 0
+       open approval did:webvh:QmScid:support.example:agents:ticket-8812/decision/3.0 (same as before the failover: true)
+org 2: agent in ["approved"] after 4 journaled inputs</code></pre>
+    <p>The design notes are in <code>tg.md/views/durable-objects.md</code>; the requirements in <code>openspec/changes/m7-durable-objects</code> (capabilities <code>durable-objects</code> and <code>object-custody</code>). The TSP mediator that objects and keepers use while offline is described in <a href="distribution.html">Cluster and federation</a>.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="distribution.html">← Cluster and federation</a>
+      <a href="browser.html">Browser and JavaScript →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

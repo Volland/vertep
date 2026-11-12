@@ -1152,6 +1152,14 @@ The site carries a German Impressum, Datenschutzerklärung and AGB, plus an Abou
 
 The legal identity (name, Berlin address, supervisory authority) is the one on pavlyshyn.me, so the three sites state one provider. Like the author's site, these pages load no third-party resource: the fonts are self-hosted woff2 files in `site/assets/fonts/`, declared in `site/assets/css/fonts.css`, so the only personal data is the GitHub Pages server log and the Datenschutz says nothing more. The AGB cover consulting, architecture and training services only; the software stays under MIT or Apache-2.0. `about.html` is built from the author's home page, CV and book list. The footer and the main navigation, including those written by `site/tools/sync-examples.py`, link all four pages.
 
+## Site code is highlighted at build time
+
+Rust, XML (SCXML) and YAML blocks on the site are highlighted by `site/tools/highlight.py`, which writes plain `<span class="k">` markup into the committed pages, so the pages still need no script.
+
+- motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: primary, since: "2026-11-12"}
+
+Pygments does the lexing and is needed only when the tool runs, never to view the site; the tool is idempotent and leaves the text of every block unchanged. `site/tools/sync-examples.py` calls the same function, so regenerated example pages keep their colours. The theme is in the "code highlighting" section of `site/assets/css/vertep.css`: ink and the rubric orange only, separated by weight and slant too, and it follows the dark-mode tokens. Blocks of other languages and the recorded outputs stay plain.
+
 ## Hosts instantiate CEL charts typed
 
 Every host creates a chart's datamodel through `DatamodelRegistry::create_for`, and `CelRegistry` instantiates a chart that declares types with its projected CEL type environment, refusing one with CEL type errors.

@@ -41,6 +41,7 @@
       <li><a href="runtime.html">The actor runtime</a></li>
       <li><a href="agents.html">Agents and deciders</a></li>
       <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -111,22 +112,22 @@
 
     <h2 id="step">step, a pure function</h2>
     <p>The interpreter is two functions in <code>vertep_core::session</code>. <code>start</code> runs the first macrostep; <code>step</code> runs every later one.</p>
-<pre data-lang="Rust"><code>pub fn start(chart: &amp;CompiledChart, input: StartInput, dm: &amp;mut dyn Datamodel)
-    -&gt; Result&lt;Outcome, StartError&gt;;
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">fn</span> <span class="nf">start</span>(chart: <span class="kp">&amp;</span><span class="nc">CompiledChart</span>, input: <span class="nc">StartInput</span>, dm: <span class="kp">&amp;</span><span class="nc">mut</span> <span class="k">dyn</span> Datamodel)
+    -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Outcome, StartError<span class="o">&gt;</span>;
 
-pub fn step(chart: &amp;CompiledChart, session: Session, input: Input, dm: &amp;mut dyn Datamodel)
-    -&gt; Result&lt;Outcome, StepError&gt;;
+<span class="k">pub</span> <span class="k">fn</span> <span class="nf">step</span>(chart: <span class="kp">&amp;</span><span class="nc">CompiledChart</span>, session: <span class="nc">Session</span>, input: <span class="nc">Input</span>, dm: <span class="kp">&amp;</span><span class="nc">mut</span> <span class="k">dyn</span> Datamodel)
+    -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Outcome, StepError<span class="o">&gt;</span>;
 
-pub struct Outcome {
-    pub session: Session,        // the session after the macrostep
-    pub effects: Vec&lt;Effect&gt;,    // in the order they were produced
-    pub trace: MacrostepTrace,   // the macrostep record
-}
+<span class="k">pub</span> <span class="k">struct</span> <span class="nc">Outcome</span> {
+    <span class="k">pub</span> session: <span class="nc">Session</span>,        <span class="c1">// the session after the macrostep
+</span>    <span class="k">pub</span> effects: <span class="nb">Vec</span><span class="o">&lt;</span>Effect<span class="o">&gt;</span>,    <span class="c1">// in the order they were produced
+</span>    <span class="k">pub</span> trace: <span class="nc">MacrostepTrace</span>,   <span class="c1">// the macrostep record
+</span>}
 
-pub struct Environment {
-    pub now_ms: i64,             // current time, as recorded in the input
-    pub seed: u64,               // seed for the datamodel's random numbers
-}</code></pre>
+<span class="k">pub</span> <span class="k">struct</span> <span class="nc">Environment</span> {
+    <span class="k">pub</span> now_ms: <span class="kt">i64</span>,             <span class="c1">// current time, as recorded in the input
+</span>    <span class="k">pub</span> seed: <span class="kt">u64</span>,               <span class="c1">// seed for the datamodel's random numbers
+</span>}</code></pre>
     <p>The session (configuration, history, internal queue, active invocations) is a value that goes in and comes back out. The datamodel, which holds the chart's variables, is passed by mutable reference, because embedded engines such as the ECMAScript one are mutable objects. "Pure" therefore means: equal sessions, equal inputs and equal datamodel states give equal results. <code>step</code> does no I/O, never reads a clock and never draws a random number of its own. The current time and the random seed arrive inside the input, in its <code>Environment</code>.</p>
     <figure class="plate">
       <div class="plate-inner">
@@ -182,11 +183,11 @@ pub struct Environment {
 
     <h2 id="actor">Actor</h2>
     <p>An <strong>actor</strong> is anything that takes events one at a time and produces events. Its contract in <code>vertep-runtime</code> (<code>crates/vertep-runtime/src/actor.rs</code>) is small:</p>
-<pre data-lang="Rust"><code>pub trait Actor {
-    /// The actor's address.
-    fn address(&amp;self) -&gt; &amp;Address;
-    /// Handles one input.
-    fn turn(&amp;mut self, input: ActorInput) -&gt; Turn;
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">trait</span> Actor {
+    <span class="sd">/// The actor's address.
+</span>    <span class="k">fn</span> <span class="nf">address</span>(<span class="o">&amp;</span><span class="bp">self</span>) -&gt; <span class="kp">&amp;</span><span class="nc">Address</span>;
+    <span class="sd">/// Handles one input.
+</span>    <span class="k">fn</span> <span class="nf">turn</span>(<span class="o">&amp;</span><span class="k">mut</span> <span class="bp">self</span>, input: <span class="nc">ActorInput</span>) -&gt; <span class="nc">Turn</span>;
 }</code></pre>
     <p>A running chart is the main kind of actor, and for a chart one <strong>turn</strong> is exactly one macrostep. Functions, tools and LLM adapters are actors too, which is why any of them can be the target of a <code>&lt;send&gt;</code>. A turn that fails leaves the journal unchanged and touches no other actor.</p>
 

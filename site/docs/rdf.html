@@ -41,6 +41,7 @@
       <li><a href="runtime.html">The actor runtime</a></li>
       <li><a href="agents.html">Agents and deciders</a></li>
       <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -297,18 +298,18 @@ type Approval = { by: iri };</code></pre>
       </tbody>
     </table>
     <p>The query is ordinary SPARQL over the named-graph layout above. This sketch follows the store tests in <code>crates/vertep-tiramemsu/tests/backend.rs</code>, using the <code>vt:inState</code> predicate the runtime writes:</p>
-<pre data-lang="Rust"><code>use vertep_store::GraphStore;
-use vertep_tiramemsu::TiramemsuShard;
+<pre data-lang="Rust"><code><span class="k">use</span> vertep_store::GraphStore;
+<span class="k">use</span> vertep_tiramemsu::TiramemsuShard;
 
-let shard = TiramemsuShard::open("data/shard-0.db")?;
-let t = shard.last_tx()?;            // remember a transaction ...
+<span class="kd">let</span> shard <span class="o">=</span> TiramemsuShard::open(<span class="s">"data/shard-0.db"</span>)<span class="o">?</span>;
+<span class="kd">let</span> t <span class="o">=</span> shard.last_tx()<span class="o">?</span>;            <span class="c1">// remember a transaction ...
 // ... later, after more appends:
-let actor = "https://acme.example/actors/Order/8f3a";
-let q = format!(
-    "SELECT ?s WHERE {{ GRAPH &lt;{actor}&gt; {{ &lt;{actor}&gt; &lt;https://w3id.org/vertep/vt#inState&gt; ?s }} }}"
+</span><span class="kd">let</span> actor <span class="o">=</span> <span class="s">"https://acme.example/actors/Order/8f3a"</span>;
+<span class="kd">let</span> q <span class="o">=</span> <span class="fm">format!</span>(
+    <span class="s">"SELECT ?s WHERE {{ GRAPH &lt;{actor}&gt; {{ &lt;{actor}&gt; &lt;https://w3id.org/vertep/vt#inState&gt; ?s }} }}"</span>
 );
-let then = shard.view_as_of(t).query(&amp;q)?.into_solutions()?;   // states as of t
-let now  = shard.view_now().query(&amp;q)?.into_solutions()?;      // states now</code></pre>
+<span class="kd">let</span> then <span class="o">=</span> shard.view_as_of(t).query(<span class="o">&amp;</span>q)<span class="o">?</span>.into_solutions()<span class="o">?</span>;   <span class="c1">// states as of t
+</span><span class="kd">let</span> now  <span class="o">=</span> shard.view_now().query(<span class="o">&amp;</span>q)<span class="o">?</span>.into_solutions()<span class="o">?</span>;      <span class="o">//</span> states now</code></pre>
     <p>Views are read-only: writing to one returns <code>StoreError::Unsupported</code>. For the state after a given journal <em>position</em> rather than a store transaction, the runtime's <code>Node::state_at(address, position)</code> rebuilds it from the journal instead.</p>
     <p><code>vertep-oxigraph</code> implements only <code>GraphStore</code>, on an embedded Oxigraph (<code>OxigraphStore</code>) or any SPARQL 1.1 endpoint (<code>SparqlEndpoint</code>). It may not hold a journal, because SPARQL Update has no compare-and-set. Instead a <code>Projector</code> copies journal entries into it in order, idempotently, and records per actor how far it got. Reads there are eventually consistent; consistent reads go to tiramemsu. When the target store lacks RDF 1.2 triple terms, annotations are written with RDF 1.1 reification.</p>
 

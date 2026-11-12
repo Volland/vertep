@@ -99,33 +99,33 @@
 
   <p>Here is a small order flow in SCXML, the W3C's XML notation for statecharts. <code>checkout</code> is a compound state, so its <code>cancel</code> transition covers <code>cart</code>, <code>payment</code> and <code>review</code> at once. Two transitions answer <code>authorized</code>. The first whose condition holds wins, in document order.</p>
 
-<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0"
-       datamodel="ecmascript" initial="idle" name="order"&gt;
-  &lt;datamodel&gt;&lt;data id="total" expr="0"/&gt;&lt;/datamodel&gt;
+<pre data-lang="SCXML"><code><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">version=</span><span class="s">"1.0"</span>
+       <span class="na">datamodel=</span><span class="s">"ecmascript"</span> <span class="na">initial=</span><span class="s">"idle"</span> <span class="na">name=</span><span class="s">"order"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;datamodel&gt;&lt;data</span> <span class="na">id=</span><span class="s">"total"</span> <span class="na">expr=</span><span class="s">"0"</span><span class="nt">/&gt;&lt;/datamodel&gt;</span>
 
-  &lt;state id="idle"&gt;
-    &lt;transition event="start" target="checkout"/&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"idle"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"start"</span> <span class="na">target=</span><span class="s">"checkout"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;state id="checkout" initial="cart"&gt;
-    &lt;transition event="cancel" target="cancelled"/&gt;
-    &lt;state id="cart"&gt;
-      &lt;transition event="pay" cond="_event.data.amount &amp;gt; 0" target="payment"&gt;
-        &lt;assign location="total" expr="_event.data.amount"/&gt;
-      &lt;/transition&gt;
-    &lt;/state&gt;
-    &lt;state id="payment"&gt;
-      &lt;transition event="authorized" cond="total &amp;gt; 100" target="review"/&gt;
-      &lt;transition event="authorized" target="paid"/&gt;
-    &lt;/state&gt;
-    &lt;state id="review"&gt;
-      &lt;transition event="approve" target="paid"/&gt;
-    &lt;/state&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"checkout"</span> <span class="na">initial=</span><span class="s">"cart"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"cancel"</span> <span class="na">target=</span><span class="s">"cancelled"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"cart"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"pay"</span> <span class="na">cond=</span><span class="s">"_event.data.amount &amp;gt; 0"</span> <span class="na">target=</span><span class="s">"payment"</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;assign</span> <span class="na">location=</span><span class="s">"total"</span> <span class="na">expr=</span><span class="s">"_event.data.amount"</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;/transition&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"payment"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"authorized"</span> <span class="na">cond=</span><span class="s">"total &amp;gt; 100"</span> <span class="na">target=</span><span class="s">"review"</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"authorized"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"review"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;final id="paid"/&gt;
-  &lt;final id="cancelled"/&gt;
-&lt;/scxml&gt;</code></pre>
+  <span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"cancelled"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
 
 <pre class="output" data-lang="vt validate"><code>$ vt validate order.scxml
 order.scxml: ok: urn:vertep:chart:sha256:23ede432a69736bd8c523baf5547828af92211b2cb5e9c1f99d1ac084d730327</code></pre>
@@ -146,8 +146,8 @@ order.scxml: ok: urn:vertep:chart:sha256:23ede432a69736bd8c523baf5547828af92211b
 
   <p>Inside Vertep, the algorithm is two functions in <code>vertep-core</code>: <code>start</code> opens a session, and <code>step</code> takes the session and one input and returns what happened.</p>
 
-<pre data-lang="Rust"><code>pub fn step(chart: &amp;CompiledChart, session: Session, input: Input, dm: &amp;mut dyn Datamodel)
-    -&gt; Result&lt;Outcome, StepError&gt;;   // Outcome { session, effects, trace }</code></pre>
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">fn</span> <span class="nf">step</span>(chart: <span class="kp">&amp;</span><span class="nc">CompiledChart</span>, session: <span class="nc">Session</span>, input: <span class="nc">Input</span>, dm: <span class="kp">&amp;</span><span class="nc">mut</span> <span class="k">dyn</span> Datamodel)
+    -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Outcome, StepError<span class="o">&gt;</span>;   <span class="o">//</span> Outcome { session, effects, trace }</code></pre>
 
   <p>It does no I/O. It has no clock, no randomness and no network. When a chart wants to send a message, start a timer or ask a model, <code>step</code> does not do it. It returns an <em>effect</em> that says so, and the runtime shell around it carries the effect out. The result comes back later as another event.</p>
 

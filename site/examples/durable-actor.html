@@ -50,8 +50,8 @@
     <p>Files: <code>examples/durable-actor/order.scxml</code>, <code>examples/durable-actor/main.rs</code>, <code>examples/durable-actor/expected-output.txt</code>. All commands run from the repository root.</p>
     <h2 id="the-chart">The chart</h2>
     <p><code>awaiting_payment</code> schedules <code>payment.timeout</code> 900 seconds ahead. The outcome states are plain states rather than top-level finals, so the final state stays visible in the output.</p>
-<pre data-lang="SCXML"><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
-&lt;!--
+<pre data-lang="SCXML"><code><span class="cp">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="cm">&lt;!--
   An order actor on the CEL datamodel with a durable payment timeout.
 
   `add` counts items, `checkout` moves to `awaiting_payment`, whose entry schedules
@@ -60,38 +60,38 @@
   same store. Paying in time cancels it.
 
   Illustrates the actor-model, event-journal and durable-timers capabilities.
---&gt;
-&lt;scxml xmlns=&quot;http://www.w3.org/2005/07/scxml&quot; version=&quot;1.0&quot; datamodel=&quot;cel&quot;
-       name=&quot;order&quot; initial=&quot;cart&quot;&gt;
-  &lt;datamodel&gt;
-    &lt;data id=&quot;items&quot; expr=&quot;0&quot;/&gt;
-  &lt;/datamodel&gt;
+--&gt;</span>
+<span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">datamodel=</span><span class="s">"cel"</span>
+       <span class="na">name=</span><span class="s">"order"</span> <span class="na">initial=</span><span class="s">"cart"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;datamodel&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"items"</span> <span class="na">expr=</span><span class="s">"0"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/datamodel&gt;</span>
 
-  &lt;state id=&quot;cart&quot;&gt;
-    &lt;transition event=&quot;add&quot;&gt;&lt;assign location=&quot;items&quot; expr=&quot;ctx.items + 1&quot;/&gt;&lt;/transition&gt;
-    &lt;transition event=&quot;checkout&quot; cond=&quot;ctx.items &gt; 0&quot; target=&quot;awaiting_payment&quot;/&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"cart"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"add"</span><span class="nt">&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"items"</span> <span class="na">expr=</span><span class="s">"ctx.items + 1"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"checkout"</span> <span class="na">cond=</span><span class="s">"ctx.items &gt; 0"</span> <span class="na">target=</span><span class="s">"awaiting_payment"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;state id=&quot;awaiting_payment&quot;&gt;
-    &lt;onentry&gt;&lt;send id=&quot;payment-timer&quot; event=&quot;payment.timeout&quot; delay=&quot;900s&quot;/&gt;&lt;/onentry&gt;
-    &lt;transition event=&quot;pay&quot; target=&quot;paid&quot;&gt;&lt;cancel sendid=&quot;payment-timer&quot;/&gt;&lt;/transition&gt;
-    &lt;transition event=&quot;payment.timeout&quot; target=&quot;expired&quot;/&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"awaiting_payment"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;onentry&gt;&lt;send</span> <span class="na">id=</span><span class="s">"payment-timer"</span> <span class="na">event=</span><span class="s">"payment.timeout"</span> <span class="na">delay=</span><span class="s">"900s"</span><span class="nt">/&gt;&lt;/onentry&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"pay"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">&gt;&lt;cancel</span> <span class="na">sendid=</span><span class="s">"payment-timer"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"payment.timeout"</span> <span class="na">target=</span><span class="s">"expired"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;!-- Plain states, not &lt;final&gt;: a top-level final state ends the session, and an ended
-       session has an empty configuration. These keep the outcome visible. --&gt;
-  &lt;state id=&quot;paid&quot;/&gt;
-  &lt;state id=&quot;expired&quot;/&gt;
-&lt;/scxml&gt;</code></pre>
+  <span class="cm">&lt;!-- Plain states, not &lt;final&gt;: a top-level final state ends the session, and an ended
+       session has an empty configuration. These keep the outcome visible. --&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"expired"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
     <h2 id="the-program">The program</h2>
     <p>Both processes run on a virtual clock, so the output is stable. A server runs the same node on the system clock with <code>Shell::tokio()</code> and <code>node.run().await</code>; <code>crates/vertep/examples/quickstart.rs</code> shows that.</p>
-<pre data-lang="Rust"><code>//! Durable actor: an order actor on a tiramemsu journal that outlives its process.
+<pre data-lang="Rust"><code><span class="sd">//! Durable actor: an order actor on a tiramemsu journal that outlives its process.
 //!
-//! &quot;Process&quot; 1 opens a store, registers the chart and sends three events to a virtual actor.
+//! "Process" 1 opens a store, registers the chart and sends three events to a virtual actor.
 //! Each accepted event becomes one journal entry; the checkout entry also records a durable
 //! timer (`payment.timeout` in 900 s). Then the node and the store are dropped, as if the
-//! process stopped. &quot;Process&quot; 2 opens the same directory ten minutes later: asking for the
-//! actor&#x27;s state replays the journal, and when the clock reaches the timer&#x27;s due time the timer
+//! process stopped. "Process" 2 opens the same directory ten minutes later: asking for the
+//! actor's state replays the journal, and when the clock reaches the timer's due time the timer
 //! fires as an ordinary journaled input, although the node that scheduled it is gone.
 //!
 //! Both nodes run on a virtual clock (`Shell::virtual_time`) and are driven with
@@ -103,135 +103,135 @@
 //! (Delayed Send Is Journaled, Timer Fires As Input) capabilities.
 //!
 //! Run with `cargo run -p vertep-examples --bin durable-actor`.
+</span>
+<span class="k">use</span> std::sync::Arc;
+<span class="k">use</span> std::time::Duration;
 
-use std::sync::Arc;
-use std::time::Duration;
+<span class="k">use</span> vertep::prelude::<span class="o">*</span>;
+<span class="k">use</span> vertep::runtime::EntryBody;
 
-use vertep::prelude::*;
-use vertep::runtime::EntryBody;
+<span class="sd">/// The chart, next to this file.
+</span><span class="k">const</span> ORDER: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span> <span class="fm">include_str!</span>(<span class="s">"order.scxml"</span>);
+<span class="sd">/// The chart type: every actor of this type is addressed by this IRI plus a key.
+</span><span class="k">const</span> ORDER_TYPE: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span> <span class="s">"https://example.org/charts/order"</span>;
+<span class="sd">/// 2026-11-11T00:00:00Z, the virtual clock's start.
+</span><span class="k">const</span> T0: <span class="kt">i64</span> <span class="o">=</span> <span class="mi">1_794_355_200_000</span>;
 
-/// The chart, next to this file.
-const ORDER: &amp;str = include_str!(&quot;order.scxml&quot;);
-/// The chart type: every actor of this type is addressed by this IRI plus a key.
-const ORDER_TYPE: &amp;str = &quot;https://example.org/charts/order&quot;;
-/// 2026-11-11T00:00:00Z, the virtual clock&#x27;s start.
-const T0: i64 = 1_794_355_200_000;
+<span class="k">type</span> <span class="nc">Error</span> <span class="o">=</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;</span>;
 
-type Error = Box&lt;dyn std::error::Error&gt;;
-
-fn main() -&gt; Result&lt;(), Error&gt; {
-    let dir = std::env::temp_dir().join(format!(&quot;vertep-durable-actor-{}&quot;, std::process::id()));
-    let result = run(&amp;dir);
-    let _ = std::fs::remove_dir_all(&amp;dir);
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
+    <span class="kd">let</span> dir <span class="o">=</span> std::env::temp_dir().join(<span class="fm">format!</span>(<span class="s">"vertep-durable-actor-{}"</span>, std::process::id()));
+    <span class="kd">let</span> result <span class="o">=</span> run(<span class="o">&amp;</span>dir);
+    <span class="kd">let</span> _ <span class="o">=</span> std::fs::remove_dir_all(<span class="o">&amp;</span>dir);
     result
 }
 
-fn run(dir: &amp;std::path::Path) -&gt; Result&lt;(), Error&gt; {
-    let (shell, clock) = Shell::virtual_time(T0);
-    let order = Address::virtual_actor(ORDER_TYPE, &quot;42&quot;)?;
-    println!(&quot;actor {}&quot;, order.as_str());
+<span class="k">fn</span> <span class="nf">run</span>(dir: <span class="kp">&amp;</span><span class="nc">std</span>::path::Path) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
+    <span class="kd">let</span> (shell, clock) <span class="o">=</span> Shell::virtual_time(T0);
+    <span class="kd">let</span> order <span class="o">=</span> Address::virtual_actor(ORDER_TYPE, <span class="s">"42"</span>)<span class="o">?</span>;
+    <span class="fm">println!</span>(<span class="s">"actor {}"</span>, order.as_str());
 
-    // ---- process 1 -------------------------------------------------------------------------
-    {
-        let backend = Arc::new(TiramemsuBackend::open(dir, 1)?);
-        let mut node = node(backend, shell.clone())?;
+    <span class="c1">// ---- process 1 -------------------------------------------------------------------------
+</span>    {
+        <span class="kd">let</span> backend <span class="o">=</span> Arc::new(TiramemsuBackend::open(dir, <span class="mi">1</span>)<span class="o">?</span>);
+        <span class="kd">let</span> <span class="k">mut</span> node <span class="o">=</span> node(backend, shell.clone())<span class="o">?</span>;
 
-        // A virtual actor needs no create call: the first message activates it.
-        for name in [&quot;add&quot;, &quot;add&quot;, &quot;checkout&quot;] {
-            node.send(&amp;order, Event::named(name, EventType::External))?;
+        <span class="c1">// A virtual actor needs no create call: the first message activates it.
+</span>        <span class="k">for</span> name <span class="k">in</span> [<span class="s">"add"</span>, <span class="s">"add"</span>, <span class="s">"checkout"</span>] {
+            node.send(<span class="o">&amp;</span>order, Event::named(name, EventType::External))<span class="o">?</span>;
         }
         node.run_until_idle();
 
-        let state = node.state(&amp;order)?;
-        println!(
-            &quot;process 1: {:?} context={}&quot;,
+        <span class="kd">let</span> state <span class="o">=</span> node.state(<span class="o">&amp;</span>order)<span class="o">?</span>;
+        <span class="fm">println!</span>(
+            <span class="s">"process 1: {:?} context={}"</span>,
             state.configuration,
-            context(&amp;state)
+            context(<span class="o">&amp;</span>state)
         );
-        print_journal(&amp;node, &amp;order)?;
-        for (due, timer) in node.pending_timers() {
-            println!(
-                &quot;  pending timer {} due at +{}s&quot;,
+        print_journal(<span class="o">&amp;</span>node, <span class="o">&amp;</span>order)<span class="o">?</span>;
+        <span class="k">for</span> (due, timer) <span class="k">in</span> node.pending_timers() {
+            <span class="fm">println!</span>(
+                <span class="s">"  pending timer {} due at +{}s"</span>,
                 timer.event.name,
-                (due - T0) / 1000
+                (due <span class="o">-</span> T0) <span class="o">/</span> <span class="mi">1000</span>
             );
         }
-        println!(&quot;process 1 stops&quot;);
-    } // the node and the store are dropped here
+        <span class="fm">println!</span>(<span class="s">"process 1 stops"</span>);
+    } <span class="c1">// the node and the store are dropped here
+</span>
+    <span class="c1">// ---- process 2, ten minutes later -------------------------------------------------------
+</span>    clock.advance(Duration::from_secs(<span class="mi">600</span>));
+    <span class="kd">let</span> backend <span class="o">=</span> Arc::new(TiramemsuBackend::open(dir, <span class="mi">1</span>)<span class="o">?</span>);
+    <span class="kd">let</span> <span class="k">mut</span> node <span class="o">=</span> node(backend, shell)<span class="o">?</span>;
 
-    // ---- process 2, ten minutes later -------------------------------------------------------
-    clock.advance(Duration::from_secs(600));
-    let backend = Arc::new(TiramemsuBackend::open(dir, 1)?);
-    let mut node = node(backend, shell)?;
-
-    // Reading the state activates the actor: its journal is replayed through the same chart.
-    let state = node.state(&amp;order)?;
-    println!(
-        &quot;process 2: {:?} context={} (replayed {} entries)&quot;,
+    <span class="c1">// Reading the state activates the actor: its journal is replayed through the same chart.
+</span>    <span class="kd">let</span> state <span class="o">=</span> node.state(<span class="o">&amp;</span>order)<span class="o">?</span>;
+    <span class="fm">println!</span>(
+        <span class="s">"process 2: {:?} context={} (replayed {} entries)"</span>,
         state.configuration,
-        context(&amp;state),
+        context(<span class="o">&amp;</span>state),
         node.stats().replayed
     );
 
-    // Five more minutes: the timer process 1 scheduled is due and fires here.
-    clock.advance(Duration::from_secs(300));
+    <span class="c1">// Five more minutes: the timer process 1 scheduled is due and fires here.
+</span>    clock.advance(Duration::from_secs(<span class="mi">300</span>));
     node.run_until_idle();
-    let state = node.state(&amp;order)?;
-    println!(
-        &quot;process 2 at +900s: {:?} context={}&quot;,
+    <span class="kd">let</span> state <span class="o">=</span> node.state(<span class="o">&amp;</span>order)<span class="o">?</span>;
+    <span class="fm">println!</span>(
+        <span class="s">"process 2 at +900s: {:?} context={}"</span>,
         state.configuration,
-        context(&amp;state)
+        context(<span class="o">&amp;</span>state)
     );
-    print_journal(&amp;node, &amp;order)?;
+    print_journal(<span class="o">&amp;</span>node, <span class="o">&amp;</span>order)<span class="o">?</span>;
 
-    // Time travel: the state after any past entry, rebuilt from the journal.
-    let then = node.state_at(&amp;order, 1)?;
-    println!(
-        &quot;as of entry 1: {:?} context={}&quot;,
+    <span class="c1">// Time travel: the state after any past entry, rebuilt from the journal.
+</span>    <span class="kd">let</span> then <span class="o">=</span> node.state_at(<span class="o">&amp;</span>order, <span class="mi">1</span>)<span class="o">?</span>;
+    <span class="fm">println!</span>(
+        <span class="s">"as of entry 1: {:?} context={}"</span>,
         then.configuration,
-        context(&amp;then)
+        context(<span class="o">&amp;</span>then)
     );
-    Ok(())
+    <span class="nb">Ok</span>(())
 }
 
-/// A node on `backend` that runs CEL charts, with the order chart registered.
-fn node(backend: Arc&lt;TiramemsuBackend&gt;, shell: Shell) -&gt; Result&lt;Node, Error&gt; {
-    let mut node = Node::builder(backend, shell)
+<span class="sd">/// A node on `backend` that runs CEL charts, with the order chart registered.
+</span><span class="k">fn</span> <span class="nf">node</span>(backend: <span class="nc">Arc</span><span class="o">&lt;</span>TiramemsuBackend<span class="o">&gt;</span>, shell: <span class="nc">Shell</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Node, Error<span class="o">&gt;</span> {
+    <span class="kd">let</span> <span class="k">mut</span> node <span class="o">=</span> Node::builder(backend, shell)
         .datamodels(Arc::new(vertep_dm_cel::CelRegistry))
         .build();
-    // `read_str` accepts only the `null` datamodel; name the ones the host supports.
-    let opts = vertep::scxml::ReadOptions::new().with_datamodels(&amp;vertep::scxml::AnyDatamodel);
-    let chart = vertep::scxml::read(ORDER, &amp;opts)?.chart;
-    // Registering is idempotent: the same chart gets the same content-addressed version.
-    node.register_type(ORDER_TYPE, chart)?;
-    Ok(node)
+    <span class="c1">// `read_str` accepts only the `null` datamodel; name the ones the host supports.
+</span>    <span class="kd">let</span> opts <span class="o">=</span> vertep::scxml::ReadOptions::new().with_datamodels(<span class="o">&amp;</span>vertep::scxml::AnyDatamodel);
+    <span class="kd">let</span> chart <span class="o">=</span> vertep::scxml::read(ORDER, <span class="o">&amp;</span>opts)<span class="o">?</span>.chart;
+    <span class="c1">// Registering is idempotent: the same chart gets the same content-addressed version.
+</span>    node.register_type(ORDER_TYPE, chart)<span class="o">?</span>;
+    <span class="nb">Ok</span>(node)
 }
 
-fn print_journal(node: &amp;Node, order: &amp;Address) -&gt; Result&lt;(), Error&gt; {
-    for entry in node.journal(order)? {
-        if let EntryBody::Input { input, effects } = &amp;entry.body {
-            let timers: Vec&lt;&amp;str&gt; = effects
+<span class="k">fn</span> <span class="nf">print_journal</span>(node: <span class="kp">&amp;</span><span class="nc">Node</span>, order: <span class="kp">&amp;</span><span class="nc">Address</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
+    <span class="k">for</span> entry <span class="k">in</span> node.journal(order)<span class="o">?</span> {
+        <span class="k">if</span> <span class="kd">let</span> EntryBody::Input { input, effects } <span class="o">=</span> <span class="o">&amp;</span>entry.body {
+            <span class="kd">let</span> timers: <span class="nb">Vec</span><span class="o">&lt;&amp;</span><span class="kt">str</span><span class="o">&gt;</span> <span class="o">=</span> effects
                 .timers
                 .iter()
-                .map(|t| t.event.name.as_str())
+                .map(<span class="o">|</span>t<span class="o">|</span> t.event.name.as_str())
                 .collect();
-            println!(
-                &quot;  entry {} at +{}s: {:&lt;16} timers scheduled: {:?}&quot;,
+            <span class="fm">println!</span>(
+                <span class="s">"  entry {} at +{}s: {:&lt;16} timers scheduled: {:?}"</span>,
                 entry.position,
-                (entry.timestamp_ms - T0) / 1000,
+                (entry.timestamp_ms <span class="o">-</span> T0) <span class="o">/</span> <span class="mi">1000</span>,
                 input.event.name,
                 timers
             );
         }
     }
-    Ok(())
+    <span class="nb">Ok</span>(())
 }
 
-/// The context of an actor state as JSON. `ActorState::datamodel` is the datamodel&#x27;s own
-/// snapshot encoding (for CEL, typed values like `{&quot;$int&quot;: &quot;2&quot;}` plus system variables);
+<span class="sd">/// The context of an actor state as JSON. `ActorState::datamodel` is the datamodel's own
+/// snapshot encoding (for CEL, typed values like `{"$int": "2"}` plus system variables);
 /// `ContextView` decodes the data items into plain values.
-fn context(state: &amp;ActorState) -&gt; String {
-    let view = vertep::agent::ContextView::new(state.datamodel.clone());
+</span><span class="k">fn</span> <span class="nf">context</span>(state: <span class="kp">&amp;</span><span class="nc">ActorState</span>) -&gt; <span class="nb">String</span> {
+    <span class="kd">let</span> view <span class="o">=</span> vertep::agent::ContextView::new(state.datamodel.clone());
     vertep::agent::json::to_json(view.data()).to_string()
 }</code></pre>
     <h2 id="run-it">Run it</h2>

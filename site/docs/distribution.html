@@ -41,6 +41,7 @@
       <li><a href="runtime.html">The actor runtime</a></li>
       <li><a href="agents.html">Agents and deciders</a></li>
       <li><a href="distribution.html" aria-current="page">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -170,14 +171,14 @@
       <li><strong>Hold</strong>, when no live owner exists: the message waits in the local mailbox and the actor is not activated.</li>
     </ul>
     <p>Every append goes through <code>ClusterStorage</code>, which routes it to the shard's store and stamps the node's lease epoch as the fencing token. The wiring, from <code>crates/vertep-cluster/tests/rt/mod.rs</code>:</p>
-<pre data-lang="Rust"><code>let cluster = ClusterNode::new(membership.clone() as Arc&lt;dyn Membership&gt;, config);
-wire.connect(&amp;cluster);                       // MemoryWire in tests; QuicWire in production
-
-let node = Node::builder(storage as Arc&lt;dyn Storage&gt;, Shell::tokio())   // a ClusterStorage
-    .datamodels(Arc::new(vertep_dm_ecma::EcmaRegistry))
+<pre data-lang="Rust"><code><span class="kd">let</span> cluster <span class="o">=</span> ClusterNode::new(membership.clone() <span class="k">as</span> Arc<span class="o">&lt;</span><span class="k">dyn</span> Membership<span class="o">&gt;</span>, config);
+wire.connect(<span class="o">&amp;</span>cluster);                       <span class="c1">// MemoryWire in tests; QuicWire in production
+</span>
+<span class="kd">let</span> node <span class="o">=</span> Node::builder(storage <span class="k">as</span> Arc<span class="o">&lt;</span><span class="k">dyn</span> Storage<span class="o">&gt;</span>, Shell::tokio())   <span class="c1">// a ClusterStorage
+</span>    .datamodels(Arc::new(vertep_dm_ecma::EcmaRegistry))
     .placement(cluster.placement())
-    .transport(cluster.processor())            // &lt;send type="cluster"&gt;
-    .build();
+    .transport(cluster.processor())            <span class="c1">// &lt;send type="cluster"&gt;
+</span>    .build();
 cluster.attach(node.handle());</code></pre>
     <p><code>ClusterConfig</code> holds the transport settings:</p>
     <table>
@@ -263,9 +264,9 @@ cluster.attach(node.handle());</code></pre>
     </ol>
     <p>An admitted event carries the sender's DID in <code>_event.origin</code> and <code>_event.originverified</code> set to true; an anonymous one has neither. The verification outcome is journaled with the event, so replay never resolves a DID or checks a signature again, and the pure core sees only the origin and one boolean. A refused message is recorded in the graph <code>&lt;actor&gt;/inbound</code>, acknowledged to the relay, and answered with <code>error.communication</code> when the sender is verified and had contacted the actor first. An ungranted message never costs the receiver a journal append.</p>
     <p>Grants are checked at both ends. A grant names a grantee, a target and SCXML event descriptors, with an optional expiry:</p>
-<pre data-lang="Rust"><code>// from crates/vertep-federation/examples/two_orgs.rs
-a.fed.grant_outbound(Grant::new(buyer.did.as_str(), shop.did.as_str(), ["order.*"]));
-b.fed.grant_inbound(Grant::new(buyer.did.as_str(), shop.did.as_str(), ["order.*"]));</code></pre>
+<pre data-lang="Rust"><code><span class="c1">// from crates/vertep-federation/examples/two_orgs.rs
+</span>a.fed.grant_outbound(Grant::new(buyer.did.as_str(), shop.did.as_str(), [<span class="s">"order.*"</span>]));
+b.fed.grant_inbound(Grant::new(buyer.did.as_str(), shop.did.as_str(), [<span class="s">"order.*"</span>]));</code></pre>
     <p>A grant can also arrive as a verifiable credential from a trusted issuer (<code>accept_credential</code>). Grants are published into the actor's identity graph, <code>&lt;did&gt;/identity</code>, so "who may talk to this agent" is a query:</p>
 <pre data-lang="SPARQL"><code>PREFIX vt-id: &lt;https://w3id.org/vertep/vt-id#&gt;
 SELECT ?grantee ?event ?until WHERE {
@@ -289,14 +290,14 @@ SELECT ?grantee ?event ?until WHERE {
       <li><strong>Undeliverable.</strong> Unreachable recipients are retried with backoff (by default 5 attempts, starting at 1 s and doubling up to 60 s). After that the sending chart receives <code>error.communication</code> with the send id and the reason, without ever blocking.</li>
     </ul>
     <p>Wiring a node, as the module documentation of <code>crates/vertep-federation/src/federation.rs</code> sketches it:</p>
-<pre data-lang="Rust"><code>let fed = Federation::builder(resolver, network).protocol(didcomm).pickup(binding).build();
-let node = Node::builder(storage, shell)
-    .mailboxes_for_scheme("did", fed.mailboxes())     // local DID actors' relay mailboxes
-    .transport(fed.transport(TransportKind::DidComm)) // &lt;send type="didcomm"&gt;
-    .build();
-fed.attach(&amp;node.handle());                         // did: resolver, wake-ups, error path
-let did = fed.provision(&amp;node.handle(), chart_type, key, &amp;config, km)?;  // DID as address
-loop { node.run_until_idle(); fed.pump(); }</code></pre>
+<pre data-lang="Rust"><code><span class="kd">let</span> fed <span class="o">=</span> Federation::builder(resolver, network).protocol(didcomm).pickup(binding).build();
+<span class="kd">let</span> node <span class="o">=</span> Node::builder(storage, shell)
+    .mailboxes_for_scheme(<span class="s">"did"</span>, fed.mailboxes())     <span class="c1">// local DID actors' relay mailboxes
+</span>    .transport(fed.transport(TransportKind::DidComm)) <span class="c1">// &lt;send type="didcomm"&gt;
+</span>    .build();
+fed.attach(<span class="o">&amp;</span>node.handle());                         <span class="c1">// did: resolver, wake-ups, error path
+</span><span class="kd">let</span> did <span class="o">=</span> fed.provision(<span class="o">&amp;</span>node.handle(), chart_type, key, <span class="o">&amp;</span>config, km)<span class="o">?</span>;  <span class="c1">// DID as address
+</span><span class="k">loop</span> { node.run_until_idle(); fed.pump(); }</code></pre>
     <p>The example <code>crates/vertep-federation/examples/two_orgs.rs</code> runs two organisations' nodes and an in-process test mediator. The buyer's <code>&lt;send&gt;</code> to the shop's <code>did:peer</code> DID is resolved to the mediator, authcrypted and forwarded; the shop's node picks it up, verifies the sender, checks the grant and journals the event before acknowledging it:</p>
 <pre data-lang="Shell"><code>cargo run -p vertep-federation --example two_orgs --features didcomm,testkit</code></pre>
 <pre class="output" data-lang="Output"><code>shop journaled order.placed from did:peer:2.Vz6MksFJPi77yVK2k5KeaVZQNqqFneW7JKC3r3S8pYjwyUHmx.Ez6LSiZjqpMXyzKGQPeDC4pCw8n3iovG3ibdtvHFABppNvQhW.SeyJpZCI6IiNkaWRjb21tIiwicyI6eyJhIjpbImRpZGNvbW0vdjIiXSwiciI6WyJkaWQ6cGVlcjoyLlZ6Nk1rcEJXYVdhcTR3REZCb29WeHFIY0xyaUxxcUM1SkVtR04zdVdWTWJ5V0hzMVkuRXo2TFNyUFpVREhoWnhOa0VRZjljdWtpcnJZVmUzeFJraU13eHhEeDVoRHFwcHd2ei5TZXlKcFpDSTZJaU5rYVdSamIyMXRJaXdpY3lJNmV5SjFjbWtpT2lKb2RIUndjem92TDIxbFpHbGhkRzl5TG1WNFlXMXdiR1V2Wkdsa1kyOXRiU0o5TENKMElqb2laRzBpZlEja2V5LTIiXSwidXJpIjoiaHR0cHM6Ly9tZWRpYXRvci5leGFtcGxlL2RpZGNvbW0ifSwidCI6ImRtIn0 via https://w3id.org/vertep/vt-id#DIDCommEventProcessor (send id Some("o-1"))
@@ -335,7 +336,7 @@ mediator still holds 0 message(s)</code></pre>
 
     <nav class="pager" aria-label="Pages">
       <a href="agents.html">← Agents and deciders</a>
-      <a href="browser.html">Browser and JavaScript →</a>
+      <a href="durable-objects.html">Durable objects →</a>
     </nav>
   </main>
 </div>

@@ -50,11 +50,11 @@
     <p>Files: <code>examples/decider-agent/refund.scxml</code>, <code>examples/decider-agent/main.rs</code>, <code>examples/decider-agent/expected-output.txt</code>. All commands run from the repository root.</p>
     <h2 id="the-chart">The chart</h2>
     <p><code>vt:decide="policy"</code> hands the choice among a state's events to whatever decider the host binds to <code>policy</code>. The chart still owns the rules. With an amount of 250, the guard <code>ctx.amount &lt;= 100</code> keeps <code>approve</code> out of the offer in <code>review</code>.</p>
-<pre data-lang="SCXML"><code>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
-&lt;!--
+<pre data-lang="SCXML"><code><span class="cp">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="cm">&lt;!--
   A refund agent with two choice points, on the CEL datamodel.
 
-  `review` and `manager` are decide states: `vt:decide=&quot;policy&quot;` hands the choice among their
+  `review` and `manager` are decide states: `vt:decide="policy"` hands the choice among their
   events to whatever decider the host binds to `policy` (a guard table, an LLM, a person, another
   actor). The chart still owns the rules: the decider is offered only the events that are
   enabled right now, so with an amount over 100 `approve` is never offered in `review`, whatever
@@ -62,40 +62,40 @@
 
   Illustrates the deciders capability (Decide State Declaration, Enabled Event Offer, Decisions
   Are Journaled Inputs, Decider Safety).
---&gt;
-&lt;scxml xmlns=&quot;http://www.w3.org/2005/07/scxml&quot; xmlns:vt=&quot;https://w3id.org/vertep/vt#&quot;
-       version=&quot;1.0&quot; datamodel=&quot;cel&quot; name=&quot;refund-agent&quot; initial=&quot;idle&quot;&gt;
-  &lt;datamodel&gt;
-    &lt;data id=&quot;amount&quot; expr=&quot;0&quot;/&gt;
-  &lt;/datamodel&gt;
+--&gt;</span>
+<span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">xmlns:vt=</span><span class="s">"https://w3id.org/vertep/vt#"</span>
+       <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">datamodel=</span><span class="s">"cel"</span> <span class="na">name=</span><span class="s">"refund-agent"</span> <span class="na">initial=</span><span class="s">"idle"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;datamodel&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"amount"</span> <span class="na">expr=</span><span class="s">"0"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/datamodel&gt;</span>
 
-  &lt;state id=&quot;idle&quot;&gt;
-    &lt;transition event=&quot;request&quot; target=&quot;review&quot;&gt;
-      &lt;assign location=&quot;amount&quot; expr=&quot;ev.data.amount&quot;/&gt;
-    &lt;/transition&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"idle"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"request"</span> <span class="na">target=</span><span class="s">"review"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;assign</span> <span class="na">location=</span><span class="s">"amount"</span> <span class="na">expr=</span><span class="s">"ev.data.amount"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/transition&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;state id=&quot;review&quot; vt:decide=&quot;policy&quot; vt:candidates=&quot;approve reject escalate&quot;&gt;
-    &lt;transition event=&quot;approve&quot; cond=&quot;ctx.amount &amp;lt;= 100&quot; target=&quot;approved&quot;/&gt;
-    &lt;transition event=&quot;reject&quot; target=&quot;rejected&quot;/&gt;
-    &lt;transition event=&quot;escalate&quot; cond=&quot;ctx.amount &gt; 100&quot; target=&quot;manager&quot;/&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"review"</span> <span class="na">vt:decide=</span><span class="s">"policy"</span> <span class="na">vt:candidates=</span><span class="s">"approve reject escalate"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">cond=</span><span class="s">"ctx.amount &amp;lt;= 100"</span> <span class="na">target=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"reject"</span> <span class="na">target=</span><span class="s">"rejected"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"escalate"</span> <span class="na">cond=</span><span class="s">"ctx.amount &gt; 100"</span> <span class="na">target=</span><span class="s">"manager"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;state id=&quot;manager&quot; vt:decide=&quot;policy&quot; vt:candidates=&quot;approve reject&quot;&gt;
-    &lt;transition event=&quot;approve&quot; target=&quot;approved&quot;/&gt;
-    &lt;transition event=&quot;reject&quot; target=&quot;rejected&quot;/&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"manager"</span> <span class="na">vt:decide=</span><span class="s">"policy"</span> <span class="na">vt:candidates=</span><span class="s">"approve reject"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">target=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"reject"</span> <span class="na">target=</span><span class="s">"rejected"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;state id=&quot;approved&quot;/&gt;
-  &lt;state id=&quot;rejected&quot;/&gt;
-&lt;/scxml&gt;</code></pre>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"rejected"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
     <h2 id="the-program">The program</h2>
     <p>The first <code>AgentHost</code> binds the scripted decider and runs the request. The second opens the same journal with no decider bound and replays it.</p>
-<pre data-lang="Rust"><code>//! Decider agent: choice points decided by a pluggable decider, journaled, and replayed
+<pre data-lang="Rust"><code><span class="sd">//! Decider agent: choice points decided by a pluggable decider, journaled, and replayed
 //! without it.
 //!
 //! The refund chart has two decide states. A real deployment would bind `policy` to an
-//! `LlmDecider` (or a person&#x27;s inbox); here a scripted decider answers from a fixed list, so
+//! `LlmDecider` (or a person's inbox); here a scripted decider answers from a fixed list, so
 //! the example needs no network and no API key, and prints the same thing on every run.
 //!
 //! Run 1 sends a refund request and lets the decider choose twice. Every answer becomes a
@@ -107,159 +107,159 @@
 //! Journaled Inputs).
 //!
 //! Run with `cargo run -p vertep-examples --bin decider-agent`.
+</span>
+<span class="k">use</span> std::collections::VecDeque;
+<span class="k">use</span> std::future::Future;
+<span class="k">use</span> std::pin::Pin;
+<span class="k">use</span> std::sync::{Arc, Mutex};
 
-use std::collections::VecDeque;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
-
-use vertep::agent::{
+<span class="k">use</span> vertep::agent::{
     AgentHost, AgentInput, Annotations, Decider, DeciderKind, Decision, DecisionOutcome,
     DecisionRequest, MemoryJournal,
 };
-use vertep::prelude::{Event, VirtualClock};
+<span class="k">use</span> vertep::prelude::{Event, VirtualClock};
 
-/// The chart, next to this file.
-const REFUND: &amp;str = include_str!(&quot;refund.scxml&quot;);
-/// The agent actor&#x27;s IRI.
-const AGENT: &amp;str = &quot;https://example.org/agents/refund/7&quot;;
-/// 2026-11-11T00:00:00Z, the virtual clock&#x27;s start.
-const T0: i64 = 1_794_355_200_000;
+<span class="sd">/// The chart, next to this file.
+</span><span class="k">const</span> REFUND: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span> <span class="fm">include_str!</span>(<span class="s">"refund.scxml"</span>);
+<span class="sd">/// The agent actor's IRI.
+</span><span class="k">const</span> AGENT: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span> <span class="s">"https://example.org/agents/refund/7"</span>;
+<span class="sd">/// 2026-11-11T00:00:00Z, the virtual clock's start.
+</span><span class="k">const</span> T0: <span class="kt">i64</span> <span class="o">=</span> <span class="mi">1_794_355_200_000</span>;
 
-type Error = Box&lt;dyn std::error::Error&gt;;
+<span class="k">type</span> <span class="nc">Error</span> <span class="o">=</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;</span>;
 
-/// A deterministic stand-in for an LLM: answers from a script, in order, and prints each offer.
-struct ScriptedDecider {
-    answers: Mutex&lt;VecDeque&lt;(&amp;&#x27;static str, &amp;&#x27;static str)&gt;&gt;,
+<span class="sd">/// A deterministic stand-in for an LLM: answers from a script, in order, and prints each offer.
+</span><span class="k">struct</span> <span class="nc">ScriptedDecider</span> {
+    answers: <span class="nc">Mutex</span><span class="o">&lt;</span>VecDeque<span class="o">&lt;</span>(<span class="o">&amp;'</span><span class="nb">static</span> <span class="kt">str</span>, <span class="o">&amp;'</span><span class="nb">static</span> <span class="kt">str</span>)<span class="o">&gt;&gt;</span>,
 }
 
-impl Decider for ScriptedDecider {
-    fn kind(&amp;self) -&gt; DeciderKind {
+<span class="k">impl</span> Decider <span class="k">for</span> ScriptedDecider {
+    <span class="k">fn</span> <span class="nf">kind</span>(<span class="o">&amp;</span><span class="bp">self</span>) -&gt; <span class="nc">DeciderKind</span> {
         DeciderKind::Custom
     }
 
-    /// The request carries the decide state, the candidate events (only those enabled now),
-    /// a read-only view of the context and the correlation id the answer must carry.
-    fn decide(
-        &amp;self,
-        request: DecisionRequest,
-    ) -&gt; Pin&lt;Box&lt;dyn Future&lt;Output = DecisionOutcome&gt; + Send&gt;&gt; {
-        let offered: Vec&lt;&amp;str&gt; = request
+    <span class="sd">/// The request carries the decide state, the candidate events (only those enabled now),
+</span>    <span class="sd">/// a read-only view of the context and the correlation id the answer must carry.
+</span>    <span class="k">fn</span> <span class="nf">decide</span>(
+        <span class="o">&amp;</span><span class="bp">self</span>,
+        request: <span class="nc">DecisionRequest</span>,
+    ) -&gt; <span class="nc">Pin</span><span class="o">&lt;</span><span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> Future<span class="o">&lt;</span>Output <span class="o">=</span> DecisionOutcome<span class="o">&gt;</span> <span class="o">+</span> <span class="nb">Send</span><span class="o">&gt;&gt;</span> {
+        <span class="kd">let</span> offered: <span class="nb">Vec</span><span class="o">&lt;&amp;</span><span class="kt">str</span><span class="o">&gt;</span> <span class="o">=</span> request
             .candidates
             .iter()
-            .map(|c| c.event.as_str())
+            .map(<span class="o">|</span>c<span class="o">|</span> c.event.as_str())
             .collect();
-        let answer = self.answers.lock().expect(&quot;lock&quot;).pop_front();
-        let outcome = match answer {
-            Some((event, why)) =&gt; {
-                println!(
-                    &quot;  decider asked in `{}`: offered {offered:?} -&gt; {event}&quot;,
+        <span class="kd">let</span> answer <span class="o">=</span> <span class="bp">self</span>.answers.lock().expect(<span class="s">"lock"</span>).pop_front();
+        <span class="kd">let</span> outcome <span class="o">=</span> <span class="k">match</span> answer {
+            <span class="nb">Some</span>((event, why)) <span class="o">=&gt;</span> {
+                <span class="fm">println!</span>(
+                    <span class="s">"  decider asked in `{}`: offered {offered:?} -&gt; {event}"</span>,
                     request.state
                 );
-                let mut decision = Decision::new(event, vertep::prelude::Value::Undefined);
-                decision.annotations = Annotations {
-                    rationale: Some(why.to_owned()),
-                    ..Annotations::default()
+                <span class="kd">let</span> <span class="k">mut</span> decision <span class="o">=</span> Decision::new(event, vertep::prelude::Value::Undefined);
+                decision.annotations <span class="o">=</span> Annotations {
+                    rationale: <span class="nb">Some</span>(why.to_owned()),
+                    <span class="o">..</span>Annotations::default()
                 };
                 DecisionOutcome::Decision(decision)
             }
-            None =&gt; DecisionOutcome::refuse(&quot;the script is exhausted&quot;),
+            <span class="nb">None</span> <span class="o">=&gt;</span> DecisionOutcome::refuse(<span class="s">"the script is exhausted"</span>),
         };
-        Box::pin(async move { outcome })
+        <span class="nb">Box</span>::pin(<span class="k">async</span> <span class="k">move</span> { outcome })
     }
 }
 
-fn main() -&gt; Result&lt;(), Error&gt; {
-    let journal = Arc::new(MemoryJournal::new());
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
+    <span class="kd">let</span> journal <span class="o">=</span> Arc::new(MemoryJournal::new());
 
-    // ---- run 1: with the decider ------------------------------------------------------------
-    println!(&quot;run 1, decider bound to `policy`:&quot;);
-    let decider = ScriptedDecider {
-        answers: Mutex::new(VecDeque::from([
-            (&quot;escalate&quot;, &quot;amount is above my approval limit&quot;),
-            (&quot;approve&quot;, &quot;manager approved: item returned unopened&quot;),
+    <span class="c1">// ---- run 1: with the decider ------------------------------------------------------------
+</span>    <span class="fm">println!</span>(<span class="s">"run 1, decider bound to `policy`:"</span>);
+    <span class="kd">let</span> decider <span class="o">=</span> ScriptedDecider {
+        answers: <span class="nc">Mutex</span>::new(VecDeque::from([
+            (<span class="s">"escalate"</span>, <span class="s">"amount is above my approval limit"</span>),
+            (<span class="s">"approve"</span>, <span class="s">"manager approved: item returned unopened"</span>),
         ])),
     };
-    let mut host = AgentHost::builder(Arc::new(VirtualClock::new(T0)))
+    <span class="kd">let</span> <span class="k">mut</span> host <span class="o">=</span> AgentHost::builder(Arc::new(VirtualClock::new(T0)))
         .journal(journal.clone())
-        .decider(&quot;policy&quot;, Arc::new(decider))
+        .decider(<span class="s">"policy"</span>, Arc::new(decider))
         .build();
-    let version = host.register(chart()?)?;
-    host.spawn(AGENT, &amp;version)?;
-    host.send(AGENT, request(250));
+    <span class="kd">let</span> version <span class="o">=</span> host.register(chart()<span class="o">?</span>)<span class="o">?</span>;
+    host.spawn(AGENT, <span class="o">&amp;</span>version)<span class="o">?</span>;
+    host.send(AGENT, request(<span class="mi">250</span>));
     host.run_until_idle();
 
-    let before = host.state(AGENT)?;
-    println!(
-        &quot;  final: {:?} context={}&quot;,
+    <span class="kd">let</span> before <span class="o">=</span> host.state(AGENT)<span class="o">?</span>;
+    <span class="fm">println!</span>(
+        <span class="s">"  final: {:?} context={}"</span>,
         before.configuration,
-        context(&amp;before)
+        context(<span class="o">&amp;</span>before)
     );
-    println!(&quot;journal:&quot;);
-    for entry in host.journal(AGENT) {
-        let detail = match &amp;entry.input {
-            AgentInput::Start { .. } =&gt; String::new(),
-            AgentInput::Event { event, .. } =&gt; event.name.clone(),
+    <span class="fm">println!</span>(<span class="s">"journal:"</span>);
+    <span class="k">for</span> entry <span class="k">in</span> host.journal(AGENT) {
+        <span class="kd">let</span> detail <span class="o">=</span> <span class="k">match</span> <span class="o">&amp;</span>entry.input {
+            AgentInput::Start { <span class="o">..</span> } <span class="o">=&gt;</span> <span class="nb">String</span>::new(),
+            AgentInput::Event { event, <span class="o">..</span> } <span class="o">=&gt;</span> event.name.clone(),
             AgentInput::Decision {
                 correlation,
                 event,
                 annotations,
-                ..
-            } =&gt; format!(
-                &quot;{event} (offer {correlation}, rationale {:?})&quot;,
-                annotations.rationale.as_deref().unwrap_or(&quot;&quot;)
+                <span class="o">..</span>
+            } <span class="o">=&gt;</span> <span class="fm">format!</span>(
+                <span class="s">"{event} (offer {correlation}, rationale {:?})"</span>,
+                annotations.rationale.as_deref().unwrap_or(<span class="s">""</span>)
             ),
-            other =&gt; format!(&quot;{other:?}&quot;),
+            other <span class="o">=&gt;</span> <span class="fm">format!</span>(<span class="s">"{other:?}"</span>),
         };
-        let line = format!(&quot;  {} {:&lt;9} {detail}&quot;, entry.position, entry.input.kind());
-        println!(&quot;{}&quot;, line.trim_end());
+        <span class="kd">let</span> line <span class="o">=</span> <span class="fm">format!</span>(<span class="s">"  {} {:&lt;9} {detail}"</span>, entry.position, entry.input.kind());
+        <span class="fm">println!</span>(<span class="s">"{}"</span>, line.trim_end());
     }
 
-    // ---- run 2: same journal, no decider ----------------------------------------------------
-    println!(&quot;run 2, same journal, no decider bound:&quot;);
-    let mut replay = AgentHost::builder(Arc::new(VirtualClock::new(T0)))
+    <span class="c1">// ---- run 2: same journal, no decider ----------------------------------------------------
+</span>    <span class="fm">println!</span>(<span class="s">"run 2, same journal, no decider bound:"</span>);
+    <span class="kd">let</span> <span class="k">mut</span> replay <span class="o">=</span> AgentHost::builder(Arc::new(VirtualClock::new(T0)))
         .journal(journal)
         .build();
-    replay.register(chart()?)?;
-    let after = replay.state(AGENT)?; // activates the actor by replaying the journal
-    replay.run_until_idle();
-    println!(
-        &quot;  final: {:?} context={}&quot;,
+    replay.register(chart()<span class="o">?</span>)<span class="o">?</span>;
+    <span class="kd">let</span> after <span class="o">=</span> replay.state(AGENT)<span class="o">?</span>; <span class="c1">// activates the actor by replaying the journal
+</span>    replay.run_until_idle();
+    <span class="fm">println!</span>(
+        <span class="s">"  final: {:?} context={}"</span>,
         after.configuration,
-        context(&amp;after)
+        context(<span class="o">&amp;</span>after)
     );
-    for position in 2..=after.position {
-        let at = replay.state_at(AGENT, position)?;
-        println!(&quot;  as of entry {position}: {:?}&quot;, at.configuration);
+    <span class="k">for</span> position <span class="k">in</span> <span class="mi">2</span><span class="o">..=</span>after.position {
+        <span class="kd">let</span> at <span class="o">=</span> replay.state_at(AGENT, position)<span class="o">?</span>;
+        <span class="fm">println!</span>(<span class="s">"  as of entry {position}: {:?}"</span>, at.configuration);
     }
-    println!(
-        &quot;  entries replayed: {}, decider calls: {}&quot;,
+    <span class="fm">println!</span>(
+        <span class="s">"  entries replayed: {}, decider calls: {}"</span>,
         replay.stats().replayed,
-        replay.stats().decider_calls.values().sum::&lt;usize&gt;()
+        replay.stats().decider_calls.values().sum::<span class="o">&lt;</span><span class="kt">usize</span><span class="o">&gt;</span>()
     );
-    assert_eq!(after.configuration, before.configuration);
-    assert_eq!(after.datamodel, before.datamodel);
-    Ok(())
+    <span class="fm">assert_eq!</span>(after.configuration, before.configuration);
+    <span class="fm">assert_eq!</span>(after.datamodel, before.datamodel);
+    <span class="nb">Ok</span>(())
 }
 
-/// Reads the chart. Charts naming a datamodel other than `null` need `AnyDatamodel`.
-fn chart() -&gt; Result&lt;vertep::prelude::Chart, Error&gt; {
-    let opts = vertep::scxml::ReadOptions::new().with_datamodels(&amp;vertep::scxml::AnyDatamodel);
-    Ok(vertep::scxml::read(REFUND, &amp;opts)?.chart)
+<span class="sd">/// Reads the chart. Charts naming a datamodel other than `null` need `AnyDatamodel`.
+</span><span class="k">fn</span> <span class="nf">chart</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>vertep::prelude::Chart, Error<span class="o">&gt;</span> {
+    <span class="kd">let</span> opts <span class="o">=</span> vertep::scxml::ReadOptions::new().with_datamodels(<span class="o">&amp;</span>vertep::scxml::AnyDatamodel);
+    <span class="nb">Ok</span>(vertep::scxml::read(REFUND, <span class="o">&amp;</span>opts)<span class="o">?</span>.chart)
 }
 
-/// A `request` event with an `amount` payload.
-fn request(amount: u32) -&gt; Event {
+<span class="sd">/// A `request` event with an `amount` payload.
+</span><span class="k">fn</span> <span class="nf">request</span>(amount: <span class="kt">u32</span>) -&gt; <span class="nc">Event</span> {
     Event {
-        name: &quot;request&quot;.into(),
-        data: vertep::agent::json::from_json(&amp;serde_json::json!({ &quot;amount&quot;: amount })),
-        ..Event::default()
+        name: <span class="s">"request"</span>.into(),
+        data: <span class="nc">vertep</span>::agent::json::from_json(<span class="o">&amp;</span>serde_json::json<span class="o">!</span>({ <span class="s">"amount"</span>: <span class="nc">amount</span> })),
+        <span class="o">..</span>Event::default()
     }
 }
 
-/// The context as JSON.
-fn context(state: &amp;vertep::agent::AgentState) -&gt; String {
-    let view = vertep::agent::ContextView::new(state.datamodel.clone());
+<span class="sd">/// The context as JSON.
+</span><span class="k">fn</span> <span class="nf">context</span>(state: <span class="kp">&amp;</span><span class="nc">vertep</span>::agent::AgentState) -&gt; <span class="nb">String</span> {
+    <span class="kd">let</span> view <span class="o">=</span> vertep::agent::ContextView::new(state.datamodel.clone());
     vertep::agent::json::to_json(view.data()).to_string()
 }</code></pre>
     <h2 id="run-it">Run it</h2>

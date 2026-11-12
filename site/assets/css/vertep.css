@@ -349,3 +349,22 @@ a.card .more { font-family: var(--font-head); color: var(--orange-text); }
   .docs-layout { display: block; }
   pre { box-shadow: none; }
 }
+
+/* ---------- code highlighting ----------
+   Written into the pages by tools/highlight.py for Rust, XML and YAML. Two inks only: ink and the
+   rubric orange, told apart by weight and slant too, so meaning never rests on colour alone. */
+pre:not(.output) .k, pre:not(.output) .kd, pre:not(.output) .kn, pre:not(.output) .kr,
+pre:not(.output) .kp, pre:not(.output) .ow { color: var(--ink); font-weight: 600; }
+pre:not(.output) .kt, pre:not(.output) .nc, pre:not(.output) .nt, pre:not(.output) .nn,
+pre:not(.output) .no { color: var(--orange-text); font-weight: 600; }
+pre:not(.output) .na, pre:not(.output) .nl, pre:not(.output) .nf, pre:not(.output) .fm,
+pre:not(.output) .nb, pre:not(.output) .bp { color: var(--orange-text); }
+pre:not(.output) .s, pre:not(.output) .s1, pre:not(.output) .s2, pre:not(.output) .sa,
+pre:not(.output) .sb, pre:not(.output) .sc, pre:not(.output) .se, pre:not(.output) .si,
+pre:not(.output) .sx { color: var(--orange-text); font-style: italic; }
+pre:not(.output) .m, pre:not(.output) .mi, pre:not(.output) .mf, pre:not(.output) .mh,
+pre:not(.output) .l, pre:not(.output) .kc { color: var(--ink); font-style: italic; }
+pre:not(.output) .c, pre:not(.output) .c1, pre:not(.output) .cm, pre:not(.output) .cs,
+pre:not(.output) .sd { color: var(--ink-2); font-style: italic; }
+pre:not(.output) .nd, pre:not(.output) .cp, pre:not(.output) .ni, pre:not(.output) .nv,
+pre:not(.output) .vi, pre:not(.output) .py { color: var(--ink-2); }

@@ -41,6 +41,7 @@
       <li><a href="runtime.html">The actor runtime</a></li>
       <li><a href="agents.html">Agents and deciders</a></li>
       <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -162,43 +163,43 @@
 
     <h2 id="writing-types">Writing types in a chart</h2>
     <p>Here is one small typed chart, a counter, on CEL in YAML. <code>types</code> names record and union types, <code>events</code> gives each event its payload type (<code>null</code> for none), and <code>context</code> gives each data item a type and an initial value:</p>
-<pre data-lang="YAML"><code>vertep: 1
-name: counter
-datamodel: cel
-types:
-  Add: { by: int }
-events: { add: Add, reset: null }
-context:
-  count: { type: int, init: "0" }
-initial: counting
-states:
-  counting:
-    on:
-      add:
-        - cond: "ev.data.by &gt; 0"
-          actions: [ { assign: { location: ctx.count, expr: "ctx.count + ev.data.by" } } ]
-      reset:
-        - actions: [ { assign: { location: ctx.count, expr: "0" } } ]</code></pre>
+<pre data-lang="YAML"><code><span class="nt">vertep</span>: <span class="l">1</span>
+<span class="nt">name</span>: <span class="l">counter</span>
+<span class="nt">datamodel</span>: <span class="l">cel</span>
+<span class="nt">types</span>:
+  <span class="nt">Add</span>: {<span class="nt"> by</span>: <span class="nv">int</span> }
+<span class="nt">events</span>: {<span class="nt"> add</span>: <span class="nv">Add</span>,<span class="nt"> reset</span>: <span class="nv">null</span> }
+<span class="nt">context</span>:
+  <span class="nt">count</span>: {<span class="nt"> type</span>: <span class="nv">int</span>,<span class="nt"> init</span>: <span class="s">"0"</span> }
+<span class="nt">initial</span>: <span class="l">counting</span>
+<span class="nt">states</span>:
+  <span class="nt">counting</span>:
+    <span class="nt">on</span>:
+      <span class="nt">add</span>:
+        - <span class="nt">cond</span>: <span class="s">"ev.data.by</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0"</span>
+          <span class="nt">actions</span>: [ {<span class="nt"> assign</span>: {<span class="nt"> location</span>: <span class="nv">ctx.count</span>,<span class="nt"> expr</span>: <span class="s">"ctx.count</span><span class="nv"> </span><span class="s">+</span><span class="nv"> </span><span class="s">ev.data.by"</span> } } ]
+      <span class="nt">reset</span>:
+        - <span class="nt">actions</span>: [ {<span class="nt"> assign</span>: {<span class="nt"> location</span>: <span class="nv">ctx.count</span>,<span class="nt"> expr</span>: <span class="s">"0"</span> } } ]</code></pre>
     <p>In SCXML the same declarations go in a <code>vt:types</code> element, and <code>vt:type</code> annotates a <code>&lt;data&gt;</code> item (or a <code>&lt;send&gt;</code> payload, or a <code>&lt;param&gt;</code>). This version uses the <code>ecmascript</code> datamodel, so its expressions read <code>_event.data</code> instead of <code>ev.data</code>:</p>
-<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
-       version="1.0" name="counter" datamodel="ecmascript" initial="counting"&gt;
-  &lt;vt:types&gt;
+<pre data-lang="SCXML"><code><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">xmlns:vt=</span><span class="s">"https://w3id.org/vertep/vt#"</span>
+       <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">name=</span><span class="s">"counter"</span> <span class="na">datamodel=</span><span class="s">"ecmascript"</span> <span class="na">initial=</span><span class="s">"counting"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;vt:types&gt;</span>
     type Add = { by: int };
     event add: Add;
     event reset;
-  &lt;/vt:types&gt;
-  &lt;datamodel&gt;
-    &lt;data id="count" expr="0" vt:type="int"/&gt;
-  &lt;/datamodel&gt;
-  &lt;state id="counting"&gt;
-    &lt;transition event="add" cond="_event.data.by &amp;gt; 0"&gt;
-      &lt;assign location="count" expr="count + _event.data.by"/&gt;
-    &lt;/transition&gt;
-    &lt;transition event="reset"&gt;
-      &lt;assign location="count" expr="0"/&gt;
-    &lt;/transition&gt;
-  &lt;/state&gt;
-&lt;/scxml&gt;</code></pre>
+  <span class="nt">&lt;/vt:types&gt;</span>
+  <span class="nt">&lt;datamodel&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"count"</span> <span class="na">expr=</span><span class="s">"0"</span> <span class="na">vt:type=</span><span class="s">"int"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/datamodel&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"counting"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"add"</span> <span class="na">cond=</span><span class="s">"_event.data.by &amp;gt; 0"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;assign</span> <span class="na">location=</span><span class="s">"count"</span> <span class="na">expr=</span><span class="s">"count + _event.data.by"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/transition&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"reset"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;assign</span> <span class="na">location=</span><span class="s">"count"</span> <span class="na">expr=</span><span class="s">"0"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/transition&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
     <p>An SCXML processor that ignores the <code>vt:</code> namespace runs this document untyped. The two files differ in datamodel, so they are two charts with two versions:</p>
 <pre class="output" data-lang="Output"><code>$ vt hash counter.yaml
 urn:vertep:chart:sha256:4ee7f3aad3f8bf39adb28adb68271c58a9460efbe090d6549a0e1eca8f954076
@@ -384,36 +385,36 @@ c:event.add a sh:NodeShape ;
 <pre class="output" data-lang="Output"><code>$ vt schema --format rust counter.yaml
 counter.yaml: the Rust projection is generated at compile time by the statechart! and include_chart! macros (vertep-macros); use include_chart!("counter.yaml") to get the typed Rust API</code></pre>
     <p>The test <code>union_projects_to_an_enum</code> in <code>crates/vertep-dm-rust/tests/rust_projection.rs</code> shows the Rust side: a union becomes an enum you can match exhaustively, records become structs, recursion through an optional is boxed.</p>
-<pre data-lang="Rust"><code>statechart! {
-    #[allow(unhandled_events, unreachable_states)]
-    name: types_demo,
+<pre data-lang="Rust"><code>statechart<span class="o">!</span> {
+    <span class="cp">#[allow(unhandled_events, unreachable_states)]</span>
+    name: <span class="nc">types_demo</span>,
     types {
-        Payment = Card { last4: string } | Cash,
-        Line = { sku: string, qty: int, price: decimal, note: optional&lt;string&gt; },
-        Order = {
-            id: iri,
-            at: datetime,
-            lines: list&lt;Line&gt;,
-            payment: Payment,
-            paid: bool,
-            extra: value,
-            parent: optional&lt;Order&gt;,
-            "unit price": optional&lt;Money&gt;,
-            type: optional&lt;string&gt;,
+        Payment <span class="o">=</span> Card { last4: <span class="nc">string</span> } <span class="o">|</span> Cash,
+        Line <span class="o">=</span> { sku: <span class="nc">string</span>, qty: <span class="nc">int</span>, price: <span class="nc">decimal</span>, note: <span class="nc">optional</span><span class="o">&lt;</span>string<span class="o">&gt;</span> },
+        Order <span class="o">=</span> {
+            id: <span class="nc">iri</span>,
+            at: <span class="nc">datetime</span>,
+            lines: <span class="nc">list</span><span class="o">&lt;</span>Line<span class="o">&gt;</span>,
+            payment: <span class="nc">Payment</span>,
+            paid: <span class="kt">bool</span>,
+            extra: <span class="nc">value</span>,
+            parent: <span class="nc">optional</span><span class="o">&lt;</span>Order<span class="o">&gt;</span>,
+            <span class="s">"unit price"</span>: <span class="nc">optional</span><span class="o">&lt;</span>Money<span class="o">&gt;</span>,
+            <span class="k">type</span>: <span class="nc">optional</span><span class="o">&lt;</span>string<span class="o">&gt;</span>,
         },
-        Tree = Leaf | Node { children: list&lt;Tree&gt; } | Labeled string,
-        Money = decimal,
+        Tree <span class="o">=</span> Leaf <span class="o">|</span> Node { children: <span class="nc">list</span><span class="o">&lt;</span>Tree<span class="o">&gt;</span> } <span class="o">|</span> Labeled string,
+        Money <span class="o">=</span> decimal,
     }
-    events { place: Order }
+    events { place: <span class="nc">Order</span> }
     initial open;
-    state open { on place =&gt; open; }
+    state open { on place <span class="o">=&gt;</span> open; }
 }
 
-fn label(p: &amp;Payment) -&gt; String {
-    // Exhaustive: the enum has exactly these two variants.
-    match p {
-        Payment::Card { last4 } =&gt; format!("card {last4}"),
-        Payment::Cash =&gt; "cash".to_string(),
+<span class="k">fn</span> <span class="nf">label</span>(p: <span class="kp">&amp;</span><span class="nc">Payment</span>) -&gt; <span class="nb">String</span> {
+    <span class="c1">// Exhaustive: the enum has exactly these two variants.
+</span>    <span class="k">match</span> p {
+        Payment::Card { last4 } <span class="o">=&gt;</span> <span class="fm">format!</span>(<span class="s">"card {last4}"</span>),
+        Payment::Cash <span class="o">=&gt;</span> <span class="s">"cash"</span>.to_string(),
     }
 }</code></pre>
 

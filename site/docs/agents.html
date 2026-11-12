@@ -41,6 +41,7 @@
       <li><a href="runtime.html">The actor runtime</a></li>
       <li><a href="agents.html" aria-current="page">Agents and deciders</a></li>
       <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -136,27 +137,27 @@
     </table>
     <p>Only an atomic or compound <code>&lt;state&gt;</code> can decide. The binding on a <code>&lt;parallel&gt;</code>, <code>&lt;final&gt;</code> or <code>&lt;history&gt;</code> is rejected, as are a malformed deadline or bound. A chart with such an error is not accepted by the agent host.</p>
     <p>This is the decide state of <code>crates/vertep-agent/examples/support-agent.scxml</code>:</p>
-<pre data-lang="SCXML"><code>&lt;state id="decide" vt:decide="llm/claude" vt:fallback="human/support" vt:deadline="30s"
-       vt:maxDecisions="10" vt:candidates="call_tool finish escalate"&gt;
-  &lt;transition event="call_tool" target="tooling"&gt;
-    &lt;send event="tool.call" targetexpr="ev.data.tool"&gt;&lt;content expr="ev.data.args"/&gt;&lt;/send&gt;
-  &lt;/transition&gt;
-  &lt;transition event="finish" target="done"&gt;&lt;assign location="answer" expr="ev.data"/&gt;&lt;/transition&gt;
-  &lt;transition event="escalate" target="human"/&gt;
-  &lt;transition event="vt.agent.budget-exhausted" target="budget_out"/&gt;
-  &lt;transition event="error.decide.invalid" target="decide"/&gt;
-  &lt;transition event="vt.decide.refused" target="human"/&gt;
-&lt;/state&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"decide"</span> <span class="na">vt:decide=</span><span class="s">"llm/claude"</span> <span class="na">vt:fallback=</span><span class="s">"human/support"</span> <span class="na">vt:deadline=</span><span class="s">"30s"</span>
+       <span class="na">vt:maxDecisions=</span><span class="s">"10"</span> <span class="na">vt:candidates=</span><span class="s">"call_tool finish escalate"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"call_tool"</span> <span class="na">target=</span><span class="s">"tooling"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;send</span> <span class="na">event=</span><span class="s">"tool.call"</span> <span class="na">targetexpr=</span><span class="s">"ev.data.tool"</span><span class="nt">&gt;&lt;content</span> <span class="na">expr=</span><span class="s">"ev.data.args"</span><span class="nt">/&gt;&lt;/send&gt;</span>
+  <span class="nt">&lt;/transition&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"finish"</span> <span class="na">target=</span><span class="s">"done"</span><span class="nt">&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"answer"</span> <span class="na">expr=</span><span class="s">"ev.data"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"escalate"</span> <span class="na">target=</span><span class="s">"human"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"vt.agent.budget-exhausted"</span> <span class="na">target=</span><span class="s">"budget_out"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"error.decide.invalid"</span> <span class="na">target=</span><span class="s">"decide"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"vt.decide.refused"</span> <span class="na">target=</span><span class="s">"human"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/state&gt;</span></code></pre>
     <p>The same binding can be written as one element, <code>&lt;vt:decide decider="d" deadline="2s"/&gt;</code>, with attributes <code>decider</code>, <code>deadline</code>, <code>fallback</code>, <code>candidates</code> and <code>maxDecisions</code>. In the YAML surface a decide state lists its extensions. This chart is taken from the test <code>decide_state_parsed_from_scxml</code> in <code>crates/vertep-agent/tests/deciders.rs</code>:</p>
-<pre data-lang="YAML"><code>vertep: 1
-name: y
-states:
-  review:
-    extensions:
-      - { local: decide, attribute: llm/claude }
-      - { local: maxDecisions, attribute: "3" }
-    on: { approve: done }
-  done: { type: final }</code></pre>
+<pre data-lang="YAML"><code><span class="nt">vertep</span>: <span class="l">1</span>
+<span class="nt">name</span>: <span class="l">y</span>
+<span class="nt">states</span>:
+  <span class="nt">review</span>:
+    <span class="nt">extensions</span>:
+      - {<span class="nt"> local</span>: <span class="nv">decide</span>,<span class="nt"> attribute</span>: <span class="nv">llm/claude</span> }
+      - {<span class="nt"> local</span>: <span class="nv">maxDecisions</span>,<span class="nt"> attribute</span>: <span class="s">"3"</span> }
+    <span class="nt">on</span>: {<span class="nt"> approve</span>: <span class="nv">done</span> }
+  <span class="nt">done</span>: {<span class="nt"> type</span>: <span class="nv">final</span> }</code></pre>
 
     <h3 id="cycle">One decision, step by step</h3>
     <ol>
@@ -186,19 +187,19 @@ states:
 
     <h2 id="deciders">Deciders</h2>
     <p>The contract, from <code>crates/vertep-agent/src/decider.rs</code>:</p>
-<pre data-lang="Rust"><code>pub trait Decider: Send + Sync {
-    /// The decider's kind.
-    fn kind(&amp;self) -&gt; DeciderKind;
-    /// Decides; the future may take arbitrarily long (the actor keeps running).
-    fn decide(&amp;self, request: DecisionRequest) -&gt; BoxFuture&lt;'static, DecisionOutcome&gt;;
-    /// The request `correlation` was cancelled or superseded; a later answer is stale.
-    fn cancel(&amp;self, _correlation: &amp;str) {}
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">trait</span> Decider: <span class="nb">Send</span> <span class="o">+</span> <span class="nb">Sync</span> {
+    <span class="sd">/// The decider's kind.
+</span>    <span class="k">fn</span> <span class="nf">kind</span>(<span class="o">&amp;</span><span class="bp">self</span>) -&gt; <span class="nc">DeciderKind</span>;
+    <span class="sd">/// Decides; the future may take arbitrarily long (the actor keeps running).
+</span>    <span class="k">fn</span> <span class="nf">decide</span>(<span class="o">&amp;</span><span class="bp">self</span>, request: <span class="nc">DecisionRequest</span>) -&gt; <span class="nc">BoxFuture</span><span class="o">&lt;'</span><span class="nb">static</span>, DecisionOutcome<span class="o">&gt;</span>;
+    <span class="sd">/// The request `correlation` was cancelled or superseded; a later answer is stale.
+</span>    <span class="k">fn</span> <span class="nf">cancel</span>(<span class="o">&amp;</span><span class="bp">self</span>, _correlation: <span class="kp">&amp;</span><span class="kt">str</span>) {}
 }
 
-pub enum DecisionOutcome {
-    Decision(Decision),   // event, payload, annotations
-    Refusal(Refusal),     // reason
-}</code></pre>
+<span class="k">pub</span> <span class="k">enum</span> <span class="nc">DecisionOutcome</span> {
+    Decision(Decision),   <span class="c1">// event, payload, annotations
+</span>    Refusal(Refusal),     <span class="c1">// reason
+</span>}</code></pre>
     <p>A <code>DecisionRequest</code> holds the decide state id, the candidates (each with its event name and payload JSON Schema), a read-only <code>ContextView</code> of the datamodel at offer time, the actor IRI, the correlation id, the binding asked, and whether this is a fallback. A decider owns its copy of the request. It has no handle on the chart, the datamodel or the store, so returning a value is all it can do.</p>
 
     <h3 id="kinds">Four kinds</h3>
@@ -213,41 +214,41 @@ pub enum DecisionOutcome {
     </table>
     <p>You can also implement <code>Decider</code> yourself and report <code>DeciderKind::Custom</code>. The <code>decider-agent</code> example on the <a href="../examples/index.html">examples page</a> does this with a scripted decider.</p>
     <p>Binding names such as <code>llm/claude</code> are plain strings. The prefix is a convention for readers, not a type: the support-agent kit binds <code>human/support</code> to a guard decider. Bindings are registered on the host builder; this is from <code>crates/vertep-agent/examples/support/kit.rs</code>:</p>
-<pre data-lang="Rust"><code>let clock = VirtualClock::new(T0);
-let mut b = AgentHost::builder(Arc::new(clock.clone()))
-    .provider("triage", Arc::new(triage))
+<pre data-lang="Rust"><code><span class="kd">let</span> clock <span class="o">=</span> VirtualClock::new(T0);
+<span class="kd">let</span> <span class="k">mut</span> b <span class="o">=</span> AgentHost::builder(Arc::new(clock.clone()))
+    .provider(<span class="s">"triage"</span>, Arc::new(triage))
     .decider(
-        "llm/claude",
+        <span class="s">"llm/claude"</span>,
         Arc::new(
-            LlmDecider::new("claude", Arc::new(model), "claude-opus-5-5").with_instructions(
-                "You are a support agent. Use the tools, then finish with an answer.",
+            LlmDecider::new(<span class="s">"claude"</span>, Arc::new(model), <span class="s">"claude-opus-5-5"</span>).with_instructions(
+                <span class="s">"You are a support agent. Use the tools, then finish with an answer."</span>,
             ),
         ),
     )
     .decider(
-        "human/support",
-        Arc::new(GuardDecider::with_rules(vec![
+        <span class="s">"human/support"</span>,
+        Arc::new(GuardDecider::with_rules(<span class="fm">vec!</span>[
             vertep_agent::decider::GuardRule {
-                event: "finish".into(),
-                guard: None,
-                payload: Some("{'text': 'A person will get back to you.'}".into()),
+                event: <span class="s">"finish"</span>.into(),
+                guard: <span class="nb">None</span>,
+                payload: <span class="nb">Some</span>(<span class="s">"{'text': 'A person will get back to you.'}"</span>.into()),
             },
         ])),
     );
-for t in tools() {
-    b = b.tool(t);
+<span class="k">for</span> t <span class="k">in</span> tools() {
+    b <span class="o">=</span> b.tool(t);
 }</code></pre>
     <p>Spawning an actor whose chart names a binding that is not registered fails with <code>InstantiateError::UnknownDecider</code>, before any input is processed.</p>
     <p>A decision may carry annotations: a rationale, a confidence in [0, 1], the decider kind and binding, the model, the prompt hash, the token usage and whether a fallback answered. They are recorded in the graph. They never influence which transition is taken.</p>
 
     <h2 id="llm-actors">LLM actors</h2>
     <p>One model call is an invoked child: <code>&lt;invoke type="vt:llm"&gt;</code>. It lives as long as the invoking state and is cancelled when that state exits, like any SCXML invoke. From the support agent:</p>
-<pre data-lang="SCXML"><code>&lt;state id="triaging"&gt;
-  &lt;invoke type="vt:llm" id="triage" vt:provider="triage" vt:model="claude-opus-5-5"
-          vt:template="Triage this support ticket in one line: {{context.ticket.text}}"/&gt;
-  &lt;transition event="done.invoke.triage" target="decide"&gt;&lt;assign location="triage" expr="ev.data.text"/&gt;&lt;/transition&gt;
-  &lt;transition event="error.llm" target="decide"/&gt;
-&lt;/state&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"triaging"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;invoke</span> <span class="na">type=</span><span class="s">"vt:llm"</span> <span class="na">id=</span><span class="s">"triage"</span> <span class="na">vt:provider=</span><span class="s">"triage"</span> <span class="na">vt:model=</span><span class="s">"claude-opus-5-5"</span>
+          <span class="na">vt:template=</span><span class="s">"Triage this support ticket in one line: {{context.ticket.text}}"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"done.invoke.triage"</span> <span class="na">target=</span><span class="s">"decide"</span><span class="nt">&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"triage"</span> <span class="na">expr=</span><span class="s">"ev.data.text"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"error.llm"</span> <span class="na">target=</span><span class="s">"decide"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/state&gt;</span></code></pre>
     <table>
       <thead><tr><th>Attribute</th><th>Meaning</th></tr></thead>
       <tbody>
@@ -266,18 +267,18 @@ for t in tools() {
     <p>Every call records prompt and completion tokens, the model, the provider binding, latency and an optional cost. The running totals of an actor are visible to its guards as the read-only data item <code>vt_usage</code>, with the fields <code>prompt_tokens</code>, <code>completion_tokens</code>, <code>total_tokens</code>, <code>calls</code> and <code>cost</code>. A budget guard such as <code>cond="vt_usage.total_tokens &amp;lt; 50000"</code> reads it like any other data. Calls made by an LLM decider count too.</p>
 
     <h3 id="providers">Providers</h3>
-<pre data-lang="Rust"><code>pub trait Provider: Send + Sync {
-    /// Completes `request`.
-    fn complete(
-        &amp;self,
-        request: ProviderRequest,
-    ) -&gt; BoxFuture&lt;'static, Result&lt;ProviderResult, ProviderError&gt;&gt;;
-    /// Streams `request` as chunks followed by the final result, when the provider can.
-    fn stream(
-        &amp;self,
-        _request: ProviderRequest,
-    ) -&gt; Option&lt;BoxStream&lt;'static, Result&lt;StreamItem, ProviderError&gt;&gt;&gt; {
-        None
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">trait</span> Provider: <span class="nb">Send</span> <span class="o">+</span> <span class="nb">Sync</span> {
+    <span class="sd">/// Completes `request`.
+</span>    <span class="k">fn</span> <span class="nf">complete</span>(
+        <span class="o">&amp;</span><span class="bp">self</span>,
+        request: <span class="nc">ProviderRequest</span>,
+    ) -&gt; <span class="nc">BoxFuture</span><span class="o">&lt;'</span><span class="nb">static</span>, <span class="nb">Result</span><span class="o">&lt;</span>ProviderResult, ProviderError<span class="o">&gt;&gt;</span>;
+    <span class="sd">/// Streams `request` as chunks followed by the final result, when the provider can.
+</span>    <span class="k">fn</span> <span class="nf">stream</span>(
+        <span class="o">&amp;</span><span class="bp">self</span>,
+        _request: <span class="nc">ProviderRequest</span>,
+    ) -&gt; <span class="nb">Option</span><span class="o">&lt;</span>BoxStream<span class="o">&lt;'</span><span class="nb">static</span>, <span class="nb">Result</span><span class="o">&lt;</span>StreamItem, ProviderError<span class="o">&gt;&gt;&gt;</span> {
+        <span class="nb">None</span>
     }
 }</code></pre>
     <p>A <code>ProviderRequest</code> carries the rendered prompt, the model, the generation parameters, an optional output schema and the tools the model may call (exactly the granted ones). A <code>ProviderResult</code> carries the content, usage, the model id the provider reports, an optional cost and any tool calls.</p>
@@ -285,88 +286,88 @@ for t in tools() {
 
     <h2 id="tools-grants">Tools and capability grants</h2>
     <p>A tool is registered by IRI with an argument type and a result type in the type language. Its JSON Schemas are derived from those types. From the support kit:</p>
-<pre data-lang="Rust"><code>let orders = Tool::new(
-    ORDERS,                                        // "https://example.org/tools/order-lookup"
-    "type Order = { id: string, status: string };", // declarations
-    "{ id: string }",                               // argument type
-    "Order",                                        // result type
-    |args: Value| async move {
-        let id = match vertep_agent::json::field(&amp;args, "id") {
-            Some(Value::String(id)) =&gt; id.clone(),
-            _ =&gt; return Err("no id".to_owned()),
+<pre data-lang="Rust"><code><span class="kd">let</span> orders <span class="o">=</span> Tool::new(
+    ORDERS,                                        <span class="c1">// "https://example.org/tools/order-lookup"
+</span>    <span class="s">"type Order = { id: string, status: string };"</span>, <span class="c1">// declarations
+</span>    <span class="s">"{ id: string }"</span>,                               <span class="c1">// argument type
+</span>    <span class="s">"Order"</span>,                                        <span class="c1">// result type
+</span>    <span class="o">|</span>args: <span class="nc">Value</span><span class="o">|</span> <span class="k">async</span> <span class="k">move</span> {
+        <span class="kd">let</span> id <span class="o">=</span> <span class="k">match</span> vertep_agent::json::field(<span class="o">&amp;</span>args, <span class="s">"id"</span>) {
+            <span class="nb">Some</span>(Value::<span class="nb">String</span>(id)) <span class="o">=&gt;</span> id.clone(),
+            _ <span class="o">=&gt;</span> <span class="k">return</span> <span class="nb">Err</span>(<span class="s">"no id"</span>.to_owned()),
         };
-        Ok(json(serde_json::json!({ "id": id, "status": "returned" })))
+        <span class="nb">Ok</span>(json(serde_json::json<span class="o">!</span>({ <span class="s">"id"</span>: <span class="nc">id</span>, <span class="s">"status"</span>: <span class="s">"returned"</span> })))
     },
 )
-.expect("the order tool is well-typed")
-.with_description("Look up an order by id");</code></pre>
+.expect(<span class="s">"the order tool is well-typed"</span>)
+.with_description(<span class="s">"Look up an order by id"</span>);</code></pre>
     <p>A chart calls a tool in one of two ways. <code>&lt;invoke type="vt:tool" src="&lt;tool IRI&gt;"&gt;</code> passes its <code>&lt;param&gt;</code>s or <code>&lt;content&gt;</code> as arguments, and the result arrives as <code>done.invoke.&lt;id&gt;</code>. A <code>&lt;send&gt;</code> whose target is the tool IRI gets its result as <code>vt:reply</code>; the support agent uses this form. Arguments are checked against the argument type before the tool runs. A failure raises <code>error.tool</code> with the class <code>arguments</code>, <code>execution</code>, <code>result</code> or <code>unknown</code>. Tool results are journaled in the caller's journal.</p>
     <p>A capability grant says what an invoked LLM, tool or plan actor may reach: send targets (actor IRIs and <code>#_parent</code>), tools, decider bindings and, for plans, functions. A state or an <code>&lt;invoke&gt;</code> declares it either as attributes or as an element:</p>
-<pre data-lang="SCXML"><code>&lt;invoke type="vt:llm" id="summary" vt:provider="p" vt:model="m1"
-        vt:template="Summarise the case of {{context.customer.name}}."
-        vt:grantTools="https://example.org/tools/search https://example.org/tools/fetch"
-        vt:grantTargets="#_parent"/&gt;
+<pre data-lang="SCXML"><code><span class="nt">&lt;invoke</span> <span class="na">type=</span><span class="s">"vt:llm"</span> <span class="na">id=</span><span class="s">"summary"</span> <span class="na">vt:provider=</span><span class="s">"p"</span> <span class="na">vt:model=</span><span class="s">"m1"</span>
+        <span class="na">vt:template=</span><span class="s">"Summarise the case of {{context.customer.name}}."</span>
+        <span class="na">vt:grantTools=</span><span class="s">"https://example.org/tools/search https://example.org/tools/fetch"</span>
+        <span class="na">vt:grantTargets=</span><span class="s">"#_parent"</span><span class="nt">/&gt;</span>
 
-&lt;vt:grant targets="#_parent vt:actor/Crm/1" tools="vt:tool/search"
-          deciders="human/inbox" functions="vt:action/notify"/&gt;</code></pre>
+<span class="nt">&lt;vt:grant</span> <span class="na">targets=</span><span class="s">"#_parent vt:actor/Crm/1"</span> <span class="na">tools=</span><span class="s">"vt:tool/search"</span>
+          <span class="na">deciders=</span><span class="s">"human/inbox"</span> <span class="na">functions=</span><span class="s">"vt:action/notify"</span><span class="nt">/&gt;</span></code></pre>
     <p>The attribute forms are <code>vt:grantTargets</code>, <code>vt:grantTools</code>, <code>vt:grantDeciders</code> and <code>vt:grantFunctions</code>; several <code>vt:grant</code> elements add up. A child's effective grant is its parent's effective grant intersected with its own declaration, recursively, so authority never widens down the invoke tree. An LLM call is offered exactly the granted tools.</p>
     <p>Enforcement sits in the send path, not in the LLM adapter, so it covers plans and nested invokes the same way. An ungranted send is not delivered. The sender gets <code>error.communication</code> with the reason <code>not-granted</code>, and the parent gets <code>vt.grant.denied</code>, which it journals. Runtime actors invoked from ordinary charts are wrapped in <code>GrantedActor</code>, which filters their sends the same way.</p>
     <div class="nb warn"><p>Grants restrict invoked children. They do not restrict the agent chart's own <code>&lt;send&gt;</code> elements: those go wherever the chart says. In <code>support-agent.scxml</code> the <code>call_tool</code> transition sends to <code>targetexpr="ev.data.tool"</code>, a target the model chose, and the chart declares no payload type, so the decision is checked by event name only. If that matters, give <code>call_tool</code> a payload type or a guard on <code>ev.data.tool</code>.</p></div>
 
     <h2 id="react">A ReAct loop is a chart</h2>
     <p>The model as the main driver needs no feature of its own. It is a decide loop whose candidates are tool calls, a finish event and an escalation, bounded by <code>vt:maxDecisions</code> or by a guard on a counter or on <code>vt_usage</code>. The whole support agent, <code>crates/vertep-agent/examples/support-agent.scxml</code>:</p>
-<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
-       version="1.0" datamodel="cel" initial="idle" name="support-agent"&gt;
-  &lt;datamodel&gt;
-    &lt;data id="ticket" expr="null"/&gt;
-    &lt;data id="triage" expr="''"/&gt;
-    &lt;data id="steps" expr="0"/&gt;
-    &lt;data id="observations" expr="[]"/&gt;
-    &lt;data id="answer" expr="null"/&gt;
-  &lt;/datamodel&gt;
+<pre data-lang="SCXML"><code><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">xmlns:vt=</span><span class="s">"https://w3id.org/vertep/vt#"</span>
+       <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">datamodel=</span><span class="s">"cel"</span> <span class="na">initial=</span><span class="s">"idle"</span> <span class="na">name=</span><span class="s">"support-agent"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;datamodel&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"ticket"</span> <span class="na">expr=</span><span class="s">"null"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"triage"</span> <span class="na">expr=</span><span class="s">"''"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"steps"</span> <span class="na">expr=</span><span class="s">"0"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"observations"</span> <span class="na">expr=</span><span class="s">"[]"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"answer"</span> <span class="na">expr=</span><span class="s">"null"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/datamodel&gt;</span>
 
-  &lt;state id="idle"&gt;
-    &lt;transition event="task" target="triaging"&gt;&lt;assign location="ticket" expr="ev.data"/&gt;&lt;/transition&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"idle"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"task"</span> <span class="na">target=</span><span class="s">"triaging"</span><span class="nt">&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"ticket"</span> <span class="na">expr=</span><span class="s">"ev.data"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;state id="triaging"&gt;
-    &lt;invoke type="vt:llm" id="triage" vt:provider="triage" vt:model="claude-opus-5-5"
-            vt:template="Triage this support ticket in one line: {{context.ticket.text}}"/&gt;
-    &lt;transition event="done.invoke.triage" target="decide"&gt;&lt;assign location="triage" expr="ev.data.text"/&gt;&lt;/transition&gt;
-    &lt;transition event="error.llm" target="decide"/&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"triaging"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;invoke</span> <span class="na">type=</span><span class="s">"vt:llm"</span> <span class="na">id=</span><span class="s">"triage"</span> <span class="na">vt:provider=</span><span class="s">"triage"</span> <span class="na">vt:model=</span><span class="s">"claude-opus-5-5"</span>
+            <span class="na">vt:template=</span><span class="s">"Triage this support ticket in one line: {{context.ticket.text}}"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"done.invoke.triage"</span> <span class="na">target=</span><span class="s">"decide"</span><span class="nt">&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"triage"</span> <span class="na">expr=</span><span class="s">"ev.data.text"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"error.llm"</span> <span class="na">target=</span><span class="s">"decide"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;state id="decide" vt:decide="llm/claude" vt:fallback="human/support" vt:deadline="30s"
-         vt:maxDecisions="10" vt:candidates="call_tool finish escalate"&gt;
-    &lt;transition event="call_tool" target="tooling"&gt;
-      &lt;send event="tool.call" targetexpr="ev.data.tool"&gt;&lt;content expr="ev.data.args"/&gt;&lt;/send&gt;
-    &lt;/transition&gt;
-    &lt;transition event="finish" target="done"&gt;&lt;assign location="answer" expr="ev.data"/&gt;&lt;/transition&gt;
-    &lt;transition event="escalate" target="human"/&gt;
-    &lt;transition event="vt.agent.budget-exhausted" target="budget_out"/&gt;
-    &lt;transition event="error.decide.invalid" target="decide"/&gt;
-    &lt;transition event="vt.decide.refused" target="human"/&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"decide"</span> <span class="na">vt:decide=</span><span class="s">"llm/claude"</span> <span class="na">vt:fallback=</span><span class="s">"human/support"</span> <span class="na">vt:deadline=</span><span class="s">"30s"</span>
+         <span class="na">vt:maxDecisions=</span><span class="s">"10"</span> <span class="na">vt:candidates=</span><span class="s">"call_tool finish escalate"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"call_tool"</span> <span class="na">target=</span><span class="s">"tooling"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;send</span> <span class="na">event=</span><span class="s">"tool.call"</span> <span class="na">targetexpr=</span><span class="s">"ev.data.tool"</span><span class="nt">&gt;&lt;content</span> <span class="na">expr=</span><span class="s">"ev.data.args"</span><span class="nt">/&gt;&lt;/send&gt;</span>
+    <span class="nt">&lt;/transition&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"finish"</span> <span class="na">target=</span><span class="s">"done"</span><span class="nt">&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"answer"</span> <span class="na">expr=</span><span class="s">"ev.data"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"escalate"</span> <span class="na">target=</span><span class="s">"human"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"vt.agent.budget-exhausted"</span> <span class="na">target=</span><span class="s">"budget_out"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"error.decide.invalid"</span> <span class="na">target=</span><span class="s">"decide"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"vt.decide.refused"</span> <span class="na">target=</span><span class="s">"human"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;state id="tooling"&gt;
-    &lt;transition event="vt:reply" target="decide"&gt;
-      &lt;assign location="observations" expr="ctx.observations + [ev.data.result]"/&gt;
-      &lt;assign location="steps" expr="ctx.steps + 1"/&gt;
-    &lt;/transition&gt;
-    &lt;transition event="error.tool" target="decide"&gt;&lt;assign location="steps" expr="ctx.steps + 1"/&gt;&lt;/transition&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"tooling"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"vt:reply"</span> <span class="na">target=</span><span class="s">"decide"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;assign</span> <span class="na">location=</span><span class="s">"observations"</span> <span class="na">expr=</span><span class="s">"ctx.observations + [ev.data.result]"</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;assign</span> <span class="na">location=</span><span class="s">"steps"</span> <span class="na">expr=</span><span class="s">"ctx.steps + 1"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/transition&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"error.tool"</span> <span class="na">target=</span><span class="s">"decide"</span><span class="nt">&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"steps"</span> <span class="na">expr=</span><span class="s">"ctx.steps + 1"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;state id="human" vt:decide="human/support" vt:candidates="finish"&gt;
-    &lt;transition event="finish" target="done"&gt;&lt;assign location="answer" expr="ev.data"/&gt;&lt;/transition&gt;
-  &lt;/state&gt;
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"human"</span> <span class="na">vt:decide=</span><span class="s">"human/support"</span> <span class="na">vt:candidates=</span><span class="s">"finish"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"finish"</span> <span class="na">target=</span><span class="s">"done"</span><span class="nt">&gt;&lt;assign</span> <span class="na">location=</span><span class="s">"answer"</span> <span class="na">expr=</span><span class="s">"ev.data"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
 
-  &lt;final id="done"&gt;
-    &lt;donedata&gt;&lt;param name="answer" expr="ctx.answer"/&gt;&lt;param name="steps" expr="ctx.steps"/&gt;&lt;/donedata&gt;
-  &lt;/final&gt;
-  &lt;final id="budget_out"&gt;
-    &lt;donedata&gt;&lt;param name="steps" expr="ctx.steps"/&gt;&lt;/donedata&gt;
-  &lt;/final&gt;
-&lt;/scxml&gt;</code></pre>
+  <span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"done"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;donedata&gt;&lt;param</span> <span class="na">name=</span><span class="s">"answer"</span> <span class="na">expr=</span><span class="s">"ctx.answer"</span><span class="nt">/&gt;&lt;param</span> <span class="na">name=</span><span class="s">"steps"</span> <span class="na">expr=</span><span class="s">"ctx.steps"</span><span class="nt">/&gt;&lt;/donedata&gt;</span>
+  <span class="nt">&lt;/final&gt;</span>
+  <span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"budget_out"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;donedata&gt;&lt;param</span> <span class="na">name=</span><span class="s">"steps"</span> <span class="na">expr=</span><span class="s">"ctx.steps"</span><span class="nt">/&gt;&lt;/donedata&gt;</span>
+  <span class="nt">&lt;/final&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
     <p>The example <code>react_support_agent</code> runs it on a virtual clock with a scripted model that searches the knowledge base, looks up the order and finishes. It prints the final state, the journal and the usage:</p>
 <pre data-lang="Shell"><code>cargo run -p vertep-agent --example react_support_agent</code></pre>
 <pre class="output" data-lang="Output"><code>configuration: []
@@ -392,20 +393,20 @@ model usage: 4 calls, 2520 prompt + 189 completion tokens</code></pre>
     </ul>
     <p>An accepted plan is named by the chart version IRI of its canonical RDF, so identical plans share one IRI and one node in the graph. It runs only as an invoked child of the requesting state. It never becomes a virtual actor, never outlives that state, and affects its parent only by sending events. Its grant is the invoking state's effective grant intersected with the plan's own root <code>vt:grant</code>.</p>
     <p>This plan is accepted in the test <code>plan_in_yaml_accepted_for_validation</code> (<code>crates/vertep-agent/tests/plan_charts.rs</code>). Its root extension declares the result type:</p>
-<pre data-lang="YAML"><code>vertep: 1
-name: booking
-datamodel: cel
-extensions:
-  - { local: result, attribute: "{ booked: bool }" }
-states:
-  book:
-    entry:
-      - send: { event: hello, target: "#_parent" }
-      - send: { event: confirmed }
-    on: { confirmed: done }
-  done:
-    type: final
-    donedata: { params: [ { name: booked, expr: "true" } ] }</code></pre>
+<pre data-lang="YAML"><code><span class="nt">vertep</span>: <span class="l">1</span>
+<span class="nt">name</span>: <span class="l">booking</span>
+<span class="nt">datamodel</span>: <span class="l">cel</span>
+<span class="nt">extensions</span>:
+  - {<span class="nt"> local</span>: <span class="nv">result</span>,<span class="nt"> attribute</span>: <span class="s">"{</span><span class="nv"> </span><span class="s">booked:</span><span class="nv"> </span><span class="s">bool</span><span class="nv"> </span><span class="s">}"</span> }
+<span class="nt">states</span>:
+  <span class="nt">book</span>:
+    <span class="nt">entry</span>:
+      - <span class="nt">send</span>: {<span class="nt"> event</span>: <span class="nv">hello</span>,<span class="nt"> target</span>: <span class="s">"#_parent"</span> }
+      - <span class="nt">send</span>: {<span class="nt"> event</span>: <span class="nv">confirmed</span> }
+    <span class="nt">on</span>: {<span class="nt"> confirmed</span>: <span class="nv">done</span> }
+  <span class="nt">done</span>:
+    <span class="nt">type</span>: <span class="l">final</span>
+    <span class="nt">donedata</span>: {<span class="nt"> params</span>: [ {<span class="nt"> name</span>: <span class="nv">booked</span>,<span class="nt"> expr</span>: <span class="s">"true"</span> } ] }</code></pre>
     <p>The invoking state declares the bounds: <code>vt:maxMacrosteps</code> (default 1000), <code>vt:maxSends</code> (default 100) and <code>vt:maxDuration</code> (a durable timer; no default). A plan that finishes delivers <code>done.invoke.&lt;id&gt;</code> if its done data has the declared result type. Otherwise the parent gets <code>error.plan</code> with the class <code>parse</code>, <code>invalid</code>, <code>bounds</code> or <code>result</code>. Accepted and rejected plans are both recorded, with lineage back to the model call that wrote them.</p>
     <p>An agent can change its own chart only through a new chart version and a migration (<code>propose_self_modification</code> in <code>crates/vertep-agent/src/plan.rs</code>). The new chart is validated and registered under its content address, and the migration goes through the ordinary chart-versioning procedure on the runtime node. The accepted migration is a journal entry; a rejection is delivered to the actor as <code>vt.self-modification.rejected</code>. A running chart is never patched in place, because that would break replay of the recorded version. See <a href="runtime.html">the actor runtime</a> for versions and migrations.</p>
 

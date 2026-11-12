@@ -41,6 +41,7 @@
       <li><a href="runtime.html">The actor runtime</a></li>
       <li><a href="agents.html">Agents and deciders</a></li>
       <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -124,13 +125,13 @@ Options:
 
     <h2 id="first-chart">A first chart, end to end</h2>
     <p>The chart below is an order. It waits in <code>open</code>; the event <code>pay</code> moves it to <code>paid</code> and schedules a <code>ship</code> event 200 ms later; <code>ship</code> moves it to <code>shipped</code>. It comes from <code>crates/vertep/examples/quickstart.rs</code>, the facade's own example. Save it as <code>order.scxml</code>.</p>
-<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="open"&gt;
-  &lt;state id="open"&gt;
-    &lt;transition event="pay" target="paid"&gt;&lt;send event="ship" delay="200ms"/&gt;&lt;/transition&gt;
-  &lt;/state&gt;
-  &lt;state id="paid"&gt;&lt;transition event="ship" target="shipped"/&gt;&lt;/state&gt;
-  &lt;state id="shipped"/&gt;
-&lt;/scxml&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">initial=</span><span class="s">"open"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"open"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"pay"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">&gt;&lt;send</span> <span class="na">event=</span><span class="s">"ship"</span> <span class="na">delay=</span><span class="s">"200ms"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"paid"</span><span class="nt">&gt;&lt;transition</span> <span class="na">event=</span><span class="s">"ship"</span> <span class="na">target=</span><span class="s">"shipped"</span><span class="nt">/&gt;&lt;/state&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"shipped"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
 
     <h3 id="check">1. Check it and name its version</h3>
     <p><code>vt validate</code> reads the chart, checks that it is well formed and that its RDF projection conforms to the SHACL shapes, and prints the chart's version IRI. <code>vt hash</code> prints only the IRI.</p>
@@ -166,29 +167,29 @@ states:
 
     <h3 id="run">3. Run it as a durable actor</h3>
     <p>The quickstart program registers the chart as an actor type, sends <code>pay</code> to the actor with key <code>42</code>, lets the node run for 400 ms, and then reads the actor's state, its journal, and its past. These are the central lines; the full file is <code>crates/vertep/examples/quickstart.rs</code>.</p>
-<pre data-lang="Rust"><code>use vertep::prelude::*;
+<pre data-lang="Rust"><code><span class="k">use</span> vertep::prelude::<span class="o">*</span>;
 
-const ORDER_TYPE: &amp;str = "https://example.org/charts/order";
+<span class="k">const</span> ORDER_TYPE: <span class="kp">&amp;</span><span class="kt">str</span> <span class="o">=</span> <span class="s">"https://example.org/charts/order"</span>;
 
-let backend = Arc::new(TiramemsuBackend::open(&amp;dir, 1)?);
-let mut node = Node::builder(backend.clone(), Shell::tokio()).build();
-let chart = vertep::scxml::read_str(ORDER).map_err(|e| format!("{e:?}"))?.chart;
-let version = node.register_type(ORDER_TYPE, chart)?;
-println!("chart version {}", version.as_str());
+<span class="kd">let</span> backend <span class="o">=</span> Arc::new(TiramemsuBackend::open(<span class="o">&amp;</span>dir, <span class="mi">1</span>)<span class="o">?</span>);
+<span class="kd">let</span> <span class="k">mut</span> node <span class="o">=</span> Node::builder(backend.clone(), Shell::tokio()).build();
+<span class="kd">let</span> chart <span class="o">=</span> vertep::scxml::read_str(ORDER).map_err(<span class="o">|</span>e<span class="o">|</span> <span class="fm">format!</span>(<span class="s">"{e:?}"</span>))<span class="o">?</span>.chart;
+<span class="kd">let</span> version <span class="o">=</span> node.register_type(ORDER_TYPE, chart)<span class="o">?</span>;
+<span class="fm">println!</span>(<span class="s">"chart version {}"</span>, version.as_str());
 
-// A virtual actor exists for every key: no create call, the first message activates it.
-let order = Address::virtual_actor(ORDER_TYPE, "42")?;
-node.send(&amp;order, Event::named("pay", EventType::External))?;
+<span class="c1">// A virtual actor exists for every key: no create call, the first message activates it.
+</span><span class="kd">let</span> order <span class="o">=</span> Address::virtual_actor(ORDER_TYPE, <span class="s">"42"</span>)<span class="o">?</span>;
+node.send(<span class="o">&amp;</span>order, Event::named(<span class="s">"pay"</span>, EventType::External))<span class="o">?</span>;
 
-// ... run the node for 400 ms inside a tokio LocalSet, then shut it down ...
-
-let now = node.state(&amp;order)?;                 // the current configuration
-for e in node.journal(&amp;order)? { /* ... */ }   // every accepted input, in order
-let then = node.state_at(&amp;order, 1)?;          // the state after entry 1, by replay
-
-// tiramemsu never deletes, so every past transaction can be queried with SPARQL:
-let shard = backend.shard_for(order.node());
-shard.view_as_of(t).query(&amp;query)?;</code></pre>
+<span class="c1">// ... run the node for 400 ms inside a tokio LocalSet, then shut it down ...
+</span>
+<span class="kd">let</span> now <span class="o">=</span> node.state(<span class="o">&amp;</span>order)<span class="o">?</span>;                 <span class="c1">// the current configuration
+</span><span class="k">for</span> e <span class="k">in</span> node.journal(<span class="o">&amp;</span>order)<span class="o">?</span> { <span class="cm">/* ... */</span> }   <span class="c1">// every accepted input, in order
+</span><span class="kd">let</span> then <span class="o">=</span> node.state_at(<span class="o">&amp;</span>order, <span class="mi">1</span>)<span class="o">?</span>;          <span class="c1">// the state after entry 1, by replay
+</span>
+<span class="c1">// tiramemsu never deletes, so every past transaction can be queried with SPARQL:
+</span><span class="kd">let</span> shard <span class="o">=</span> backend.shard_for(order.node());
+shard.view_as_of(t).query(<span class="o">&amp;</span>query)<span class="o">?</span>;</code></pre>
 <pre data-lang="Shell"><code>cargo run -p vertep --example quickstart</code></pre>
 <pre class="output" data-lang="Output"><code>chart version urn:vertep:chart:sha256:6b74f6c5d780053619e9d360bbd73331f41fd52709d0bb7f5310d175b1272b08
 now: ["shipped"] after 2 entries

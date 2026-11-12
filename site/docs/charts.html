@@ -41,6 +41,7 @@
       <li><a href="runtime.html">The actor runtime</a></li>
       <li><a href="agents.html">Agents and deciders</a></li>
       <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
       <li><a href="browser.html">Browser and JavaScript</a></li>
     </ul>
     <h4>Reference</h4>
@@ -118,18 +119,18 @@
 
     <h2 id="scxml">SCXML</h2>
     <p>Vertep reads standard SCXML 1.0 documents and runs them with the W3C SCXML interpretation algorithm, checked against the W3C conformance suite (see <a href="verification.html">Verification</a>). Here is a small chart on the <code>null</code> datamodel, which has no data and accepts only <code>In()</code> conditions. Save it as <code>door.scxml</code>:</p>
-<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="door" initial="closed"&gt;
-  &lt;state id="closed"&gt;
-    &lt;transition event="open" target="opened"/&gt;
-    &lt;transition event="lock" target="locked"/&gt;
-  &lt;/state&gt;
-  &lt;state id="opened"&gt;
-    &lt;transition event="close" target="closed"/&gt;
-  &lt;/state&gt;
-  &lt;state id="locked"&gt;
-    &lt;transition event="unlock" target="closed"/&gt;
-  &lt;/state&gt;
-&lt;/scxml&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">name=</span><span class="s">"door"</span> <span class="na">initial=</span><span class="s">"closed"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"closed"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"open"</span> <span class="na">target=</span><span class="s">"opened"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"lock"</span> <span class="na">target=</span><span class="s">"locked"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"opened"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"close"</span> <span class="na">target=</span><span class="s">"closed"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"locked"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"unlock"</span> <span class="na">target=</span><span class="s">"closed"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
     <p>Check it, then convert it to YAML:</p>
 <pre class="output" data-lang="Output"><code>$ vt validate door.scxml
 door.scxml: ok: urn:vertep:chart:sha256:1dc511b5d015deca8f320c136c262267c95b7e2cba6f76173318ded0951f63cd
@@ -160,23 +161,23 @@ urn:vertep:chart:sha256:1dc511b5d015deca8f320c136c262267c95b7e2cba6f76173318ded0
 
     <h3 id="scxml-rust">Reading SCXML from Rust</h3>
     <p>The <code>vertep</code> facade re-exports the reader as <code>vertep::scxml</code>. <code>CompiledChart::new</code> runs the well-formedness validator and builds the tables <code>step</code> needs. From <code>examples/traffic-light/main.rs</code>:</p>
-<pre data-lang="Rust"><code>fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
-    // 1. Read the SCXML document into the chart IR, then validate and compile it.
-    let parsed = vertep::scxml::read_str(CHART)?;
-    let chart = CompiledChart::new(parsed.chart).map_err(|v| format!("invalid chart: {v:?}"))?;
+<pre data-lang="Rust"><code><span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), <span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;&gt;</span> {
+    <span class="c1">// 1. Read the SCXML document into the chart IR, then validate and compile it.
+</span>    <span class="kd">let</span> parsed <span class="o">=</span> vertep::scxml::read_str(CHART)<span class="o">?</span>;
+    <span class="kd">let</span> chart <span class="o">=</span> CompiledChart::new(parsed.chart).map_err(<span class="o">|</span>v<span class="o">|</span> <span class="fm">format!</span>(<span class="s">"invalid chart: {v:?}"</span>))<span class="o">?</span>;
 
-    // 2. Start a session. The chart names the `null` datamodel (no data, only `In()` guards).
-    let mut dm = NullDatamodel::new();
-    let mut timers: Vec&lt;Timer&gt; = Vec::new();
-    let mut now_ms = 0;
-    let start = StartInput {
-        info: SessionInfo {
-            sessionid: "light-1".into(),
-            ..SessionInfo::default()
+    <span class="c1">// 2. Start a session. The chart names the `null` datamodel (no data, only `In()` guards).
+</span>    <span class="kd">let</span> <span class="k">mut</span> dm <span class="o">=</span> NullDatamodel::new();
+    <span class="kd">let</span> <span class="k">mut</span> timers: <span class="nb">Vec</span><span class="o">&lt;</span>Timer<span class="o">&gt;</span> <span class="o">=</span> <span class="nb">Vec</span>::new();
+    <span class="kd">let</span> <span class="k">mut</span> now_ms <span class="o">=</span> <span class="mi">0</span>;
+    <span class="kd">let</span> start <span class="o">=</span> StartInput {
+        info: <span class="nc">SessionInfo</span> {
+            sessionid: <span class="s">"light-1"</span>.into(),
+            <span class="o">..</span>SessionInfo::default()
         },
-        ..StartInput::default()
+        <span class="o">..</span>StartInput::default()
     };
-    let outcome = session::start(&amp;chart, start, &amp;mut dm).map_err(|e| format!("{e:?}"))?;</code></pre>
+    <span class="kd">let</span> outcome <span class="o">=</span> session::start(<span class="o">&amp;</span>chart, start, <span class="o">&amp;</span><span class="k">mut</span> dm).map_err(<span class="o">|</span>e<span class="o">|</span> <span class="fm">format!</span>(<span class="s">"{e:?}"</span>))<span class="o">?</span>;</code></pre>
     <p><code>read_str</code> uses default options, which accept only the <code>null</code> datamodel. For other datamodels pass a <code>DatamodelSet</code>, for example <code>vertep_scxml::ReadOptions::default().with_datamodels(&amp;vertep_scxml::AnyDatamodel)</code>, as <code>crates/vertep-dm-rust/tests/rust_dsl.rs</code> does. A <code>src</code> attribute on <code>&lt;script&gt;</code>, <code>&lt;data&gt;</code>, <code>&lt;content&gt;</code> or <code>&lt;invoke&gt;</code> is read only through a <code>SourceResolver</code> you supply; with none, every <code>src</code> is an error. The reader does no I/O of its own.</p>
 
     <h3 id="loss">What SCXML loses, and the loss report</h3>
@@ -207,60 +208,60 @@ lossy.scxml: refusing to convert scxml to yaml: it would lose:
     <h2 id="yaml">YAML</h2>
     <p>The YAML surface is a thin mirror of the IR. States are keyed by id under <code>states</code>, and key order is document order. A document starts with <code>vertep: 1</code> (the format version, required) and <code>name</code>. The reader is built on a YAML 1.2 parser that keeps key order and reports a line and column for every node. YAML 1.1 parsers were rejected because they read <code>on</code> as the boolean <code>true</code>, and <code>on</code> is the key of every state's transitions.</p>
     <p>This is <code>examples/typed-order/order.yaml</code>, a typed chart on the CEL datamodel:</p>
-<pre data-lang="YAML"><code># A typed order chart in YAML on the CEL datamodel.
-#
-# `types` names record and union types, `events` gives every event its payload type and
-# `context` gives every data item a type and an initial value. Guards and assignments are CEL
-# expressions: `ctx` is the context, `ev.data` the event payload. `vt typecheck` checks every
-# expression against these declarations before the chart ever runs.
-#
-# Illustrates the type-system capability (named types, typed events and context, Command Line
-# Type Tools), yaml-format and cel-datamodel.
-vertep: 1
-name: order
-datamodel: cel
-types:
-  Item: { sku: string, qty: int, price: decimal }
-  Pay: { amount: decimal, method: { oneOf: { Card: { last4: string }, Invoice: null } } }
-  Ship: { carrier: string, tracking: "optional&lt;string&gt;" }
-events:
-  add: Item
-  checkout: null
-  pay: Pay
-  approve: null
-  ship: Ship
-  cancel: null
-context:
-  items: { type: "list&lt;Item&gt;", init: "[]" }
-  total: { type: decimal, init: "0" }
-  limit: { type: decimal, init: "500" }
-initial: shopping
-states:
-  shopping:
-    on: { cancel: cancelled }
-    initial: cart
-    states:
-      cart:
-        on:
-          add:
-            - cond: "ev.data.qty &gt; 0"
-              actions:
-                - assign: { location: ctx.items, expr: "ctx.items + [ev.data]" }
-                - assign: { location: ctx.total, expr: "ctx.total + ev.data.price * decimal(ev.data.qty)" }
-          checkout:
-            - { cond: "size(ctx.items) &gt; 0", target: payment }
-      payment:
-        on:
-          pay:
-            - { cond: "ev.data.amount &lt; ctx.total", target: payment }
-            - { cond: "ctx.total &gt; ctx.limit", target: review }
-            - { target: fulfilment }
-      review:
-        on: { approve: fulfilment }
-  fulfilment:
-    on: { ship: shipped }
-  shipped: { type: final }
-  cancelled: { type: final }</code></pre>
+<pre data-lang="YAML"><code><span class="c1"># A typed order chart in YAML on the CEL datamodel.</span>
+<span class="c1">#</span>
+<span class="c1"># `types` names record and union types, `events` gives every event its payload type and</span>
+<span class="c1"># `context` gives every data item a type and an initial value. Guards and assignments are CEL</span>
+<span class="c1"># expressions: `ctx` is the context, `ev.data` the event payload. `vt typecheck` checks every</span>
+<span class="c1"># expression against these declarations before the chart ever runs.</span>
+<span class="c1">#</span>
+<span class="c1"># Illustrates the type-system capability (named types, typed events and context, Command Line</span>
+<span class="c1"># Type Tools), yaml-format and cel-datamodel.</span>
+<span class="nt">vertep</span>: <span class="l">1</span>
+<span class="nt">name</span>: <span class="l">order</span>
+<span class="nt">datamodel</span>: <span class="l">cel</span>
+<span class="nt">types</span>:
+  <span class="nt">Item</span>: {<span class="nt"> sku</span>: <span class="nv">string</span>,<span class="nt"> qty</span>: <span class="nv">int</span>,<span class="nt"> price</span>: <span class="nv">decimal</span> }
+  <span class="nt">Pay</span>: {<span class="nt"> amount</span>: <span class="nv">decimal</span>,<span class="nt"> method</span>: {<span class="nt"> oneOf</span>: {<span class="nt"> Card</span>: {<span class="nt"> last4</span>: <span class="nv">string</span> },<span class="nt"> Invoice</span>: <span class="nv">null</span> } } }
+  <span class="nt">Ship</span>: {<span class="nt"> carrier</span>: <span class="nv">string</span>,<span class="nt"> tracking</span>: <span class="s">"optional&lt;string&gt;"</span> }
+<span class="nt">events</span>:
+  <span class="nt">add</span>: <span class="l">Item</span>
+  <span class="nt">checkout</span>: <span class="l">null</span>
+  <span class="nt">pay</span>: <span class="l">Pay</span>
+  <span class="nt">approve</span>: <span class="l">null</span>
+  <span class="nt">ship</span>: <span class="l">Ship</span>
+  <span class="nt">cancel</span>: <span class="l">null</span>
+<span class="nt">context</span>:
+  <span class="nt">items</span>: {<span class="nt"> type</span>: <span class="s">"list&lt;Item&gt;"</span>,<span class="nt"> init</span>: <span class="s">"[]"</span> }
+  <span class="nt">total</span>: {<span class="nt"> type</span>: <span class="nv">decimal</span>,<span class="nt"> init</span>: <span class="s">"0"</span> }
+  <span class="nt">limit</span>: {<span class="nt"> type</span>: <span class="nv">decimal</span>,<span class="nt"> init</span>: <span class="s">"500"</span> }
+<span class="nt">initial</span>: <span class="l">shopping</span>
+<span class="nt">states</span>:
+  <span class="nt">shopping</span>:
+    <span class="nt">on</span>: {<span class="nt"> cancel</span>: <span class="nv">cancelled</span> }
+    <span class="nt">initial</span>: <span class="l">cart</span>
+    <span class="nt">states</span>:
+      <span class="nt">cart</span>:
+        <span class="nt">on</span>:
+          <span class="nt">add</span>:
+            - <span class="nt">cond</span>: <span class="s">"ev.data.qty</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0"</span>
+              <span class="nt">actions</span>:
+                - <span class="nt">assign</span>: {<span class="nt"> location</span>: <span class="nv">ctx.items</span>,<span class="nt"> expr</span>: <span class="s">"ctx.items</span><span class="nv"> </span><span class="s">+</span><span class="nv"> </span><span class="s">[ev.data]"</span> }
+                - <span class="nt">assign</span>: {<span class="nt"> location</span>: <span class="nv">ctx.total</span>,<span class="nt"> expr</span>: <span class="s">"ctx.total</span><span class="nv"> </span><span class="s">+</span><span class="nv"> </span><span class="s">ev.data.price</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">decimal(ev.data.qty)"</span> }
+          <span class="nt">checkout</span>:
+            - {<span class="nt"> cond</span>: <span class="s">"size(ctx.items)</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">0"</span>,<span class="nt"> target</span>: <span class="nv">payment</span> }
+      <span class="nt">payment</span>:
+        <span class="nt">on</span>:
+          <span class="nt">pay</span>:
+            - {<span class="nt"> cond</span>: <span class="s">"ev.data.amount</span><span class="nv"> </span><span class="s">&lt;</span><span class="nv"> </span><span class="s">ctx.total"</span>,<span class="nt"> target</span>: <span class="nv">payment</span> }
+            - {<span class="nt"> cond</span>: <span class="s">"ctx.total</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">ctx.limit"</span>,<span class="nt"> target</span>: <span class="nv">review</span> }
+            - {<span class="nt"> target</span>: <span class="nv">fulfilment</span> }
+      <span class="nt">review</span>:
+        <span class="nt">on</span>: {<span class="nt"> approve</span>: <span class="nv">fulfilment</span> }
+  <span class="nt">fulfilment</span>:
+    <span class="nt">on</span>: {<span class="nt"> ship</span>: <span class="nv">shipped</span> }
+  <span class="nt">shipped</span>: {<span class="nt"> type</span>: <span class="nv">final</span> }
+  <span class="nt">cancelled</span>: {<span class="nt"> type</span>: <span class="nv">final</span> }</code></pre>
     <p>The keys a state takes, from <code>crates/vertep-yaml/src/lib.rs</code>:</p>
     <table>
       <thead><tr><th>Key</th><th>Meaning</th></tr></thead>
@@ -282,70 +283,70 @@ dn.yaml:3:12: datamodel: expected a string, found null</code></pre></div>
     <h2 id="macro">The <code>statechart!</code> macro</h2>
     <p><code>statechart!</code> writes a chart in Rust tokens on the <code>rust</code> datamodel. Guards and actions are ordinary Rust functions, bound by name. The macro runs inside the compiler: it lowers the tokens to the IR, runs the same well-formedness validator and type checker the runtime uses, reports unreachable states and unhandled events, and generates a typed API. Every finding is a compile error or warning at the offending tokens. The macros are re-exported by <code>vertep-dm-rust</code>, so a crate needs only that dependency.</p>
     <p>This is <code>examples/rust-macro/main.rs</code>, a turnstile:</p>
-<pre data-lang="Rust"><code>use vertep_dm_rust::{MachineError, statechart};
+<pre data-lang="Rust"><code><span class="k">use</span> vertep_dm_rust::{MachineError, statechart};
 
-statechart! {
-    name: turnstile,
-    types { Coin = { cents: int } }
-    context { credit: int = 0, price: int = 50, passes: int = 0 }
-    events { coin: Coin, push, shutdown }
+statechart<span class="o">!</span> {
+    name: <span class="nc">turnstile</span>,
+    types { Coin <span class="o">=</span> { cents: <span class="nc">int</span> } }
+    context { credit: <span class="nc">int</span> <span class="o">=</span> <span class="mi">0</span>, price: <span class="nc">int</span> <span class="o">=</span> <span class="mi">50</span>, passes: <span class="nc">int</span> <span class="o">=</span> <span class="mi">0</span> }
+    events { coin: <span class="nc">Coin</span>, push, shutdown }
 
     initial service;
     state service {
         initial locked;
-        on shutdown =&gt; off;
+        on shutdown <span class="o">=&gt;</span> off;
         state locked {
-            // Targetless: stay locked and count the coin.
-            on coin / add_credit;
-            // Eventless: unlock as soon as there is enough credit.
-            always if paid =&gt; unlocked;
+            <span class="c1">// Targetless: stay locked and count the coin.
+</span>            on coin <span class="o">/</span> add_credit;
+            <span class="c1">// Eventless: unlock as soon as there is enough credit.
+</span>            always <span class="k">if</span> paid <span class="o">=&gt;</span> unlocked;
         }
         state unlocked {
-            on coin / add_credit;
-            on push =&gt; locked / let_through;
+            on coin <span class="o">/</span> add_credit;
+            on push <span class="o">=&gt;</span> locked <span class="o">/</span> let_through;
         }
     }
-    final off;
+    <span class="kr">final</span> off;
 }
 
-/// Guard: guards get the context and the payload read-only, and return a bool.
-fn paid(ctx: &amp;Ctx, _: &amp;()) -&gt; bool {
-    ctx.credit &gt;= ctx.price
+<span class="sd">/// Guard: guards get the context and the payload read-only, and return a bool.
+</span><span class="k">fn</span> <span class="nf">paid</span>(ctx: <span class="kp">&amp;</span><span class="nc">Ctx</span>, _: <span class="kp">&amp;</span>()) -&gt; <span class="kt">bool</span> {
+    ctx.credit <span class="o">&gt;=</span> ctx.price
 }
 
-/// Action: actions may change the context; `Emit` would let them raise or send events.
-fn add_credit(ctx: &amp;mut Ctx, coin: &amp;Coin, _: &amp;mut Emit) {
-    ctx.credit += coin.cents;
+<span class="sd">/// Action: actions may change the context; `Emit` would let them raise or send events.
+</span><span class="k">fn</span> <span class="nf">add_credit</span>(ctx: <span class="kp">&amp;</span><span class="nc">mut</span> Ctx, coin: <span class="kp">&amp;</span><span class="nc">Coin</span>, _: <span class="kp">&amp;</span><span class="nc">mut</span> Emit) {
+    ctx.credit <span class="o">+=</span> coin.cents;
 }
 
-/// Action without an emitter: the shorter signature is accepted too.
-fn let_through(ctx: &amp;mut Ctx, _: &amp;()) {
-    ctx.credit -= ctx.price;
-    ctx.passes += 1;
+<span class="sd">/// Action without an emitter: the shorter signature is accepted too.
+</span><span class="k">fn</span> <span class="nf">let_through</span>(ctx: <span class="kp">&amp;</span><span class="nc">mut</span> Ctx, _: <span class="kp">&amp;</span>()) {
+    ctx.credit <span class="o">-=</span> ctx.price;
+    ctx.passes <span class="o">+=</span> <span class="mi">1</span>;
 }
 
-fn main() -&gt; Result&lt;(), MachineError&gt; {
-    println!("chart version {}", *VERSION);
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), MachineError<span class="o">&gt;</span> {
+    <span class="fm">println!</span>(<span class="s">"chart version {}"</span>, <span class="o">*</span>VERSION);
 
-    // `Machine::start` runs the start macrostep; the effects (none here) are returned.
-    let (mut m, _effects) = Machine::start("turnstile-1")?;
-    show("(start)", &amp;m);
+    <span class="c1">// `Machine::start` runs the start macrostep; the effects (none here) are returned.
+</span>    <span class="kd">let</span> (<span class="k">mut</span> m, _effects) <span class="o">=</span> Machine::start(<span class="s">"turnstile-1"</span>)<span class="o">?</span>;
+    show(<span class="s">"(start)"</span>, <span class="o">&amp;</span>m);
 
-    let script = [
-        Event::Coin { cents: 20 },
-        Event::Push, // nothing happens: the turnstile is locked
-        Event::Coin { cents: 50 },
+    <span class="kd">let</span> script <span class="o">=</span> [
+        Event::Coin { cents: <span class="mi">20</span> },
+        Event::Push, <span class="c1">// nothing happens: the turnstile is locked
+</span>        Event::Coin { cents: <span class="mi">50</span> },
         Event::Push,
         Event::Push,
         Event::Shutdown,
     ];
-    for event in script {
-        let label = format!("{event:?}");
-        m.send(event)?;
-        show(&amp;label, &amp;m);
+    <span class="k">for</span> event <span class="k">in</span> script {
+        <span class="kd">let</span> label <span class="o">=</span> <span class="fm">format!</span>(<span class="s">"{event:?}"</span>);
+        m.send(event)<span class="o">?</span>;
+        show(<span class="o">&amp;</span>label, <span class="o">&amp;</span>m);
     }
-    assert!(m.is_terminated(), "`off` is a top-level final state");
-    Ok(())
+    <span class="fm">assert!</span>(m.is_terminated(), <span class="s">"`off` is a top-level final state"</span>);
+    <span class="nb">Ok</span>(())
 }</code></pre>
 <pre class="output" data-lang="Output"><code>$ cargo run -p vertep-examples --bin rust-macro
 chart version urn:vertep:chart:sha256:0b1614ef361262f9f6fec5189fa5834756f37808a3a466f81a9f83d6ed20e868
@@ -380,145 +381,145 @@ Shutdown               -&gt; []                   credit=20  passes=1</code></pr
 
     <h2 id="same-chart">One chart in three surfaces</h2>
     <p>The test <code>order_chart_is_the_same_from_every_surface</code> in <code>crates/vertep-dm-rust/tests/rust_dsl.rs</code> writes one order chart three times, and asserts that all three give the same IR, the same API and the same version IRI, and run the same. In the macro:</p>
-<pre data-lang="Rust"><code>statechart! {
-    name: order,
-    datamodel: rust,
+<pre data-lang="Rust"><code>statechart<span class="o">!</span> {
+    name: <span class="nc">order</span>,
+    datamodel: <span class="nc">rust</span>,
     types {
-        Pay = { amount: decimal },
-        Approval = { by: iri },
+        Pay <span class="o">=</span> { amount: <span class="nc">decimal</span> },
+        Approval <span class="o">=</span> { by: <span class="nc">iri</span> },
     }
-    context { total: decimal = 0, limit: decimal = 100 }
-    events { start, pay: Pay, authorized, approve: Approval, cancel }
+    context { total: <span class="nc">decimal</span> <span class="o">=</span> <span class="mi">0</span>, limit: <span class="nc">decimal</span> <span class="o">=</span> <span class="mi">100</span> }
+    events { start, pay: <span class="nc">Pay</span>, authorized, approve: <span class="nc">Approval</span>, cancel }
 
     initial idle;
-    state idle { on start =&gt; checkout; }
+    state idle { on start <span class="o">=&gt;</span> checkout; }
     state checkout {
         initial cart;
-        on cancel =&gt; cancelled;
+        on cancel <span class="o">=&gt;</span> cancelled;
         state cart {
-            on pay if positive =&gt; payment / record_total;
+            on pay <span class="k">if</span> positive <span class="o">=&gt;</span> payment <span class="o">/</span> record_total;
         }
         state payment {
-            on authorized if over_limit =&gt; review;
-            on authorized =&gt; paid;
+            on authorized <span class="k">if</span> over_limit <span class="o">=&gt;</span> review;
+            on authorized <span class="o">=&gt;</span> paid;
         }
-        state review { on approve =&gt; paid; }
+        state review { on approve <span class="o">=&gt;</span> paid; }
     }
-    final paid;
-    final cancelled;
+    <span class="kr">final</span> paid;
+    <span class="kr">final</span> cancelled;
 }</code></pre>
     <p>With these functions, shared by all three:</p>
-<pre data-lang="Rust"><code>pub fn positive(_: &amp;Ctx, ev: &amp;Pay) -&gt; bool {
-    ev.amount &gt; Decimal::ZERO
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">fn</span> <span class="nf">positive</span>(_: <span class="kp">&amp;</span><span class="nc">Ctx</span>, ev: <span class="kp">&amp;</span><span class="nc">Pay</span>) -&gt; <span class="kt">bool</span> {
+    ev.amount <span class="o">&gt;</span> Decimal::ZERO
 }
-pub fn over_limit(ctx: &amp;Ctx, _: &amp;()) -&gt; bool {
-    ctx.total &gt; ctx.limit
+<span class="k">pub</span> <span class="k">fn</span> <span class="nf">over_limit</span>(ctx: <span class="kp">&amp;</span><span class="nc">Ctx</span>, _: <span class="kp">&amp;</span>()) -&gt; <span class="kt">bool</span> {
+    ctx.total <span class="o">&gt;</span> ctx.limit
 }
-pub fn record_total(ctx: &amp;mut Ctx, ev: &amp;Pay, _: &amp;mut Emit) {
-    ctx.total = ev.amount;
+<span class="k">pub</span> <span class="k">fn</span> <span class="nf">record_total</span>(ctx: <span class="kp">&amp;</span><span class="nc">mut</span> Ctx, ev: <span class="kp">&amp;</span><span class="nc">Pay</span>, _: <span class="kp">&amp;</span><span class="nc">mut</span> Emit) {
+    ctx.total <span class="o">=</span> ev.amount;
 }</code></pre>
     <p>In YAML, <code>crates/vertep-dm-rust/tests/charts/order.yaml</code>:</p>
-<pre data-lang="YAML"><code>vertep: 1
-name: order
-datamodel: rust
-types:
-  Pay:
-    amount: decimal
-  Approval:
-    by: iri
-events:
-  start: null
-  pay: Pay
-  authorized: null
-  approve: Approval
-  cancel: null
-context:
-  total:
-    type: decimal
-    init: "0"
-  limit:
-    type: decimal
-    init: "100"
-initial: idle
-states:
-  idle:
-    on:
-      start: checkout
-  checkout:
-    initial: cart
-    on:
-      cancel: cancelled
-    states:
-      cart:
-        on:
-          pay:
-            cond: "vt:guard/order/positive"
-            target: payment
-            actions:
-              - foreach:
-                  array: "vt:action/order/record_total"
-                  item: _vt_emit
-                  do:
-                    - send:
-                        eventexpr: _vt_emit.event
-                        targetexpr: _vt_emit.target
-                        typeexpr: _vt_emit.type
-                        delayexpr: _vt_emit.delay
-                        content:
-                          expr: _vt_emit.data
-      payment:
-        on:
-          authorized:
-            - cond: "vt:guard/order/over_limit"
-              target: review
-            - target: paid
-      review:
-        on:
-          approve: paid
-  paid:
-    type: final
-  cancelled:
-    type: final</code></pre>
+<pre data-lang="YAML"><code><span class="nt">vertep</span>: <span class="l">1</span>
+<span class="nt">name</span>: <span class="l">order</span>
+<span class="nt">datamodel</span>: <span class="l">rust</span>
+<span class="nt">types</span>:
+  <span class="nt">Pay</span>:
+    <span class="nt">amount</span>: <span class="l">decimal</span>
+  <span class="nt">Approval</span>:
+    <span class="nt">by</span>: <span class="l">iri</span>
+<span class="nt">events</span>:
+  <span class="nt">start</span>: <span class="l">null</span>
+  <span class="nt">pay</span>: <span class="l">Pay</span>
+  <span class="nt">authorized</span>: <span class="l">null</span>
+  <span class="nt">approve</span>: <span class="l">Approval</span>
+  <span class="nt">cancel</span>: <span class="l">null</span>
+<span class="nt">context</span>:
+  <span class="nt">total</span>:
+    <span class="nt">type</span>: <span class="l">decimal</span>
+    <span class="nt">init</span>: <span class="s">"0"</span>
+  <span class="nt">limit</span>:
+    <span class="nt">type</span>: <span class="l">decimal</span>
+    <span class="nt">init</span>: <span class="s">"100"</span>
+<span class="nt">initial</span>: <span class="l">idle</span>
+<span class="nt">states</span>:
+  <span class="nt">idle</span>:
+    <span class="nt">on</span>:
+      <span class="nt">start</span>: <span class="l">checkout</span>
+  <span class="nt">checkout</span>:
+    <span class="nt">initial</span>: <span class="l">cart</span>
+    <span class="nt">on</span>:
+      <span class="nt">cancel</span>: <span class="l">cancelled</span>
+    <span class="nt">states</span>:
+      <span class="nt">cart</span>:
+        <span class="nt">on</span>:
+          <span class="nt">pay</span>:
+            <span class="nt">cond</span>: <span class="s">"vt:guard/order/positive"</span>
+            <span class="nt">target</span>: <span class="l">payment</span>
+            <span class="nt">actions</span>:
+              - <span class="nt">foreach</span>:
+                  <span class="nt">array</span>: <span class="s">"vt:action/order/record_total"</span>
+                  <span class="nt">item</span>: <span class="l">_vt_emit</span>
+                  <span class="nt">do</span>:
+                    - <span class="nt">send</span>:
+                        <span class="nt">eventexpr</span>: <span class="l">_vt_emit.event</span>
+                        <span class="nt">targetexpr</span>: <span class="l">_vt_emit.target</span>
+                        <span class="nt">typeexpr</span>: <span class="l">_vt_emit.type</span>
+                        <span class="nt">delayexpr</span>: <span class="l">_vt_emit.delay</span>
+                        <span class="nt">content</span>:
+                          <span class="nt">expr</span>: <span class="l">_vt_emit.data</span>
+      <span class="nt">payment</span>:
+        <span class="nt">on</span>:
+          <span class="nt">authorized</span>:
+            - <span class="nt">cond</span>: <span class="s">"vt:guard/order/over_limit"</span>
+              <span class="nt">target</span>: <span class="l">review</span>
+            - <span class="nt">target</span>: <span class="l">paid</span>
+      <span class="nt">review</span>:
+        <span class="nt">on</span>:
+          <span class="nt">approve</span>: <span class="l">paid</span>
+  <span class="nt">paid</span>:
+    <span class="nt">type</span>: <span class="l">final</span>
+  <span class="nt">cancelled</span>:
+    <span class="nt">type</span>: <span class="l">final</span></code></pre>
     <p>In SCXML, <code>crates/vertep-dm-rust/tests/charts/order.scxml</code>:</p>
-<pre data-lang="SCXML"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#" version="1.0" name="order" datamodel="rust" initial="idle"&gt;
-  &lt;vt:types xmlns:vt="https://w3id.org/vertep/vt#"&gt;type Pay = { amount: decimal };
+<pre data-lang="SCXML"><code><span class="cp">&lt;?xml version="1.0" encoding="UTF-8"?&gt;</span>
+<span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">xmlns:vt=</span><span class="s">"https://w3id.org/vertep/vt#"</span> <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">name=</span><span class="s">"order"</span> <span class="na">datamodel=</span><span class="s">"rust"</span> <span class="na">initial=</span><span class="s">"idle"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;vt:types</span> <span class="na">xmlns:vt=</span><span class="s">"https://w3id.org/vertep/vt#"</span><span class="nt">&gt;</span>type Pay = { amount: decimal };
 type Approval = { by: iri };
 event start;
 event pay: Pay;
 event authorized;
 event approve: Approval;
 event cancel;
-&lt;/vt:types&gt;
-  &lt;datamodel&gt;
-    &lt;data id="total" expr="0" vt:type="decimal"/&gt;
-    &lt;data id="limit" expr="100" vt:type="decimal"/&gt;
-  &lt;/datamodel&gt;
-  &lt;state id="idle"&gt;
-    &lt;transition event="start" target="checkout"/&gt;
-  &lt;/state&gt;
-  &lt;state id="checkout" initial="cart"&gt;
-    &lt;transition event="cancel" target="cancelled"/&gt;
-    &lt;state id="cart"&gt;
-      &lt;transition event="pay" cond="vt:guard/order/positive" target="payment"&gt;
-        &lt;foreach array="vt:action/order/record_total" item="_vt_emit"&gt;
-          &lt;send eventexpr="_vt_emit.event" targetexpr="_vt_emit.target" typeexpr="_vt_emit.type" delayexpr="_vt_emit.delay"&gt;
-            &lt;content expr="_vt_emit.data"/&gt;
-          &lt;/send&gt;
-        &lt;/foreach&gt;
-      &lt;/transition&gt;
-    &lt;/state&gt;
-    &lt;state id="payment"&gt;
-      &lt;transition event="authorized" cond="vt:guard/order/over_limit" target="review"/&gt;
-      &lt;transition event="authorized" target="paid"/&gt;
-    &lt;/state&gt;
-    &lt;state id="review"&gt;
-      &lt;transition event="approve" target="paid"/&gt;
-    &lt;/state&gt;
-  &lt;/state&gt;
-  &lt;final id="paid"/&gt;
-  &lt;final id="cancelled"/&gt;
-&lt;/scxml&gt;</code></pre>
+<span class="nt">&lt;/vt:types&gt;</span>
+  <span class="nt">&lt;datamodel&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"total"</span> <span class="na">expr=</span><span class="s">"0"</span> <span class="na">vt:type=</span><span class="s">"decimal"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"limit"</span> <span class="na">expr=</span><span class="s">"100"</span> <span class="na">vt:type=</span><span class="s">"decimal"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/datamodel&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"idle"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"start"</span> <span class="na">target=</span><span class="s">"checkout"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"checkout"</span> <span class="na">initial=</span><span class="s">"cart"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"cancel"</span> <span class="na">target=</span><span class="s">"cancelled"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"cart"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"pay"</span> <span class="na">cond=</span><span class="s">"vt:guard/order/positive"</span> <span class="na">target=</span><span class="s">"payment"</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;foreach</span> <span class="na">array=</span><span class="s">"vt:action/order/record_total"</span> <span class="na">item=</span><span class="s">"_vt_emit"</span><span class="nt">&gt;</span>
+          <span class="nt">&lt;send</span> <span class="na">eventexpr=</span><span class="s">"_vt_emit.event"</span> <span class="na">targetexpr=</span><span class="s">"_vt_emit.target"</span> <span class="na">typeexpr=</span><span class="s">"_vt_emit.type"</span> <span class="na">delayexpr=</span><span class="s">"_vt_emit.delay"</span><span class="nt">&gt;</span>
+            <span class="nt">&lt;content</span> <span class="na">expr=</span><span class="s">"_vt_emit.data"</span><span class="nt">/&gt;</span>
+          <span class="nt">&lt;/send&gt;</span>
+        <span class="nt">&lt;/foreach&gt;</span>
+      <span class="nt">&lt;/transition&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"payment"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"authorized"</span> <span class="na">cond=</span><span class="s">"vt:guard/order/over_limit"</span> <span class="na">target=</span><span class="s">"review"</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"authorized"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
+    <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"review"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"cancelled"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
     <p>The SCXML and YAML show how the <code>rust</code> datamodel appears in the IR. A guard is a <code>cond</code> holding an IRI, <code>vt:guard/&lt;chart&gt;/&lt;function&gt;</code>. An action is a <code>&lt;foreach&gt;</code> whose <code>array</code> is the action's IRI, <code>vt:action/&lt;chart&gt;/&lt;function&gt;</code>. Evaluating the array runs the action, which may change the context, and yields the events it emitted; the body sends each one. This keeps every effect of an action visible in the IR and in the step output, without any change to the interpreter. The rules are in <code>crates/vertep-dm-rust/src/lowering.rs</code>.</p>
 <pre class="output" data-lang="Output"><code>$ vt hash order.scxml
 urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f
@@ -547,16 +548,16 @@ exit 1</code></pre>
 <pre class="output" data-lang="Output"><code>$ vt validate door-typo.yaml
 door-typo.yaml:8:13: states.closed.on.open.target: unknown target `opend`; did you mean `opened`?</code></pre>
     <p>Structural errors come from the core validator, and <code>vt validate</code> also checks the chart's RDF projection against the SHACL shapes. This chart puts only a history state in <code>closed</code>, a transition in a final state, and <code>&lt;donedata&gt;</code> in a state that is not final:</p>
-<pre data-lang="SCXML"><code>&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" name="door" initial="closed"&gt;
-  &lt;state id="closed"&gt;
-    &lt;history id="h"/&gt;
-    &lt;transition event="open" target="opened"/&gt;
-  &lt;/state&gt;
-  &lt;final id="opened"&gt;
-    &lt;transition event="close" target="closed"/&gt;
-  &lt;/final&gt;
-  &lt;state id="x"&gt;&lt;donedata&gt;&lt;content expr="1"/&gt;&lt;/donedata&gt;&lt;state id="y"/&gt;&lt;/state&gt;
-&lt;/scxml&gt;</code></pre>
+<pre data-lang="SCXML"><code><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">name=</span><span class="s">"door"</span> <span class="na">initial=</span><span class="s">"closed"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"closed"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;history</span> <span class="na">id=</span><span class="s">"h"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"open"</span> <span class="na">target=</span><span class="s">"opened"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+  <span class="nt">&lt;final</span> <span class="na">id=</span><span class="s">"opened"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"close"</span> <span class="na">target=</span><span class="s">"closed"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/final&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"x"</span><span class="nt">&gt;&lt;donedata&gt;&lt;content</span> <span class="na">expr=</span><span class="s">"1"</span><span class="nt">/&gt;&lt;/donedata&gt;&lt;state</span> <span class="na">id=</span><span class="s">"y"</span><span class="nt">/&gt;&lt;/state&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
 <pre class="output" data-lang="Output"><code>$ vt validate door-shapes.scxml
 door-shapes.scxml:2:3: StateHistoryOnly at State { id: "closed" }
 door-shapes.scxml:6:3: FinalContent { what: "transitions" } at State { id: "opened" }
@@ -583,11 +584,11 @@ door-shapes.scxml: shapes: &lt;urn:vertep:chart:sha256:dcf27340493a3568d3813f8b9
 
     <h3 id="macro-errors">Errors from the macro</h3>
     <p>In the macro, the same checks become compiler errors at the right span. These are the recorded outputs of the compile-fail tests in <code>crates/vertep-dm-rust/tests/ui/</code>. A misspelled target:</p>
-<pre data-lang="Rust"><code>statechart! {
-    name: order,
+<pre data-lang="Rust"><code>statechart<span class="o">!</span> {
+    name: <span class="nc">order</span>,
     events { pay }
     initial cart;
-    state cart { on pay =&gt; paymnt; }
+    state cart { on pay <span class="o">=&gt;</span> paymnt; }
     state payment;
 }</code></pre>
 <pre class="output" data-lang="Output"><code>error: unknown target state `paymnt`; did you mean `payment`?

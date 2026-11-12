@@ -12,6 +12,8 @@ after the examples change:
 from html import escape
 from pathlib import Path
 
+from highlight import highlight_block
+
 ROOT = Path(__file__).resolve().parents[2]
 EX = ROOT / "examples"
 OUT = ROOT / "site" / "examples"
@@ -30,7 +32,8 @@ def excerpt(rel: str, first: int, last: int) -> str:
 
 def code(text: str, lang: str, output: bool = False) -> str:
     cls = ' class="output"' if output else ""
-    return f'<pre{cls} data-lang="{escape(lang)}"><code>{escape(text)}</code></pre>'
+    body = escape(text) if output else highlight_block(text, lang)
+    return f'<pre{cls} data-lang="{escape(lang)}"><code>{body}</code></pre>'
 
 
 def run(cmd: str) -> str:
