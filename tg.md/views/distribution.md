@@ -93,7 +93,7 @@ classDiagram
     class EtcdMembership
     class KubeLeaseMembership
     Membership <|.. StaticMembership : config members, deterministic leases
-    Membership <|.. GossipMembership : SWIM via foca, leader grants leases
+    Membership <|.. GossipMembership : built-in SWIM, leader grants leases
     Membership <|.. EtcdMembership : etcd leases authoritative
     Membership <|.. KubeLeaseMembership : Kubernetes Lease objects
     Membership --> View
@@ -380,7 +380,7 @@ A DID is optional and per actor: an actor that crosses a trust boundary uses its
 - describes:: [[components#vertep-federation]]
 - describes:: [[decisions#IRI identity and lifecycle classes]] {note: "a DID is an IRI, so it is the RDF subject of state and history"}
 
-`Opt-In DID Identity Per Actor` keeps keys and cryptography away from in-cluster `vt:` actors. `Supported DID Methods` ships `did:key` (offline), `did:peer` (pairwise relationships) and `did:webvh` (long-lived public actors with verifiable key history) behind `Pluggable DID Resolver`. `DID Resolution As Address Resolution` turns DID document services into routes and keys, with bounded caching and re-resolution on expiry or endpoint failure (`Resolution Caching`).
+`Opt-In DID Identity Per Actor` keeps keys and cryptography away from in-cluster `vt:` actors. `Supported DID Methods` ships `did:key` (offline), `did:peer` (pairwise relationships) and `did:web` (HTTPS through an injectable `HttpFetcher`) built in, and `did:webvh` (long-lived public actors with verifiable key history) behind the `webvh` cargo feature of `vertep-federation`, all behind `Pluggable DID Resolver` (`crates/vertep-federation/src/resolver/`). `DID Resolution As Address Resolution` turns DID document services into routes and keys, with bounded caching and re-resolution on expiry or endpoint failure (`Resolution Caching`).
 
 ```mermaid
 flowchart TD
@@ -390,7 +390,7 @@ flowchart TD
     end
     subgraph Directory["Directory (by address scheme)"]
         SD["shard table (vt:)"]
-        DD["DidDirectory: method resolvers<br/>did:key, did:peer, did:webvh"]
+        DD["DidDirectory: method resolvers<br/>did:key, did:peer, did:web, did:webvh (feature)"]
     end
     subgraph Mailbox["2. Mailbox"]
         LM["local or shard mailbox"]
@@ -419,7 +419,7 @@ Inbound cross-trust messages are decrypted, verified against the sender's DID, c
 - describes:: [[decisions#Event-sourced actors]] {note: "verification outcome is an input"}
 - describes:: [[constraints#SCXML discards unmatched events]] {note: "refused messages are recorded, not silently dropped"}
 
-`Authenticated Event Origin` sets `_event.origin` to the sender DID only after verification; `Unauthenticated Event Marking` lets anonymous messages in only by policy, marked unverified for guards. `Journaled Verification Outcome` keeps the pure core free of resolution and cryptography: it sees `_event.origin` and one boolean. `DID-Scoped Capability Grants`, `Outbound Grant Enforcement` and `Credential-Based Grants` enforce authority at both ends, before the core, so an ungranted message never costs the receiver a journal append.
+`Authenticated Event Origin` sets `_event.origin` to the sender DID only after verification; `Unauthenticated Event Marking` lets anonymous messages in only by policy, marked unverified for guards. `Journaled Verification Outcome` keeps the pure core free of resolution and cryptography: it sees `_event.origin` and one boolean, `_event.originverified`. `DID-Scoped Capability Grants`, `Outbound Grant Enforcement` and `Credential-Based Grants` enforce authority at both ends, before the core, so an ungranted message never costs the receiver a journal append.
 
 ```mermaid
 flowchart LR
@@ -436,7 +436,7 @@ flowchart LR
     TY -- yes --> DUP{"message id seen?"}
     DUP -- yes --> ACK["ack, drop duplicate"]
     DUP -- no --> J["journal append:<br/>event, origin, verified flag"]
-    J --> S["step sees _event.origin"]
+    J --> S["step sees _event.origin, _event.originverified"]
 ```
 
 Grants are graph statements (grantee DID, target actor, event descriptors, optional expiry) or verifiable credentials from a trusted issuer, so "who may talk to this agent" is a SPARQL query:
@@ -578,10 +578,11 @@ Where the M4 and M5 specs refine the accepted decisions; the specs govern.
 
 - describes:: [[decisions#Shard-based placement]]
 - describes:: [[decisions#Identity, mailbox and transport layers]]
+- describes:: [[decisions#Verified origin flag in the event]]
 
 - **Fencing epochs are new.** The decision guards single activation with the lease plus the journal compare-and-set. The spec adds strictly increasing fencing epochs checked on appends, on standby replication and on outbound frames, because compare-and-set alone cannot stop a stale owner's side effects or work across shipped file copies.
 - **Standby replication is new.** The decision moves shards only by shipping files (v1) or leases (later). `Journal Replication To Standbys` adds an optional replication factor for failover, and states plainly that with factor 1 a failed owner's shards are unavailable.
 - **Shard count must be a power of two**, a refinement that turns resharding into a split.
 - **Transport order is now chosen.** The decision left DIDComm versus TSP open; the spec defaults to TSP first, then DIDComm, configurable per deployment.
 - **Grants are enforced before the journal.** The decision placed authorization at trust boundaries; the spec specifies inbound refusal before any append, so ungranted traffic costs no journal space.
-- **The verified flag is not yet a field of `_event`.** Design D4 gives the core `_event.origin` plus one boolean; the implementation sets `_event.origin` only for a verified sender and keeps the flag in the inbound records, until `vertep-core` gains the field.
+- **The verified flag is a field of `_event`.** Design D4 gives the core `_event.origin` plus one boolean, and `vertep-core` now carries it as `Event::originverified` (`crates/vertep-core/src/datamodel.rs`): every datamodel exposes it, the journal stores it as `vt:originVerified`, and an unverified event has no origin.

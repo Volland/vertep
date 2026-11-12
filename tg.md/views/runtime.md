@@ -44,24 +44,32 @@ An actor is anything that receives SCXML events one at a time and produces event
 The `Actor Trait` requirement asks for a single contract so that every kind is interchangeable as a target of `<send>` and `<invoke>`. A sketch of its shape:
 
 ```rust
+// crates/vertep-runtime/src/actor.rs
 /// One event in, zero or more events out. A chart is one implementation.
-pub trait Actor: Send + 'static {
-    /// The address IRI; also the RDF subject of state and journal.
-    fn address(&self) -> &Iri;
-    /// Run one turn. For a chart this is exactly one SCXML macrostep.
-    fn turn(&mut self, input: Input) -> Result<TurnOutput, ActorFailure>;
+pub trait Actor {
+    /// The address; also the RDF subject of state and journal.
+    fn address(&self) -> &Address;
+    /// Handle one input. For a chart this is exactly one SCXML macrostep.
+    fn turn(&mut self, input: ActorInput) -> Turn;
 }
 
-pub struct Input {
+/// Finished at once (a chart's macrostep) or a future the runtime runs in the background
+/// (an async function or stream); either way the actor takes no other input until it ends.
+pub enum Turn {
+    Ready(Result<TurnOutput, ActorFailure>),
+    Pending(BoxFuture<Result<TurnOutput, ActorFailure>>),
+}
+
+pub struct ActorInput {
     pub event: Event,          // name, data, sendid, origin, origintype
-    pub message_id: MessageId, // dedup key
-    pub received_at: Timestamp // stamped by the shell's Clock, journaled
+    pub message_id: String,    // dedup key
+    pub received_at_ms: i64,   // stamped by the shell's Clock when dequeued, journaled
 }
 
 pub struct TurnOutput {
-    pub sends: Vec<OutgoingSend>,   // dispatched only after the journal append
-    pub timers: Vec<TimerCommand>,  // schedule or cancel, journaled
-    pub config_digest: Digest,      // checked on replay
+    pub sends: Vec<Outgoing>,  // target, event, delay_ms; dispatched only after the append
+    pub cancels: Vec<String>,  // send ids of delayed sends to cancel
+    pub done: Option<Value>,   // set when the actor completed, with its done data
 }
 ```
 
@@ -71,7 +79,7 @@ classDiagram
     class Actor {
         <<trait>>
         address() Iri
-        turn(Input) TurnOutput
+        turn(ActorInput) Turn
     }
     class ChartActor {
         chart version IRI
@@ -224,22 +232,35 @@ flowchart LR
 ```
 
 ```rust
-pub trait Mailbox {
-    fn enqueue(&self, msg: Envelope) -> Result<(), MailboxError>;
-    /// Next message in order, skipping (not removing) deferred ones.
-    fn receive(&self, deferred: &[EventDescriptor]) -> Option<Envelope>;
-    fn ack(&self, id: &MessageId) -> Result<(), MailboxError>;
+// crates/vertep-runtime/src/mailbox.rs and transport.rs (abridged)
+pub trait Mailbox: Send + Sync {
+    fn enqueue(&self, env: Envelope) -> Result<(), MailboxError>;
+    /// Oldest message neither in flight nor deferred (its event name matches no
+    /// descriptor in `deferred`), now marked in flight.
+    fn receive(&self, deferred: &[String]) -> Option<Envelope>;
+    fn ack(&self, message_id: &str) -> Result<(), MailboxError>;
+    fn release(&self, message_id: &str);   // put an in-flight message back
+    fn release_all(&self);
+    fn pending(&self) -> Vec<Envelope>;
+    // ...
 }
 
-pub trait Transport {
+pub trait Transport: Send + Sync {
     /// The SCXML Event I/O Processor type IRI that <send type="..."> selects.
-    fn type_iri(&self) -> &Iri;
-    fn deliver(&self, to: &MailboxRef, msg: Envelope) -> Result<(), TransportError>;
+    fn type_iri(&self) -> &str;
+    fn aliases(&self) -> Vec<String> { Vec::new() }
+    fn deliver(&self, mailbox: &dyn Mailbox, env: Envelope) -> Result<(), TransportError>;
 }
 
-pub trait Directory {
+/// One resolver per address scheme; the Directory dispatches on the scheme.
+pub trait Resolver: Send + Sync {
+    fn resolve(&self, address: &Address) -> Option<Arc<dyn Mailbox>>;
+}
+pub struct Directory { /* scheme -> Arc<dyn Resolver> */ }
+impl Directory {
+    pub fn register(&self, scheme: &str, resolver: Arc<dyn Resolver>);
     /// Depends only on the address, so reactivation or relocation keeps it.
-    fn resolve(&self, address: &Iri) -> Result<MailboxRef, ResolveError>;
+    pub fn resolve(&self, address: &Address) -> Result<Arc<dyn Mailbox>, ResolveError>;
 }
 ```
 
@@ -280,9 +301,21 @@ A message id built from the sender's address and the send id is stable across re
 
 - describes:: [[decisions#Non-blocking request and deferred events]]
 
+A state declares a request as a `<vt:request>` child element, which `lower` in `crates/vertep-runtime/src/chart.rs` rewrites before compiling (example from `crates/vertep-runtime/tests/messaging.rs`):
+
+```xml
+<state id="quoting">
+  <vt:request target="https://example.org/charts/pricer/b" event="price.get"
+              timeout="5s" reply="priced" ontimeout="failed"/>
+  <transition event="ping"/>
+</state>
+```
+
+The lowering adds a `<send>` on entry, a generated waiting substate, a transition on `vt:reply` to the `reply` target and one on `error.timeout` to the `ontimeout` target; the replier answers with an ordinary send of `vt:reply`.
+
 ```mermaid
 stateDiagram-v2
-    state "quoting (declares vt:request price.get, vt:timeout 5s)" as quoting {
+    state "quoting (vt:request element: event price.get, timeout 5s)" as quoting {
         [*] --> sending
         sending --> waiting: on entry, send price.get with corr id, schedule error.timeout timer
         waiting --> waiting: other events handled normally
@@ -291,7 +324,7 @@ stateDiagram-v2
     quoting --> failed: error.timeout where corr id matches
 ```
 
-- **Correlation ids** (`Deterministic Correlation Ids`). `corr = hash(actor IRI, journal position of the issuing macrostep, index k of the request in that macrostep)`. Replay rebuilds the same id without storing it separately.
+- **Correlation ids** (`Deterministic Correlation Ids`). The id is `<actor IRI>/request/<position>.<k>`: the journal position of the issuing macrostep and the index k of the request in it (`Address::correlation_id` in `crates/vertep-runtime/src/address.rs`). Replay rebuilds the same id without storing it separately.
 - **Timeouts** (`Request Timeout`). The timeout is a durable timer in the same journal entry, so it survives deactivation and restarts and fires `error.timeout` with the correlation id.
 - **Duplicate replies** (`Duplicate Reply Suppression`). At most one reply per correlation id is delivered; later ones are acknowledged and dropped.
 - **Blocking ask only outside** (`External Blocking Ask`). HTTP handlers and tests may `ask(...).await`; executable content never can.
@@ -378,9 +411,11 @@ The shell talks to its async runtime only through small spawn, clock and sleep t
 - describes:: [[roadmap#M2 Actor runtime]]
 
 ```rust
-pub trait Spawn { fn spawn(&self, f: BoxFuture<'static, ()>); }
-pub trait Clock { fn now(&self) -> Timestamp; }        // read only by the shell
-pub trait Sleep { fn sleep(&self, d: Duration) -> BoxFuture<'static, ()>; }
+// crates/vertep-runtime/src/shell.rs
+pub trait Spawn: Send + Sync { fn spawn(&self, fut: BoxFuture<()>); }
+pub trait Clock: Send + Sync { fn now_ms(&self) -> i64; }   // read only by the shell
+pub trait Sleep: Send + Sync { fn sleep_until(&self, at_ms: i64) -> BoxFuture<()>; }
+pub struct Shell { pub spawn: Arc<dyn Spawn>, pub clock: Arc<dyn Clock>, pub sleep: Arc<dyn Sleep> }
 ```
 
 ```mermaid

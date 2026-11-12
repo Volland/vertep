@@ -105,7 +105,7 @@
           <path d="M328 143 H236"/>
         </g>
         <g font-family="JetBrains Mono, monospace" font-size="11" style="fill:var(--ink-2)">
-          <text x="246" y="46">OfferDecision</text>
+          <text x="262" y="46">offer</text>
           <text x="250" y="136">journaled</text>
         </g>
       </svg>
@@ -114,7 +114,7 @@
   </figure>
 
   <ol>
-    <li><strong>Offer.</strong> When the chart enters a decide state, the pure core computes which events would actually be enabled now, restricted to the declared candidates. It emits an <code>OfferDecision</code> effect with a correlation id taken from the journal position, so a replay produces the same id.</li>
+    <li><strong>Offer.</strong> When the chart enters a decide state, the pure core computes which events would actually be enabled now, restricted to the declared candidates. The offer gets a correlation id taken from the actor's journal position, so a replay computes the same offer with the same id.</li>
     <li><strong>Decide.</strong> The shell asks the decider, asynchronously. The actor does not block. It stays in an ordinary state and keeps handling other events.</li>
     <li><strong>Return.</strong> The answer comes back as an event, <code>vt.decision</code>, through the mailbox. It is appended to the journal, deduplicated by correlation id, and only then processed.</li>
     <li><strong>Validate.</strong> The answer is accepted only if its correlation id names the open offer, its event was a candidate, its payload matches the candidate's schema, and the transition it would take is still the one that was enabled when the offer was made. Then the event is raised and normal SCXML selection takes the transition. Otherwise the chart gets <code>error.decide.invalid</code> with a reason such as <code>not-a-candidate</code>, <code>payload-schema</code>, <code>stale</code> or <code>not-enabled</code>.</li>
@@ -130,7 +130,7 @@
       <tr><td>The state is a transcript</td><td>The state is a configuration of named states. What may happen next is written in the chart.</td></tr>
       <tr><td>It cannot be replayed</td><td>Decisions and model results are journaled <em>before</em> they are processed. Replay feeds them back and never calls a model.</td></tr>
       <tr><td>Side effects have no bound</td><td>Only offered candidates are accepted. Tools are actors, and an invoking state grants its child the tools it may use; the send path enforces the intersection of grants.</td></tr>
-      <tr><td>It has no clock</td><td><code>vt:deadline</code> is a durable timer journaled with the offer. When it fires, <code>vt:fallback</code> hands the choice to another decider, perhaps a person. <code>vt:maxDecisions</code> ends runaway loops with an event.</td></tr>
+      <tr><td>It has no clock</td><td><code>vt:deadline</code> is a durable timer, so it fires across restarts and replay. When it fires, <code>vt:fallback</code> hands the choice to another decider, perhaps a person. <code>vt:maxDecisions</code> ends runaway loops with an event.</td></tr>
     </tbody>
   </table>
 
@@ -140,7 +140,7 @@
 
   <h2>The journal is the run</h2>
 
-  <p>Everything nondeterministic enters a Vertep actor as a journaled input: the offer, the decision with its annotations, the model's result with its prompt hash, usage and model name, the tool's reply, the timer that fired. Large prompts and results are stored once by content hash.</p>
+  <p>Everything nondeterministic enters a Vertep actor as a journaled input: the decision with its annotations, the model's result with its prompt hash, usage and model name, the tool's reply, the timer that fired. The offers themselves are not stored: they follow from the chart and the journal, so replay computes them again. Large prompts and results are stored once by content hash.</p>
 
   <p>So an agent run is not a log <em>about</em> the run. It <em>is</em> the run. Replay it with no model, no network and no API key, and the chart passes through exactly the same states. A bug report becomes a journal you can step through.</p>
 

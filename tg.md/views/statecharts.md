@@ -236,31 +236,47 @@ Guards and actions bind by IRI (`Functions Registered by IRI`). The generated `b
 - describes:: [[constraints#Aeneas supports a Rust subset]]
 
 ```rust
+// crates/vertep-core/src/session.rs (fields abridged)
 pub struct Session {
-    config: StateSet,             // bitset over states in document order
-    history: HistoryRecords,      // shallow and deep records per history state
-    internal: VecDeque<Event>,    // internal queue
-    invocations: Invocations,     // active invokes with their ids
-    send_counter: u64,            // deterministic send ids
-    bound: DataBinding,           // which data items are initialized (late binding)
-    status: Status,               // Running or Done
+    pub sessionid: String,
+    pub status: Status,                 // Running or Terminated
+    pub configuration: StateSet,        // bitset over states in document order
+    pub history: History,               // shallow and deep records per history state
+    pub internal_queue: VecDeque<Event>,
+    pub invocations: Vec<Invocation>,   // started, not yet cancelled invokes
+    pub data_initialized: StateSet,     // late binding: which states' data is initialized
+    pub send_counter: u64,              // deterministic send ids
+    pub invoke_counter: u64,
+    pub macrosteps: u64,
+    pub options: Options,               // microstep budget, send and invoke types
 }
 
-pub enum Input { Start(StartParams), External(Event), Cancel }
+pub struct Environment { pub now_ms: i64, pub seed: u64 }   // journaled time, seed from the entry IRI
+
+pub struct StartInput { pub info: SessionInfo, pub env: Environment, pub options: Options,
+                        pub data: Vec<(String, Value)>, pub sessions: Option<Vec<String>> }
+pub enum InputKind { Event(Event), Cancel }
+pub struct Input { pub env: Environment, pub kind: InputKind, pub sessions: Option<Vec<String>> }
 
 pub enum Effect {
-    Send { id: SendId, event: Event, target: Target, kind: IoProcessor, delay: Duration },
-    Cancel { send_id: SendId },
-    Invoke { id: InvokeId, spec: InvokeSpec },
-    CancelInvoke { id: InvokeId },
-    Forward { invoke: InvokeId, event: Event },   // autoforward
-    Log { label: String, value: Value },
-    SessionDone { donedata: Option<Value> },
+    Send(SendRequest),                  // sendid, event, target, type_, delay_ms
+    Cancel { sendid: String },
+    Invoke(InvokeRequest),              // invokeid, state, type_, src, content, params, autoforward
+    CancelInvoke { invokeid: String },
+    Forward { invokeid: String, event: Event },   // autoforward
+    Log { label: Option<String>, value: Option<Value> },
+    SessionDone { data: Value, cancelled: bool },
 }
 
-pub fn step(chart: &CompiledChart, s: Session, input: Input, dm: &mut dyn Datamodel)
-    -> (Session, Vec<Effect>);
+pub struct Outcome { pub session: Session, pub effects: Vec<Effect>, pub trace: MacrostepTrace }
+
+pub fn start(chart: &CompiledChart, input: StartInput, dm: &mut dyn Datamodel)
+    -> Result<Outcome, StartError>;     // UnsupportedDatamodel, DatamodelMismatch, Datamodel, BudgetExceeded
+pub fn step(chart: &CompiledChart, session: Session, input: Input, dm: &mut dyn Datamodel)
+    -> Result<Outcome, StepError>;      // Terminated, BudgetExceeded (with the partial outcome)
 ```
+
+Starting a session is its own function rather than an input variant, and time and randomness reach the datamodel only through `Input.env` (`now_ms`, `seed`): the runtime takes the time from the entry's journaled timestamp and derives the seed from the entry IRI (`seed_of` in `crates/vertep-runtime/src/address.rs`), so replay gets both back without storing random values.
 
 The datamodel is passed as `&mut dyn Datamodel` because embedded engines such as boa are mutable; purity therefore means "a function of session, input and datamodel snapshot", which `Deterministic Evaluation` and `Datamodel Snapshot` make exact. The spec wording `Pure Step Function` and this signature agree under that reading.
 
@@ -291,7 +307,7 @@ sequenceDiagram
     participant H as Host
     participant S as step
     participant D as Datamodel
-    H->>S: Input External(e)
+    H->>S: step(session, Input with InputKind Event e)
     S->>S: finalize, autoforward
     loop until stable
         S->>D: conditions (read-only)
@@ -303,7 +319,7 @@ sequenceDiagram
         S->>D: onentry content (document order)
         D-->>S: errors become error.execution on the internal queue
     end
-    S-->>H: Session and effects
+    S-->>H: Outcome with session, effects, trace
 ```
 
 ### Transition selection and conflicts
@@ -453,7 +469,7 @@ pub enum Type {
 pub fn check_chart(chart: &Chart) -> Result<TypedChart, Vec<Diagnostic>>;   // reports every error
 ```
 
-- **Primitives** (`Primitive Types`): `bool`, `int` (i64), `decimal` (arbitrary precision), `string`, `datetime` (RFC 3339 with offset), `iri` (RFC 3987).
+- **Primitives** (`Primitive Types`): `bool`, `int` (i64), `decimal` (arbitrary precision), `string`, `datetime` (RFC 3339 with offset, encoded in UTC with `Z`), `iri` (RFC 3987).
 - **Named types** (`Named Content-Addressed Types`): the IRI is the hash of the canonical definition, so the chart version IRI covers its types and a type edit is a version change.
 - **Recursion** (`Recursive and Cyclic Type Definitions`): only through a list or an optional.
 - **Opt-in** (`Opt-In Chart Typing`, `Dynamic Value Boundary`): untyped charts run on `value` exactly as in M0; `value` enters static code only through a checked conversion.
@@ -476,4 +492,4 @@ flowchart LR
     CH -- "accepts iff" --> S
 ```
 
-The agreement property for each projection P is `check(T, v) = P.accepts(P(T), encode(v))`, where `encode` is the canonical value encoding: tagged unions as `{"tag", "value"}`, decimals as strings, datetimes normalized to UTC with the offset kept. `Types Survive Every Surface` makes the round trip SCXML, YAML, IR and RDF type-preserving, with the same chart version IRI at the end.
+The agreement property for each projection P is `check(T, v) = P.accepts(P(T), encode(v))`, where `encode` is the canonical value encoding: tagged unions as `{"tag", "value"}`, decimals as strings, datetimes normalized to UTC and written with a `Z` suffix (`crates/vertep-core/src/types/prim.rs`). `Types Survive Every Surface` makes the round trip SCXML, YAML, IR and RDF type-preserving, with the same chart version IRI at the end.

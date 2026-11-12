@@ -36,7 +36,7 @@ flowchart TB
     subgraph evidence["Evidence"]
         TR["trace equality on every test"]
         CR["conformance report"]
-        CT["vt:certifiedBy in the graph"]
+        CT["vt:certifiedBy certificate<br/>(N-Triples on stdout)"]
     end
     RS --> TR
     OR --> TR
@@ -254,7 +254,8 @@ flowchart LR
 What the model leaves out, and what remains:
 
 - `pattern` is read as the lexical rule its regular expression encodes; the regular expressions themselves are not proven equal to those rules. `int` is decided on the exact decimal, Rust decides it on the `f64`, so the differential cases stay away from the edges of the signed 64-bit range.
-- The SHACL projection (backlog 4.2), typed step soundness (4.4: the Lean `step` has no expression typer, so the values it assigns come from the untyped answer tape) and certifying typed charts with `vt certify` (4.5: the Lean RDF reader rejects `vt-types` triples) are open.
+- The SHACL projection (backlog 4.2) and typed step soundness (4.4: the Lean `step` has no expression typer, so the values it assigns come from the untyped answer tape) are open.
+- Typed charts certify (4.5, 2026-11-12): `Types/Syntax.lean` reads a chart's `vt:types` block as Rust does and `Rdf/Types.lean` derives its type triples (type IRIs, definitions, shapes), which the chart version covers, see [[decisions#The Lean checker recomputes a chart's type triples]].
 
 ## Differential oracle loop
 
@@ -354,7 +355,7 @@ Known risk: boa's ECMAScript gaps can fail tests unrelated to SCXML; those are a
 
 ## Certificates in the graph
 
-`vt certify` is a Lean-compiled checker: given a chart as RDF it decides `WellFormed` and, when it holds, emits a certificate as RDF attached to the chart version IRI with `vt:certifiedBy`.
+`vt certify` runs a Lean-compiled checker: given a chart as RDF it decides `WellFormed` and, when it holds, prints a certificate as N-Triples attached to the chart version IRI with `vt:certifiedBy`.
 
 - describes:: [[decisions#Content-addressed chart versions]]
 - describes:: [[components#vertep-cli]]
@@ -365,31 +366,35 @@ sequenceDiagram
     participant CLI as vt (vertep-cli)
     participant RDF as vertep-rdf
     participant CK as vt certify (Lean binary)
-    participant GS as GraphStore
     U->>CLI: vt certify order.scxml
     CLI->>RDF: parse, project to N-Quads, hash
     RDF-->>CLI: N-Quads + chart version IRI
-    CLI->>CK: N-Quads
-    CK->>CK: decode, decide WellFormed
+    CLI->>CK: vt-certify --chart file.nq
+    CK->>CK: decode, derive type triples, recompute version, decide WellFormed
     alt well-formed
-        CK-->>CLI: certificate RDF
-        CLI->>GS: insert certificate graph
+        CK-->>CLI: certificate N-Triples, exit 0
+        CLI-->>U: print certificate on stdout
     else not well-formed
-        CK-->>CLI: rejection with the failing rule
+        CK-->>CLI: rejection with the failing rule, exit 1 (2 if not a chart projection)
     end
 ```
+
+The checker (`VT_CERTIFY`, or `vt-certify` on `PATH`, built by `lake build` in `lean/vertep-lean`) is found and run by `certify` in `crates/vertep-cli/src/commands.rs`; the certificate is built by `certificate` in `lean/vertep-lean/VertepLean/Certify.lean`. Its theorem list is fixed there:
 
 ```turtle
 <urn:vertep:chart:sha256:4be1...> vt:certifiedBy <urn:vertep:cert:sha256:91c0...> .
 <urn:vertep:cert:sha256:91c0...> a vt:Certificate ;
-    vt:theorem "Vertep.shapes_equiv", "Vertep.step_wf", "Vertep.rdf_roundtrip" ;
+    vt:theorem "Vertep.checkWF_iff", "Vertep.violations_eq_nil_iff", "Vertep.Rdf.fromRDF_sound",
+               "Vertep.step_deterministic", "Vertep.transition_selection",
+               "Vertep.step_requests_declared" ;
     vt:leanToolchain "leanprover/lean4:v4.35.0" ;
-    vt:leanRdfRevision "<pinned revision>" ;
-    vt:checkerHash "sha256:..." ;
-    prov:generatedAtTime "2026-11-11T12:00:00Z"^^xsd:dateTime .
+    vt:leanRdfRevision "b407b97424150fec25a1ade514c71ea7abc61b42" ;
+    vt:checkerHash "sha256:..." .
 ```
 
-Because the chart IRI is a content hash, a certificate can never apply to a different chart; a new version needs a new certificate. Certificates are ordinary graph facts, so "which running actors use uncertified charts" is a SPARQL query over the runtime graph.
+The certificate IRI hashes the version and the certificate body. `vt-certify` adds `prov:generatedAtTime` only when given `--time`, which `vt certify` never passes, so the certificate for a chart and checker is the same on every run. `vt certify` only prints it; putting it into a graph store is up to the caller.
+
+Because the chart IRI is a content hash, a certificate can never apply to a different chart; a new version needs a new certificate. Once loaded into a store, certificates are ordinary graph facts, so "which running actors use uncertified charts" is a SPARQL query over the runtime graph.
 
 ## Later - Aeneas for the kernel
 

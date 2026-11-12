@@ -34,16 +34,16 @@ flowchart LR
     subgraph Trusted["Trusted: pure and replayable"]
         MB["Mailbox"]
         J["Journal append<br/>(before processing)"]
-        S["step(config, datamodel, event)"]
+        S["step(chart, session, input, datamodel)"]
     end
     LLM --> D
     H --> D
     T --> V
     P --> V
-    D -- "vt.decision / llm.result" --> MB
+    D -- "vt.decision / done.invoke.id" --> MB
     V -- "events only" --> MB
     MB --> J --> S
-    S -- "effects: OfferDecision, sends, invokes" --> D
+    S -- "offer from enabled_events after the macrostep; sends, invokes" --> D
 ```
 
 Three consequences follow, and the rest of this view is their detail:
@@ -69,19 +69,23 @@ The agent layer is one crate, `vertep-agent`, on top of the runtime, the CEL dat
 classDiagram
     class Decider {
         <<trait>>
-        +decide(req: DecisionRequest) DecisionOutcome
-        +cancel(corr: CorrelationId)
+        +kind() DeciderKind
+        +decide(request: DecisionRequest) BoxFuture~DecisionOutcome~
+        +cancel(correlation: str)
     }
     class DecisionRequest {
         +state: StateId
         +candidates: Vec~Candidate~
         +context: ContextView
         +actor: Iri
-        +corr: CorrelationId
+        +correlation: CorrelationId
+        +binding: String
+        +fallback: bool
     }
     class Candidate {
-        +event: EventName
-        +payload_schema: JsonSchema
+        +event: String
+        +schema: Json
+        +schema_hash: String
     }
     class DecisionOutcome {
         <<enum>>
@@ -95,7 +99,7 @@ classDiagram
     }
     class Provider {
         <<trait>>
-        +complete(prompt, model, params, schema) ProviderResult
+        +complete(request: ProviderRequest) BoxFuture~ProviderResult~
     }
     class ToolActor {
         +iri: Iri
@@ -128,10 +132,10 @@ A `vt:decide` state names one decider binding, an optional deadline, a fallback 
 
 The flow is covered by `Decide State Declaration`, `Enabled Event Offer`, `Decider Contract`, `Decisions Are Journaled Inputs`, `Decision Validation Against Candidates` and `Non-blocking Decision Wait`.
 
-1. **Offer.** Entering the decide state makes the pure core compute the candidate set with `enabled_events(config, datamodel)`: every event whose transition would be enabled, ancestors included, restricted to declared candidates. The core emits an `OfferDecision` effect with a correlation id derived from the journal position, so replay reproduces it.
+1. **Offer.** After each macrostep the agent machine (`crates/vertep-agent/src/machine.rs`) recomputes the candidate set of every active decide state with the pure `enabled_events(chart, session, probe, state, declared)` in `crates/vertep-agent/src/enabled.rs`: every event whose transition out of the state, an active descendant or an ancestor would be enabled, restricted to `vt:candidates`, guards evaluated on a probe copy of the datamodel. The correlation id is `<actor>/decision/<position>.<k>`, derived from the journal position of the input whose macrostep made the offer, so replay reproduces it.
 2. **Decide.** The shell calls the bound decider asynchronously. The actor stays in an ordinary active state and keeps processing other events.
 3. **Return.** The decision comes back through the mailbox as the external event `vt.decision`, is appended to the journal (deduplicated by correlation id) and only then processed.
-4. **Validate.** A generated guard accepts it only if the event is in the offered candidate set for that correlation id and the payload conforms to the candidate's schema. Then the chosen event is raised internally and normal SCXML selection takes the transition. Otherwise `error.decide.invalid` is raised with a reason (`not-a-candidate`, `payload-schema`, `stale`).
+4. **Validate.** The machine accepts the decision only if its correlation id names the open offer, its event is a candidate, its payload conforms to the candidate's schema, its annotations are valid, and the transition it would take now is the one enabled at offer time (a payload guard is evaluated for real only now). Then the chosen event is raised and normal SCXML selection takes the transition. Otherwise `error.decide.invalid` is raised with a reason: `not-a-candidate`, `payload-schema`, `stale`, `annotation` or `not-enabled`.
 
 ```mermaid
 sequenceDiagram
@@ -141,19 +145,20 @@ sequenceDiagram
     participant J as Journal
     participant S as vertep-agent shell
     participant D as Decider
-    MB->>A: event enters decide state "route"
-    A->>J: append macrostep + OfferDecision(corr j42)
-    A-->>S: effect OfferDecision(candidates, schemas, corr j42)
-    S->>D: DecisionRequest(corr j42)
+    MB->>J: append input n
+    J->>A: deliver; macrostep enters decide state "route"
+    A-->>S: Outcome (new configuration)
+    S->>S: enabled_events on a probe datamodel, offer corr actor/decision/n.0
+    S->>D: DecisionRequest(corr)
     Note over A: still active, other events processed
-    D-->>S: Decision(approve, payload, annotations)
-    S->>MB: vt.decision(corr j42)
+    D-->>S: DecisionOutcome::Decision(approve, payload, annotations)
+    S->>MB: vt.decision(corr)
     MB->>J: append input (dedup by corr)
     J->>A: deliver vt.decision
-    alt candidate, schema ok, not stale
-        A->>A: raise approve internally, take transition
+    alt offered, candidate, schema and annotations ok, still enabled
+        S->>A: raise approve, take transition
     else invalid
-        A->>A: raise error.decide.invalid(reason)
+        S->>A: raise error.decide.invalid(reason)
     end
 ```
 
@@ -191,23 +196,25 @@ This is `Decider Kinds`. A guard decider is the deterministic fallback of choice
 
 | Kind | How it decides | Typical use |
 |---|---|---|
-| Guard decider | first candidate in document order whose declared decision guard holds; pure, deterministic | fallback, policy, tests |
-| LLM decider | structured output whose schema is a `oneOf` over candidates | agent reasoning |
-| Human decider | publishes the request to an inbox actor; the answer is a reply | approvals, escalation |
-| Actor decider | non-blocking `vt:request` to another actor IRI | delegation, ensembles, a supervisor agent |
+| Guard decider (`GuardDecider`) | first candidate in document order whose CEL decision guard holds (`with_rules`, `from_chart` reading `vt:decisionGuard`, or `first_enabled`); pure, deterministic | fallback, policy, tests |
+| LLM decider (`LlmDecider`) | structured output whose schema is a `oneOf` over candidates | agent reasoning |
+| Human decider (`HumanDecider`) | puts the request in an `Inbox`; a person reads `inbox.pending()` and answers with `inbox.answer(correlation, outcome)` | approvals, escalation |
+| Actor decider (`ActorDecider`) | sends `vt.decide.request` to another actor IRI as a non-blocking request and reads its reply | delegation, ensembles, a supervisor agent |
 
 ```rust
-#[async_trait]
+// crates/vertep-agent/src/decider.rs
 pub trait Decider: Send + Sync {
-    /// Must not mutate anything; receives an immutable context view.
-    async fn decide(&self, req: DecisionRequest) -> DecisionOutcome;
-    /// Called when the request is cancelled or superseded by a re-offer.
-    fn cancel(&self, corr: CorrelationId);
+    fn kind(&self) -> DeciderKind;   // Guard | Llm | Human | Actor | Custom
+    /// May take arbitrarily long; the actor keeps running. Owns its copy of the request
+    /// (state, candidates, read-only ContextView, actor, correlation, binding, fallback).
+    fn decide(&self, request: DecisionRequest) -> BoxFuture<'static, DecisionOutcome>;
+    /// The request was cancelled or superseded by a re-offer; a later answer is stale.
+    fn cancel(&self, _correlation: &str) {}
 }
 
 pub enum DecisionOutcome {
-    Decision { event: EventName, payload: Value, annotations: Annotations },
-    Refusal { reason: String },
+    Decision(Decision),   // event, payload, annotations
+    Refusal(Refusal),     // reason
 }
 ```
 
@@ -230,13 +237,13 @@ Untyped charts offer the dynamic value schema, and decisions are validated for t
 
 ## LLM actors
 
-`<invoke type="vt:llm">` starts one model call as an invoked actor; its result is journaled in the parent as `llm.result` before processing, so replay never calls a provider.
+`<invoke type="vt:llm">` starts one model call as an invoked actor; its result reaches the chart as `done.invoke.<id>`, journaled first as an `llm.result` input, so replay never calls a provider.
 
 - describes:: [[capabilities#LLM actors]]
 - describes:: [[glossary#Invoked actor]] {note: "an LLM call lives and dies with its invoking state"}
 - describes:: [[decisions#Event-sourced actors]]
 
-The call actor renders the prompt template against a read-only view of the context and the triggering event, records the prompt hash, calls the provider, validates structured output and sends `llm.result` or `error.llm` to its parent (`LLM Invocation`, `Prompt Templates`, `Provider Contract`, `Structured Output`, `Journaled Model Results`). It is cancelled when the invoking state exits, like any SCXML invoke.
+The call actor renders the prompt template against a read-only view of the context and the triggering event, records the prompt hash, calls the provider, validates structured output and delivers `done.invoke.<id>` or `error.llm` (with a class such as `rate-limited`, `schema` or `transport`) to its parent (`LLM Invocation`, `Prompt Templates`, `Provider Contract`, `Structured Output`, `Journaled Model Results`). It is cancelled when the invoking state exits, like any SCXML invoke.
 
 ```mermaid
 sequenceDiagram
@@ -249,14 +256,14 @@ sequenceDiagram
     alt live run
         P-->>C: start invoke (template, model, output type)
         C->>C: render prompt, hash sha256
-        C->>PR: complete(prompt, model, params, schema)
+        C->>PR: complete(ProviderRequest)
         PR-->>C: content, usage, model id
         C->>C: validate against output JSON Schema
-        C->>P: llm.result (or error.llm class schema)
+        C->>P: result (or error.llm with class schema)
         P->>J: append llm.result input FIRST
-        J->>P: process: done.invoke routing, guards
+        J->>P: process as done.invoke.id
     else replay
-        J->>P: llm.result already journaled for this invoke id
+        J->>P: llm.result input already journaled, processed as done.invoke.id
         Note over C,PR: no call actor started, no provider call
     end
 ```
@@ -265,27 +272,37 @@ Rules worth knowing:
 
 - **No implicit retries** (`Retries Expressed in the Chart`). Retries are transitions on `error.llm`. The `vt:retry` invoke extension is sugar for a bounded retry substate with a durable backoff timer, so retry behaviour is visible in the chart and in the graph.
 - **Streaming is optional** (`Streaming Partials`). Partials arrive as `vt.llm.partial` for targetless transitions only, and only the final result is journaled.
-- **Accounting** (`Usage and Cost Accounting`). Each call records prompt and completion tokens, model, provider binding, latency and optional cost as `vt-agent:` statements. Cumulative usage of the actor and its invoked descendants is a read-only system variable that budget guards read.
+- **Accounting** (`Usage and Cost Accounting`). Each call records prompt and completion tokens, model, provider binding, latency and optional cost as `vt-agent:` statements. Cumulative usage of the actor is the read-only data item `vt_usage` (`prompt_tokens`, `completion_tokens`, `total_tokens`, `calls`, `cost`) that budget guards read; LLM decider calls count too.
 - **Vendor-neutral** (`Provider Contract`). No vendor SDK is needed to build or run Vertep; concrete providers are optional cargo features.
 
 ```rust
-#[async_trait]
+// crates/vertep-agent/src/llm.rs
 pub trait Provider: Send + Sync {
-    async fn complete(
-        &self,
-        prompt: &RenderedPrompt,
-        model: &ModelId,
-        params: &GenerationParams,
-        output: Option<&JsonSchema>,
-    ) -> Result<ProviderResult, ProviderError>;
+    fn complete(&self, request: ProviderRequest)
+        -> BoxFuture<'static, Result<ProviderResult, ProviderError>>;
+    /// Chunks then the final result, when the provider can stream.
+    fn stream(&self, _request: ProviderRequest)
+        -> Option<BoxStream<'static, Result<StreamItem, ProviderError>>> { None }
+}
+
+pub struct ProviderRequest {
+    pub prompt: RenderedPrompt,         // text and sha256 hash
+    pub model: String,
+    pub params: GenerationParams,       // temperature, max_tokens
+    pub output_schema: Option<Json>,
+    pub tools: Vec<ToolSchema>,         // exactly the granted tools
 }
 
 pub struct ProviderResult {
-    pub content: Content,       // text or parsed JSON
-    pub usage: Usage,           // prompt_tokens, completion_tokens
-    pub model: ModelId,         // as reported by the provider
+    pub content: String,
+    pub usage: Usage,                   // prompt_tokens, completion_tokens
+    pub model: String,                  // as reported by the provider
+    pub cost: Option<Cost>,
+    pub tool_calls: Vec<ToolCallRequest>,
 }
 ```
+
+With `vt:output`, the `done.invoke.<id>` data is the parsed and validated value; without it, an object with `text`, `model`, `call`, `promptHash`, `usage` and `toolCalls`. `ScriptedProvider` ships for tests and examples; the `anthropic` cargo feature adds `AnthropicProvider` over an application-supplied `HttpClient`.
 
 ## Tools and capability grants
 
@@ -322,18 +339,21 @@ A ReAct agent is a chart: a decide loop whose candidates are tool calls, a finis
 ```mermaid
 stateDiagram-v2
     [*] --> idle
-    idle --> decide: task
-    state "decide (vt:decide, LLM decider)" as decide
+    idle --> triaging: task
+    state "triaging (invoke vt:llm triage)" as triaging
+    triaging --> decide: done.invoke.triage
+    triaging --> decide: error.llm
+    state "decide (vt:decide llm/claude, fallback human/support)" as decide
     decide --> tooling: call_tool
     decide --> done: finish
     decide --> human: escalate
+    decide --> human: vt.decide.refused
     decide --> exhausted: vt.agent.budget-exhausted
     decide --> decide: error.decide.invalid
-    decide --> human: error.decide.timeout
-    state "tooling (vt:request to granted tool)" as tooling
-    tooling --> decide: done.invoke
+    state "tooling (send tool.call to the chosen tool IRI)" as tooling
+    tooling --> decide: vt:reply
     tooling --> decide: error.tool
-    state "human (vt:decide, human decider)" as human
+    state "human (vt:decide human/support)" as human
     human --> done: finish
     done --> [*]
     exhausted --> [*]
@@ -341,96 +361,109 @@ stateDiagram-v2
 
 ### Example agent chart
 
-A complete support agent in the YAML surface: typed events, CEL, an LLM decider with deadline and fallback, granted tools and human escalation.
+A complete support agent in the YAML surface: typed events, CEL, an LLM triage call, an LLM decider with deadline and fallback, tool calls and human escalation.
 
-The YAML syntax is owned by `yaml-format` in M1; treat keys as illustrative.
+It is `crates/vertep-agent/examples/support-agent.scxml` with payload types added, and `vt validate` and `vt typecheck` accept it.
+
+Agent bindings are not YAML keys of their own: decide states and `vt:llm` invokes carry them as `extensions` entries (`local` plus `attribute`), the lossless spelling of `vt:` attributes in `crates/vertep-yaml`.
 
 ```yaml
-chart: support-agent
+vertep: 1
+name: support-agent
 datamodel: cel
 types:
-  Ticket:   { id: string, customer: iri, text: string }
-  ToolCall: { tool: iri, args: any }
-  Answer:   { text: string, confidence: decimal }
-context:
-  ticket: { type: optional<Ticket> }
-  steps:  { type: int, init: 0 }
-  notes:  { type: list<string>, init: [] }
+  Ticket: { id: string, text: string }
+  Answer: { text: string, confidence: decimal }
 events:
-  task:      Ticket
-  call_tool: ToolCall
-  finish:    Answer
-  escalate:  { reason: string }
+  task: Ticket
+  finish: Answer
+  escalate: { reason: string }
+context:
+  ticket: { init: "null" }
+  triage: { init: "''" }
+  steps: { type: int, init: "0" }
+  observations: { init: "[]" }
+  answer: { init: "null" }
 initial: idle
 states:
   idle:
     on:
-      task: { target: decide, assign: { ticket: "event.data" } }
-  decide:
-    vt:decide:
-      decider: llm/claude-support
-      candidates: [call_tool, finish, escalate]
-      deadline: 30s
-      fallback: guards/escalate-on-timeout
-      maxDecisions: 12
-    on:
-      call_tool:  { target: tooling }
-      finish:     { target: done, guard: "event.data.confidence >= 0.6" }
-      escalate:   { target: human }
-      vt.agent.budget-exhausted: { target: human }
-  tooling:
+      task: { target: triaging, actions: [ { assign: { location: ticket, expr: ev.data } } ] }
+  triaging:
     invoke:
-      type: vt:request
-      target: "event.data.tool"
-      data: "event.data.args"
-      grants: { tools: [vt:tool/kb_search, vt:tool/order_lookup] }
-      timeout: 20s
+      id: triage
+      type: "vt:llm"
+      extensions:
+        - { local: provider, attribute: triage }
+        - { local: model, attribute: claude-opus-5-5 }
+        - { local: template, attribute: "Triage this support ticket in one line: {{context.ticket.text}}" }
     on:
-      done.invoke:
+      done.invoke.triage: { target: decide, actions: [ { assign: { location: triage, expr: ev.data.text } } ] }
+      error.llm: decide
+  decide:
+    extensions:
+      - { local: decide, attribute: llm/claude }
+      - { local: candidates, attribute: "call_tool finish escalate" }
+      - { local: deadline, attribute: "30s" }
+      - { local: fallback, attribute: human/support }
+      - { local: maxDecisions, attribute: "10" }
+    on:
+      call_tool:
+        target: tooling
+        actions: [ { send: { event: tool.call, targetexpr: ev.data.tool, content: { expr: ev.data.args } } } ]
+      finish: { target: done, actions: [ { assign: { location: answer, expr: ev.data } } ] }
+      escalate: human
+      vt.agent.budget-exhausted: budget_out
+      error.decide.invalid: decide
+      vt.decide.refused: human
+  tooling:
+    on:
+      "vt:reply":
         target: decide
-        assign: { steps: "steps + 1", notes: "notes + [string(event.data)]" }
-      error.tool:      { target: decide }
-      error.timeout:   { target: decide }
-      error.communication: { target: human }
+        actions:
+          - { assign: { location: observations, expr: "ctx.observations + [ev.data.result]" } }
+          - { assign: { location: steps, expr: "ctx.steps + 1" } }
+      error.tool: { target: decide, actions: [ { assign: { location: steps, expr: "ctx.steps + 1" } } ] }
   human:
-    vt:decide:
-      decider: human/support-inbox
-      candidates: [finish]
+    extensions:
+      - { local: decide, attribute: human/support }
+      - { local: candidates, attribute: finish }
     on:
-      finish: { target: done }
+      finish: { target: done, actions: [ { assign: { location: answer, expr: ev.data } } ] }
   done:
     type: final
-    donedata: "event.data"
+    donedata: { params: { answer: ctx.answer, steps: ctx.steps } }
+  budget_out:
+    type: final
+    donedata: { params: { steps: ctx.steps } }
 ```
 
-The same agent wired from Rust: the chart is compiled with `include_chart!`, deciders, providers and tools are registered by binding name, and the virtual actor is addressed by IRI.
+The same agent wired from Rust, after `crates/vertep-agent/examples/support/kit.rs`: deciders, providers and tools are registered by binding name on `AgentHost::builder`, the chart is registered by version, and the actor is addressed by IRI.
 
 ```rust
-use vertep::prelude::*;
+use std::sync::Arc;
+use vertep_agent::anthropic::AnthropicProvider;   // `anthropic` feature
+use vertep_agent::{AgentHost, GuardDecider, HumanDecider, Inbox, LlmDecider, Provider};
+use vertep_runtime::shell::SystemClock;
 
-include_chart!(SupportAgent, "charts/support-agent.yaml");
+let chart = vertep_yaml::read_str(include_str!("charts/support-agent.yaml"))?;
+let model: Arc<dyn Provider> = Arc::new(AnthropicProvider::new(http, api_key)); // your HttpClient
+let inbox = Inbox::default();
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let runtime = Runtime::builder()
-        .store(TiramemsuStore::open("data/shard-0.tm")?)
-        .provider("claude", AnthropicProvider::from_env()?)
-        .decider("llm/claude-support", LlmDecider::new("claude", "claude-sonnet-5-5"))
-        .decider("guards/escalate-on-timeout", GuardDecider::first_enabled(["escalate"]))
-        .decider("human/support-inbox", HumanDecider::inbox("vt:actor/SupportInbox/main"))
-        .tool("vt:tool/kb_search", KbSearch::new(index))
-        .tool("vt:tool/order_lookup", OrderLookup::new(db))
-        .build()
-        .await?;
+let mut host = AgentHost::builder(Arc::new(SystemClock))
+    .provider("triage", model.clone())
+    .decider("llm/claude", Arc::new(LlmDecider::new("claude", model, "claude-opus-5-5")))
+    .decider("human/support", Arc::new(HumanDecider::new(inbox.clone())))
+    .decider("guards/escalate", Arc::new(GuardDecider::first_enabled(["escalate"])))
+    .tool(kb_search)                    // Tool::new(iri, declarations, argument type, result type, fn)
+    .tool(order_lookup)
+    .build();
 
-    let agent = runtime.virtual_actor::<SupportAgent>("vt:actor/SupportAgent/ticket-8812");
-    agent.send(SupportAgentEvent::Task(Ticket {
-        id: "8812".into(),
-        customer: iri!("vt:actor/Customer/42"),
-        text: "My order never arrived".into(),
-    })).await?;
-    Ok(())
-}
+let version = host.register(chart)?;
+host.spawn("https://example.org/agents/support/8812", &version)?;
+host.send("https://example.org/agents/support/8812", task_event);
+host.run_until_idle();
+// A person answers escalations with inbox.pending() and inbox.answer(correlation, outcome).
 ```
 
 ## Plan charts
@@ -488,7 +521,7 @@ sequenceDiagram
     participant CV as Chart versioning
     participant J as Journal
     A->>L: invoke vt:llm "improve your own chart"
-    L-->>A: llm.result: chart v2 + mapping v1 to v2 (journaled)
+    L-->>A: done.invoke: chart v2 + mapping v1 to v2 (journaled as llm.result)
     A->>V: validate v2 (IR, SHACL, CEL-only where required)
     V-->>A: ok, version IRI v2 = hash
     A->>CV: propose migration v1 to v2
@@ -508,15 +541,16 @@ An agent run is a journal: offers, decisions, model results, tool results, plans
 
 | Journaled item | Kind | Written when |
 |---|---|---|
-| `OfferDecision` with correlation id and candidate fingerprint | effect in the macrostep append | decide state entered or re-offered |
-| `vt.decision` with annotations | input | decider answered |
-| `llm.result` with prompt hash, content, usage, model | input | provider returned |
-| tool result (`done.invoke`, reply) | input | tool replied |
-| deadline timer | entry with the offer | offer made |
-| plan accepted or rejected, plan version IRI | input or entry | plan validated |
-| migration snapshot, mapping, snapshot | entry | self-modification accepted |
+| `start` with the chart version | input | actor spawned |
+| `event` with message id | input | external event delivered |
+| `decision` (correlation, event, payload, annotations) or `refusal` | input | decider answered |
+| `llm.result` (prompt hash, content, usage, model, latency) or `llm.error` (class) | input | provider returned |
+| `tool.result` | input | tool replied |
+| `timer` (deadline, retry backoff) | input | timer fired |
+| plan accepted or rejected, plan version IRI | rebuilt by the machine from the input that carried the plan | replay |
+| migration snapshot, mapping, snapshot | migration entry in the runtime journal (`Node::migrate`) | self-modification accepted |
 
-Replay feeds these back instead of calling deciders, providers or tools. To explore an alternative ("what if the model had chosen `escalate`?") the supported way is to fork the actor's journal at the position of the offer and supply a different decision, which becomes a new branch rather than an edit of history. Large prompts and results are stored once by content hash and referenced from journal entries.
+Offers are not journaled: the machine recomputes them from the replayed configuration, and their correlation ids `<actor>/decision/<position>.<k>` come out the same. Replay feeds these back instead of calling deciders, providers or tools. To explore an alternative ("what if the model had chosen `escalate`?") the supported way is to fork the actor's journal at the position of the offer and supply a different decision, which becomes a new branch rather than an edit of history. Prompts are recorded by hash only; the model's content is stored inline in its `llm.result` input.
 
 ## Agent ontology
 
@@ -553,7 +587,7 @@ classDiagram
 ```
 
 ```turtle
-@prefix vt-agent: <https://vertep.dev/ns/agent#> .
+@prefix vt-agent: <https://w3id.org/vertep/agent#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 
 :d42 a vt-agent:Decision ;
@@ -643,11 +677,13 @@ flowchart LR
     H --> P["Providers"]
     H --> T["Tools"]
     D -- "Decision or Refusal" --> MB
-    P -- "llm.result or LLM error" --> MB
+    P -- "llm.result or llm.error" --> MB
     T -- "tool result" --> MB
     M -- "records" --> G["vt-agent graph"]
 ```
 
 Every answer from outside — a decision, a model result, a tool result, a fired timer — is an input that the host journals before the machine applies it, so replaying a journal (or a prefix of it, for a fork) rebuilds the actor without consulting anything. The machine wraps the core's `step`: after each macrostep it recomputes the candidate sets of active decide states, re-offers when a fingerprint changes and closes offers of exited states. Plans run inside the parent's machine as bounded child sessions, so their state is rebuilt by the parent's replay and their duration bound is a durable timer of the parent.
+
+**Current limitation: no durable agent journal.** The input kinds are those of `AgentInput` in `crates/vertep-agent/src/journal.rs`, but `MemoryJournal` is the only implementation of the `AgentJournal` trait, and `AgentHost::builder` defaults to it. An agent's journal therefore lives as long as the host process; replay and forks work within it, and a durable implementation over `JournalStore` is still to come.
 
 Runtime actors invoked from ordinary charts are restricted by `GrantedActor`, a wrapper around their factory: an ungranted send becomes `error.communication` (reason `not-granted`) to the sender and `vt.grant.denied` to the parent, which journals it.

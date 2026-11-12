@@ -83,8 +83,11 @@ classDiagram
     class History["vt:History"] {
         vt:historyType
     }
+    class Token["vt:Token"] {
+        vt:value
+        vt:order
+    }
     class Transition["vt:Transition"] {
-        vt:event
         vt:cond
         vt:transitionType
         vt:order
@@ -123,6 +126,7 @@ classDiagram
     State "1" --> "*" Transition : vt:transition
     Transition "1" --> "1" StateNode : vt:source
     Transition "1" --> "*" TargetRef : vt:target
+    Transition "1" --> "*" Token : vt:event
     TargetRef --> StateNode : vt:state
     Transition "1" --> "*" Executable : vt:action
     State "1" --> "*" Executable : vt:onentry, vt:onexit
@@ -166,7 +170,7 @@ classDiagram
     class Entry["vt:JournalEntry"] {
         vt:position
         vt:messageId
-        vt:configDigest
+        vt:configurationDigest
     }
     class Macrostep["vt:Macrostep"]
     class Snapshot["vt:Snapshot"] {
@@ -314,32 +318,54 @@ The projection rules, each a requirement of `chart-rdf`:
 - **Executable content as literals** (`Executable Content As Literals`). A condition is a literal whose datatype names the datamodel, so `x > 1` under ECMAScript and the same text under CEL are different values.
 - **Annotations outside the projection** (`Annotations Outside The Projection`). Reconstruction and hashing read only projection triples, so a store can annotate charts freely.
 
-A small chart, two states and one guarded transition, as projected Turtle:
+A small chart, two states and one guarded transition, as `vt convert --to turtle` prints it:
 
 ```turtle
-@prefix vt:  <https://w3id.org/vertep/vt#> .
-@prefix c:   <urn:vertep:chart:sha256:3f2a...9c#> .
+# vt convert --to turtle door.scxml (selection nodes with vt:choice omitted)
+@prefix c: <urn:vertep:chart:sha256:f9bf24070cdcc119d8b713cbf6e1848a22e3d3d96924baa7758c10683b34e674#> .
+@prefix vt: <https://w3id.org/vertep/vt#> .
 
 c:chart a vt:Chart ;
-    vt:name "door" ;
-    vt:datamodel vt:EcmaScript ;
-    vt:initial c:closed ;
-    vt:child c:closed , c:open .
-
-c:closed a vt:State ; vt:id "closed" ; vt:order 0 ;
-    vt:transition c:closed-t0 .
-
-c:open a vt:State ; vt:id "open" ; vt:order 1 .
-
-c:closed-t0 a vt:Transition ;
-    vt:order 0 ;
-    vt:source c:closed ;
-    vt:event "door.open" ;
-    vt:cond "!locked"^^vt:ecmascriptExpr ;
-    vt:target c:closed-t0-target0 .
-
-c:closed-t0-target0 a vt:TargetRef ; vt:order 0 ; vt:state c:open .
+	vt:binding "early" ;
+	vt:bindingExplicit false ;
+	vt:child c:s.closed , c:s.open ;
+	vt:datamodel "ecmascript" ;
+	vt:datamodelExplicit true ;
+	vt:initial c:chart:ia0 ;
+	vt:name "door" .
+c:chart:ia0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.closed .
+c:s.closed a vt:State , vt:StateNode ;
+	vt:ancestor c:chart ;
+	vt:id "closed" ;
+	vt:idGenerated false ;
+	vt:order 0 ;
+	vt:transition c:s.closed:t0 .
+c:s.closed:t0 a vt:Transition ;
+	vt:cond "!locked"^^vt:ecmascriptExpr ;
+	vt:event c:s.closed:t0:ev0 ;
+	vt:order 0 ;
+	vt:source c:s.closed ;
+	vt:target c:s.closed:t0:tg0 ;
+	vt:transitionType "external" ;
+	vt:transitionTypeExplicit false .
+c:s.closed:t0:ev0 a vt:Token ;
+	vt:order 0 ;
+	vt:value "door.open" .
+c:s.closed:t0:tg0 a vt:TargetRef ;
+	vt:order 0 ;
+	vt:scope c:chart ;
+	vt:state c:s.open .
+c:s.open a vt:State , vt:StateNode ;
+	vt:ancestor c:chart ;
+	vt:id "open" ;
+	vt:idGenerated false ;
+	vt:order 1 .
 ```
+
+State nodes are `#s.<id>`, transitions `#s.<id>:t<k>`, event descriptors `vt:Token` nodes with an order and a value, and `vt:datamodel` is the datamodel name as a plain literal; the initial state is reached through a `vt:TargetRef`, like every other target.
 
 ## SHACL shapes
 
@@ -410,43 +436,57 @@ A journal entry is an RDF dataset: its statements live in a named graph named by
 - describes:: [[capabilities#Event journal]]
 - describes:: [[decisions#Event-sourced actors]]
 
-Entry, snapshot, timer and dead-letter IRIs are derived from the actor address and the journal position or send id (`Stable Runtime IRIs`), so replay and re-projection produce the same IRIs. The specs fix determinism, not a layout; the IRIs below are illustrative.
+Entry, snapshot, timer and dead-letter IRIs are derived from the actor address A and the journal position or send id (`Stable Runtime IRIs`), so replay and re-projection produce the same IRIs: entry `A/entry/<n>` (also its graph name), its input `A/entry/<n>/input`, sends `A/entry/<n>/send/<k>`, timers `A/entry/<n>/timer/<send id>`, snapshots `A/snapshot/<n>`, dead letters `A/dead-letter/<digest>` in graph `A/dead-letters` (`crates/vertep-runtime/src/address.rs`). The entry below follows `to_entry` in `crates/vertep-runtime/src/journal.rs`, abridged.
 
 ```trig
-@prefix vt:   <https://w3id.org/vertep/vt#> .
-@prefix prov: <http://www.w3.org/ns/prov#> .
-@prefix a:    <https://acme.example/actors/Order/8f3a/> .
+@prefix vt:  <https://w3id.org/vertep/vt#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix e:   <https://acme.example/actors/Order/8f3a/entry/7/> .
 
 # Journal entry 7: the input, the version it ran under, its effects
-a:journal-7 {
-    a:journal-7 a vt:JournalEntry ;
-        vt:actor <https://acme.example/actors/Order/8f3a> ;
-        vt:position 7 ;
-        vt:messageId "msg-01J9Z" ;
+<https://acme.example/actors/Order/8f3a/entry/7> {
+    <https://acme.example/actors/Order/8f3a/entry/7> a vt:JournalEntry , vt:InputEntry , vt:Macrostep ;
+        vt:actor <https://acme.example/actors/Order/8f3a> ;     # added by the store
+        vt:position 7 ;                                         # added by the store
         vt:chartVersion <urn:vertep:chart:sha256:3f2a...9c> ;
-        vt:inputEvent a:journal-7-in ;
-        vt:configDigest "b81c..." ;
-        vt:send a:journal-7-send0 ;
-        vt:schedules a:timer-s12 .
+        vt:messageId "msg-01J9Z" ;
+        vt:timestamp 1794355200000 ;
+        vt:configurationDigest "b81c..." ;
+        vt:input e:input ;
+        vt:send <https://acme.example/actors/Order/8f3a/entry/7/send/0> ;
+        vt:schedules <https://acme.example/actors/Order/8f3a/entry/7/timer/s12> .
 
-    a:journal-7-in vt:name "payment.received" ;
-        vt:origin <https://acme.example/actors/Payment/77> ;
-        vt:origintype <http://www.w3.org/TR/scxml/#SCXMLEventProcessor> ;
-        vt:data "{\"amount\": 120}"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON> .
+    e:input a vt:InputEvent ;
+        vt:messageId "msg-01J9Z" ;
+        vt:eventName "payment.received" ;
+        vt:eventType "external" ;
+        vt:origin "https://acme.example/actors/Payment/77" ;
+        vt:originType "http://www.w3.org/TR/scxml/#SCXMLEventProcessor" ;
+        vt:payload "{\"amount\":120}" .
 
-    a:journal-7-send0 vt:target <https://acme.example/actors/Shipping/12> ;
-        vt:name "ship.request" ; vt:sendId "s11" ; vt:order 0 .
+    <https://acme.example/actors/Order/8f3a/entry/7/send/0> a vt:OutgoingSend ;
+        vt:order 0 ;
+        vt:messageId "https://acme.example/actors/Order/8f3a/entry/7/send/0" ;
+        vt:sendTarget "https://acme.example/actors/Shipping/12" ;
+        vt:eventName "ship.request" ;
+        vt:payload "{}" .
 
-    a:timer-s12 a vt:Timer ; vt:sendId "s12" ;
-        vt:due "2026-11-12T10:00:00Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+    <https://acme.example/actors/Order/8f3a/entry/7/timer/s12> a vt:Timer ;
+        vt:sendId "s12" ;
+        vt:dueAt 1794358800000 ;
+        vt:eventName "payment.reminder" ;
+        vt:scheduledBy <https://acme.example/actors/Order/8f3a/entry/7> .
 }
 
 # Current state of the actor, derived from entry 7
 <https://acme.example/actors/Order/8f3a> {
-    <https://acme.example/actors/Order/8f3a> vt:active
-        <urn:vertep:chart:sha256:3f2a...9c#paid> .
+    <https://acme.example/actors/Order/8f3a> vt:status vt:Running ;
+        vt:chartVersion <urn:vertep:chart:sha256:3f2a...9c> ;
+        vt:inState <urn:vertep:chart:sha256:3f2a...9c#s.paid> .
 }
 ```
+
+Times are integers in milliseconds since the epoch, payloads are JSON text, and the current-state predicate is `vt:inState`, one triple per active state pointing at the state node of the running chart version.
 
 ## Annotations
 
@@ -505,8 +545,8 @@ PREFIX vt: <https://w3id.org/vertep/vt#>
 SELECT ?entry ?event ?origin WHERE {
   GRAPH ?entry {
     ?entry vt:actor <https://acme.example/actors/Order/8f3a> ;
-           vt:inputEvent ?in .
-    ?in vt:name ?event ; vt:origin ?origin .
+           vt:input ?in .
+    ?in vt:eventName ?event ; vt:origin ?origin .
   }
 }
 ORDER BY ?entry

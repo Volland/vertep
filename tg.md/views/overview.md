@@ -178,7 +178,7 @@ sequenceDiagram
     MB->>ACT: activate if inactive (snapshot + replay)
     ACT->>ACT: drop if message id already journaled
     ACT->>ST: step(session, pay, datamodel)
-    ST-->>ACT: new session + effects
+    ST-->>ACT: Outcome: session, effects, trace
     ACT->>J: one transaction - entry graph, derived state, new head
     J-->>ACT: committed at position n+1
     ACT->>MB: ack(message id)
@@ -196,13 +196,17 @@ sequenceDiagram
 8. **Query.** `db.now()` is the current-state graph and `db.as_of(t)` is time travel without replay (`Time Travel Views`).
 
 ```rust
-// The seam between the pure core and the shell (sketch; see views/statecharts).
+// The seam between the pure core and the shell (crates/vertep-core/src/session.rs).
+pub fn start(chart: &CompiledChart, input: StartInput, dm: &mut dyn Datamodel)
+    -> Result<Outcome, StartError>;
 pub fn step(
     chart: &CompiledChart,
     session: Session,
-    input: Input,               // external event with message id and journaled timestamp
+    input: Input,               // InputKind::Event or Cancel, plus env: journaled now_ms, seed from the entry IRI
     dm: &mut dyn Datamodel,
-) -> (Session, Vec<Effect>);    // Send, Cancel, Invoke, CancelInvoke, Forward, Log, SessionDone
+) -> Result<Outcome, StepError>;
+// Outcome { session, effects, trace }; effects are
+// Send, Cancel, Invoke, CancelInvoke, Forward, Log, SessionDone
 ```
 
 ### Failure modes along the path

@@ -168,24 +168,31 @@ Storage is two RDF-agnostic traits: a journal store with linearizable per-actor 
 - describes:: [[decisions#Two storage traits with tiramemsu as default]]
 
 ```rust
-pub trait JournalStore {
-    /// Linearizable and all-or-nothing per actor address.
+// crates/vertep-store/src/journal.rs and graph.rs (abridged)
+pub trait JournalStore: Send + Sync {
+    fn capabilities(&self) -> JournalCapabilities;
+    fn supports_fencing(&self) -> bool { self.capabilities().fencing }
+    /// Linearizable and all-or-nothing per actor; on any error nothing is written.
     fn append(
         &self,
-        actor: &Iri,
+        actor: &NamedNode,
         expected: Position,
-        entries: &[RdfDataset],
-        meta: Option<AppendMeta>, // fencing token: (scope IRI, epoch)
-    ) -> Result<Position, AppendError>; // AppendError::Conflict | Fenced | Io
-    fn read(&self, actor: &Iri, from: Position) -> Result<EntryStream, ReadError>;
-    fn supports_fencing(&self) -> bool;
+        entries: &[Entry],      // a named entry IRI plus its triples
+        meta: &AppendMeta,      // fencing: Option<FencingToken>, state: Option<StateDelta>
+    ) -> Result<Position, AppendError>; // Conflict | Fenced | Unsupported | Invalid | Storage
+    fn read(&self, actor: &NamedNode, from: Position) -> Result<Vec<JournalRecord>, StoreError>;
+    fn head(&self, actor: &NamedNode) -> Result<Position, StoreError>;
+    fn actors(&self) -> Result<Vec<NamedNode>, StoreError>;
 }
 
-pub trait GraphStore {
-    fn insert_quads(&self, quads: &[Quad]) -> Result<(), GraphError>;
-    fn query(&self, sparql: &str) -> Result<Solutions, GraphError>;
+pub trait GraphStore: Send + Sync {
+    fn capabilities(&self) -> GraphCapabilities;   // rdf, union_default_graph, ...
     /// RDF 1.2 triple terms, or classic reification fallback.
-    fn rdf_capability(&self) -> RdfCapability; // Rdf12 | Rdf11
+    fn rdf_capability(&self) -> RdfCapability;     // Rdf12 | Rdf11
+    fn insert_quads(&self, quads: &[Quad]) -> Result<(), StoreError>;
+    fn remove_quads(&self, quads: &[Quad]) -> Result<(), StoreError>;
+    fn clear_graph(&self, graph: &NamedNode) -> Result<(), StoreError>;
+    fn query(&self, sparql: &str) -> Result<QueryResults, StoreError>; // Solutions | Boolean | Graph
 }
 ```
 
@@ -194,15 +201,19 @@ classDiagram
     direction LR
     class JournalStore {
         <<trait>>
+        capabilities()
         append(actor, expected, entries, meta)
         read(actor, from)
-        supports_fencing()
+        head(actor)
+        actors()
     }
     class GraphStore {
         <<trait>>
+        capabilities()
         insert_quads(quads)
-        query(sparql)
-        rdf_capability()
+        remove_quads(quads)
+        clear_graph(graph)
+        query(sparql) QueryResults
     }
     class TiramemsuBackend["vertep-tiramemsu"]
     class SparqlBackend["vertep-oxigraph"]
