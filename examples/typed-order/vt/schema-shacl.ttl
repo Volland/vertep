@@ -7,6 +7,9 @@ c:context.f.items.t.cons.first a sh:PropertyShape ;
 	sh:maxCount 1 ;
 	sh:minCount 1 ;
 	sh:path rdf:first .
+c:context.f.items.t.cons.member a sh:PropertyShape ;
+	sh:node <urn:vertep:type:sha256:0d6fd3b341d6b5040f844a11796ede3b4947a3df1230493272094bdcbfe4c9c6> ;
+	sh:path vt:listMember .
 c:context.f.items.t.cons.rest a sh:PropertyShape ;
 	sh:maxCount 1 ;
 	sh:minCount 1 ;
@@ -14,24 +17,15 @@ c:context.f.items.t.cons.rest a sh:PropertyShape ;
 c:context.f.items.t.cons a sh:NodeShape ;
 	sh:closed true ;
 	sh:nodeKind sh:BlankNode ;
-	sh:property c:context.f.items.t.cons.first , c:context.f.items.t.cons.rest .
+	sh:property c:context.f.items.t.cons.first , c:context.f.items.t.cons.member , c:context.f.items.t.cons.rest .
 c:context.f.items.t.lor.0 rdf:first c:context.f.items.t.nil ;
 	rdf:rest c:context.f.items.t.lor.1 .
 c:context.f.items.t.lor.1 rdf:first c:context.f.items.t.cons ;
 	rdf:rest rdf:nil .
-c:context.f.items.t.m a sh:PropertyShape ;
-	sh:node <urn:vertep:type:sha256:0d6fd3b341d6b5040f844a11796ede3b4947a3df1230493272094bdcbfe4c9c6> ;
-	sh:path c:context.f.items.t.members.0 .
-c:context.f.items.t.members.0 rdf:first c:context.f.items.t.rest\* ;
-	rdf:rest c:context.f.items.t.members.1 .
-c:context.f.items.t.members.1 rdf:first rdf:first ;
-	rdf:rest rdf:nil .
 c:context.f.items.t.nil a sh:NodeShape ;
 	sh:hasValue rdf:nil .
-c:context.f.items.t.rest\* sh:zeroOrMorePath rdf:rest .
 c:context.f.items.t a sh:NodeShape ;
-	sh:or c:context.f.items.t.lor.0 ;
-	sh:property c:context.f.items.t.m .
+	sh:or c:context.f.items.t.lor.0 .
 c:context.f.items a sh:PropertyShape ;
 	sh:maxCount 1 ;
 	sh:minCount 1 ;

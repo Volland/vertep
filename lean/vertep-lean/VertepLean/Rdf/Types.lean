@@ -288,15 +288,12 @@ def constrain (D : Decls) (iris : List (String × String)) (node : Term) (base p
     let cons := nodeAt base (path ++ ".cons")
     let first := property cons base (path ++ ".cons.first") rdfFirst (some 1) (some 1)
     let rest := property cons base (path ++ ".cons.rest") rdfRest (some 1) (some 1)
-    let l := collection base (path ++ ".lor") [nil, cons]
-    let star := nodeAt base (path ++ ".rest*")
-    let seq := collection base (path ++ ".members") [star, rdfFirst]
-    let p := property node base (path ++ ".m") seq.1 none none
+    let m := property cons base (path ++ ".cons.member") (vt "listMember") none none
     let s := shapeRef iris base (path ++ ".l") item
       (constrain D iris (nodeAt base (path ++ ".l")) base (path ++ ".l") item)
+    let l := collection base (path ++ ".lor") [nil, cons]
     [nodeShape nil, ⟨nil, sh "hasValue", rdfNil⟩, nodeShape cons] ++ closedBlank cons ++
-      first.2 ++ rest.2 ++ l.2 ++ [⟨node, sh "or", l.1⟩, ⟨star, sh "zeroOrMorePath", rdfRest⟩] ++
-      seq.2 ++ p.2 ++ s.2 ++ [⟨p.1, sh "node", s.1⟩]
+      first.2 ++ rest.2 ++ m.2 ++ s.2 ++ [⟨m.1, sh "node", s.1⟩] ++ l.2 ++ [⟨node, sh "or", l.1⟩]
   | .record fs =>
     closedBlank node ++ fs.attach.flatMap fun ⟨(name, ft), _⟩ =>
       let fpath := segment path "f" name

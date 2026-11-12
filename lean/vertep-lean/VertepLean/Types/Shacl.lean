@@ -14,14 +14,18 @@ validator) agrees with the typing relation `HasType`.
 
 * `encGraph v` is the encoding of a value: `vt:Null` for `null` and `undefined`, typed literals
   for booleans, numbers (`xsd:long` when integral and in the signed 64-bit range, else
-  `xsd:decimal`) and strings, RDF collections for arrays, and for objects a blank node with one
+  `xsd:decimal`) and strings, for arrays an RDF collection whose first cell also has one
+  `vt:listMember` triple per item, and for objects a blank node with one
   `<https://w3id.org/vertep/field#name>` triple per entry that is not `undefined`. Blank nodes
-  are labelled by their position in the value.
+  are labelled by their position in the value (the further cells of a collection by their
+  list's position and index).
 * `shapeOf D k t` is the node shape of `t` as LeanRDF shapes, component for component as
   `TypeShapes::constrain` writes them. LeanRDF shapes are finite trees (SHACL leaves recursive
   shapes undefined, §3.4, and LeanRDF's reader rejects them), while the Rust shapes graph refers
   to a named type's shape by its IRI, so recursion through named types is unfolded `k` times;
-  past that a named type is `sh:not` of the empty shape, which nothing conforms to.
+  past that a named type is `sh:not` of the empty shape, which nothing conforms to. Every
+  property path is a predicate, as in the Rust shapes graph: a list's members are checked on
+  `vt:listMember` (verification backlog 4.7).
 
 `shacl_agrees`: for blocks and types whose unions have distinct tags and values whose objects
 have distinct keys, a value has a type exactly when its encoding conforms to some unfolding of
@@ -39,6 +43,8 @@ open LeanRDF LeanRDF.Shacl Vertep.Rdf
 def fieldIri (k : String) : IRI := ⟨fieldNs ++ percentEncode k⟩
 def firstIri : IRI := ⟨"http://www.w3.org/1999/02/22-rdf-syntax-ns#first"⟩
 def restIri : IRI := ⟨"http://www.w3.org/1999/02/22-rdf-syntax-ns#rest"⟩
+/-- `vt:listMember`: from a list's node to each of its items (Rust `vt::LIST_MEMBER`). -/
+def memberIri : IRI := ⟨vtNs ++ "listMember"⟩
 def nilT : Term := .iri ⟨"http://www.w3.org/1999/02/22-rdf-syntax-ns#nil"⟩
 def nullT : Term := .iri ⟨vtNs ++ "Null"⟩
 def longIri : IRI := ⟨xsdLong⟩
@@ -83,22 +89,35 @@ def node (pos : List Nat) : Value → Term
   | .array (_ :: _) => bn pos
   | .object _ => bn pos
 
-/-- The triples whose subject is the node at `pos`: a collection cell's `rdf:first` and
-`rdf:rest`, an object's entries that are not `undefined`. -/
+/-- The `i`-th cell (`i ≥ 1`) of the collection of the list at `pos`: its label is the label
+of `pos`, a `c` (which no position's label has) and `i` times `a`. -/
+def cellT (pos : List Nat) (i : Nat) : Term :=
+  .bnode ⟨String.ofList (code pos ++ 'c' :: List.replicate i 'a')⟩
+
+/-- The `i`-th cell of the collection of the list at `pos`; the first is the list's node. -/
+def cell (pos : List Nat) (i : Nat) : Term := if i = 0 then bn pos else cellT pos i
+
+/-- The triples of the value at `pos` that are not inside one of its items or entries: a list's
+`vt:listMember` triples and collection cells, an object's entries that are not `undefined`. -/
 def locals (pos : List Nat) : Value → List Triple
-  | .array (x :: xs) =>
-    [⟨bn pos, .iri firstIri, node (pos ++ [0]) x⟩, ⟨bn pos, .iri restIri, node (pos ++ [1]) (.array xs)⟩]
+  | .array items =>
+    items.zipIdx.flatMap fun (x, i) =>
+      [⟨bn pos, .iri memberIri, node (pos ++ [i]) x⟩,
+       ⟨cell pos i, .iri firstIri, node (pos ++ [i]) x⟩,
+       ⟨cell pos i, .iri restIri, if i + 1 < items.length then cell pos (i + 1) else nilT⟩]
   | .object es =>
     es.zipIdx.flatMap fun ((k, x), i) =>
       if isUndef x then [] else [⟨bn pos, .iri (fieldIri k), node (pos ++ [i]) x⟩]
   | _ => []
 
-/-- The value at a relative position: `0` and `1` step to a cell's item and the rest of the
-collection, `i` to an object's `i`-th entry unless it is `undefined`. -/
+/-- The value at a relative position: `i` steps to a list's `i`-th item, or to an object's
+`i`-th entry unless it is `undefined`. -/
 def sub : Value → List Nat → Option Value
   | v, [] => some v
-  | .array (x :: _), 0 :: r => sub x r
-  | .array (_ :: xs), 1 :: r => sub (.array xs) r
+  | .array items, i :: r =>
+    match items[i]? with
+    | some x => sub x r
+    | none => none
   | .object es, i :: r =>
     match es[i]? with
     | some (_, x) => if isUndef x then none else sub x r
@@ -108,15 +127,16 @@ def sub : Value → List Nat → Option Value
 /-- The encoding of `v` at `pos`: the local triples of every position below it. -/
 def encT (pos : List Nat) (v : Value) : List Triple :=
   match v with
-  | .array (x :: xs) => locals pos v ++ encT (pos ++ [0]) x ++ encT (pos ++ [1]) (.array xs)
+  | .array items =>
+    locals pos v ++ items.zipIdx.attach.flatMap fun ⟨(x, i), _hm⟩ => encT (pos ++ [i]) x
   | .object es =>
     locals pos v ++ es.zipIdx.attach.flatMap fun ⟨((_, x), i), _hm⟩ =>
       if isUndef x then [] else encT (pos ++ [i]) x
   | _ => []
 termination_by sizeOf v
 decreasing_by
-  · simp only [Value.array.sizeOf_spec, List.cons.sizeOf_spec]; omega
-  · simp only [Value.array.sizeOf_spec, List.cons.sizeOf_spec]; omega
+  · have := List.sizeOf_lt_of_mem (List.fst_mem_of_mem_zipIdx _hm)
+    simp only [Value.array.sizeOf_spec] at this ⊢; omega
   · have := List.sizeOf_lt_of_mem (List.fst_mem_of_mem_zipIdx _hm)
     simp only [Value.object.sizeOf_spec, Prod.mk.sizeOf_spec] at this ⊢; omega
 
@@ -150,9 +170,6 @@ def mkShape (path : Option Path) (comps : List Component) : Shape :=
 def nodeS (comps : List Component) : Shape := mkShape none comps
 def propS (p : IRI) (comps : List Component) : Shape := mkShape (some (.pred p)) comps
 
-/-- `rdf:rest*/rdf:first`: the members of a collection. -/
-def membersPath : Path := .seq [.zeroOrMore (.pred restIri), .pred firstIri]
-
 /-- A closed blank node with these predicates (Rust `closed_blank` and the property paths). -/
 def closedBlank (allowed : List IRI) : List Component := [.test (.nodeKind .bnode), .closed allowed]
 
@@ -183,9 +200,9 @@ def comps (D : Decls) (k : Nat) (t : Ty) : List Component :=
   | .optional t => [.or [nodeS [.hasValue nullT], nodeS (comps D k t)]]
   | .list t =>
     [.or [nodeS [.hasValue nilT],
-          nodeS (closedBlank [firstIri, restIri] ++
-            [.property (propS firstIri (counts false)), .property (propS restIri (counts false))])],
-     .property (mkShape (some membersPath) [.node (nodeS (comps D k t))])]
+          nodeS (closedBlank [firstIri, restIri, memberIri] ++
+            [.property (propS firstIri (counts false)), .property (propS restIri (counts false)),
+             .property (propS memberIri [.node (nodeS (comps D k t))])])]]
   | .record fs =>
     closedBlank (fs.map fun f => fieldIri f.1) ++ fs.attach.map fun ⟨(name, ft), _⟩ =>
       .property (propS (fieldIri name) (counts (optish D ft) ++ [.node (nodeS (comps D k ft))]))
@@ -558,8 +575,10 @@ theorem decimal_ok {m : Int} {e : Nat} (h : Lex.intOk m e = false) :
 /-! ## Graphs that encode a value -/
 
 /-- `Enc G v n`: in `G`, the node `n` stands for the value `v`: literals and `vt:Null` as in
-`numTerm`, `boolTerm`, `strLit`; a collection cell's only triples are its `rdf:first` and
-`rdf:rest`; an object's node has exactly one triple per entry that is not `undefined`. -/
+`numTerm`, `boolTerm`, `strLit`; a non-empty list's node is the first cell of a collection, and
+its only triples are its `rdf:first` (the first item), its `rdf:rest` and one `vt:listMember`
+per item (`f i` stands for the `i`-th); an object's node has exactly one triple per entry that is
+not `undefined`. -/
 inductive Enc (G : Graph) : Value → Term → Prop where
   | undef : Enc G .undefined nullT
   | null : Enc G .null nullT
@@ -567,18 +586,18 @@ inductive Enc (G : Graph) : Value → Term → Prop where
   | num (m : Int) (e : Nat) : Enc G (.num m e) (numTerm m e)
   | str (s : String) : Enc G (.str s) (strLit s)
   | nil : Enc G (.array []) nilT
-  | cons (x : Value) (xs : List Value) (b : BlankNode) (nx nr : Term) :
+  | cons (x : Value) (xs : List Value) (b : BlankNode) (nr : Term) (f : Nat → Term) :
       (∀ p o, (⟨.bnode b, p, o⟩ : Triple) ∈ G ↔
-        (p = .iri firstIri ∧ o = nx) ∨ (p = .iri restIri ∧ o = nr)) →
-      Enc G x nx → Enc G (.array xs) nr → Enc G (.array (x :: xs)) (.bnode b)
+        ∃ i y, (x :: xs)[i]? = some y ∧
+          ((p = .iri memberIri ∧ o = f i) ∨ (i = 0 ∧ p = .iri firstIri ∧ o = f i) ∨
+            (i = 0 ∧ p = .iri restIri ∧ o = nr))) →
+      (∀ i y, (x :: xs)[i]? = some y → Enc G y (f i)) →
+      Enc G (.array (x :: xs)) (.bnode b)
   | object (es : List (String × Value)) (b : BlankNode) (f : String → Term) :
       (∀ p o, (⟨.bnode b, p, o⟩ : Triple) ∈ G ↔
         ∃ k x, present es k = some x ∧ p = .iri (fieldIri k) ∧ o = f k) →
       (∀ k x, present es k = some x → Enc G x (f k)) →
       Enc G (.object es) (.bnode b)
-
-/-- Every subject of the graph is a blank node. -/
-def BNodeSubjects (G : Graph) : Prop := ∀ t ∈ G, ∃ b, t.s = .bnode b
 
 /-! ## What an encoded node reveals -/
 
@@ -596,6 +615,10 @@ theorem fieldIri_ne_first (k : String) : fieldIri k ≠ firstIri := by
 
 theorem fieldIri_ne_rest (k : String) : fieldIri k ≠ restIri := by
   simp [fieldIri, restIri, fieldNs, ← String.toList_inj, String.toList_append]
+
+theorem member_ne_first : memberIri ≠ firstIri := by decide
+theorem member_ne_rest : memberIri ≠ restIri := by decide
+theorem first_ne_rest : firstIri ≠ restIri := by decide
 
 @[simp] theorem dt_ok_iri (d : IRI) (i : IRI) : (TermTest.datatype d).ok (.iri i) = false := rfl
 @[simp] theorem dt_ok_bnode (d : IRI) (b : BlankNode) : (TermTest.datatype d).ok (.bnode b) = false :=
@@ -710,81 +733,51 @@ theorem compsHold_iff (path : Option Path) (cs : List Component) (x : Term) :
   | nil => simp [CompsHold]
   | cons c cs ih => simp [CompsHold, ih]
 
-theorem no_nilT_subject (hG : BNodeSubjects G) (p o : Term) : (⟨nilT, p, o⟩ : Triple) ∉ G := by
-  intro h
-  obtain ⟨b, hb⟩ := hG _ h
-  simp [nilT] at hb
+/-- The triples of an encoded list's node, predicate by predicate. -/
+theorem cons_first {x : Value} {xs : List Value} {b : BlankNode} {nr : Term} {f : Nat → Term}
+    (hiff : ∀ p o, (⟨.bnode b, p, o⟩ : Triple) ∈ G ↔
+      ∃ i y, (x :: xs)[i]? = some y ∧
+        ((p = .iri memberIri ∧ o = f i) ∨ (i = 0 ∧ p = .iri firstIri ∧ o = f i) ∨
+          (i = 0 ∧ p = .iri restIri ∧ o = nr))) (o : Term) :
+    (⟨.bnode b, .iri firstIri, o⟩ : Triple) ∈ G ↔ o = f 0 := by
+  rw [hiff]
+  constructor
+  · rintro ⟨i, y, _, ⟨he, _⟩ | ⟨rfl, _, rfl⟩ | ⟨_, he, _⟩⟩
+    · exact absurd (Term.iri.inj he).symm member_ne_first
+    · rfl
+    · exact absurd (Term.iri.inj he) first_ne_rest
+  · rintro rfl
+    exact ⟨0, x, rfl, .inr (.inl ⟨rfl, rfl, rfl⟩)⟩
 
-theorem star_rest (hG : BNodeSubjects G) {items : List Value} {n z : Term}
-    (h : Enc G (.array items) n) (hz : ValueNode G (.zeroOrMore (.pred restIri)) n z) :
-    ∃ j, Enc G (.array (items.drop j)) z := by
-  generalize hp : Path.zeroOrMore (.pred restIri) = P at hz
-  revert h
-  induction hz with
-  | starRefl => intro h; exact ⟨0, by simpa using h⟩
-  | starTail h1 h2 ih =>
-    intro h
-    cases hp
-    obtain ⟨j, hj⟩ := ih rfl h
-    rw [pred_iff] at h2
-    generalize hd : items.drop j = l at hj
-    cases hj with
-    | nil => exact absurd h2 (no_nilT_subject hG _ _)
-    | cons x xs b nx nr hiff _ hr =>
-      have := (hiff _ _).1 h2
-      rcases this with ⟨he, _⟩ | ⟨_, rfl⟩
-      · simp [firstIri, restIri] at he
-      · refine ⟨j + 1, ?_⟩
-        rw [← List.drop_drop, hd]
-        simpa using hr
-  | _ => cases hp
+theorem cons_rest {x : Value} {xs : List Value} {b : BlankNode} {nr : Term} {f : Nat → Term}
+    (hiff : ∀ p o, (⟨.bnode b, p, o⟩ : Triple) ∈ G ↔
+      ∃ i y, (x :: xs)[i]? = some y ∧
+        ((p = .iri memberIri ∧ o = f i) ∨ (i = 0 ∧ p = .iri firstIri ∧ o = f i) ∨
+          (i = 0 ∧ p = .iri restIri ∧ o = nr))) (o : Term) :
+    (⟨.bnode b, .iri restIri, o⟩ : Triple) ∈ G ↔ o = nr := by
+  rw [hiff]
+  constructor
+  · rintro ⟨i, y, _, ⟨he, _⟩ | ⟨_, he, _⟩ | ⟨_, _, rfl⟩⟩
+    · exact absurd (Term.iri.inj he).symm member_ne_rest
+    · exact absurd (Term.iri.inj he).symm first_ne_rest
+    · rfl
+  · rintro rfl
+    exact ⟨0, x, rfl, .inr (.inr ⟨rfl, rfl, rfl⟩)⟩
 
-theorem rest_star {items : List Value} {n : Term} (h : Enc G (.array items) n) :
-    ∀ j, j ≤ items.length → ∃ z, ValueNode G (.zeroOrMore (.pred restIri)) n z ∧
-      Enc G (.array (items.drop j)) z := by
-  intro j
-  induction j with
-  | zero => intro _; exact ⟨n, .starRefl, by simpa using h⟩
-  | succ j ih =>
-    intro hj
-    obtain ⟨z, hz, he⟩ := ih (by omega)
-    generalize hd : items.drop j = l at he
-    cases he with
-    | nil =>
-      have : (items.drop j).length = 0 := by rw [hd]; rfl
-      simp at this; omega
-    | cons x xs b nx nr hiff _ hr =>
-      refine ⟨nr, .starTail hz ((pred_iff G).2 ((hiff _ _).2 (.inr ⟨rfl, rfl⟩))), ?_⟩
-      rw [← List.drop_drop, hd]
-      simpa using hr
-
-theorem member_enc (hG : BNodeSubjects G) {items : List Value} {n y : Term}
-    (h : Enc G (.array items) n) (hy : ValueNode G membersPath n y) : ∃ x ∈ items, Enc G x y := by
-  unfold membersPath at hy
-  cases hy with
-  | seqCons hz hy =>
-    cases hy with
-    | seqCons hf hn =>
-      cases hn
-      obtain ⟨j, hj⟩ := star_rest hG h hz
-      rw [pred_iff] at hf
-      generalize hd : items.drop j = l at hj
-      cases hj with
-      | nil => exact absurd hf (no_nilT_subject hG _ _)
-      | cons x xs b nx nr hiff hx _ =>
-        rcases (hiff _ _).1 hf with ⟨_, rfl⟩ | ⟨he, _⟩
-        · refine ⟨x, ?_, hx⟩
-          exact List.mem_of_mem_drop (by rw [hd]; simp)
-        · simp [firstIri, restIri] at he
-
-theorem enc_member {items : List Value} {n : Term} (h : Enc G (.array items) n) {x : Value}
-    (hx : x ∈ items) : ∃ y, ValueNode G membersPath n y ∧ Enc G x y := by
-  obtain ⟨j, hj, rfl⟩ := List.getElem_of_mem hx
-  obtain ⟨z, hz, he⟩ := rest_star h j (by omega)
-  rw [List.drop_eq_getElem_cons hj] at he
-  cases he with
-  | cons _ _ b nx nr hiff hx' _ =>
-    exact ⟨nx, .seqCons hz (.seqCons ((pred_iff G).2 ((hiff _ _).2 (.inl ⟨rfl, rfl⟩))) .seqNil), hx'⟩
+theorem cons_member {x : Value} {xs : List Value} {b : BlankNode} {nr : Term} {f : Nat → Term}
+    (hiff : ∀ p o, (⟨.bnode b, p, o⟩ : Triple) ∈ G ↔
+      ∃ i y, (x :: xs)[i]? = some y ∧
+        ((p = .iri memberIri ∧ o = f i) ∨ (i = 0 ∧ p = .iri firstIri ∧ o = f i) ∨
+          (i = 0 ∧ p = .iri restIri ∧ o = nr))) (o : Term) :
+    (⟨.bnode b, .iri memberIri, o⟩ : Triple) ∈ G ↔ ∃ i y, (x :: xs)[i]? = some y ∧ o = f i := by
+  rw [hiff]
+  constructor
+  · rintro ⟨i, y, hy, ⟨_, rfl⟩ | ⟨_, he, _⟩ | ⟨_, he, _⟩⟩
+    · exact ⟨i, y, hy, rfl⟩
+    · exact absurd (Term.iri.inj he) member_ne_first
+    · exact absurd (Term.iri.inj he) member_ne_rest
+  · rintro ⟨i, y, hy, rfl⟩
+    exact ⟨i, y, hy, .inl ⟨rfl, rfl⟩⟩
 
 /-- An object's entry is present exactly when it is in the entries and not `undefined`, when the
 keys are distinct. -/
@@ -905,36 +898,37 @@ theorem object_prop {es : List (String × Value)} {b : BlankNode} {fn : String �
       obtain ⟨_, _, rfl⟩ := (hfield y).1 hy
       exact hc
 
-/-- The shape of a non-empty collection's cell. -/
-def consS : Shape :=
-  nodeS (closedBlank [firstIri, restIri] ++
-    [.property (propS firstIri (counts false)), .property (propS restIri (counts false))])
+/-- The shape of a non-empty list's node, its members checked against `S`. -/
+def consS (S : Shape) : Shape :=
+  nodeS (closedBlank [firstIri, restIri, memberIri] ++
+    [.property (propS firstIri (counts false)), .property (propS restIri (counts false)),
+     .property (propS memberIri [.node S])])
 
-theorem cons_iff {v : Value} {n : Term} (h : Enc G v n) :
-    Conforms G consS n ↔ ∃ x xs, v = .array (x :: xs) := by
+theorem cons_iff {v : Value} {n : Term} (h : Enc G v n) (S : Shape) :
+    Conforms G (consS S) n ↔ ∃ x xs, v = .array (x :: xs) ∧
+      ∀ y, (⟨n, .iri memberIri, y⟩ : Triple) ∈ G → Conforms G S y := by
   simp only [consS, conforms_nodeS, closedBlank, counts, List.cons_append, List.nil_append,
     compsHold_cons, compsHold_nil, holds_test, holds_closed, holds_property, conforms_propS,
-    holds_minCount1, holds_maxCount1, Bool.false_eq_true, ↓reduceIte, and_true]
+    holds_minCount1, holds_maxCount1, holds_pnode, Bool.false_eq_true, ↓reduceIte, and_true]
   constructor
   · intro hh
     obtain ⟨y, hy⟩ := hh.2.2.1.1
-    rcases (enc_bnode h).1 hh.1 with ⟨es, rfl⟩ | hc
+    rcases (enc_bnode h).1 hh.1 with ⟨es, rfl⟩ | ⟨x, xs, rfl⟩
     · cases h with
       | object _ b fn hiff _ =>
         obtain ⟨k, x, _, he, _⟩ := (hiff _ _).1 hy
         simp only [Term.iri.injEq] at he
         exact absurd he.symm (fieldIri_ne_first k)
-    · exact hc
-  · rintro ⟨x, xs, rfl⟩
+    · exact ⟨x, xs, rfl, hh.2.2.2.2⟩
+  · rintro ⟨x, xs, rfl, hm⟩
     cases h with
-    | cons _ _ b nx nr hiff _ _ =>
-      have hf : ∀ y, (⟨.bnode b, .iri firstIri, y⟩ : Triple) ∈ G ↔ y = nx := by
-        intro y; rw [hiff]; simp [firstIri, restIri]
-      have hr : ∀ y, (⟨.bnode b, .iri restIri, y⟩ : Triple) ∈ G ↔ y = nr := by
-        intro y; rw [hiff]; simp [firstIri, restIri]
-      refine ⟨rfl, fun p o ho => ?_, ⟨⟨nx, (hf _).2 rfl⟩, fun y z hy hz => ?_⟩,
-        ⟨⟨nr, (hr _).2 rfl⟩, fun y z hy hz => ?_⟩⟩
-      · rcases (hiff _ _).1 ho with ⟨rfl, _⟩ | ⟨rfl, _⟩
+    | cons _ _ b nr f hiff _ =>
+      have hf := cons_first hiff
+      have hr := cons_rest hiff
+      refine ⟨rfl, fun p o ho => ?_, ⟨⟨f 0, (hf _).2 rfl⟩, fun y z hy hz => ?_⟩,
+        ⟨⟨nr, (hr _).2 rfl⟩, fun y z hy hz => ?_⟩, hm⟩
+      · obtain ⟨i, y, _, ⟨rfl, _⟩ | ⟨_, rfl, _⟩ | ⟨_, rfl, _⟩⟩ := (hiff _ _).1 ho
+        · exact ⟨memberIri, by simp, rfl⟩
         · exact ⟨firstIri, by simp, rfl⟩
         · exact ⟨restIri, by simp, rfl⟩
       · rw [(hf _).1 hy, (hf _).1 hz]
@@ -947,8 +941,8 @@ theorem cons_not_closed {x : Value} {xs : List Value} {n : Term} (h : Enc G (.ar
   rw [holds_closed]
   intro hc
   cases h with
-  | cons _ _ b nx nr hiff _ _ =>
-    obtain ⟨q, hq, he⟩ := hc _ _ ((hiff _ _).2 (.inl ⟨rfl, rfl⟩))
+  | cons _ _ b nr f hiff _ =>
+    obtain ⟨q, hq, he⟩ := hc _ _ ((cons_first hiff _).2 rfl)
     simp only [Term.iri.injEq] at he
     exact hne (he ▸ hq)
 
@@ -1049,31 +1043,38 @@ theorem agrees_optional (k : Nat) (t : Ty) (ih : Agrees D G k t) : Agrees D G k 
     or_false, exists_eq_or_imp, exists_eq_left, conforms_nodeS, holds_hasValue, enc_null h,
     ih ht' v n hv h, Bool.or_eq_true]
 
-theorem agrees_list (hG : BNodeSubjects G) (k : Nat) (t : Ty) (ih : Agrees D G k t) :
-    Agrees D G k (.list t) := by
+theorem agrees_list (k : Nat) (t : Ty) (ih : Agrees D G k t) : Agrees D G k (.list t) := by
   intro ht v n hv h
   have ht' : JsonSchema.tagsOk t = true := by rw [JsonSchema.tagsOk] at ht; exact ht
   rw [comps]
-  have hcons : nodeS (closedBlank [firstIri, restIri] ++
-      [.property (propS firstIri (counts false)), .property (propS restIri (counts false))]) =
-      consS := rfl
+  have hcons : nodeS (closedBlank [firstIri, restIri, memberIri] ++
+      [.property (propS firstIri (counts false)), .property (propS restIri (counts false)),
+       .property (propS memberIri [.node (nodeS (comps D k t))])]) =
+      consS (nodeS (comps D k t)) := rfl
   simp only [hcons, compsHold_cons, compsHold_nil, and_true, holds_or, List.mem_cons,
     List.not_mem_nil, or_false, exists_eq_or_imp, exists_eq_left, conforms_nodeS, holds_hasValue,
-    holds_property, conforms_mkShape, cons_iff h, enc_nil h]
-  simp only [CompHolds, VN, conforms_nodeS]
-  cases v with
-  | array items =>
+    enc_nil h]
+  rw [cons_iff h]
+  cases h with
+  | nil => rw [checkF]; simp
+  | cons x xs b nr f hiff hch =>
     rw [checkF]
     simp only [List.all_eq_true]
     have hok := keysOk_array hv
     constructor
-    · rintro ⟨_, hm⟩ x hx
-      obtain ⟨y, hy, he⟩ := enc_member h hx
-      exact (ih ht' x y (hok x hx) he).1 (hm y hy)
+    · rintro (h0 | ⟨_, _, _, hm⟩)
+      · cases h0
+      · intro y hy
+        obtain ⟨i, hi⟩ := List.getElem?_of_mem hy
+        have hc := hm _ ((cons_member hiff _).2 ⟨i, y, hi, rfl⟩)
+        rw [conforms_nodeS] at hc
+        exact (ih ht' y (f i) (hok y hy) (hch i y hi)).1 hc
     · intro hall
-      refine ⟨by cases items <;> simp, fun y hy => ?_⟩
-      obtain ⟨x, hx, he⟩ := member_enc hG h hy
-      exact (ih ht' x y (hok x hx) he).2 (hall x hx)
+      refine .inr ⟨x, xs, rfl, fun o ho => ?_⟩
+      obtain ⟨i, y, hi, rfl⟩ := (cons_member hiff _).1 ho
+      have hy := List.mem_of_getElem? hi
+      rw [conforms_nodeS]
+      exact (ih ht' y (f i) (hok y hy) (hch i y hi)).2 (hall y hy)
   | _ => rw [checkF]; simp; try (intro _ hh; cases hh)
 
 theorem record_comps_iff (k : Nat) (fs : List (String × Ty)) (n : Term) :
@@ -1141,11 +1142,11 @@ theorem agrees_record (k : Nat) (fs : List (String × Ty))
         exact (hf1 f hf).1 (hall f hf)
       · intro hall f hf
         exact (hf1 f hf).2 (hall ⟨f, hf⟩ (List.mem_attach _ _))
-  | cons x xs b nx nr hiff hx hr =>
+  | cons x xs b nr f hiff hch =>
     rw [checkF]
     simp only [Bool.false_eq_true, iff_false, not_and]
     intro _ hc _
-    refine cons_not_closed (.cons x xs b nx nr hiff hx hr) _ ?_ hc
+    refine cons_not_closed (.cons x xs b nr f hiff hch) _ ?_ hc
     have := first_not_field (fs.map (·.1))
     simpa [List.map_map, Function.comp_def] using this
     intro _ hh; cases hh
@@ -1333,11 +1334,11 @@ theorem agrees_union (k : Nat) (vs : List (String × Option Ty))
         have hno : ∀ s, es.lookup "tag" ≠ some (.str s) := fun s hs => by
           rw [← present_str] at hs; simp [htg] at hs
         simp only [reduceCtorEq, exists_false, false_and, and_false, Option.some.injEq]
-  | cons x xs b nx nr hiff hx hr =>
+  | cons x xs b nr f hiff hch =>
     rw [checkF]
     simp only [Bool.false_eq_true, iff_false, not_and]
     intro _ hc
-    exact absurd hc (cons_not_closed (.cons x xs b nx nr hiff hx hr) _
+    exact absurd hc (cons_not_closed (.cons x xs b nr f hiff hch) _
       (first_not_field ["tag", "value"]))
     intro _ hh; cases hh
   | num m e =>
@@ -1367,7 +1368,7 @@ theorem sizeOf_payload {vs : List (String × Option Ty)} {x : String × Option T
   simp only at hp; subst hp
   simp only [Ty.union.sizeOf_spec, Prod.mk.sizeOf_spec, Option.some.sizeOf_spec] at this ⊢; omega
 
-theorem agrees_at (hP : PatternsAgree) (hG : BNodeSubjects G) (k : Nat)
+theorem agrees_at (hP : PatternsAgree) (k : Nat)
     (hn : ∀ n, Agrees D G k (.named n)) : ∀ t, Agrees D G k t := by
   suffices ∀ m t, sizeOf t = m → Agrees D G k t from fun t => this _ t rfl
   intro m
@@ -1380,17 +1381,17 @@ theorem agrees_at (hP : PatternsAgree) (hG : BNodeSubjects G) (k : Nat)
   | prim p => exact agrees_prim hP k p
   | named n => exact hn n
   | optional t => exact agrees_optional k t (ih _ (by simp) t rfl)
-  | list t => exact agrees_list hG k t (ih _ (by simp) t rfl)
+  | list t => exact agrees_list k t (ih _ (by simp) t rfl)
   | record fs => exact agrees_record k fs (fun f hf => ih _ (sizeOf_field hf) f.2 rfl)
   | union vs => exact agrees_union k vs (fun x hx pt hp => ih _ (sizeOf_payload hx hp) pt rfl)
 
 /-- **The shapes agree with `checkF`** at every unfolding. -/
-theorem agrees_all (hP : PatternsAgree) (hD : ∀ d ∈ D, JsonSchema.tagsOk d.2 = true)
-    (hG : BNodeSubjects G) : ∀ k t, Agrees D G k t := by
+theorem agrees_all (hP : PatternsAgree) (hD : ∀ d ∈ D, JsonSchema.tagsOk d.2 = true) :
+    ∀ k t, Agrees D G k t := by
   intro k
   induction k with
-  | zero => exact agrees_at hP hG 0 agrees_named0
-  | succ k ih => exact agrees_at hP hG (k + 1) (agrees_named hD k ih)
+  | zero => exact agrees_at hP 0 agrees_named0
+  | succ k ih => exact agrees_at hP (k + 1) (agrees_named hD k ih)
 
 /-- The same statement for `checkF` at all types, from its named case. -/
 theorem checkF_at (P : Nat → Ty → Prop) (k : Nat) (hn : ∀ n, P k (.named n))
@@ -1663,31 +1664,31 @@ end Main
 /-- On a graph that encodes the value, the `k`-th unfolding of the shapes of `t` holds at the
 value's node exactly when `checkF` accepts the value. -/
 theorem conforms_iff_checkF (hP : PatternsAgree) {D : Decls}
-    (hD : ∀ d ∈ D, JsonSchema.tagsOk d.2 = true) {G : Graph} (hG : BNodeSubjects G) (k : Nat)
+    (hD : ∀ d ∈ D, JsonSchema.tagsOk d.2 = true) {G : Graph} (k : Nat)
     {t : Ty} (ht : JsonSchema.tagsOk t = true) {v : Value} {n : Term} (hv : keysOk v = true)
     (h : Enc G v n) : Conforms G (shapeOf D k t) n ↔ checkF D k t v = true := by
   rw [shapeOf, conforms_nodeS]
-  exact agrees_all hP hD hG k t ht v n hv h
+  exact agrees_all hP hD k t ht v n hv h
 
 /-- **SHACL agreement on encoding graphs**: the value has the type exactly when its node conforms
 to some unfolding of the type's shapes. -/
 theorem shacl_agrees_enc (hP : PatternsAgree) {D : Decls}
-    (hD : ∀ d ∈ D, JsonSchema.tagsOk d.2 = true) {G : Graph} (hG : BNodeSubjects G) {t : Ty}
+    (hD : ∀ d ∈ D, JsonSchema.tagsOk d.2 = true) {G : Graph} {t : Ty}
     (ht : JsonSchema.tagsOk t = true) {v : Value} {n : Term} (hv : keysOk v = true)
     (h : Enc G v n) : (∃ k, Conforms G (shapeOf D k t) n) ↔ HasType D v t := by
   constructor
   · rintro ⟨k, hk⟩
-    exact checkF_sound D k t v ((conforms_iff_checkF hP hD hG k ht hv h).1 hk)
+    exact checkF_sound D k t v ((conforms_iff_checkF hP hD k ht hv h).1 hk)
   · intro hty
     obtain ⟨k, hk⟩ := checkF_complete D hty
-    exact ⟨k, (conforms_iff_checkF hP hD hG k ht hv h).2 hk⟩
+    exact ⟨k, (conforms_iff_checkF hP hD k ht hv h).2 hk⟩
 
 /-- Unfolding further keeps conformance. -/
 theorem conforms_mono_enc (hP : PatternsAgree) {D : Decls}
-    (hD : ∀ d ∈ D, JsonSchema.tagsOk d.2 = true) {G : Graph} (hG : BNodeSubjects G) (k : Nat)
+    (hD : ∀ d ∈ D, JsonSchema.tagsOk d.2 = true) {G : Graph} (k : Nat)
     {t : Ty} (ht : JsonSchema.tagsOk t = true) {v : Value} {n : Term} (hv : keysOk v = true)
     (h : Enc G v n) : Conforms G (shapeOf D k t) n → Conforms G (shapeOf D (k + 1) t) n := by
-  rw [conforms_iff_checkF hP hD hG k ht hv h, conforms_iff_checkF hP hD hG (k + 1) ht hv h]
+  rw [conforms_iff_checkF hP hD k ht hv h, conforms_iff_checkF hP hD (k + 1) ht hv h]
   exact checkF_mono D k t v
 
 /-! ## The concrete encoding encodes -/
@@ -1727,11 +1728,11 @@ theorem bn_inj {p q : List Nat} (h : bn p = bn q) : p = q := by
 theorem sub_append : ∀ (v : Value) (r r' : List Nat),
     sub v (r ++ r') = (sub v r).bind (fun w => sub w r')
   | v, [], r' => by simp [sub]
-  | .array [], i :: r, r' => by simp [sub]
-  | .array (x :: xs), 0 :: r, r' => by simp only [List.cons_append, sub]; exact sub_append x r r'
-  | .array (x :: xs), 1 :: r, r' => by
-    simp only [List.cons_append, sub]; exact sub_append (.array xs) r r'
-  | .array (_ :: _), (_ + 2) :: r, r' => by simp [sub]
+  | .array items, i :: r, r' => by
+    simp only [List.cons_append, sub]
+    cases items[i]? with
+    | none => rfl
+    | some x => exact sub_append x r r'
   | .object es, i :: r, r' => by
     simp only [List.cons_append, sub]
     cases es[i]? with
@@ -1744,41 +1745,82 @@ theorem sub_append : ∀ (v : Value) (r r' : List Nat),
   | .undefined, _ :: _, _ | .null, _ :: _, _ | .bool _, _ :: _, _ | .num _ _, _ :: _, _
   | .str _, _ :: _, _ => by simp [sub]
 
-theorem locals_subject {q : List Nat} {w : Value} {t : Triple} (h : t ∈ locals q w) : t.s = bn q := by
+/-- No position's label has a `c`. -/
+theorem code_ab : ∀ (p : List Nat), ∀ c ∈ code p, c = 'a' ∨ c = 'b'
+  | [] => by simp [code]
+  | i :: p => by
+    intro c hc
+    simp only [code, List.mem_append, List.mem_replicate, List.mem_cons] at hc
+    rcases hc with ⟨_, rfl⟩ | rfl | hc
+    · exact .inl rfl
+    · exact .inr rfl
+    · exact code_ab p c hc
+
+theorem bn_ne_cellT (p q : List Nat) (i : Nat) : bn p ≠ cellT q i := by
+  intro h
+  simp only [bn, cellT, Term.bnode.injEq, BlankNode.mk.injEq] at h
+  have := congrArg String.toList h
+  simp only [String.toList_ofList] at this
+  have hc : 'c' ∈ code p := by rw [this]; simp
+  rcases code_ab p _ hc with h | h <;> exact absurd h (by decide)
+
+theorem cell_cases (q : List Nat) (i : Nat) : cell q i = bn q ∨ ∃ j, cell q i = cellT q j := by
+  unfold cell
+  split
+  · exact .inl rfl
+  · exact .inr ⟨i, rfl⟩
+
+theorem bn_eq_cell (q : List Nat) (i : Nat) : bn q = cell q i ↔ i = 0 := by
+  unfold cell
+  split
+  · simp_all
+  · rename_i h
+    simp only [h, iff_false]
+    exact bn_ne_cellT q q i
+
+theorem locals_subject {q : List Nat} {w : Value} {t : Triple} (h : t ∈ locals q w) :
+    t.s = bn q ∨ ∃ i, t.s = cellT q i := by
   unfold locals at h
   split at h
-  · simp at h; rcases h with rfl | rfl <;> rfl
+  · simp only [List.mem_flatMap, List.mem_cons, List.not_mem_nil, or_false] at h
+    obtain ⟨⟨x, i⟩, _, ht⟩ := h
+    rcases ht with rfl | rfl | rfl
+    · exact .inl rfl
+    · exact cell_cases q i
+    · exact cell_cases q i
   · simp only [List.mem_flatMap] at h
     obtain ⟨⟨⟨k, x⟩, i⟩, _, ht⟩ := h
     split at ht
     · simp at ht
-    · simp at ht; subst ht; rfl
+    · simp at ht; subst ht; exact .inl rfl
   · simp at h
 
 theorem mem_encT : ∀ (v : Value) (pos : List Nat) (t : Triple),
     t ∈ encT pos v ↔ ∃ r w, sub v r = some w ∧ t ∈ locals (pos ++ r) w
-  | .array [], pos, t => by
+  | .array items, pos, t => by
     rw [encT]
-    · simp only [List.not_mem_nil, false_iff, not_exists, not_and]
-      intro r w hs ht
-      cases r with
-      | nil => simp [sub] at hs; subst hs; simp [locals] at ht
-      | cons i r => simp [sub] at hs
-    all_goals first | (intro _ _ hh; cases hh) | (intro _ hh; cases hh)
-  | .array (x :: xs), pos, t => by
-    rw [encT]
-    simp only [List.mem_append, mem_encT x, mem_encT (.array xs)]
+    simp only [List.mem_append, List.mem_flatMap, List.mem_attach, true_and, Subtype.exists]
     constructor
-    · rintro ((h | ⟨r, w, hs, ht⟩) | ⟨r, w, hs, ht⟩)
+    · rintro (h | ⟨⟨x, i⟩, hm, ht⟩)
       · exact ⟨[], _, rfl, by simpa using h⟩
-      · exact ⟨0 :: r, w, by simpa [sub] using hs, by simpa using ht⟩
-      · exact ⟨1 :: r, w, by simpa [sub] using hs, by simpa using ht⟩
+      · have := List.sizeOf_lt_of_mem (List.fst_mem_of_mem_zipIdx hm)
+        obtain ⟨r, w, hs, ht⟩ := (mem_encT x (pos ++ [i]) t).1 ht
+        refine ⟨i :: r, w, ?_, by simpa using ht⟩
+        rw [List.mk_mem_zipIdx_iff_getElem?] at hm
+        simp [sub, hm, hs]
     · rintro ⟨r, w, hs, ht⟩
       match r, hs with
-      | [], hs => simp [sub] at hs; subst hs; exact .inl (.inl (by simpa using ht))
-      | 0 :: r, hs => exact .inl (.inr ⟨r, w, by simpa [sub] using hs, by simpa using ht⟩)
-      | 1 :: r, hs => exact .inr ⟨r, w, by simpa [sub] using hs, by simpa using ht⟩
-      | (_ + 2) :: r, hs => simp [sub] at hs
+      | [], hs => simp [sub] at hs; subst hs; exact .inl (by simpa using ht)
+      | i :: r, hs =>
+        simp only [sub] at hs
+        cases he : items[i]? with
+        | none => rw [he] at hs; cases hs
+        | some x =>
+          rw [he] at hs
+          simp only at hs
+          have hm : (x, i) ∈ items.zipIdx := List.mk_mem_zipIdx_iff_getElem?.2 he
+          have := List.sizeOf_lt_of_mem (List.fst_mem_of_mem_zipIdx hm)
+          exact .inr ⟨(x, i), hm, (mem_encT x (pos ++ [i]) t).2 ⟨r, w, hs, by simpa using ht⟩⟩
   | .object es, pos, t => by
     rw [encT]
     simp only [List.mem_append, List.mem_flatMap, List.mem_attach, true_and, Subtype.exists]
@@ -1825,7 +1867,7 @@ theorem mem_encT : ∀ (v : Value) (pos : List Nat) (t : Triple),
 termination_by v => sizeOf v
 decreasing_by
   all_goals first
-    | (simp only [Value.array.sizeOf_spec, List.cons.sizeOf_spec]; omega)
+    | (simp only [Value.array.sizeOf_spec] at *; omega)
     | (simp only [Value.object.sizeOf_spec, Prod.mk.sizeOf_spec] at *; omega)
 
 theorem mem_encGraph_bn (v0 : Value) {q : List Nat} {w : Value} (hq : sub v0 q = some w)
@@ -1834,21 +1876,26 @@ theorem mem_encGraph_bn (v0 : Value) {q : List Nat} {w : Value} (hq : sub v0 q =
   rw [encGraph, Graph.mem_ofList, mem_encT]
   constructor
   · rintro ⟨r, w', hs, ht⟩
-    have := locals_subject ht
-    simp only [List.nil_append] at this
-    have hr := bn_inj this
-    subst hr
-    rw [hq] at hs; cases hs
-    simpa using ht
+    rcases locals_subject ht with h | ⟨i, h⟩
+    · simp only [List.nil_append] at h
+      have hr := bn_inj h
+      subst hr
+      rw [hq] at hs; cases hs
+      simpa using ht
+    · simp only [List.nil_append] at h
+      exact absurd h (bn_ne_cellT _ _ _)
   · intro ht
     exact ⟨q, w, hq, by simpa using ht⟩
 
-/-- Every subject of an encoding is a blank node. -/
-theorem encGraph_bnodes (v0 : Value) : BNodeSubjects (encGraph v0) := by
-  intro t ht
-  rw [encGraph, Graph.mem_ofList, mem_encT] at ht
-  obtain ⟨r, w, _, ht⟩ := ht
-  exact ⟨_, locals_subject ht⟩
+/-- The node of a list's `i`-th item. -/
+def itemNode (q : List Nat) (items : List Value) (i : Nat) : Term :=
+  match items[i]? with
+  | some y => node (q ++ [i]) y
+  | none => nilT
+
+theorem itemNode_eq {q : List Nat} {items : List Value} {i : Nat} {y : Value}
+    (h : items[i]? = some y) : itemNode q items i = node (q ++ [i]) y := by
+  simp [itemNode, h]
 
 /-- The node of an object's entry named `k`, entries numbered from `i`. -/
 def entryNode (q : List Nat) : List (String × Value) → Nat → String → Term
@@ -1892,14 +1939,32 @@ theorem enc_of_sub (v0 : Value) : ∀ (w : Value) (q : List Nat), sub v0 q = som
     have hsub : ∀ r, sub v0 (q ++ r) = sub (.array (x :: xs)) r := fun r => by
       rw [sub_append, hq]; rfl
     have hok := keysOk_array_iff.1 hv
-    refine .cons x xs _ (node (q ++ [0]) x) (node (q ++ [1]) (.array xs)) (fun p o => ?_)
-      (enc_of_sub v0 x (q ++ [0]) (by rw [hsub]; rfl) (hok x (by simp)))
-      (enc_of_sub v0 (.array xs) (q ++ [1]) (by rw [hsub]; rfl)
-        (keysOk_array_iff.2 fun y hy => hok y (by simp [hy])))
-    have := mem_encGraph_bn v0 hq p o
-    simp only [bn] at this
-    rw [this]
-    simp [locals, bn]
+    refine .cons x xs _ (if 0 + 1 < (x :: xs).length then cell q (0 + 1) else nilT)
+      (itemNode q (x :: xs)) (fun p o => ?_) (fun i y hi => ?_)
+    · have := mem_encGraph_bn v0 hq p o
+      simp only [bn] at this
+      rw [this]
+      simp only [locals, List.mem_flatMap, List.mem_cons, List.not_mem_nil, or_false, Prod.exists,
+        List.mk_mem_zipIdx_iff_getElem?]
+      constructor
+      · rintro ⟨y, i, hi, ht | ht | ht⟩ <;> simp only [Triple.mk.injEq] at ht
+        · obtain ⟨_, rfl, rfl⟩ := ht
+          exact ⟨i, y, hi, .inl ⟨rfl, (itemNode_eq hi).symm⟩⟩
+        · obtain ⟨hc, rfl, rfl⟩ := ht
+          have hi0 := (bn_eq_cell q i).1 hc
+          subst hi0
+          exact ⟨0, y, hi, .inr (.inl ⟨rfl, rfl, (itemNode_eq hi).symm⟩)⟩
+        · obtain ⟨hc, rfl, rfl⟩ := ht
+          have hi0 := (bn_eq_cell q i).1 hc
+          subst hi0
+          exact ⟨0, y, hi, .inr (.inr ⟨rfl, rfl, rfl⟩)⟩
+      · rintro ⟨i, y, hi, ⟨rfl, rfl⟩ | ⟨rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl⟩⟩
+        · exact ⟨y, i, hi, .inl (by rw [itemNode_eq hi]; rfl)⟩
+        · exact ⟨y, 0, hi, .inr (.inl (by rw [itemNode_eq hi]; rfl))⟩
+        · exact ⟨y, 0, hi, .inr (.inr rfl)⟩
+    · have := List.sizeOf_lt_of_mem (List.mem_of_getElem? hi)
+      rw [itemNode_eq hi]
+      exact enc_of_sub v0 y (q ++ [i]) (by rw [hsub]; simp [sub, hi]) (hok y (List.mem_of_getElem? hi))
   | .object es, q, hq, hv => by
     obtain ⟨hnd, _⟩ := keysOk_object hv
     have hsub : ∀ r, sub v0 (q ++ r) = sub (.object es) r := fun r => by
@@ -1938,7 +2003,7 @@ theorem enc_of_sub (v0 : Value) : ∀ (w : Value) (q : List Nat), sub v0 q = som
 termination_by w => sizeOf w
 decreasing_by
   all_goals first
-    | (simp only [Value.array.sizeOf_spec, List.cons.sizeOf_spec]; omega)
+    | (simp only [Value.array.sizeOf_spec] at *; omega)
     | (simp only [Value.object.sizeOf_spec, Prod.mk.sizeOf_spec] at *; omega)
 
 /-- The encoding of a value with distinct keys encodes it. -/
@@ -1958,7 +2023,7 @@ lexical rules do. -/
 theorem shacl_agrees (hP : PatternsAgree) (D : Decls) (hD : ∀ d ∈ D, JsonSchema.tagsOk d.2 = true)
     (t : Ty) (ht : JsonSchema.tagsOk t = true) (v : Value) (hv : keysOk v = true) :
     (∃ k, Conforms (encGraph v) (shapeOf D k t) (encNode v)) ↔ HasType D v t :=
-  shacl_agrees_enc hP hD (encGraph_bnodes v) ht hv (enc_encGraph v hv)
+  shacl_agrees_enc hP hD ht hv (enc_encGraph v hv)
 
 /-- The same with LeanRDF's validator: no validation results at some unfolding. -/
 -- @tg: implements:: [[openspec:formal-model#SHACL Projection Agreement]]
@@ -1976,6 +2041,6 @@ theorem conforms_mono (hP : PatternsAgree) (D : Decls)
     (ht : JsonSchema.tagsOk t = true) (v : Value) (hv : keysOk v = true) :
     Conforms (encGraph v) (shapeOf D k t) (encNode v) →
       Conforms (encGraph v) (shapeOf D (k + 1) t) (encNode v) :=
-  conforms_mono_enc hP hD (encGraph_bnodes v) k ht hv (enc_encGraph v hv)
+  conforms_mono_enc hP hD k ht hv (enc_encGraph v hv)
 
 end Vertep.Types.Shacl

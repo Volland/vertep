@@ -16,8 +16,11 @@
 #
 # Values are encoded in RDF for SHACL validation as follows: booleans as xsd:boolean, integral
 # numbers in the signed 64-bit range as xsd:long, other finite numbers as xsd:decimal, strings
-# as xsd:string, null as vt:Null, arrays as RDF collections and objects as blank nodes with one
-# triple per entry whose predicate is <https://w3id.org/vertep/field#name>.
+# as xsd:string, null as vt:Null, arrays as RDF collections whose first cell also links each item
+# with vt:listMember, and objects as blank nodes with one triple per entry whose predicate is
+# <https://w3id.org/vertep/field#name>. The shape of list<T> checks the members on vt:listMember,
+# a predicate path, so the shapes need no rdf:rest*/rdf:first path (whose path nodes would be
+# blank nodes); the collection keeps the order and repetitions of the items.
 
 <https://w3id.org/vertep/vt/types>
     a owl:Ontology ;
@@ -164,3 +167,8 @@ vt:someType
     rdfs:label "present type"@en ;
     rdfs:comment "The type of the value of an optional type when it is present."@en ;
     rdfs:domain vt:OptionalType .
+
+vt:listMember
+    a rdf:Property ;
+    rdfs:label "list member"@en ;
+    rdfs:comment "In the RDF encoding of a value: from the first cell of the RDF collection of a non-empty list to each of its items, so that SHACL shapes reach the members with a predicate path. The collection still gives the order and repetitions."@en .

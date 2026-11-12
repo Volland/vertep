@@ -8,8 +8,8 @@ LeanRDF's SHACL Core validator on the encoding of values agrees with the checker
 agreement tests (`crates/vertep-rdf/tests/types.rs`); the regular expressions of the three
 `sh:pattern`s agree with the lexical rules on sample strings (the `PatternsAgree` hypothesis);
 and for a non-recursive block, reading the Rust-mirrored shape triples (`Rdf.namedTypeShapes`,
-the triples `vt certify` checks against Rust) with LeanRDF's shapes reader gives the same
-verdicts as the shapes the theorem is about.
+the triples `vt certify` checks against Rust) with LeanRDF's shapes reader gives the checker's
+verdicts, lists included.
 -/
 
 namespace Vertep.Test.Shacl
@@ -117,18 +117,34 @@ def rustOk (D : Decls) (t : Ty) (v : Value) : Option Bool := do
 
 def flat : Decls := named.filter (·.1 != "Node")
 
-/-- Types whose Rust shapes are well-formed SHACL: no `list` (see below). -/
-def listFree (t : Ty) : Bool := !(reprStr t).contains "Node" && !(reprStr t).contains "list"
+/-- Types without the recursive `Node`, whose shapes LeanRDF's reader rejects (SHACL leaves
+recursive shapes undefined). -/
+def nonRecursive (t : Ty) : Bool := !(reprStr t).contains "Node"
 
-#guard (cases.filter fun (t, _) => listFree t).all fun (t, v) =>
+/-- Cases with lists, for the cross-check: lists of lists, of named types and of optionals. -/
+def listCases : List (Ty × Value) :=
+  [(.list (.prim .int), .array [num 1, num 2]), (.list (.prim .int), .array [num 1, s "2"]),
+   (.list (.prim .int), .array [s "2", num 1]), (.list (.prim .int), .array [num 1, num 1]),
+   (.list (.list (.prim .int)), .array [.array [num 1], .array []]),
+   (.list (.list (.prim .int)), .array [.array [num 1], .array [s "2"]]),
+   (.list (.named "Item"), .array [obj [("sku", s "a"), ("qty", num 1)]]),
+   (.list (.named "Item"), .array [obj [("sku", s "a")]]),
+   (.list (.named "MaybeInt"), .array [.null, num 3]),
+   (.list (.named "MaybeInt"), .array [.null, s "3"]),
+   (.record [("xs", .list (.prim .string))], obj [("xs", .array [s "a", s "b"])]),
+   (.record [("xs", .list (.prim .string))], obj [("xs", .array [s "a", .bool true])])]
+
+-- The Rust-mirrored shapes, read by LeanRDF, agree with the checker, lists included: the members
+-- are checked on `vt:listMember`, a predicate path (verification backlog 4.7).
+#guard ((cases ++ listCases).filter fun (t, _) => nonRecursive t).all fun (t, v) =>
   rustOk flat t v == some (check flat [] t v)
+#guard (listCases.filter fun (t, v) => !check flat [] t v).length ≥ 5
 
-/- **Known disagreement** (verification backlog 4.2): `shapes.rs` mints the `rdf:rest*` path
-node and the sequence path of a list's member property as IRIs, and SHACL §2.3.1 reads an IRI
-as a predicate path, so LeanRDF (and any SHACL engine) never reaches the members: the
-Rust-published shapes accept `[1, "2"]` as a `list<int>`. The shapes of `shapeOf` (and the
-theorem) use the intended path `rdf:rest*/rdf:first`. -/
-#guard rustOk flat (.list (.prim .int)) (.array [num 1, s "2"]) == some true
+/- Before verification backlog 4.7, `shapes.rs` minted the `rdf:rest*` path node and the
+sequence path of a list's member property as IRIs, which SHACL §2.3.1 reads as predicate paths,
+so the Rust-published shapes accepted `[1, "2"]` as a `list<int>`. -/
+#guard rustOk flat (.list (.prim .int)) (.array [num 1, s "2"]) == some false
+#guard rustOk flat (.list (.prim .int)) (.array [num 1, num 2]) == some true
 #guard shaclOk flat 1 (.list (.prim .int)) (.array [num 1, s "2"]) == false
 
 /-! ## The theorem, applied -/

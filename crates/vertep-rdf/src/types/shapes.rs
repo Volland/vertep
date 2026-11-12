@@ -3,7 +3,10 @@
 //! A type projects to a node shape that the [RDF encoding](super::value) of a value conforms
 //! to exactly when the core checker ([`Declarations::check`]) accepts the value. The node shape
 //! of a named type is its type IRI; shapes nested in it are minted under that IRI
-//! (`<type IRI>#s...`), so the projection has no blank nodes.
+//! (`<type IRI>#s...`), so the projection has no blank nodes. Every `sh:path` is a predicate
+//! (an IRI, which SHACL §2.3.1 reads as a predicate path): the members of a list are reached
+//! through the `vt:listMember` triples of the [encoding](super::value), not `rdf:rest*/rdf:first`,
+//! whose path nodes would have to be blank nodes.
 //!
 //! | type | constraints on the value node |
 //! |---|---|
@@ -13,7 +16,7 @@
 //! | `value` | none |
 //! | named type | `sh:node` its type IRI |
 //! | `optional<T>` | `sh:or` of `sh:hasValue vt:Null` and the shape of `T` |
-//! | `list<T>` | `rdf:nil` or a closed collection cell, and every member (`rdf:rest*/rdf:first`) conforms to `T` |
+//! | `list<T>` | `rdf:nil`, or a closed collection cell with one `rdf:first`, one `rdf:rest`, and every `vt:listMember` conforming to `T` |
 //! | record | a closed blank node: one property shape per field with `sh:maxCount 1`, `sh:minCount 1` unless the field is optional or `value`, and `sh:node` the field type |
 //! | union | a closed blank node with exactly one string `tag`, at most one `value`, and `sh:or` of one shape per variant fixing the tag and the payload |
 
@@ -288,23 +291,19 @@ impl<'a> TypeShapes<'a> {
                         Some(1),
                     );
                 }
+                // Every member, by the vt:listMember triples of the encoding.
+                let m = self.property(
+                    &cons,
+                    base,
+                    &format!("{path}.cons.member"),
+                    vt::LIST_MEMBER.into_owned().into(),
+                    None,
+                    None,
+                );
+                let s = self.shape_ref(base, &format!("{path}.l"), item);
+                self.add(&m, sh("node"), s);
                 let l = self.list(base, &format!("{path}.lor"), vec![nil.into(), cons.into()]);
                 self.add(node, sh("or"), l);
-                // Every member: rdf:rest*/rdf:first.
-                let star = NamedNode::new_unchecked(node_iri(base, &format!("{path}.rest*")));
-                self.add(
-                    &star,
-                    sh("zeroOrMorePath"),
-                    NamedNode::new_unchecked(vt::RDF_REST),
-                );
-                let seq = self.list(
-                    base,
-                    &format!("{path}.members"),
-                    vec![star.into(), NamedNode::new_unchecked(vt::RDF_FIRST).into()],
-                );
-                let p = self.property(node, base, &format!("{path}.m"), seq, None, None);
-                let s = self.shape_ref(base, &format!("{path}.l"), item);
-                self.add(&p, sh("node"), s);
             }
             Type::Record(fields) => {
                 self.closed_blank(node);

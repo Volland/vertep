@@ -329,21 +329,9 @@ impl<'g> Loader<'g> {
     }
 
     fn path(&self, t: &Term) -> Result<Path, ShapesError> {
-        // An IRI is a predicate path unless the shapes graph describes it as a complex path
-        // (an IRI-named list or path node, as the type projection mints them).
+        // An IRI is a predicate path, whatever the shapes graph says about it (SHACL §2.3.1).
         if let Term::NamedNode(n) = t {
-            let complex = ["first", "inversePath", "alternativePath"]
-                .iter()
-                .map(|l| if *l == "first" { rdf(l) } else { sh(l) })
-                .chain(
-                    ["zeroOrMorePath", "oneOrMorePath", "zeroOrOnePath"]
-                        .iter()
-                        .map(|l| sh(l)),
-                )
-                .any(|p| self.g.object_for_subject_predicate(n, &p).is_some());
-            if !complex {
-                return Ok(Path::Predicate(n.clone()));
-            }
+            return Ok(Path::Predicate(n.clone()));
         }
         if self.object(t, &rdf("first"))?.is_some() {
             let items = self.list(t)?;

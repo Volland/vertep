@@ -463,6 +463,8 @@ vt_terms! {
     ITEM_TYPE = "itemType";
     /// `vt:someType`: the type of the present value of an optional type.
     SOME_TYPE = "someType";
+    /// `vt:listMember`: from the node of an encoded non-empty list to each of its members.
+    LIST_MEMBER = "listMember";
     /// `vt:Null`: the RDF encoding of an absent (`null`) value.
     NULL = "Null";
 }

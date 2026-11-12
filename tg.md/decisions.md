@@ -520,6 +520,16 @@ An object entry whose value is `undefined` is absent for every check of the type
 
 Before, `{a: 1, q: undefined}` failed `{a: int}` with `UnknownField` while its RDF encoding conformed to the type's shapes, so the SHACL projection disagreed with the checker. A declared field holding `undefined` was already absent; the unknown-field check now reads entries the same way, in `crates/vertep-core/src/types/check.rs` and in the Lean `check` and `HasType`. Rejected: encoding `undefined` entries as `vt:Null`, which makes a payload-free union variant with `value: undefined` fail its `sh:maxCount 0`.
 
+## List members get a member predicate
+
+A non-empty list's RDF node links each item with `vt:listMember`, and the SHACL shape of `list<T>` checks members on that predicate, so every path of the type shapes is a predicate path and the shapes stay blank-node free.
+
+- motivated_by:: [[decisions#Persistent vt namespace and blank-node-free charts]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#Type projections must agree with the checker]] {weight: primary}
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary, note: "found by the cross-check of the SHACL projection proof, verification backlog 4.2; fixed in 4.7"}
+
+The shape of `list<T>` used to check members on `rdf:rest*/rdf:first`, with the `sh:zeroOrMorePath` node and the sequence list minted as IRIs under the type IRI. SHACL §2.3.1 reads an IRI as a predicate path, so a standard engine never reached the members and accepted `[1, "2"]` as a `list<int>`; only `vertep-rdf`'s validator, which read such IRIs structurally, agreed with the checker. Now `value.rs` adds `<first cell> vt:listMember <item>` for every item, the closed collection cell of the shape allows `rdf:first`, `rdf:rest` and `vt:listMember`, and its `vt:listMember` property shape carries `sh:node` of the item type; the Rust validator reads every IRI path as a predicate. The RDF collection stays: the member triples are a set, and the collection keeps the order and the repeated items, so the encoding still determines the value. Only the list's own node carries members, so the encoding stays linear in the list's length. Type IRIs do not change (they hash definitions, not shapes); chart versions of charts whose types use lists do. `vt:listMember` is declared in `ontology/vt-types.ttl`; `Types/Shacl.lean` mirrors the encoding and the shapes, and `shacl_agrees` no longer needs the encoding's subjects to be blank nodes. Rejected: blank nodes for the path nodes, which would make typed chart projections non-ground and require RDFC-1.0 in the Lean certifier.
+
 ## Type checking stops on non-contractive recursion
 
 `type A = optional<A>` stays valid, as the type-system spec allows recursion through an optional; the value checker reports a mismatch instead of expanding a named type again at the same value position.

@@ -727,12 +727,18 @@ fn undefined_entries_are_absent_for_the_checker_and_the_shapes() {
         ),
         (
             union.clone(),
-            Value::Object(vec![("tag".into(), s("X")), ("value".into(), Value::Undefined)]),
+            Value::Object(vec![
+                ("tag".into(), s("X")),
+                ("value".into(), Value::Undefined),
+            ]),
             true,
         ),
         (
             union,
-            Value::Object(vec![("tag".into(), s("Y")), ("value".into(), Value::Undefined)]),
+            Value::Object(vec![
+                ("tag".into(), s("Y")),
+                ("value".into(), Value::Undefined),
+            ]),
             false,
         ),
     ];
@@ -781,13 +787,11 @@ fn shacl_patterns_use_the_xpath_syntax() {
 /// Every `sh:path` of the type shapes is a well-formed SHACL property path (SHACL §2.3.1): an
 /// IRI is a predicate path, so the nodes of sequence and `sh:zeroOrMorePath` paths must be blank
 /// nodes. Found by the Lean cross-check (verification backlog 4.2, `VertepTests/Shacl.lean`):
-/// the member property of `list<T>` mints `<…#t.rest*>` and `<…#t.members.0>` as IRIs, so a
-/// standard SHACL engine reads the path as a predicate and never checks the members (LeanRDF's
-/// validator accepts `[1, "2"]` as a `list<int>`). Fixing it needs a design decision: blank
-/// nodes in shape paths (against "Persistent vt namespace and blank-node-free charts") or a
-/// member predicate in the value encoding.
+/// the member property of `list<T>` minted `<…#t.rest*>` and `<…#t.members.0>` as IRIs, so a
+/// standard SHACL engine read the path as a predicate and never checked the members. Fixed by
+/// verification-backlog 4.7: members are reached on `vt:listMember`, a predicate path.
+// @tg: verifies:: [[openspec:type-system#SHACL Projection#SHACL agrees with the checker]] {level: unit}
 #[test]
-#[ignore = "known: list member paths are IRIs, not well-formed SHACL paths (verification-backlog 4.2)"]
 fn type_shape_paths_are_well_formed_shacl() {
     let d = decls(NAMED);
     let g = vertep_rdf::types::shapes::value_shapes(&d, &Type::list(Type::INT)).expect("shapes");
@@ -807,4 +811,91 @@ fn type_shape_paths_are_well_formed_shacl() {
             }
         }
     }
+}
+
+/// The published shapes of `list<T>` check the members under a standard reading of SHACL paths
+/// (an IRI `sh:path` is a predicate): the shapes a chart projection carries for
+/// `type L = list<int>`, read by the validator, reject `[1, "2"]` and accept `[1, 2]`; the members
+/// are the `vt:listMember` triples of the encoding, next to the collection that keeps the order.
+// @tg: verifies:: [[openspec:type-system#SHACL Projection#SHACL agrees with the checker]] {level: unit}
+#[test]
+fn published_list_shapes_check_every_member() {
+    use vertep_rdf::shacl::Shapes;
+    use vertep_rdf::types::value::{VALUE_ROOT, value_graph};
+
+    let c = chart("type L = list<int>; type LL = list<L>;", "");
+    let g: Graph = project(&c).graph;
+    let path = NamedNodeRef::new_unchecked("http://www.w3.org/ns/shacl#path");
+    let paths: Vec<_> = g.triples_for_predicate(path).map(|t| t.object).collect();
+    assert!(paths.iter().all(|p| matches!(p, TermRef::NamedNode(_))));
+    assert!(paths.contains(&TermRef::NamedNode(vt::LIST_MEMBER)));
+    let d = decls("type L = list<int>; type LL = list<L>;");
+    let iris = TypeIris::of(&d);
+    let shapes = g.clone();
+    let root = NamedNodeRef::new_unchecked(VALUE_ROOT);
+    let value = NamedNodeRef::new_unchecked(vt::RDF_VALUE);
+    let sh = |l: &str| NamedNode::new_unchecked(format!("http://www.w3.org/ns/shacl#{l}"));
+    let check = |name: &str, v: &Value| {
+        let mut sg = shapes.clone();
+        let target = NamedNode::new_unchecked("urn:test:target");
+        let p = NamedNode::new_unchecked("urn:test:target-p");
+        let t = iris.get(name).unwrap().named_node();
+        sg.insert(oxrdf::TripleRef::new(&target, rdf_type(), &sh("NodeShape")));
+        sg.insert(oxrdf::TripleRef::new(&target, &sh("targetNode"), root));
+        sg.insert(oxrdf::TripleRef::new(&target, &sh("property"), &p));
+        sg.insert(oxrdf::TripleRef::new(&p, &sh("path"), value));
+        sg.insert(oxrdf::TripleRef::new(&p, &sh("node"), &t));
+        let report = Shapes::from_graph(&sg)
+            .expect("shapes")
+            .validate(&value_graph(v));
+        (report.conforms(), d.check(&Type::named(name), v).is_ok())
+    };
+    let n = |x: f64| Value::Number(x);
+    let ints = Value::Array(vec![n(1.0), n(2.0), n(1.0)]);
+    assert_eq!(check("L", &ints), (true, true));
+    assert_eq!(check("L", &Value::Array(vec![])), (true, true));
+    assert_eq!(
+        check("L", &Value::Array(vec![n(1.0), s("2")])),
+        (false, false)
+    );
+    assert_eq!(
+        check("L", &Value::Array(vec![s("2"), n(1.0)])),
+        (false, false)
+    );
+    assert_eq!(check("L", &Value::Object(vec![])), (false, false));
+    let nested = |x: Value| Value::Array(vec![Value::Array(vec![n(1.0)]), Value::Array(vec![x])]);
+    assert_eq!(check("LL", &nested(n(2.0))), (true, true));
+    assert_eq!(check("LL", &nested(s("2"))), (false, false));
+    // The encoding: one vt:listMember per distinct item term on the first cell, and the
+    // collection with every item in order.
+    let eg = value_graph(&ints);
+    let head = eg
+        .object_for_subject_predicate(root, value)
+        .expect("root")
+        .into_owned();
+    let oxrdf::Term::BlankNode(head) = head else {
+        panic!("a non-empty list is a blank node")
+    };
+    assert_eq!(
+        eg.objects_for_subject_predicate(&head, vt::LIST_MEMBER)
+            .count(),
+        2
+    );
+    let first = NamedNodeRef::new_unchecked(vt::RDF_FIRST);
+    let rest = NamedNodeRef::new_unchecked(vt::RDF_REST);
+    let mut cell = oxrdf::Term::BlankNode(head);
+    let mut items = Vec::new();
+    while let oxrdf::Term::BlankNode(b) = &cell {
+        items.push(
+            eg.object_for_subject_predicate(b, first)
+                .unwrap()
+                .to_string(),
+        );
+        cell = eg
+            .object_for_subject_predicate(b, rest)
+            .unwrap()
+            .into_owned();
+    }
+    assert_eq!(items.len(), 3);
+    assert_eq!(items[0], items[2]);
 }

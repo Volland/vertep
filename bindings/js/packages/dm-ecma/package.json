@@ -20,7 +20,10 @@
   },
   "files": [
     "dist/",
-    "wasm/"
+    "wasm/",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
   ],
   "peerDependencies": {
     "@vertep/web": "0.1.0"

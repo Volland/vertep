@@ -25,7 +25,10 @@
   "files": [
     "dist/",
     "wasm/core/",
-    "wasm/journal/"
+    "wasm/journal/",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
   ],
   "sideEffects": [
     "./dist/worker.js"

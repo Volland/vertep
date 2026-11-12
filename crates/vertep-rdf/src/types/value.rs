@@ -11,8 +11,14 @@
 //! | a non-finite number | `xsd:double` literal (`NaN`, `INF`, `-INF`) |
 //! | a string | `xsd:string` literal |
 //! | `null`, `undefined` | `vt:Null` |
-//! | an array | an RDF collection (`rdf:nil` when empty) |
+//! | an array | an RDF collection (`rdf:nil` when empty) whose first cell also has one `vt:listMember` triple per item |
 //! | an object | a blank node with one triple per entry whose value is not `undefined`, predicate `<https://w3id.org/vertep/field#name>` |
+//!
+//! The `vt:listMember` triples let a SHACL shape reach every member of a list with a predicate
+//! path: the path `rdf:rest*/rdf:first` would need blank nodes in the shapes (SHACL §2.3.1 reads
+//! an IRI as a predicate path), and the type shapes in a chart projection are blank-node free.
+//! The collection stays next to them because the member triples are a set: it keeps the order
+//! and the repeated items of the list.
 //!
 //! [`value_graph`] puts the encoding under the fixed node [`VALUE_ROOT`] with `rdf:value`.
 
@@ -35,6 +41,7 @@ pub fn field_predicate(name: &str) -> NamedNode {
 
 /// The RDF encoding of `value`: a graph holding `<urn:vertep:value> rdf:value <encoding>` and
 /// the triples of the encoding.
+// @tg: implements:: [[openspec:type-system#SHACL Projection]]
 pub fn value_graph(value: &Value) -> Graph {
     let mut g = Graph::new();
     let root = NamedNode::new_unchecked(VALUE_ROOT);
@@ -70,14 +77,14 @@ pub fn encode(g: &mut Graph, value: &Value) -> Term {
         }
         Value::String(s) => Literal::new_simple_literal(s).into(),
         Value::Array(items) => {
+            let members: Vec<Term> = items.iter().map(|item| encode(g, item)).collect();
             let mut rest: Term = NamedNode::new_unchecked(vt::RDF_NIL).into();
-            for item in items.iter().rev() {
+            for first in members.iter().rev() {
                 let cell = BlankNode::default();
-                let first = encode(g, item);
                 g.insert(TripleRef::new(
                     &cell,
                     NamedNodeRef::new_unchecked(vt::RDF_FIRST),
-                    &first,
+                    first,
                 ));
                 g.insert(TripleRef::new(
                     &cell,
@@ -85,6 +92,11 @@ pub fn encode(g: &mut Graph, value: &Value) -> Term {
                     &rest,
                 ));
                 rest = cell.into();
+            }
+            if let Term::BlankNode(head) = &rest {
+                for member in &members {
+                    g.insert(TripleRef::new(head, vt::LIST_MEMBER, member));
+                }
             }
             rest
         }
