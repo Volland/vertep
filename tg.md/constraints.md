@@ -226,3 +226,12 @@ The `didwebvh-rs` 0.8 API and its `Signer` trait are async; synchronous custody 
 - constrains:: [[decisions#did:webvh entries are signed through the key manager]] {strength: should, source: "didwebvh-rs 0.8 API"}
 - constrains:: [[decisions#Witnessing is a custody request judged by a replica policy]] {strength: should, source: "didwebvh-rs 0.8 API"}
 
+
+## Electron Web Workers can have Node integration
+
+Electron hosts that enable Node integration in workers, Obsidian among them, set `process.versions.node` inside Web Workers, so a Node check that tests only `process` and `window` mistakes such a worker for `worker_threads`.
+
+- constrains:: [[bindings/js/packages/web/src/worker.ts#isNode]] {strength: must, source: "Electron nodeIntegrationInWorker; seen in Obsidian 1.14"}
+- constrains:: [[bindings/js/packages/web/src/client.ts#isNode]] {strength: must, source: "Electron nodeIntegrationInWorker; seen in Obsidian 1.14"}
+
+`@vertep/web` treats any scope with `WorkerGlobalScope` as a Web Worker, so the worker uses `postMessage` and fetches its WebAssembly by URL there (fixed in 0.1.4).

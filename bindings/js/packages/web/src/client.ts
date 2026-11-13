@@ -121,7 +121,12 @@ interface Port {
   terminate(): void;
 }
 
-const isNode = typeof process !== "undefined" && !!process.versions?.node && typeof (globalThis as { window?: unknown }).window === "undefined";
+// Node, not a browser page or Web Worker (Electron sets `process.versions.node` in both)
+const isNode =
+  typeof process !== "undefined" &&
+  !!process.versions?.node &&
+  typeof (globalThis as { window?: unknown }).window === "undefined" &&
+  typeof (globalThis as { WorkerGlobalScope?: unknown }).WorkerGlobalScope === "undefined";
 
 async function startWorker(
   url: URL,

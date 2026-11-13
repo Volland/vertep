@@ -6,6 +6,35 @@ All notable changes to Vertep are recorded here. The format follows
 
 All crates of the workspace and both npm packages share one version.
 
+## [0.1.4] - 2026-11-13
+
+Layout is formatting: charts drawn in the Vertepnyk designer keep their version. Change
+`layout-namespace`.
+
+### Added
+
+- **Layout namespace** `https://w3id.org/vertep/layout#` (prefix `vl`), exported as
+  `vertep_core::ir::VL_NS` and from `vertep-scxml`.
+  - **SCXML:** the reader drops every `vl` attribute and element and lists it in
+    `LossReport::formatting` as `LossKind::Layout`. Strict mode accepts it, and other foreign
+    namespaces are unchanged.
+  - **YAML:** an optional top-level `layout` key is accepted and ignored; the writer never
+    emits it.
+  - Layout never reaches the IR, so moving a box never changes the chart hash or version IRI.
+
+### Fixed
+
+- **`@vertep/web` in Electron workers:** the client and worker no longer mistake a Web Worker
+  with Node integration (Obsidian, for one) for Node's `worker_threads`. Before, the worker
+  waited on `node:worker_threads` and the client never got an answer.
+
+### Changed
+
+- The `m8-webvh` and `layout-namespace` changes are archived; their requirements are in
+  `openspec/specs/webvh-identity`, `webvh-hosting`, `scxml-format` and `yaml-format`.
+- CI tests the cluster shard hash on `macos-15-intel` in place of the retired `macos-13`
+  runner.
+
 ## [0.1.3] - 2026-11-13
 
 Milestone M8: `did:webvh` hosting. Change `m8-webvh`; design in
@@ -191,6 +220,7 @@ The first release: milestones M0 to M6.
 - **M6, WebAssembly and JavaScript:** the core and a browser shell in WebAssembly, the
   `@vertep/web` and `@vertep/dm-ecma` npm packages, and a tiramemsu journal in OPFS.
 
+[0.1.4]: https://github.com/Volland/vertep/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Volland/vertep/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Volland/vertep/compare/9904604...v0.1.2
 [0.1.1]: https://github.com/Volland/vertep/commit/9904604

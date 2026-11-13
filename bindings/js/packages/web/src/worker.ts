@@ -41,8 +41,16 @@ interface Glue {
   hasJournal(): boolean;
 }
 
+/**
+ * Node's `worker_threads`, not a Web Worker. Electron hosts with Node integration in workers
+ * (Obsidian, for one) set `process.versions.node` inside Web Workers too, so a Web Worker scope
+ * wins over `process`.
+ */
 const isNode =
-  typeof process !== "undefined" && !!process.versions?.node && typeof (globalThis as { window?: unknown }).window === "undefined";
+  typeof process !== "undefined" &&
+  !!process.versions?.node &&
+  typeof (globalThis as { window?: unknown }).window === "undefined" &&
+  typeof (globalThis as { WorkerGlobalScope?: unknown }).WorkerGlobalScope === "undefined";
 
 type Post = (m: FromWorker, transfer?: Transferable[]) => void;
 

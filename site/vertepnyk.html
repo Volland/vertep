@@ -113,7 +113,7 @@ pnpm --filter vertepnyk-electron run dist       # the desktop app for this OS</c
     <div class="nb warn">
       <p>What "preview" means:</p>
       <ul>
-        <li><strong>Layout and the chart hash.</strong> Vertepnyk writes layout as <code>vl:</code> attributes in SCXML and a <code>layout</code> key in YAML. Vertep 0.1.3 does not yet treat that namespace as formatting, so <code>vt hash</code> from crates.io reports a new version when layout changes. The engine bundled in Vertepnyk already ignores it, and the next Vertep release will too.</li>
+        <li><strong>Layout and the chart hash.</strong> Vertepnyk writes layout as <code>vl:</code> attributes in SCXML and a <code>layout</code> key in YAML. Vertep treats both as formatting from 0.1.4, so moving a box keeps the chart's version; with <code>vt</code> 0.1.3 or older, <code>vt hash</code> reports a new version when layout changes. Update with <code>cargo install vertep-cli</code>.</li>
         <li><strong>The first open writes layout.</strong> A chart without layout gets one when it is first opened, so a fresh file shows as modified; in VS Code that first undo takes two presses.</li>
         <li><strong><code>.vt.yaml</code> files</strong> cannot be bound by extension in Obsidian or the desktop app; open them with the <em>Open in designer</em> command.</li>
         <li><strong>Obsidian's community directory</strong> does not list the plugin yet.</li>

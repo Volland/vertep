@@ -99,7 +99,7 @@ is enabled. A customer should be able to send a new `request` from
   <h3>5. Check what changed, not just that it is valid</h3>
   <p>A chart's version IRI is the hash of its behaviour, not of its bytes. That gives code review a sharp question: did this change alter what the chart does? Ask the agent to report <code>vt hash</code> before and after. A rename of a state, a new transition or a changed guard gives a new version; reflowed text and comments do not. When the version changes, the next step is to turn the runs you just made into tests, so the behaviour you checked by hand stays checked.</p>
   <div class="nb warn">
-    <p>One caveat while Vertepnyk is a preview. Its layout lives in a namespace that Vertep reserves for formatting, so moving a box should not change the version. The engine bundled in Vertepnyk already ignores layout, but Vertep 0.1.3 from crates.io does not yet: with layout in the file, the published <code>vt hash</code> reports a new version after a drag. Compare versions from the same <code>vt</code>, or strip layout before hashing, until the next Vertep release.</p>
+    <p>Layout lives in a namespace Vertep reserves for formatting, so moving a box never changes the version. That holds from <code>vt</code> 0.1.4; an older <code>vt</code> reads the layout as content and reports a new version after a drag, so make sure the agent's <code>vt</code> is current (<code>cargo install vertep-cli</code>).</p>
   </div>
 
   <h2>Who is good at what</h2>
