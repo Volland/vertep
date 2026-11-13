@@ -30,7 +30,11 @@ fn illegal(cc: &CompiledChart, config: &StateSet) -> Option<String> {
         }
         let p = st.parent.unwrap_or(ROOT);
         if p != ROOT && !config.contains(p) {
-            return Some(format!("{} is active below inactive {}", st.id, cc.state(p).id));
+            return Some(format!(
+                "{} is active below inactive {}",
+                st.id,
+                cc.state(p).id
+            ));
         }
         match st.kind {
             StateKind::Compound if count(s) != 1 => {

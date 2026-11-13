@@ -1,0 +1,8 @@
+# Only the workspace manifests and sources reach the build context.
+*
+!Cargo.toml
+!Cargo.lock
+!crates
+!examples
+crates/*/target
+**/node_modules

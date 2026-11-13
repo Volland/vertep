@@ -27,9 +27,18 @@ function serve() {
 
 async function chrome() {
   const profile = tempDir();
-  const proc = spawn(CHROME, ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "about:blank"], { stdio: "ignore" });
+  // CI runners (Ubuntu 24.04) restrict unprivileged user namespaces, which Chrome's sandbox
+  // needs; the page under test is our own, so the sandbox is dropped there.
+  const sandbox = process.env.CI ? ["--no-sandbox"] : [];
+  const proc = spawn(CHROME, ["--headless=new", ...sandbox, "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "--no-default-browser-check", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+  let stderr = "";
+  proc.stderr.on("data", (d) => (stderr = (stderr + d).slice(-4000)));
   const portFile = join(profile, "DevToolsActivePort");
-  for (let i = 0; i < 200 && !existsSync(portFile); i++) await sleep(50);
+  for (let i = 0; i < 400 && !existsSync(portFile) && proc.exitCode === null; i++) await sleep(50);
+  if (!existsSync(portFile)) {
+    proc.kill("SIGKILL");
+    throw new Error(`Chrome did not start (exit ${proc.exitCode}): ${stderr}`);
+  }
   const port = readFileSync(portFile, "utf8").split("\n")[0];
   const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
   const ws = new WebSocket(pages.find((p) => p.type === "page").webSocketDebuggerUrl);
@@ -68,7 +77,13 @@ async function chrome() {
 test("browser: OPFS storage in a dedicated worker", { skip: !existsSync(CHROME) && "Chrome is not installed" }, async (t) => {
   const server = await serve();
   const url = `http://127.0.0.1:${server.address().port}/packages/web/test/browser/index.html`;
-  const b = await chrome();
+  let b;
+  try {
+    b = await chrome();
+  } catch (e) {
+    server.close();
+    throw e;
+  }
   try {
     await b.open(url);
     const path = `/vertep/app-${Date.now()}.db`;

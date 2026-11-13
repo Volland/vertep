@@ -1,5 +1,6 @@
 // The core in WebAssembly against the same core natively: identical traces.
 import assert from "node:assert/strict";
+import { crateVersion } from "../../../scripts/check-version.mjs";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -58,7 +59,7 @@ test("native and WebAssembly steps agree", async () => {
 // @tg: verifies:: [[openspec:wasm-bindings#Core Builds For WebAssembly Unchanged#Core compiles for wasm32 without changes]] {level: integration}
 test("the core build for wasm32 loads and runs", async () => {
   const core = await loadBuild("core");
-  assert.equal(core.version(), "0.1.0");
+  assert.equal(core.version(), crateVersion(), "the build reports the workspace version");
   assert.equal(core.hasJournal(), false);
   assert.equal(typeof core.traceCases, "undefined", "test-only exports stay out of the published build");
   const system = await core.ActorSystem.create(JSON.stringify({ storage: "memory" }), null);

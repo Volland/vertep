@@ -244,7 +244,9 @@ fn gen_text(r: &mut Rng, d: &Declarations) -> String {
         text.push(if r.chance(10) { ' ' } else { '\n' });
     }
     if r.chance(20) {
-        let edits = ['|', ';', '{', '}', '"', '\\', '#', ':', ',', 'x', '\u{b}', '\u{a0}', '\n'];
+        let edits = [
+            '|', ';', '{', '}', '"', '\\', '#', ':', ',', 'x', '\u{b}', '\u{a0}', '\n',
+        ];
         let chars: Vec<char> = text.chars().collect();
         if !chars.is_empty() {
             let at = r.below(chars.len());

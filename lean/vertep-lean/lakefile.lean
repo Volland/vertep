@@ -50,6 +50,11 @@ lean_exe «vertep-journal» where
 lean_exe «vertep-lease» where
   root := `VertepLeaseMain
 
+/-- The custody model as a differential oracle for custody fault histories (m7-durable-objects
+10.3): `lake exe vertep-custody --history HISTORY.jsonl`. -/
+lean_exe «vertep-custody» where
+  root := `VertepCustodyMain
+
 /-- Decision validation as a differential oracle for agent runs (m3-agents 8.5):
 `lake exe vertep-decide --obs DECISIONS.jsonl`. -/
 lean_exe «vertep-decide» where

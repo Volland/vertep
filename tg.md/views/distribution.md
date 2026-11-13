@@ -1,13 +1,13 @@
 ---
 type: View
 status: draft
-openspec: [cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes]
+openspec: [cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, tsp-mediator]
 ---
 # Distribution
 
 How Vertep actors run on many machines: trusted clusters with shards, leases and fencing over QUIC, and federation across trust boundaries with DIDs and relay mailboxes.
 
-This view explains milestones M4 and M5, the crates `vertep-cluster` and `vertep-federation`. Requirement names in backticks are from the OpenSpec changes `m4-cluster` and `m5-federation`.
+This view explains milestones M4 and M5, the crates `vertep-cluster` and `vertep-federation`, and the TSP mediator of M7 (`vertep-tsp-mediator`). Requirement names in backticks are from the OpenSpec changes `m4-cluster`, `m5-federation` and `m7-durable-objects`.
 
 ## Cluster and federation
 
@@ -516,7 +516,97 @@ sequenceDiagram
 | `origin` | the verified sender DID, never taken from the body |
 | `origintype` | the I/O processor that delivered it |
 
+`TSP Mediator Mailbox` (M7) closes the TSP side of store-and-forward: TSP 1.0 defines no mailbox, so a TSP actor that is offline registers with a `vt-mediator` (see [[views/distribution#Distribution#TSP mediator]]) and its relay mailbox picks up through `TspMailboxClient`, acknowledging after the append like the DIDComm mailbox. `Live Delivery Over WebSocket` lets both mailboxes hold a live session on which the relay pushes messages as they arrive; acknowledgement still follows the append, so a dropped session loses nothing.
+
 `Transport Selection From The DID Document` tries services in a configured preference order (TSP first by default, then DIDComm) with fallback. `Undeliverable Message Reporting` raises `error.communication` with the send id once the retry policy is exhausted, without blocking the chart. `Mailbox Ordering` promises order only within one mailbox; across relays or senders, charts use `vt:request` correlation ids.
+
+## TSP mediator
+
+`vt-mediator` is a TSP 1.0 routed-mode intermediary with durable mailboxes. It keeps messages for registered VIDs until they pick them up, and it never opens an event.
+
+- describes:: [[components#vertep-tsp-mediator]]
+- describes:: [[capabilities#TSP mediator]]
+- describes:: [[capabilities#Relay mailboxes]]
+- describes:: [[decisions#Vertep ships its own TSP mediator]]
+- describes:: [[decisions#TSP pickup is a versioned protocol inside TSP]]
+- describes:: [[decisions#The mediator stores opaque sealed bytes in its own journal]]
+- describes:: [[decisions#Live delivery is a WebSocket binding of pickup]]
+- describes:: [[constraints#TSP provides no delivery guarantee]]
+- describes:: [[constraints#TSP intermediaries do not persist inner VIDs]]
+- describes:: [[constraints#TSP routing needs neighbour relationships]]
+
+TSP routes through intermediaries but "provides no delivery guarantee" and defines no pickup. The mediator adds both without changing TSP on the wire: everything it speaks is ordinary TSP.
+
+Messages that reach it are of three kinds:
+
+- **Relationship messages.** These are relationship forming (`TSP_RFI`, `TSP_RFA` and `TSP_RFD`). Relationships are kept by the short form of a VID, so a reference wallet introducing itself with a long-form `did:peer:4` gets its reply at the short form.
+- **Routed messages.** The mediator opens its own layer with `forward_routed`. A middle hop goes on to the next intermediary. At the last hop, the nested message, sealed to the recipient, is handled as follows:
+  - it is pushed on a live session, if the recipient has one;
+  - otherwise it is posted to the recipient's own endpoint, if that endpoint answers;
+  - otherwise it is stored for a registered recipient;
+  - otherwise it is refused.
+- **Mailbox requests.** These are application messages of the versioned protocol in `vertep_federation::tsp_mailbox`: `register`, `status`, `deliver`, `received`, `unregister` and `live`. They travel over the relationship of the VID and the mediator, and the reply comes back in the response.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Sender (VID S)
+    participant M as vt-mediator (last hop)
+    participant J as mailbox journal (tiramemsu)
+    participant R as Recipient mailbox (VID R)
+    R->>M: TSP_RFI, then register (sealed to M)
+    M->>J: append register
+    M-->>R: registered: route through M
+    S->>M: routed message, inner sealed to R
+    M->>M: open own layer, re-seal nested for R
+    M->>J: append stored (R, sealed bytes, id, arrival, size)
+    M-->>S: accepted (HTTP 200) only after the append
+    R->>M: deliver (limit)
+    M-->>R: batch (still held)
+    R->>R: open, verify S, journal append
+    R->>M: received (ids)
+    M->>J: append received; copy deleted
+```
+
+**Storage.** Each mailbox is an event-sourced journal in any `JournalStore`, a directory of tiramemsu shard files by default, with one writer per file. Every change is appended before it takes effect:
+
+- registration;
+- a stored message;
+- `received`;
+- expiry;
+- revocation.
+
+Replay rebuilds the mailboxes on start. An entry holds only the recipient VID, the opaque sealed bytes, a message id, the arrival time and the size. The id is a digest of the post as the previous hop sent it, so a retried post is stored once.
+
+Acknowledged ciphertext stays in the journal history until `vt-mediator compact` rewrites the store with live messages only. A replicated deployment puts an M4 `ReplicatedJournal` under the store: a message is accepted only after a standby stored it, and a standby that takes the shard serves every accepted message.
+
+**Limits.** These hold per VID:
+
+- **Quotas.** There is a maximum message count and a maximum byte count. A full mailbox refuses new messages and never drops stored ones.
+- **Retention.** Expired messages are deleted, and the next `status` or `deliver` reports how many expired and when the oldest did, once.
+- **Ownership.** The TSP sender of a request is authenticated, and a request that names another recipient gets `problem` `not-owner`.
+- **Operator controls.** The operator can revoke a mailbox or allow registration only to listed VIDs.
+
+**Live sessions.** A live session is a WebSocket at `<tsp path>/live`. Its first frame is a sealed `live` from a registered VID. The mediator then pushes `batch` frames, everything waiting and then each new message, and accepts `received` frames. `LiveEndpoint` and `LiveNetwork` in `vertep_federation::live` are the seam. `LocalLiveNetwork` serves tests, and `WsLiveNetwork` with the axum server serves deployments.
+
+```mermaid
+flowchart LR
+    subgraph Org2["Organisation of R"]
+        N["runtime node<br/>relay inbox"] --> C["TspMailboxClient<br/>PickupSource"]
+    end
+    subgraph Med["vt-mediator"]
+        H["POST /tsp"] --> MC["Mediator<br/>route, store, answer"]
+        W["GET /tsp/live (WebSocket)"] --> MC
+        MC --> ST[("mailbox journals<br/>tiramemsu shards")]
+        MC --> X["/health, /metrics, /did.json"]
+    end
+    C -- "register, deliver, received (TSP over HTTP)" --> H
+    C -- "live session: batch pushed, received sent" --> W
+    S["sender anywhere"] -- "routed TSP" --> H
+    MC -- "middle hop" --> NX["next intermediary"]
+```
+
+**Running it.** `vt-mediator serve` reads a TOML file and `VT_MEDIATOR_*` variables. On first start it creates its keys and identity (`did:peer`, or `did:web` served at `/.well-known/did.json`). It serves health and Prometheus metrics labelled by VID only, and sweeps expiries every minute. `crates/vertep-tsp-mediator/docker` has an image and a compose file that run two mediators in a route.
 
 ## Federation inside the runtime
 
@@ -569,6 +659,11 @@ The distributed failure cases and what the design guarantees in each; safety nev
 | Stale routing table | redirect plus forward, hop limit | `Redirect On Stale Routing` |
 | Worker node dies mid-request | error event or request timeout to the caller; no silent retry unless idempotent | `Worker Failure Reporting` |
 | Mediator crashes after pickup | no ack before append, so redelivery; dedup by id | `DIDComm Message Pickup` |
+| TSP recipient offline | `vt-mediator` stores before accepting; pickup or live push later | `TSP Mediator Mailbox`, `Durable Store-And-Forward` |
+| Mediator store fails | message refused with a retryable status; the previous hop keeps it | `Durable Store-And-Forward` |
+| Mediator node lost | a standby holding the replicated mailbox journal takes over | `Replicated Mediator Deployment` |
+| Live session drops before acknowledgement | message stays at the mediator, pushed again on the next session | `Live Delivery Session` |
+| Mailbox full or expired | refused (sender retries) or expired and reported on the next pickup | `Retention And Quotas` |
 | Key rotated while messages are in flight | grace period for retired keys; undecryptable messages recorded | `Key Rotation Without Address Change` |
 | Recipient unreachable for good | `error.communication` after the retry policy, chart not blocked | `Undeliverable Message Reporting` |
 

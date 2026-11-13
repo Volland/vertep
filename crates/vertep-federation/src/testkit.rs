@@ -25,6 +25,7 @@ pub struct TestMediator {
     refuse: AtomicBool,
     /// Mediated DIDs and the recipient DIDs each registered (`keylist-update`).
     keylists: std::sync::Mutex<std::collections::BTreeMap<String, Vec<String>>>,
+    me: std::sync::Weak<TestMediator>,
 }
 
 #[cfg(feature = "didcomm")]
@@ -60,14 +61,62 @@ impl TestMediator {
                 }],
             }),
         )?;
-        Ok(Arc::new(TestMediator {
+        Ok(Arc::new_cyclic(|me| TestMediator {
             store: DropBox::new(identity.did.clone()),
             agent: crate::didcomm::DidCommAgent::new(identity, km),
             net,
             resolver,
             refuse: AtomicBool::new(false),
             keylists: std::sync::Mutex::new(std::collections::BTreeMap::new()),
+            me: me.clone(),
         }))
+    }
+
+    /// The DIDs whose messages `from` picks up: itself and the recipients it registered.
+    fn recipients_of(&self, from: &str) -> Vec<String> {
+        let k = self
+            .keylists
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut v = k.get(from).cloned().unwrap_or_default();
+        v.push(from.to_owned());
+        v
+    }
+
+    /// Pushes what is held for `recipient` to `from` on a live session, as a `delivery`.
+    fn push_delivery(&self, from: &str, recipient: &str, to: &dyn crate::live::FrameSink) {
+        use serde_json::{Value, json};
+        let held = self.store.held_for(recipient);
+        if held.is_empty() {
+            return;
+        }
+        let attachments: Vec<Value> = held
+            .iter()
+            .map(|m| {
+                let json: Value = serde_json::from_slice(&m.bytes).unwrap_or(Value::Null);
+                json!({"id": m.id, "data": {"json": json}})
+            })
+            .collect();
+        let mut msg = crate::pickup::protocol_message(
+            &format!("live-{}", crate::live::frame_id()),
+            crate::pickup::DELIVERY,
+            self.did(),
+            from,
+            json!({ "recipient_did": recipient }),
+        );
+        if let Some(o) = msg.as_object_mut() {
+            o.remove("return_route");
+            o.insert("attachments".into(), Value::Array(attachments));
+        }
+        let Ok(did) = crate::Did::parse(from) else {
+            return;
+        };
+        let Ok(doc) = self.resolver.resolve(&did) else {
+            return;
+        };
+        if let Ok(jwe) = self.agent.seal_message(&msg, &doc.document) {
+            let _ = to.send(jwe.as_bytes());
+        }
     }
 
     /// Answers one Mediator Coordination 2.0 or Message Pickup 3.0 request from the
@@ -322,6 +371,73 @@ impl RelayEndpoint for TestMediator {
             }
             Err(e) => Err(NetError::Refused(e.to_string())),
         }
+    }
+}
+
+/// One live session at the test mediator: after `live-delivery-change` from an authenticated
+/// DID, what is held for its recipients is pushed at once and whenever more arrives.
+#[cfg(feature = "didcomm")]
+struct MediatorSession {
+    mediator: std::sync::Weak<TestMediator>,
+    to_client: Arc<dyn crate::live::FrameSink>,
+}
+
+#[cfg(feature = "didcomm")]
+impl crate::live::FrameSink for MediatorSession {
+    fn send(&self, frame: &[u8]) -> Result<(), NetError> {
+        let Some(m) = self.mediator.upgrade() else {
+            return Err(NetError::Unreachable("mediator gone".into()));
+        };
+        let jwe = std::str::from_utf8(frame).map_err(|e| NetError::Refused(e.to_string()))?;
+        let plain = m
+            .agent
+            .decrypt(jwe, m.resolver.as_ref(), crate::Timestamp::now())
+            .map_err(|e| NetError::Refused(e.to_string()))?;
+        let Some((from, _)) = &plain.sender else {
+            return Err(NetError::Refused("anonymous live request".into()));
+        };
+        let from = from.as_str().to_owned();
+        let is_change = plain
+            .message
+            .get("type")
+            .and_then(serde_json::Value::as_str)
+            == Some(crate::pickup::LIVE_DELIVERY_CHANGE);
+        let on = plain
+            .message
+            .pointer("/body/live_delivery")
+            .and_then(serde_json::Value::as_bool)
+            == Some(true);
+        if !(is_change && on) {
+            return Ok(());
+        }
+        let recipients = m.recipients_of(&from);
+        for r in &recipients {
+            m.push_delivery(&from, r, self.to_client.as_ref());
+        }
+        let weak = self.mediator.clone();
+        let to = self.to_client.clone();
+        m.store.live(
+            &recipients,
+            Arc::new(move |recipient: &str| {
+                if let Some(m) = weak.upgrade() {
+                    m.push_delivery(&from, recipient, to.as_ref());
+                }
+            }),
+        );
+        Ok(())
+    }
+}
+
+#[cfg(feature = "didcomm")]
+impl crate::live::LiveEndpoint for TestMediator {
+    fn accept(
+        &self,
+        to_client: Arc<dyn crate::live::FrameSink>,
+    ) -> Arc<dyn crate::live::FrameSink> {
+        Arc::new(MediatorSession {
+            mediator: self.me.clone(),
+            to_client,
+        })
     }
 }
 

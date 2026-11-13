@@ -1,0 +1,53 @@
+@prefix vt:   <https://w3id.org/vertep/vt#> .
+@prefix cust: <https://w3id.org/vertep/custody/1.0#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# The durable-object and custody module of the vt ontology (M7, m7-durable-objects).
+
+vt:DurableObject a owl:Class ;
+    rdfs:label "durable object" ;
+    rdfs:comment "A virtual actor with a DID address and a hash-chained, signed journal kept by its custodians." .
+
+vt:CustodyEpoch a owl:Class ;
+    rdfs:label "custody epoch" ;
+    rdfs:comment "A numbered term in which one host is a durable object's only writer." .
+
+vt:Equivocation a owl:Class ;
+    rdfs:label "equivocation" ;
+    rdfs:comment "Two validly signed entries for one object, epoch and position with different hashes." .
+
+vt:custodyEpoch a owl:DatatypeProperty ; rdfs:domain vt:JournalEntry ; rdfs:range xsd:integer ;
+    rdfs:comment "The custody epoch an entry was written in." .
+vt:writer a owl:ObjectProperty ; rdfs:domain vt:JournalEntry ;
+    rdfs:comment "The host that wrote and signed an entry." .
+vt:previousEntryHash a owl:DatatypeProperty ; rdfs:domain vt:JournalEntry ; rdfs:range xsd:string ;
+    rdfs:comment "The content hash (hex SHA-256) of the preceding entry." .
+vt:entryHash a owl:DatatypeProperty ; rdfs:domain vt:JournalEntry ; rdfs:range xsd:string ;
+    rdfs:comment "The entry's own content hash (hex SHA-256)." .
+vt:entrySignature a owl:DatatypeProperty ; rdfs:domain vt:JournalEntry ; rdfs:range xsd:string ;
+    rdfs:comment "The writer's signature over the content hash (base64url)." .
+vt:custodyRecord a owl:DatatypeProperty ; rdfs:range xsd:string ;
+    rdfs:comment "A custody log record (JSON) of a custodian's replica." .
+
+vt:epochOf a owl:ObjectProperty ; rdfs:range vt:DurableObject .
+vt:epochNumber a owl:DatatypeProperty ; rdfs:range xsd:integer .
+vt:epochHost a owl:ObjectProperty ; rdfs:domain vt:CustodyEpoch .
+vt:custodian a owl:ObjectProperty ; rdfs:domain vt:CustodyEpoch .
+vt:promisedBy a owl:ObjectProperty ; rdfs:domain vt:CustodyEpoch .
+vt:firstPosition a owl:DatatypeProperty ; rdfs:domain vt:CustodyEpoch ; rdfs:range xsd:integer .
+vt:lastPosition a owl:DatatypeProperty ; rdfs:domain vt:CustodyEpoch ; rdfs:range xsd:integer .
+vt:conflictingEntry a owl:DatatypeProperty ; rdfs:domain vt:Equivocation ; rdfs:range xsd:string .
+
+# Custody protocol message types (carried as JSON over TSP).
+cust:prepare  a rdfs:Class ; rdfs:comment "Asks a custodian to promise an epoch." .
+cust:promise  a rdfs:Class ; rdfs:comment "A custodian's signed promise, with its head, accepted epoch and configuration." .
+cust:refuse   a rdfs:Class ; rdfs:comment "A refusal naming the highest epoch promised." .
+cust:append   a rdfs:Class ; rdfs:comment "A writer's batch of entries up to its head, with configuration and key wraps." .
+cust:ack      a rdfs:Class ; rdfs:comment "A custodian stored a batch; its head." .
+cust:behind   a rdfs:Class ; rdfs:comment "The custodian lacks entries before the batch; resend from its head." .
+cust:diverged a rdfs:Class ; rdfs:comment "A different entry of the same epoch is held; possibly equivocation." .
+cust:read     a rdfs:Class ; rdfs:comment "Asks for entries from a position." .
+cust:entries  a rdfs:Class ; rdfs:comment "Entries, key wraps and configurations." .
+cust:failed   a rdfs:Class ; rdfs:comment "A request that was not answered." .

@@ -35,9 +35,21 @@ pub fn cel(initial: &str, head: &str, body: &str) -> Chart {
 }
 
 /// A host builder on a virtual clock at [`T0`].
+///
+/// With `VERTEP_AGENT_JOURNAL=store` the host journals into a [`vertep_agent::StoreAgentJournal`]
+/// over an in-memory journal store instead of the default `MemoryJournal`, so every suite runs
+/// against both journals.
 pub fn builder() -> (AgentHostBuilder, VirtualClock) {
     let clock = VirtualClock::new(T0);
-    (AgentHost::builder(Arc::new(clock.clone())), clock)
+    let b = AgentHost::builder(Arc::new(clock.clone()));
+    let b = if std::env::var("VERTEP_AGENT_JOURNAL").as_deref() == Ok("store") {
+        b.journal(Arc::new(vertep_agent::StoreAgentJournal::new(Arc::new(
+            vertep_store::MemoryStore::new(),
+        ))))
+    } else {
+        b
+    };
+    (b, clock)
 }
 
 /// Registers `chart` and spawns [`AGENT`] under it.

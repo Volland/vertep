@@ -1160,6 +1160,14 @@ Rust, XML (SCXML) and YAML blocks on the site are highlighted by `site/tools/hig
 
 Pygments does the lexing and is needed only when the tool runs, never to view the site; the tool is idempotent and leaves the text of every block unchanged. `site/tools/sync-examples.py` calls the same function, so regenerated example pages keep their colours. The theme is in the "code highlighting" section of `site/assets/css/vertep.css`: ink and the rubric orange only, separated by weight and slant too, and it follows the dark-mode tokens. Blocks of other languages and the recorded outputs stay plain.
 
+## Editor lint and spell-check are configured in the repository
+
+Markdown lint and spell-check rules live in `.markdownlint.json` and `cspell.json` at the repository root, so every editor shows the same marks and project words are not flagged one by one.
+
+- motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: secondary, since: "2026-11-12"}
+
+The lint config switches off inline-HTML, first-line-heading, line-length and bare-URL rules, because the README's centred header needs HTML and the `tg.md/` sections carry long lines and URLs. The word list holds project terms (Vertep, SCXML, SHACL, tiramemsu) and the British spellings come from the `en-GB` language. Tables in the README use the spaced `| --- |` separator that lint expects.
+
 ## Hosts instantiate CEL charts typed
 
 Every host creates a chart's datamodel through `DatamodelRegistry::create_for`, and `CelRegistry` instantiates a chart that declares types with its projected CEL type environment, refusing one with CEL type errors.
@@ -1197,3 +1205,140 @@ The Lean `step` has no expression typer, and the typers belong to the datamodels
 - motivated_by:: [[decisions#No-std core and tokio shell]] {weight: secondary, since: "2026-11-12", note: "core::error::Error keeps the core no_std"}
 
 `StartError`, `StepError`, `EvalError`, `Violation` and `Violations` (`From<Vec<Violation>>`) in the core, and `CelError`, `LoadError` and `LoadErrors` in the CEL datamodel. Messages are short and lowercase and name the offending state, transition or location. `StartError::source` returns the datamodel's `EvalError`. `CelValue` also derives `PartialEq`, which is structural equality (`Int(1) != Uint(1)`, NaN unequal to itself), not CEL `==` (`cel_eq`), and `ir::Data` derives `Default`. Existing signatures are unchanged, so the change is additive; it came out of writing the crate READMEs, whose examples had to format every error by hand.
+
+## Vertep uses third-party relays only
+
+M5 position: Vertep is a client of existing DIDComm mediators and TSP intermediaries and ships only in-process test relays for CI (M5 design, non-goals).
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-11"}
+
+Superseded for TSP by [[decisions#Vertep ships its own TSP mediator]]; it still holds for DIDComm, where `MediatorClient` talks to third-party mediators such as Identus.
+
+## Durable objects are DID virtual actors with verifiable journals
+
+A durable object is a virtual actor with a `did:webvh` address and a hash-chained, signed journal; its state stays the chart's datamodel, written only by journaled turns (M7 design D1).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#State changes travel in the append]] {weight: primary}
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: secondary}
+
+Rejected: a key-value storage API beside the chart, which would be a second state model outside replay, certificates and time travel. `did:key` and `did:peer` are refused for durable objects because neither can change custodians or endpoints without changing the address.
+
+## Journal entries are hash-chained and host-signed
+
+Each durable-object entry states, inside its graph, the previous entry's hash, object DID, position, custody epoch, writer DID, its content hash and the writer's signature over it (M7 design D2).
+
+- motivated_by:: [[decisions#Durable objects are DID virtual actors with verifiable journals]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#Keys stay behind a key manager]] {weight: primary}
+
+The hash is SHA-256 over the sorted N-Triples lines of the graph without the seal statements; an entry with blank nodes is relabelled with RDFC-1.0 first. Keeping the link in the graph means every journal store round-trips it untouched. Rejected for now: a Merkle transparency log (signed checkpoints can add Merkle proofs later), RDFC-1.0 on every entry (too slow per turn) and metadata in `AppendMeta`, which every store would have to learn.
+
+## Custody epochs are won by quorum promises
+
+A host becomes writer of epoch e after a majority of custodians promise e; it adopts the chain accepted in the highest epoch, then the longest, and an entry commits once a quorum accepts it in one epoch (M7 design D3).
+
+- motivated_by:: [[constraints#Clock skew beyond the safety margin breaks lease exclusivity]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#Fencing epochs on journal appends]] {weight: primary}
+- motivated_by:: [[decisions#A standby's fence rises only with entries it stores]] {weight: secondary}
+- motivated_by:: [[decisions#Unreplicated entries stay unreadable until the quorum catches up]] {weight: secondary}
+
+This is Paxos over the whole log, with the epoch as ballot and the custodian's chain as accepted value, so an entry from an older epoch is never declared committed by counting copies alone: it commits when a quorum re-accepts it in the new epoch. Runtime replay decodes every entry as a turn, which is why there is no Raft-style epoch-start entry; promises go to the lineage graph. Rejected: leases from etcd or Kubernetes (a shared authority is what crossing organisations removes), time-based leases (clock skew) and anchoring on a ledger (cost and latency, not needed for single-writer safety). Duelling candidates only delay progress; a randomised, growing back-off resolves them.
+
+## Replication rides TSP through a replica link
+
+The cluster's suffix-shipping replication is factored over a replica link; custody uses a TSP link between the writer's host VID and each custodian's VID, direct or through a mediator (M7 design D4).
+
+- motivated_by:: [[decisions#TSP before DIDComm across trust boundaries]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#TSP direct when reachable, routed otherwise]] {weight: secondary}
+- motivated_by:: [[decisions#Optional standby journal replication]] {weight: secondary, note: "the same shipping and fence rules"}
+
+Rejected: a separate custody protocol over HTTP or gRPC, which would duplicate the authentication and confidentiality TSP gives and bypass grants.
+
+## Keepers store ciphertext under a per-object content key
+
+Keeper replicas hold a clear header (DID, position, epoch, previous hash, signature) and an encrypted body; the object's content key is wrapped to every host and rotated when a host leaves (M7 design D5).
+
+- motivated_by:: [[decisions#Journal entries are hash-chained and host-signed]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#Keys stay behind a key manager]] {weight: secondary}
+
+The header is enough to order, store and verify. A removed host can still read entries written before its removal; that limit is accepted. Rejected: clear replicas at every custodian, which would make storage-only parties as trusted as hosts.
+
+## Equivocation is kept as evidence
+
+Two validly signed entries for one object, epoch and position with different hashes are recorded as evidence, the epoch is refused and the controller is told; the protocol detects a cheating host but does not tolerate it (M7 design D6).
+
+- motivated_by:: [[decisions#Journal entries are hash-chained and host-signed]] {weight: primary, since: "2026-11-12"}
+
+A different entry at the same position from a higher epoch is the normal replacement of an uncommitted tail, not equivocation. Byzantine fault tolerance among hosts is out of scope.
+
+## Custodian set changes use joint consensus
+
+A signed change first replicates the new set as pending, needing quorums of both sets for every commit and election; it takes effect once both quorums hold the journal and is published once the new set accepts the switch (M7 design D7).
+
+- motivated_by:: [[decisions#Custody epochs are won by quorum promises]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[constraints#did:webvh updates need the web host]] {weight: secondary}
+- supersedes:: [[decisions#Custodian set changes are replicated, then published]] {since: "2026-11-12", reason: "the Lean custody model found two counterexamples: a shrink and an interrupted change could lose committed entries"}
+
+Custody state is a configuration record, the effective set plus an optional pending next set, carried by every batch and promise. A candidate that sees a newer record prepares again with it. Custodians never take a record back within one epoch. The rejected rule switched once a quorum of the old set and every newcomer accepted: stale members of a shrunk set, or the new set alone after an interrupted change, could then elect a writer without a committed entry. Both counterexamples are regression tests.
+
+## Custodian set changes are replicated, then published
+
+Superseded first rule: a controller-signed reconfiguration took effect once a quorum of the old set accepted it and the new custodians held the chain.
+
+- motivated_by:: [[decisions#Custody epochs are won by quorum promises]] {weight: primary, since: "2026-11-12"}
+
+It is unsafe, see [[decisions#Custodian set changes use joint consensus]].
+
+## The agent journal is stored in a journal store
+
+`StoreAgentJournal` keeps each agent input as an entry of the agent's journal in a `JournalStore`, appended at head plus one; `MemoryJournal` stays the default for tests (M7 design D8).
+
+- motivated_by:: [[decisions#The agent host journals agent inputs]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#Two storage traits with tiramemsu as default]] {weight: secondary}
+
+An agent declared as a durable object gets the custody journal, which is a `JournalStore` too.
+
+## Vertep ships its own TSP mediator
+
+`vertep-tsp-mediator` and its `vt-mediator` binary route TSP messages and keep store-and-forward mailboxes, because TSP 1.0 defines none and no TSP mediator exists to depend on (M7 design D9).
+
+- supersedes:: [[decisions#Vertep uses third-party relays only]] {since: "2026-11-12", reason: "TSP 1.0 has no store-and-forward; durable objects need mailboxes while every host is offline"}
+- motivated_by:: [[constraints#TSP provides no delivery guarantee]] {weight: primary, since: "2026-11-12"}
+
+DIDComm stays client-only against third-party mediators through Pickup 3.0.
+
+## TSP pickup is a versioned protocol inside TSP
+
+Registration, status, delivery, acknowledgement and live sessions are TSP application messages typed under a versioned Vertep IRI, sent over the relationship between a VID and its mediator (M7 design D10).
+
+- motivated_by:: [[constraints#TSP provides no delivery guarantee]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[constraints#TSP routing needs neighbour relationships]] {weight: primary, note: "registration is the last-hop neighbour relationship"}
+- motivated_by:: [[decisions#Remote mediators through Pickup 3.0]] {weight: secondary, note: "same semantics as DIDComm Pickup 3.0"}
+
+Rejected: HTTP polling outside TSP (unauthenticated and it leaks who picks up) and holding messages in TSP relationship control messages, which the spec does not allow.
+
+## The mediator stores opaque sealed bytes in its own journal
+
+The mediator stores the re-sealed last-hop message per recipient VID in a store-backed drop box, accepts from the previous hop only after the append and deletes on acknowledgement (M7 design D11).
+
+- motivated_by:: [[constraints#TSP intermediaries do not persist inner VIDs]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: primary}
+- motivated_by:: [[decisions#Optional standby journal replication]] {weight: secondary, note: "replicated deployment"}
+
+Its message id is a SHA-256 digest of the post as the previous hop sent it, so a retried post is stored once even though the re-sealed bytes differ. Receivers deduplicate by the envelope's own message id inside the ciphertext. Acknowledged ciphertext stays in the journal history until `vt-mediator compact` rewrites the store.
+
+## Live delivery is a WebSocket binding of pickup
+
+A live request upgrades to a WebSocket on which the mediator pushes batches and the client acknowledges after its journal append; DIDComm mailboxes get the same binding for Pickup 3.0 live mode (M7 design D12).
+
+- motivated_by:: [[decisions#WebSocket is a transport and an Event I/O Processor]] {weight: secondary, since: "2026-11-12"}
+- motivated_by:: [[decisions#DIDComm mailboxes acknowledge after the append]] {weight: primary}
+
+## Hosts share the object VID and only the writer acknowledges
+
+Every host of a durable object holds the object's TSP keys in its key manager, so any host can open its messages; only the current writer journals and acknowledges them (M7 design D13).
+
+- motivated_by:: [[decisions#Custody epochs are won by quorum promises]] {weight: primary, since: "2026-11-12"}
+- motivated_by:: [[decisions#Keys stay behind a key manager]] {weight: secondary}
+
+Rejected: one VID per host behind a routing indirection, which would make senders follow custody changes. Keys rotate through the `did:webvh` log when a host leaves.

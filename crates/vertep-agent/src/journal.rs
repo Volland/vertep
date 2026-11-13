@@ -9,8 +9,10 @@
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
+use oxrdf::{Literal, NamedNode, TermRef, Triple};
 use serde::{Deserialize, Serialize};
 use vertep_core::datamodel::{Event, Value};
+use vertep_store::{AppendError, AppendMeta, Entry, JournalRecord, JournalStore, Position};
 
 use crate::decider::Annotations;
 use crate::llm::{Cost, ErrorClass, ToolCallRequest, Usage};
@@ -181,8 +183,18 @@ pub trait AgentJournal: Send + Sync {
     ///
     /// [`JournalError::Conflict`] when another entry is at that position.
     fn append(&self, actor: &str, entry: JournalEntry) -> Result<(), JournalError>;
-    /// The entries of `actor`, in order.
+    /// The entries of `actor`, in order; empty when the journal cannot be read (use
+    /// [`AgentJournal::try_read`] to see the failure).
     fn read(&self, actor: &str) -> Vec<JournalEntry>;
+    /// The entries of `actor`, in order, or why they could not be read. The host replays
+    /// through this method, so a failing store never looks like an empty journal.
+    ///
+    /// # Errors
+    ///
+    /// [`JournalError::Backend`] when the backend fails or holds an unreadable entry.
+    fn try_read(&self, actor: &str) -> Result<Vec<JournalEntry>, JournalError> {
+        Ok(self.read(actor))
+    }
     /// Every actor with a journal.
     fn actors(&self) -> Vec<String>;
 }
@@ -234,6 +246,116 @@ impl AgentJournal for MemoryJournal {
         self.inner
             .lock()
             .map(|g| g.keys().cloned().collect())
+            .unwrap_or_default()
+    }
+}
+
+/// The predicate of the JSON text of an agent input in a stored journal entry.
+pub const AGENT_INPUT: &str = "https://w3id.org/vertep/vt#agentInput";
+
+/// An agent journal in a [`JournalStore`]: each [`JournalEntry`] is one store entry of the
+/// agent's journal (its address must be an IRI), named `<actor>/agent-input/<position>` and
+/// holding the entry's JSON text as `vt:agentInput`. Appends are compare-and-set at the head,
+/// so agents survive restarts on a durable store (tiramemsu) and can be forked from it, and a
+/// durable object's custody journal can carry an agent as well.
+#[derive(Clone)]
+pub struct StoreAgentJournal {
+    store: std::sync::Arc<dyn JournalStore>,
+}
+
+impl core::fmt::Debug for StoreAgentJournal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("StoreAgentJournal").finish_non_exhaustive()
+    }
+}
+
+impl StoreAgentJournal {
+    /// An agent journal in `store`.
+    pub fn new(store: std::sync::Arc<dyn JournalStore>) -> Self {
+        StoreAgentJournal { store }
+    }
+
+    fn address(actor: &str) -> Result<NamedNode, JournalError> {
+        NamedNode::new(actor)
+            .map_err(|e| JournalError::Backend(format!("agent address {actor} is not an IRI: {e}")))
+    }
+
+    fn decode(record: &JournalRecord) -> Result<JournalEntry, JournalError> {
+        let p = NamedNode::new_unchecked(AGENT_INPUT);
+        let text = record
+            .entry
+            .triples()
+            .objects_for_subject_predicate(record.entry.name(), &p)
+            .find_map(|o| match o {
+                TermRef::Literal(l) => Some(l.value().to_owned()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                JournalError::Backend(format!(
+                    "entry {} at {} has no vt:agentInput",
+                    record.entry.name(),
+                    record.position.get()
+                ))
+            })?;
+        let entry = JournalEntry::from_json(&text)
+            .map_err(|e| JournalError::Backend(format!("entry {}: {e}", record.entry.name())))?;
+        if entry.position != record.position.get() {
+            return Err(JournalError::Backend(format!(
+                "entry {} states position {}, stored at {}",
+                record.entry.name(),
+                entry.position,
+                record.position.get()
+            )));
+        }
+        Ok(entry)
+    }
+}
+
+// @tg: implements:: [[openspec:durable-objects#Durable Agent Journal]]
+impl AgentJournal for StoreAgentJournal {
+    fn append(&self, actor: &str, entry: JournalEntry) -> Result<(), JournalError> {
+        let address = Self::address(actor)?;
+        let name = NamedNode::new(format!("{actor}/agent-input/{}", entry.position))
+            .map_err(|e| JournalError::Backend(e.to_string()))?;
+        let stored = Entry::new(
+            name.clone(),
+            [Triple::new(
+                name,
+                NamedNode::new_unchecked(AGENT_INPUT),
+                Literal::new_simple_literal(entry.to_json()),
+            )],
+        );
+        let expected = Position::new(entry.position.saturating_sub(1));
+        match self
+            .store
+            .append(&address, expected, &[stored], &AppendMeta::none())
+        {
+            Ok(_) => Ok(()),
+            Err(AppendError::Conflict { actual, .. }) => {
+                Err(JournalError::Conflict { head: actual.get() })
+            }
+            Err(e) => Err(JournalError::Backend(e.to_string())),
+        }
+    }
+
+    fn read(&self, actor: &str) -> Vec<JournalEntry> {
+        self.try_read(actor).unwrap_or_default()
+    }
+
+    fn try_read(&self, actor: &str) -> Result<Vec<JournalEntry>, JournalError> {
+        let address = Self::address(actor)?;
+        self.store
+            .read(&address, Position::ZERO)
+            .map_err(|e| JournalError::Backend(e.to_string()))?
+            .iter()
+            .map(Self::decode)
+            .collect()
+    }
+
+    fn actors(&self) -> Vec<String> {
+        self.store
+            .actors()
+            .map(|a| a.into_iter().map(|n| n.into_string()).collect())
             .unwrap_or_default()
     }
 }

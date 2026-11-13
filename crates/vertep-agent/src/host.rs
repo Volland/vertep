@@ -323,7 +323,12 @@ impl AgentHost {
                 }
             }
         }
-        if !self.journal.read(actor).is_empty() {
+        if !self
+            .journal
+            .try_read(actor)
+            .map_err(|e| InstantiateError::Start(e.to_string()))?
+            .is_empty()
+        {
             return Err(InstantiateError::Exists(actor.to_owned()));
         }
         let ts = self.now_ms();
@@ -415,7 +420,7 @@ impl AgentHost {
         if self.actors.contains_key(actor) {
             return Ok(());
         }
-        let entries = self.journal.read(actor);
+        let entries = self.journal.try_read(actor).map_err(HostError::Journal)?;
         let (m, effects) = self.replay(actor, &entries, None)?;
         self.stats.activations += 1;
         self.stats.replayed += entries.len() as u64;
@@ -523,7 +528,7 @@ impl AgentHost {
     ///
     /// [`HostError`].
     pub fn state_at(&self, actor: &str, position: u64) -> Result<AgentState, HostError> {
-        let entries = self.journal.read(actor);
+        let entries = self.journal.try_read(actor).map_err(HostError::Journal)?;
         let (m, _) = self.replay(actor, &entries, Some(position))?;
         Ok(snapshot(&m, position.min(entries.len() as u64)))
     }
@@ -583,10 +588,15 @@ impl AgentHost {
         new_actor: &str,
         inject: Vec<AgentInput>,
     ) -> Result<(), HostError> {
-        if !self.journal.read(new_actor).is_empty() {
+        if !self
+            .journal
+            .try_read(new_actor)
+            .map_err(HostError::Journal)?
+            .is_empty()
+        {
             return Err(HostError::Unknown(format!("{new_actor} exists")));
         }
-        for e in self.journal.read(actor) {
+        for e in self.journal.try_read(actor).map_err(HostError::Journal)? {
             if e.position > position {
                 break;
             }

@@ -1,0 +1,33 @@
+# Two vt-mediators in a route: a sender reaches m1, m1 forwards to m2, and m2 holds the
+# message for its registered recipient until it picks it up.
+#
+#   docker compose -f crates/vertep-tsp-mediator/docker/compose.yaml up -d --build
+#
+# Inside the network the mediators reach each other at their public URLs (m1, m2); from the
+# host they are on ports 18701 and 18702. Each keeps its keys and mailboxes in a volume.
+name: vt-mediators
+
+x-mediator: &mediator
+  build:
+    context: ../../..
+    dockerfile: crates/vertep-tsp-mediator/docker/Dockerfile
+  image: vertep/vt-mediator:dev
+  restart: unless-stopped
+
+services:
+  m1:
+    <<: *mediator
+    environment:
+      VT_MEDIATOR_PUBLIC_URL: http://m1:8700/tsp
+    ports: ["18701:8700"]
+    volumes: ["m1-data:/var/lib/vt-mediator"]
+  m2:
+    <<: *mediator
+    environment:
+      VT_MEDIATOR_PUBLIC_URL: http://m2:8700/tsp
+    ports: ["18702:8700"]
+    volumes: ["m2-data:/var/lib/vt-mediator"]
+
+volumes:
+  m1-data:
+  m2-data:

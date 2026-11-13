@@ -1,0 +1,57 @@
+[package]
+name = "vertep-objects"
+description = "Durable objects for Vertep: DID-addressed actors with verifiable journals and decentralised custody over TSP"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+homepage = "https://volland.github.io/vertep/"
+documentation = "https://docs.rs/vertep-objects"
+keywords = ["actors", "event-sourcing", "did", "tsp", "replication"]
+categories = ["network-programming", "cryptography"]
+
+[features]
+default = []
+# The TSP replica link (custody messages between host and custodian VIDs).
+tsp = ["vertep-federation/tsp"]
+# Test helpers: static host keys, signers and in-process custodians.
+testkit = []
+# Tests require the Lean custody model (`vertep-custody`) instead of skipping its replay.
+differential = []
+
+[dependencies]
+vertep-store = { workspace = true }
+vertep-federation = { workspace = true }
+vertep-core = { workspace = true, features = ["std"] }
+vertep-cluster = { workspace = true }
+vertep-runtime = { workspace = true }
+oxttl = { version = "0.2.5", features = ["rdf-12"] }
+oxrdf = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+base64 = "0.22"
+chacha20poly1305 = "0.10"
+getrandom = "0.3"
+
+[dev-dependencies]
+vertep-objects = { path = ".", features = ["testkit", "tsp"] }
+vertep-federation = { workspace = true, features = ["tsp", "testkit"] }
+url = "2"
+vertep-store = { workspace = true, features = ["testkit"] }
+vertep-tiramemsu = { workspace = true }
+tempfile = "3"
+vertep-dm-ecma = { workspace = true }
+vertep-agent = { workspace = true }
+vertep-scxml = { workspace = true }
+vertep-core = { workspace = true, features = ["std"] }
+
+[lints]
+workspace = true
+
+[[example]]
+name = "three_orgs"
+required-features = ["testkit", "tsp"]

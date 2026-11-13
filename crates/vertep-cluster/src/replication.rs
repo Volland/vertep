@@ -128,6 +128,64 @@ impl fmt::Display for ReplicaError {
 
 impl std::error::Error for ReplicaError {}
 
+/// A link to one replica of a journal, generic over the batch it carries: the cluster's
+/// standbys take [`ReplicationBatch`]es over the cluster transport, and a durable object's
+/// custodians take custody batches over TSP (`vertep-objects`). The suffix shipping both use is
+/// [`ship_suffix`].
+pub trait ReplicaLink<B>: Send + Sync {
+    /// The replica, for logs and acknowledgement bookkeeping.
+    fn replica(&self) -> String;
+    /// Ships `batch`; returns the replica's head for the batch's journal after storing it.
+    ///
+    /// # Errors
+    ///
+    /// [`ReplicaError`]; [`ReplicaError::Behind`] asks for a resend from the replica's head.
+    fn replicate(&self, batch: &B) -> Result<Position, ReplicaError>;
+}
+
+/// What shipping a journal suffix to one replica achieved.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ShipOutcome {
+    /// The replica stored the suffix; its head is now this position.
+    Stored(Position),
+    /// The replica has accepted a higher epoch than the batch's.
+    Fenced(u64),
+    /// The replica did not store the suffix (unreachable, diverged, store failure, or still
+    /// behind after one resend).
+    Failed(ReplicaError),
+}
+
+/// Ships to `link` the entries after `from` (the head it is believed to hold): reads them with
+/// `read` (entries from a position on, inclusive), wraps them with `batch` (the position they
+/// follow and the entries) and, when the replica answers [`ReplicaError::Behind`], resends once
+/// from the head it reported.
+///
+/// # Errors
+///
+/// The errors of `read`.
+pub fn ship_suffix<B, E, L: ReplicaLink<B> + ?Sized>(
+    link: &L,
+    from: Position,
+    mut read: impl FnMut(Position) -> Result<Vec<Entry>, E>,
+    mut batch: impl FnMut(Position, Vec<Entry>) -> B,
+) -> Result<ShipOutcome, E> {
+    let mut from = from;
+    let mut last = ReplicaError::Unreachable(link.replica());
+    for _ in 0..2 {
+        let entries = read(from.next())?;
+        match link.replicate(&batch(from, entries)) {
+            Ok(p) => return Ok(ShipOutcome::Stored(p)),
+            Err(ReplicaError::Behind { head }) => {
+                last = ReplicaError::Behind { head };
+                from = head;
+            }
+            Err(ReplicaError::Fenced { highest, .. }) => return Ok(ShipOutcome::Fenced(highest)),
+            Err(e) => return Ok(ShipOutcome::Failed(e)),
+        }
+    }
+    Ok(ShipOutcome::Failed(last))
+}
+
 /// Where an owner ships a shard's appends: one standby.
 pub trait StandbyLink: Send + Sync {
     /// The standby node.
@@ -288,6 +346,15 @@ impl<J: JournalStore> LocalStandby<J> {
     }
 }
 
+impl<T: StandbyLink + ?Sized> ReplicaLink<ReplicationBatch> for T {
+    fn replica(&self) -> String {
+        self.node().to_string()
+    }
+    fn replicate(&self, batch: &ReplicationBatch) -> Result<Position, ReplicaError> {
+        StandbyLink::replicate(self, batch)
+    }
+}
+
 impl<J: JournalStore> StandbyLink for LocalStandby<J> {
     fn node(&self) -> &NodeId {
         &self.node
@@ -403,41 +470,43 @@ impl<J: JournalStore, M: Membership + ?Sized> ReplicatedJournal<J, M> {
         let mut fenced = None;
         for link in &self.links() {
             let key = (link.node().clone(), actor.clone());
-            let mut from = self
+            let from = self
                 .lock()
                 .acked
                 .get(&key)
                 .copied()
                 .unwrap_or(Position::ZERO);
-            for _ in 0..2 {
-                let entries: Vec<Entry> = self
-                    .inner
-                    .store()
-                    .read(actor, from.next())?
-                    .into_iter()
-                    .map(|r| r.entry)
-                    .collect();
-                let batch = ReplicationBatch {
+            let outcome = ship_suffix(
+                link.as_ref(),
+                from,
+                |p| {
+                    Ok::<_, StoreError>(
+                        self.inner
+                            .store()
+                            .read(actor, p)?
+                            .into_iter()
+                            .map(|r| r.entry)
+                            .collect(),
+                    )
+                },
+                |after, entries| ReplicationBatch {
                     fence,
                     actor: actor.clone(),
-                    after: from,
+                    after,
                     entries,
-                };
-                match link.replicate(&batch) {
-                    Ok(p) => {
-                        self.lock().acked.insert(key.clone(), p);
-                        if p >= head {
-                            acks += 1;
-                        }
-                        break;
+                },
+            )?;
+            match outcome {
+                ShipOutcome::Stored(p) => {
+                    self.lock().acked.insert(key, p);
+                    if p >= head {
+                        acks += 1;
                     }
-                    Err(ReplicaError::Behind { head }) => from = head,
-                    Err(ReplicaError::Fenced { highest, .. }) => {
-                        fenced = Some(fenced.map_or(highest, |h: u64| h.max(highest)));
-                        break;
-                    }
-                    Err(_) => break,
                 }
+                ShipOutcome::Fenced(highest) => {
+                    fenced = Some(fenced.map_or(highest, |h: u64| h.max(highest)));
+                }
+                ShipOutcome::Failed(_) => {}
             }
         }
         Ok((acks, fenced))

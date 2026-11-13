@@ -28,7 +28,7 @@ A pooled actor with many activations per address and no journal, used for LLM ca
 
 ## Mailbox
 
-A durable inbox for one or more actors that outlives activations; it can be a local queue, a store-backed queue or a DIDComm or TSP mediator.
+A durable inbox for one or more actors that outlives activations; it can be a local queue, a store-backed queue, a DIDComm mediator or a TSP mediator such as `vt-mediator`.
 
 - defines:: [[decisions#Identity, mailbox and transport layers]]
 
@@ -43,6 +43,30 @@ The pluggable chooser behind a `vt:decide` state: guards, an LLM, a human or ano
 The unit of placement in a cluster: the set of actors whose IRI hashes to it, leased to one node and stored in one journal file.
 
 - defines:: [[decisions#Shard-based placement]]
+
+## Durable object
+
+A virtual actor with a `did:webvh` address and a hash-chained, signed journal kept by its custodians, so it survives any one host or organisation and has one writer at a time.
+
+- defines:: [[decisions#Durable objects are DID virtual actors with verifiable journals]]
+
+## Custodian
+
+A party named in a durable object's DID document that keeps its journal: a host may activate and write the object, a keeper only stores encrypted entries.
+
+- defines:: [[decisions#Keepers store ciphertext under a per-object content key]]
+
+## Custody epoch
+
+The numbered term in which one host is a durable object's only writer, won by promises from a majority of its custodians and recorded in the journal.
+
+- defines:: [[decisions#Custody epochs are won by quorum promises]]
+
+## Keeper
+
+A storage-only custodian: it stores, orders and verifies a durable object's entries by their clear headers but cannot read their encrypted bodies.
+
+- defines:: [[decisions#Keepers store ciphertext under a per-object content key]]
 
 ## Vertep
 

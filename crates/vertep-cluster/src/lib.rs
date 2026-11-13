@@ -113,8 +113,8 @@ pub use rebalance::{
     move_by_shipping, plan_moves, reshard_offline, ship_journal, verify_same_end,
 };
 pub use replication::{
-    LocalStandby, ReplicaError, ReplicatedJournal, ReplicationBatch, StandbyLink, StandbyReplica,
-    may_take, replica_set, standbys_of,
+    LocalStandby, ReplicaError, ReplicaLink, ReplicatedJournal, ReplicationBatch, ShipOutcome,
+    StandbyLink, StandbyReplica, may_take, replica_set, ship_suffix, standbys_of,
 };
 pub use routing::{ActivationGate, DedupCache, Inbound, NotOwner, Redirect, RoutingTable};
 pub use view::{Member, MemberStatus, ShardOwner, Subscription, View, ViewTracker};

@@ -21,6 +21,10 @@
 //!   [`inbox`] holds the relay mailboxes of local DID actors, fed by pickups from mediators,
 //!   intermediaries and the node's own inbound queue ([`net`]), acknowledged after the journal
 //!   append. `testkit` (feature `testkit`) has an in-process mediator and intermediary.
+//! - **Mailboxes at a TSP mediator** (M7): `tsp_mailbox` (feature `tsp`) is the versioned
+//!   mailbox protocol of `vt-mediator` (`vertep-tsp-mediator`) and its client, a pickup source
+//!   for the relay inbox; [`live`] is the seam of live sessions on which a relay pushes messages
+//!   (TSP mailboxes, and DIDComm Pickup 3.0 live mode in `pickup::MediatorClient::with_live`).
 //!
 //! Identity data is projected into RDF with [`ontology`] and validated by its SHACL shapes. See
 //! `tg.md/views/distribution.md` for the architecture.
@@ -42,6 +46,7 @@ pub mod grants;
 pub mod identity;
 pub mod inbox;
 pub mod keys;
+pub mod live;
 pub mod net;
 pub mod ontology;
 pub mod origin;
@@ -55,6 +60,8 @@ pub mod testkit;
 pub mod time;
 #[cfg(feature = "tsp")]
 pub mod tsp;
+#[cfg(feature = "tsp")]
+pub mod tsp_mailbox;
 pub mod vocab;
 
 pub use credential::{CredentialError, issue_grant_credential, verify_grant_credential};
@@ -67,6 +74,7 @@ pub use grants::{Grant, GrantRefusal, GrantSet};
 pub use identity::{ActorIdentity, DidMethodChoice, IdentityConfig, KeyRef};
 pub use inbox::{PickupBinding, PickupReport, Recipients, RelayInbox, RelayMailbox};
 pub use keys::{FileKeyManager, InMemoryKeyManager, KeyError, KeyManager, KeyType, PublicKey};
+pub use live::{FrameSink, LiveEndpoint, LiveNetwork, LocalLiveNetwork, live_uri};
 pub use net::{DropBox, LocalNetwork, NetError, PickupSource, RelayEndpoint, RelayNetwork};
 pub use origin::{
     Admitted, AnonymousPolicy, InboundPolicy, InboundRecord, OpenedMessage, Refusal,
