@@ -12,3 +12,4 @@ Architecture views of Vertep, typed `View`: each explains a slice of the system 
 - [[distribution]] — cluster membership, shards, QUIC, worker pools and DID federation
 - [[browser]] — WebAssembly core, browser shell, OPFS journal and TypeScript API
 - [[durable-objects]] — DID-addressed durable objects, custody epochs over TSP, keepers and failover
+- [[wallet]] — the agent wallet, role charts, plugin interfaces, consent, the Lean exchange model and conformance

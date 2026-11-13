@@ -1,7 +1,7 @@
 ---
 type: Capability
 status: draft
-openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting]
+openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc]
 ---
 # Capabilities
 
@@ -222,3 +222,27 @@ The `did:webvh` 1.0 file layout, directory, git and command publishers, serving 
 - scheduled_in:: [[roadmap#M8 did:webvh hosting]]
 
 Implemented in [[components#vertep-webvh]], [[components#vertep-cli]] and [[components#vertep-tsp-mediator]].
+
+## Agent wallet
+
+A wallet per identity: a sealed credential store, holder-binding keys, five plugin interfaces, credential formats, consent as a decide state, status lists, lifecycle and `vt wallet`. OpenSpec: `agent-wallet`.
+
+- scheduled_in:: [[roadmap#M9 Agent wallet]]
+
+Implemented in [[components#vertep-wallet]] and [[components#vertep-cli]].
+
+## Credential exchange
+
+One exchange vocabulary for every protocol, role charts, the native protocol over TSP, the Lean exchange model with its theorems and checker, and the plugin conformance kit. OpenSpec: `credential-exchange`.
+
+- scheduled_in:: [[roadmap#M9 Agent wallet]]
+
+Implemented in [[components#vertep-wallet]] and [[components#vertep-lean]].
+
+## OID4VC
+
+OpenID4VCI issuance with the pre-authorised code flow and OpenID4VP presentation with DCQL and `direct_post`, as exchange-protocol plugins for issuers, holders and verifiers. OpenSpec: `oid4vc`.
+
+- scheduled_in:: [[roadmap#M9 Agent wallet]]
+
+Implemented in [[components#vertep-wallet]] behind feature `oid4vc`.

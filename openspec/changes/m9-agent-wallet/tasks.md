@@ -1,20 +1,20 @@
 ## 1. Graph first
 
-- [ ] 1.1 Add milestone `M9 Agent wallet` to `tg.md/roadmap.md`, with `precedes::` from M5 and M8, and add it to the roadmap diagram
-- [ ] 1.2 Add a Component section `vertep-wallet` to `tg.md/components.md`, before any code lands:
+- [x] 1.1 Add milestone `M9 Agent wallet` to `tg.md/roadmap.md`, with `precedes::` from M5 and M8, and add it to the roadmap diagram
+- [x] 1.2 Add a Component section `vertep-wallet` to `tg.md/components.md`, before any code lands:
   - edges `provides::` (agent-wallet, credential-exchange, oid4vc), `uses::` (vertep-federation, vertep-agent, vertep-runtime, vertep-rdf), `realizes::` and `scheduled_in::` M9;
   - add the crate to the component diagram;
   - update the `vertep-lean` section with the wallet model
-- [ ] 1.3 Add Capability sections `Agent wallet`, `Credential exchange` and `OID4VC` to `tg.md/capabilities.md`, and list `agent-wallet`, `credential-exchange` and `oid4vc` in its `openspec:` frontmatter
-- [ ] 1.4 Record design decisions D1–D13 as `Decision` sections in `tg.md/decisions.md`, with the `motivated_by::` edges that design.md names
-- [ ] 1.5 Record the six constraints in `tg.md/constraints.md`, each with `source:` and `constrains::` edges to the decisions it binds:
+- [x] 1.3 Add Capability sections `Agent wallet`, `Credential exchange` and `OID4VC` to `tg.md/capabilities.md`, and list `agent-wallet`, `credential-exchange` and `oid4vc` in its `openspec:` frontmatter
+- [x] 1.4 Record design decisions D1–D13 as `Decision` sections in `tg.md/decisions.md`, with the `motivated_by::` edges that design.md names
+- [x] 1.5 Record the six constraints in `tg.md/constraints.md`, each with `source:` and `constrains::` edges to the decisions it binds:
   - OpenID4VC 1.0;
   - Data Integrity EdDSA;
   - SD-JWT and SD-JWT VC;
   - Bitstring Status List;
   - EdDSA-only key manager;
   - no remote JSON-LD contexts
-- [ ] 1.6 Write the View `tg.md/views/wallet.md`, with `describes::` edges:
+- [x] 1.6 Write the View `tg.md/views/wallet.md`, with `describes::` edges:
   - wallet actor and role charts;
   - plugin interfaces;
   - exchange vocabulary;
