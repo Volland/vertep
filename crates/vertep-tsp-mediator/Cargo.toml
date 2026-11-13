@@ -26,6 +26,8 @@ required-features = ["server"]
 
 [dependencies]
 vertep-federation = { workspace = true, features = ["tsp"] }
+# `did = "webvh:..."`: the mediator creates and serves its own did:webvh.
+vertep-webvh = { workspace = true }
 vertep-store = { workspace = true }
 vertep-tiramemsu = { workspace = true }
 oxrdf = { workspace = true }

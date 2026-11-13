@@ -8,6 +8,8 @@
 //! vt convert <chart> --to scxml|yaml|turtle|trig|nquads [-o <file>]
 //! vt certify <chart>                                    run the Lean checker, print the certificate
 //! vt cluster reshard <dir> <out>                        double a stopped cluster's shard count
+//! vt webvh create|update|rotate|deactivate|verify|witness|publish|serve
+//! vt webvh object create | vt webvh custody change      durable-object DIDs and custody changes
 //! ```
 //!
 //! A chart may be SCXML (`.scxml`), YAML (`.yaml`) or RDF (`.ttl`, `.trig`, `.nq`, `.nt`);
@@ -20,6 +22,7 @@
 pub mod cel;
 pub mod commands;
 pub mod surface;
+pub mod webvh;
 
 pub use commands::{Outcome, SchemaFormat};
 pub use surface::Surface;

@@ -133,8 +133,28 @@ impl CustodyFixture {
     pub fn new(hosts: &[&str], keepers: &[&str], quorum: Option<usize>) -> Self {
         let object = DurableObjectId::new("did:webvh:QmScid:example.org:objects:ticket-8812")
             .expect("valid object DID");
+        Self::for_object(
+            object,
+            TestHost::new("did:web:controller.example.org"),
+            hosts,
+            keepers,
+            quorum,
+        )
+    }
+
+    /// As [`CustodyFixture::new`], for the object `object` controlled by `controller`.
+    ///
+    /// # Panics
+    ///
+    /// For an invalid configuration.
+    pub fn for_object(
+        object: DurableObjectId,
+        controller: TestHost,
+        hosts: &[&str],
+        keepers: &[&str],
+        quorum: Option<usize>,
+    ) -> Self {
         let directory = Arc::new(StaticKeyDirectory::new());
-        let controller = TestHost::new("did:web:controller.example.org");
         directory.add_controller(object.as_str(), controller.public);
         let custodians: Vec<Custodian> = hosts
             .iter()
@@ -170,6 +190,25 @@ impl CustodyFixture {
         let id = TestHost::new(did);
         self.directory.add_verification(did, id.public);
         self.directory.set_agreement(did, id.agreement_public);
+        self.party_with(id)
+    }
+
+    /// Moves the fixture to the object `object` (a DID created after the custodians' keys, as
+    /// a `did:webvh` whose witnesses are the custodians): every party keeps its keys and gets a
+    /// fresh store and replica of the new object; the controller's key is registered for it.
+    ///
+    /// # Panics
+    ///
+    /// When a replica cannot be opened.
+    pub fn rebind(&mut self, object: DurableObjectId) {
+        self.object = object;
+        self.directory
+            .add_controller(self.object.as_str(), self.controller.public);
+        let ids: Vec<TestHost> = self.parties.iter().map(|p| p.id.clone()).collect();
+        self.parties = ids.into_iter().map(|id| self.party_with(id)).collect();
+    }
+
+    fn party_with(&self, id: TestHost) -> Party {
         let store = Arc::new(MemoryStore::new());
         let replica = Arc::new(
             Replica::open(

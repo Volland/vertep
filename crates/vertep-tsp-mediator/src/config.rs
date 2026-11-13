@@ -6,7 +6,8 @@
 //! listen = "0.0.0.0:8700"                      # VT_MEDIATOR_LISTEN
 //! public_url = "https://mediator.example/tsp"  # VT_MEDIATOR_PUBLIC_URL, the TSP endpoint
 //! data_dir = "/var/lib/vt-mediator"            # VT_MEDIATOR_DATA_DIR
-//! did = "peer"                                 # or "web:mediator.example"; VT_MEDIATOR_DID
+//! did = "peer"                                 # or "web:mediator.example" or
+//!                                              # "webvh:mediator.example[:path]"; VT_MEDIATOR_DID
 //! shards = 4                                   # mailbox shard files (one writer each)
 //! direct_delivery = true
 //! allow = []                                   # VIDs allowed to register; empty: open
@@ -162,9 +163,9 @@ impl MediatorConfig {
         if self.shards == 0 {
             return Err(ConfigError("shards must be at least 1".into()));
         }
-        if self.did != "peer" && !self.did.starts_with("web:") {
+        if self.did != "peer" && !self.did.starts_with("web:") && !self.did.starts_with("webvh:") {
             return Err(ConfigError(format!(
-                "did must be \"peer\" or \"web:<host>\", not {}",
+                "did must be \"peer\", \"web:<host>\" or \"webvh:<host>[:<path>]\", not {}",
                 self.did
             )));
         }
@@ -226,19 +227,98 @@ impl MediatorConfig {
             types: vec!["TSPTransport".into()],
             endpoints: vec![ServiceEndpoint::uri(&self.public_url)],
         }];
-        let method = match self.did.strip_prefix("web:") {
-            Some(host) => DidMethodChoice::Hosted {
-                did: format!("did:web:{host}"),
-                services,
-            },
-            None => DidMethodChoice::Peer { services },
-        };
-        let identity = ActorIdentity::provision(km, &IdentityConfig::new(method))
-            .map_err(|e| ConfigError(e.to_string()))?;
         std::fs::create_dir_all(&self.data_dir).map_err(|e| ConfigError(e.to_string()))?;
+        let identity = if let Some(rest) = self.did.strip_prefix("webvh:") {
+            self.create_webvh(km, rest, services)?
+        } else {
+            let method = match self.did.strip_prefix("web:") {
+                Some(host) => DidMethodChoice::Hosted {
+                    did: format!("did:web:{host}"),
+                    services,
+                },
+                None => DidMethodChoice::Peer { services },
+            };
+            ActorIdentity::provision(km, &IdentityConfig::new(method))
+                .map_err(|e| ConfigError(e.to_string()))?
+        };
         let json = serde_json::to_vec_pretty(&identity).map_err(|e| ConfigError(e.to_string()))?;
         std::fs::write(&path, json).map_err(|e| ConfigError(format!("{}: {e}", path.display())))?;
         Ok(identity)
+    }
+}
+
+impl MediatorConfig {
+    /// The directory of the mediator's own `did:webvh` log (`did = "webvh:..."`).
+    pub fn webvh_dir(&self) -> PathBuf {
+        self.data_dir.join("webvh")
+    }
+
+    /// Creates the mediator's `did:webvh` (`<host>[:<path>]`) with pre-rotation: its identity,
+    /// its genesis log entry, and the names of its update keys, kept in [`Self::webvh_dir`].
+    // @tg: implements:: [[openspec:webvh-hosting#Mediator Under did:webvh]]
+    // @tg: implements:: [[decisions#The mediator creates and serves its own did:webvh]]
+    fn create_webvh(
+        &self,
+        km: &dyn KeyManager,
+        spec: &str,
+        services: Vec<Service>,
+    ) -> Result<ActorIdentity, ConfigError> {
+        let mut parts = spec.split(':');
+        let host = parts
+            .next()
+            .filter(|h| !h.is_empty())
+            .ok_or_else(|| ConfigError(format!("did {}: no host", self.did)))?
+            .replace("%3A", ":")
+            .replace("%3a", ":");
+        let path: Vec<&str> = parts.collect();
+        let options = vertep_webvh::CreateOptions::new(host)
+            .path(&path.join(":"))
+            .pre_rotation(true);
+        let err = |e: &dyn std::fmt::Display| ConfigError(format!("did:webvh: {e}"));
+        let mut identity =
+            vertep_webvh::document::provision(km, &options, services).map_err(|e| err(&e))?;
+        let doc = vertep_webvh::document::identity_document(&identity, km).map_err(|e| err(&e))?;
+        let keys = self.key_manager()?;
+        let mut author = vertep_webvh::Author::generate(keys, true).map_err(|e| err(&e))?;
+        let log = author.create(&options, &doc).map_err(|e| err(&e))?;
+        vertep_webvh::document::bind(&mut identity, log.did());
+        let dir = self.webvh_dir();
+        std::fs::create_dir_all(&dir).map_err(|e| ConfigError(e.to_string()))?;
+        let write = |name: &str, text: &str| {
+            let p = dir.join(name);
+            std::fs::write(&p, text).map_err(|e| ConfigError(format!("{}: {e}", p.display())))
+        };
+        write("did.jsonl", &log.jsonl())?;
+        write(
+            "update-keys.json",
+            &serde_json::to_string_pretty(author.update_keys())
+                .map_err(|e| ConfigError(e.to_string()))?,
+        )?;
+        Ok(identity)
+    }
+
+    /// The mediator's own `did:webvh` log, when it has one: the URL path of its directory
+    /// (`/.well-known` or `/<path>`) and the log.
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError`] when the log cannot be read.
+    pub fn webvh_log(&self) -> Result<Option<(String, vertep_webvh::DidLog)>, ConfigError> {
+        if !self.did.starts_with("webvh:") {
+            return Ok(None);
+        }
+        let p = self.webvh_dir().join("did.jsonl");
+        let text = std::fs::read_to_string(&p)
+            .map_err(|e| ConfigError(format!("{}: {e}", p.display())))?;
+        let log = vertep_webvh::DidLog::from_files(&text, None)
+            .map_err(|e| ConfigError(e.to_string()))?;
+        let dir = vertep_webvh::log_dir(log.did()).map_err(|e| ConfigError(e.to_string()))?;
+        let base: Vec<String> = dir
+            .iter()
+            .skip(1)
+            .map(|c| c.to_string_lossy().into_owned())
+            .collect();
+        Ok(Some((format!("/{}", base.join("/")), log)))
     }
 }
 

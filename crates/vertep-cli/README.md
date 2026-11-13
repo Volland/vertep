@@ -269,6 +269,30 @@ After the nodes stop and the lease dump is empty:
 resharded 4 to 8 shards: 0 actors, 0 entries copied to data-8
 ```
 
+### did:webvh
+
+`vt webvh` creates and hosts `did:webvh` DIDs with keys in a file key manager directory
+(`--keys`). Beside the keys, `dids/<did>/` keeps the update-key names and the working log.
+Logs are published only once they verify.
+
+```sh
+vt webvh create --domain example.org --keys keys --out site --pre-rotation
+vt webvh verify site/example.org/.well-known/did.jsonl
+```
+
+```text
+valid: did:webvh:QmXa...:example.org
+versions: 1
+version: 1-QmPd...
+deactivated: false
+```
+
+`update`, `rotate` and `deactivate` add entries. `witness` adds a witness proof, and `publish`
+writes to a directory, a git working copy (`--git`) or a directory followed by a command
+(`--command`). `serve` serves a site directory. `object create` makes a durable object's DID,
+whose custodians witness its log at the custody quorum. `custody change` prepares a custodian-set
+change: the next log entry and the signed request for the writer.
+
 ### From Rust
 
 Every subcommand is a function in `vertep_cli::commands` that returns an `Outcome` with the
@@ -310,6 +334,8 @@ fn main() -> std::io::Result<()> {
 | `vt gen ts <chart> [--name NAME]` | `commands::gen_ts` | TypeScript module for `@vertep/web` |
 | `vt certify <chart>` | `commands::certify` | run the Lean checker, print the certificate |
 | `vt cluster reshard <dir> <out>` | `commands::cluster_reshard` | double a stopped cluster's shard count |
+| `vt webvh create\|update\|rotate\|deactivate\|verify\|witness\|publish\|serve` | `webvh` | author, verify, witness, publish and serve `did:webvh` DIDs |
+| `vt webvh object create`, `vt webvh custody change` | `webvh::object_create`, `webvh::custody_change_cmd` | durable-object DIDs and custodian-set changes |
 
 Library types: `Outcome` (stdout, stderr, exit code), `SchemaFormat`, `Surface` (surface
 detection, reading and writing), and `cel` (the CEL type environment projection of chart

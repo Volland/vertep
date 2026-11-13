@@ -1,0 +1,53 @@
+[package]
+name = "vertep-webvh"
+description = "did:webvh for Vertep: create, update, witness, publish and serve DID logs with key-manager keys"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+homepage = "https://volland.github.io/vertep/"
+documentation = "https://docs.rs/vertep-webvh"
+keywords = ["did", "webvh", "decentralized", "identity", "witness"]
+categories = ["cryptography", "web-programming"]
+
+[features]
+default = ["custody"]
+# Custodians as witnesses of durable-object DID logs, and the custody DocumentPublisher.
+custody = ["dep:vertep-objects"]
+# `vt webvh serve`: an axum file server for published logs.
+server = ["dep:axum", "dep:tokio"]
+
+[dependencies]
+vertep-federation = { workspace = true, features = ["webvh"] }
+vertep-objects = { workspace = true, optional = true }
+# Log mechanics (SCID, entry hashes, proofs, pre-rotation, witness proofs): the pinned DIF library.
+didwebvh-rs = { version = "0.8.2", default-features = false }
+affinidi-data-integrity = "0.8.1"
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+futures = { workspace = true, features = ["executor"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+axum = { version = "0.7.9", default-features = false, features = ["http1", "tokio"], optional = true }
+tokio = { workspace = true, optional = true, features = ["rt-multi-thread", "net", "macros"] }
+
+[dev-dependencies]
+vertep-webvh = { path = ".", features = ["custody", "server"] }
+vertep-objects = { workspace = true, features = ["testkit", "tsp"] }
+vertep-federation = { workspace = true, features = ["webvh", "tsp", "testkit"] }
+vertep-store = { workspace = true, features = ["testkit"] }
+tempfile = "3"
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "macros", "time"] }
+ureq = { version = "2.12.1", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+base64 = "0.22"
+bs58 = "0.5"
+url = "2"
+didwebvh-rs = { version = "0.8.2", default-features = false }
+futures = { workspace = true, features = ["executor"] }
+
+[lints]
+workspace = true

@@ -116,6 +116,10 @@ impl TspCustodyEndpoint {
             CustodyRequest::Prepare { candidate, .. } => candidate == &sender,
             CustodyRequest::Append(b) => b.writer == sender,
             CustodyRequest::Read { .. } => self.replica.config().is_host(&sender),
+            CustodyRequest::Witness(_) => {
+                self.replica.config().is_host(&sender)
+                    || self.replica.next().is_some_and(|n| n.is_host(&sender))
+            }
         };
         let answer = if speaks_for {
             self.replica.handle(&request)

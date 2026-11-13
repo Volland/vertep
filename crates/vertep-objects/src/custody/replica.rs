@@ -19,7 +19,7 @@ use vertep_store::{AppendMeta, Entry, JournalStore, Position, StoreError};
 use super::config::{CustodyConfig, Role};
 use super::wire::{
     AppendBatch, CustodyRequest, CustodyResponse, EpochPromise, Evidence, KeyDirectory, KeyWrap,
-    WireEntry, WireFacts, entry_from_nquads, record_rank, verify_keeper_authorship,
+    WireEntry, WireFacts, WitnessRequest, entry_from_nquads, record_rank, verify_keeper_authorship,
     verify_keeper_seal,
 };
 use crate::chain::{ChainHead, Digest, EntrySigner, HostKeys, verify_entry};
@@ -165,6 +165,7 @@ pub struct Replica {
     directory: Arc<dyn KeyDirectory>,
     sink: Mutex<Option<Arc<dyn EvidenceSink>>>,
     history: Mutex<Option<Arc<super::history::History>>>,
+    witness: Mutex<Option<Arc<dyn super::witness::EntryWitness>>>,
     state: Mutex<State>,
 }
 
@@ -226,6 +227,7 @@ impl Replica {
             directory,
             sink: Mutex::new(None),
             history: Mutex::new(None),
+            witness: Mutex::new(None),
             state: Mutex::new(state),
         })
     }
@@ -374,6 +376,7 @@ impl Replica {
         let object = match request {
             CustodyRequest::Prepare { object, .. } | CustodyRequest::Read { object, .. } => object,
             CustodyRequest::Append(b) => &b.object,
+            CustodyRequest::Witness(w) => &w.object,
         };
         if object != self.object.as_str() {
             return CustodyResponse::Failed {
@@ -441,7 +444,49 @@ impl Replica {
                 answer
             }
             CustodyRequest::Read { from, .. } => self.read(*from),
+            CustodyRequest::Witness(w) => self.witness(w),
         }
+    }
+
+    /// Judges a witness request with the policy set by [`Replica::set_witness`], against the
+    /// effective and pending configurations of the record this replica accepted.
+    // @tg: implements:: [[openspec:webvh-identity#Custodian Witnessing Rules]] {confidence: partial, note: "the custody side: the accepted configurations; the entry checks are the policy's"}
+    fn witness(&self, request: &WitnessRequest) -> CustodyResponse {
+        let policy = self
+            .witness
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        let Some(policy) = policy else {
+            return CustodyResponse::Failed {
+                reason: format!("{} does not witness DID log entries", self.custodian()),
+            };
+        };
+        let (accepted, promised) = {
+            let st = self.lock();
+            let mut a = vec![st.config().clone()];
+            a.extend(st.next.clone());
+            (a, st.promised)
+        };
+        match policy.witness(request, &accepted) {
+            Ok(proof) => CustodyResponse::Witnessed {
+                custodian: self.custodian().to_owned(),
+                proof,
+            },
+            Err(reason) => CustodyResponse::Refused {
+                highest: promised,
+                reason,
+            },
+        }
+    }
+
+    /// Witnesses `did:webvh` log entries of the object with `policy`. Without one, witness
+    /// requests fail.
+    pub fn set_witness(&self, policy: Arc<dyn super::witness::EntryWitness>) {
+        *self
+            .witness
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(policy);
     }
 
     // @tg: implements:: [[openspec:object-custody#Quorum-Promised Custody Epochs]]

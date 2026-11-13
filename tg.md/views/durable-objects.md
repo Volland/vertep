@@ -1,13 +1,13 @@
 ---
 type: View
 status: draft
-openspec: [durable-objects, object-custody]
+openspec: [durable-objects, object-custody, webvh-identity, webvh-hosting]
 ---
 # Durable Objects
 
 How Vertep keeps one actor alive across organisations: a DID address, a hash-chained signed journal, custodians that talk over TSP, and one writer per custody epoch won by quorum promises.
 
-This view explains milestone M7 and the crate `vertep-objects`. The TSP mediator that custodians and objects use while offline is in [[views/distribution#Distribution]]. Requirement names in backticks are from the OpenSpec change `m7-durable-objects`.
+This view explains milestone M7 and the crate `vertep-objects`, and from milestone M8 how `vertep-webvh` writes, witnesses and hosts the objects' `did:webvh` logs. The TSP mediator that custodians and objects use while offline is in [[views/distribution#Distribution]]. Requirement names in backticks are from the OpenSpec change `m7-durable-objects`.
 
 ## The idea
 
@@ -109,6 +109,66 @@ The controller signs a new set; the writer replicates it as pending, which needs
 - describes:: [[constraints#did:webvh updates need the web host]]
 
 Custody state is a configuration record: the effective set and, during a change, the pending next set. While a change is pending, every commit and every election needs a quorum of each set. Promises report the record, so a candidate that meets a pending change prepares again under both sets. Custodians refuse batches that carry an older set than they hold. The first rule (switch on a quorum of the old set plus every newcomer) lost committed entries in two counterexamples the Lean custody model produced, a shrink and an interrupted change; both are regression tests now.
+
+## did:webvh logs and witnesses
+
+An object's DID log names its custodians as witnesses at the custody quorum, so the published document changes only with the same majority that commits custody; `vertep-webvh` writes, witnesses and hosts the log.
+
+- describes:: [[roadmap#M8 did:webvh hosting]]
+- describes:: [[capabilities#webvh identity]]
+- describes:: [[capabilities#webvh hosting]]
+- describes:: [[components#vertep-webvh]]
+- describes:: [[decisions#did:webvh authoring builds on didwebvh-rs]]
+- describes:: [[decisions#did:webvh entries are signed through the key manager]]
+- describes:: [[decisions#Custodians witness their object's DID log]]
+- describes:: [[decisions#Witnessing is a custody request judged by a replica policy]]
+- describes:: [[decisions#Custody changes carry their DID log entry]]
+- describes:: [[decisions#Log publishers verify before they write]]
+- describes:: [[decisions#vt webvh serve is a static log server]]
+- describes:: [[decisions#The mediator creates and serves its own did:webvh]]
+- describes:: [[constraints#did:webvh witnesses are did:key]]
+- describes:: [[constraints#did:webvh versionTime strictly increases]]
+
+**Authoring.** `Author` writes entries with update keys it knows only by name. `KmSigner` makes every signature through the key manager. Objects use pre-rotation: each entry reveals the key the previous one announced by hash, and announces the next. The document comes from a Vertep identity, plus the `VertepCustody` service and the controller's key.
+
+**Witnessing.** A custodian witnesses as the `did:key` of its Ed25519 signing key. A witness request is an ordinary custody request, so it travels in process or over TSP. The replica hands it to its `EntryWitness` policy with the effective and pending configurations it accepted. The policy checks three things before it signs over the entry's `versionId`:
+
+- the published log verifies;
+- the entry is its valid next entry, signed by a current update key;
+- the entry declares one of those configurations.
+
+**Custody changes.** `vt webvh custody change` (or `custody_change`) builds the entry declaring the new set and its new witness list, and the controller-signed request that carries it. The writer runs the joint-consensus change. After the switch, `WebvhPublisher`, the custody `DocumentPublisher`, asks the custodians for proofs. A witness-list change applies only from the next entry, so the old set witnesses the change at its own threshold. The custodians that accepted the joint phase hold the new set as pending or effective, so they agree. The publisher then verifies the whole log and publishes it.
+
+```mermaid
+sequenceDiagram
+    participant C as Controller
+    participant W as Writer host
+    participant O as Old custodians
+    participant N as New custodians
+    participant P as Log publisher
+    C->>C: vt webvh custody change (entry n+1 declares the new set and witnesses)
+    C->>W: ReconfigurationRequest with did_log_entry
+    W->>O: append with next pending (joint phase)
+    W->>N: append with next pending (joint phase)
+    O-->>W: ack (quorum of the old set)
+    N-->>W: ack (quorum of the new set)
+    W->>N: switch: the new set takes effect
+    N-->>W: ack (quorum of the new set)
+    W->>O: witness entry n+1
+    O-->>W: proofs (each checks: valid next entry, accepted set)
+    W->>P: verify the log with did-witness.json, then publish
+    P-->>W: did.jsonl, did-witness.json, did.json written
+```
+
+**Hosting.** Publishers write the `did:webvh` 1.0 layout below a root: `<domain>/.well-known/` or `<domain>/<path>/`, holding `did.jsonl`, `did-witness.json` and the `did:web` form `did.json`. There are three:
+
+- the directory publisher;
+- the git publisher (commit and push, for Pages);
+- the command publisher (any CLI, such as `aws s3 sync` or `wrangler pages deploy`).
+
+Each refuses a log that does not verify, naming the failing entry or the missing proofs. `vt webvh serve` serves such a root behind a TLS proxy. `vt-mediator` with `did = "webvh:<host>"` creates its own log and serves it beside `/tsp`.
+
+**Interop.** The DIF test-suite vectors resolve through Vertep, except `witness-update`. That vector lowers its own witness threshold, and Vertep refuses it, as `didwebvh-rs` does. Accepting it would let a stolen update key witness its own entry.
 
 ## Inside the runtime
 

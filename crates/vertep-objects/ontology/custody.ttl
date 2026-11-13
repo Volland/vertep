@@ -51,3 +51,5 @@ cust:diverged a rdfs:Class ; rdfs:comment "A different entry of the same epoch i
 cust:read     a rdfs:Class ; rdfs:comment "Asks for entries from a position." .
 cust:entries  a rdfs:Class ; rdfs:comment "Entries, key wraps and configurations." .
 cust:failed   a rdfs:Class ; rdfs:comment "A request that was not answered." .
+cust:witness  a rdfs:Class ; rdfs:comment "Asks a custodian to witness the next entry of the object's did:webvh log." .
+cust:witnessed a rdfs:Class ; rdfs:comment "A custodian's witness proof over a log entry's versionId." .

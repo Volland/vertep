@@ -197,3 +197,32 @@ A `did:webvh` log entry is signed by the DID's update keys and published by the 
 - constrains:: [[decisions#Custodian set changes use joint consensus]] {strength: should, source: "DIF did:webvh specification"}
 
 Custody itself never waits on the web host; discovery of a changed set does.
+
+## did:webvh witnesses are did:key
+
+`did:webvh` 1.0 names witnesses by `did:key` DIDs and verifies their `eddsa-jcs-2022` proofs over an entry's `versionId`; a witness list change applies from the entry after the one that makes it.
+
+- constrains:: [[decisions#Custodians witness their object's DID log]] {strength: must, source: "DIF did:webvh v1.0, witnesses"}
+- constrains:: [[decisions#Custody changes carry their DID log entry]] {strength: must, source: "DIF did:webvh v1.0, witnesses", note: "the old list witnesses the change"}
+
+## did:webvh versionTime strictly increases
+
+Each `did:webvh` entry's `versionTime` must be later than the previous one and not in the future, at second granularity, so entries written within one second need a waited timestamp.
+
+- constrains:: [[decisions#did:webvh authoring builds on didwebvh-rs]] {strength: must, source: "DIF did:webvh v1.0, log entry"}
+- constrains:: [[decisions#Custody changes carry their DID log entry]] {strength: must, source: "DIF did:webvh v1.0, log entry"}
+
+## did:webvh resolves domains over HTTPS
+
+A `did:webvh` maps to an HTTPS URL on a domain name; `didwebvh-rs` rejects IP addresses, so local tests cannot point a DID at a loopback server directly.
+
+- constrains:: [[decisions#vt webvh serve is a static log server]] {strength: must, source: "DIF did:webvh v1.0, DID-to-HTTPS transformation"}
+- constrains:: [[decisions#Tests route did:webvh domains through the fetcher]] {strength: must, source: "didwebvh-rs URL validation"}
+
+## didwebvh-rs is async
+
+The `didwebvh-rs` 0.8 API and its `Signer` trait are async; synchronous custody and command code drives them with `futures::executor::block_on`, never inside a tokio worker.
+
+- constrains:: [[decisions#did:webvh entries are signed through the key manager]] {strength: should, source: "didwebvh-rs 0.8 API"}
+- constrains:: [[decisions#Witnessing is a custody request judged by a replica policy]] {strength: should, source: "didwebvh-rs 0.8 API"}
+
