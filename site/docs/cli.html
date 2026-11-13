@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The vt command — Vertep docs</title>
-<meta name="description" content="Every subcommand of vt, the Vertep command line: typecheck, schema, validate, hash, convert, gen ts, certify and cluster reshard, with their flags, exit codes and real runs on real charts.">
+<meta name="description" content="Every subcommand of vt, the Vertep command line: typecheck, schema, validate, hash, convert, gen ts, certify, cluster reshard and webvh, with their flags, exit codes and real runs on real charts.">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/fonts.css">
 <link rel="stylesheet" href="../assets/css/vertep.css">
@@ -55,7 +55,7 @@
   <main id="main" class="content">
     <p class="breadcrumb"><a href="index.html">Docs</a> · Reference</p>
     <h1>The vt command</h1>
-    <p class="lede"><code>vt</code> checks, hashes, converts and certifies charts, generates TypeScript for the browser, and reshards a stopped cluster. This page lists every subcommand with its real help text and a real run on a chart from the repository.</p>
+    <p class="lede"><code>vt</code> checks, hashes, converts and certifies charts, generates TypeScript for the browser, reshards a stopped cluster, and creates, witnesses, publishes and serves <code>did:webvh</code> DIDs. This page lists every subcommand with its real help text and a real run on a chart from the repository.</p>
 
     <p>All outputs on this page come from the <code>vt</code> binary built from the current sources. Commands are run from the repository root unless the text says otherwise. Very long outputs are trimmed, and each trim is marked.</p>
 
@@ -101,6 +101,7 @@ Options:
         <tr><td><code>vt gen ts &lt;chart&gt;</code></td><td>Prints a typed TypeScript module for <code>@vertep/web</code>.</td><td><a href="#gen-ts">gen ts</a></td></tr>
         <tr><td><code>vt certify &lt;chart&gt;</code></td><td>Runs the Lean-compiled checker and prints its certificate.</td><td><a href="#certify">certify</a></td></tr>
         <tr><td><code>vt cluster reshard &lt;dir&gt; &lt;out&gt;</code></td><td>Doubles the shard count of a stopped cluster.</td><td><a href="#reshard">cluster reshard</a></td></tr>
+        <tr><td><code>vt webvh &lt;command&gt;</code></td><td>Creates, updates, rotates, verifies, witnesses, publishes and serves <code>did:webvh</code> DIDs; creates durable-object DIDs and custody changes.</td><td><a href="#webvh">webvh</a></td></tr>
       </tbody>
     </table>
 
@@ -762,6 +763,68 @@ replication_factor = 1</code></pre>
     <p>The end-to-end test <code>crates/vertep-cli/tests/reshard.rs</code> runs the same command on a cluster of 40 actors and checks that each one's journal is in the shard it hashes to after doubling.</p>
 
     <div class="nb warn"><p>The shard files are opened before they are copied. If <code>DIR</code> is missing some of them, <code>reshard</code> creates them empty in <code>DIR</code>, as it did in the run above. The existing files are not modified.</p></div>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <h2 id="webvh">vt webvh</h2>
+    <p><code>vt webvh</code> creates and hosts <code>did:webvh</code> DIDs, the public DIDs of durable objects and of <code>vt-mediator</code>. Keys live in a file key manager directory (<code>--keys</code>). Beside the key files, <code>dids/&lt;did&gt;/</code> holds what the controller needs and no private key: the update key names and the working log. A log is published only once it verifies. The runs below start in an empty directory.</p>
+<pre class="output" data-lang="vt webvh --help"><code>Create, update, witness, publish and serve did:webvh DIDs
+
+Usage: vt webvh &lt;COMMAND&gt;
+
+Commands:
+  create      Create a DID from a new identity; prints the DID
+  update      Replace services or the whole document
+  rotate      Rotate the update key (to the announced key with pre-rotation)
+  deactivate  Deactivate the DID
+  verify      Verify a did.jsonl (with the did-witness.json beside it)
+  witness     Add this key's witness proof for the log's last entry
+  publish     Verify the working log and publish it
+  serve       Serve a site directory of published DIDs over HTTP
+  object      Durable-object DIDs
+  custody     Custody of durable objects
+  help        Print this message or the help of the given subcommand(s)</code></pre>
+
+    <h3 id="webvh-create">Create, verify and rotate</h3>
+<pre data-lang="Shell"><code>vt webvh create --domain example.org --keys keys --out site --pre-rotation \
+    --service TSPTransport=https://example.org/tsp</code></pre>
+<pre class="output" data-lang="Output"><code>did:webvh:QmYokHuGx69PRTz3svAZDVEf5iKAwovdD7Ug5WKQLghtE5:example.org
+log: keys/dids/did_webvh_QmYokHuGx69PRTz3svAZDVEf5iKAwovdD7Ug5WKQLghtE5_example.org/did.jsonl
+published: site/example.org/.well-known/did.jsonl
+published: site/example.org/.well-known/did.json</code></pre>
+<pre data-lang="Shell"><code>vt webvh verify site/example.org/.well-known/did.jsonl</code></pre>
+<pre class="output" data-lang="Output"><code>valid: did:webvh:QmYokHuGx69PRTz3svAZDVEf5iKAwovdD7Ug5WKQLghtE5:example.org
+versions: 1
+version: 1-QmcYvxPJNn1D1iccWU1vXXB2AtKF1DNV11N1HzKG2QYRTv
+deactivated: false</code></pre>
+    <p>With <code>--pre-rotation</code>, each entry announces the next update key by its hash, so <code>vt webvh rotate</code> can only move to that key. A stolen current key cannot extend the log. <code>update --service TYPE=URL</code> adds or replaces a service, and <code>deactivate</code> ends the DID. <code>verify</code> exits with 1 and names the failing entry when a log does not verify. The DID differs on every run, because the SCID is a hash of the first entry.</p>
+
+    <h3 id="webvh-object">A durable object and its witnesses</h3>
+    <p><code>object create</code> makes an object DID that declares its custodians (<code>ROLE,DID,MULTIKEY</code>, where the multikey is the custodian's Ed25519 signing key). The log names them as witnesses with the quorum as the threshold, and pre-rotation is always on:</p>
+<pre data-lang="Shell"><code>vt webvh object create --domain example.org --path objects:ticket-8812 --keys keys \
+    --custodian host,did:web:a.example,z6MkhFij... --custodian host,did:web:b.example,z6Mkjz... \
+    --custodian keeper,did:web:k.example,z6Mk... --quorum 2</code></pre>
+<pre class="output" data-lang="Output"><code>did:webvh:QmbXU12egxuh5ZTFH28Bhxf52cGqJJe5WSCA5sBhuacTe6:example.org:objects:ticket-8812
+log: keys/dids/did_webvh_QmbXU12egxuh5ZTFH28Bhxf52cGqJJe5WSCA5sBhuacTe6_example.org_objects_ticket-8812/did.jsonl
+custodians: 3 (quorum 2)
+witnesses: 0 of 2 proofs for 1-QmdfcTGSoaHKzBb2ix1jzq8QNV16QHxMVGryG3HTSLaeJ7; run `vt webvh witness` then `vt webvh publish`</code></pre>
+    <p>Publishing before the witnesses sign is refused:</p>
+<pre class="output" data-lang="vt webvh publish (exit 1)"><code>log entry 1-QmdfcTGSoaHKzBb2ix1jzq8QNV16QHxMVGryG3HTSLaeJ7 has 0 of 2 witness proofs; 2 missing</code></pre>
+    <p>Each custodian witnesses with its own key directory, then the controller publishes:</p>
+<pre data-lang="Shell"><code>vt webvh witness keys/dids/&lt;did&gt;/did.jsonl --keys custodian-a --key z6MkhFij...
+vt webvh witness keys/dids/&lt;did&gt;/did.jsonl --keys custodian-b --key z6Mkjz...
+vt webvh publish &lt;did&gt; --keys keys --out site</code></pre>
+<pre class="output" data-lang="Output"><code>witnessed 1-QmdfcTGSoaHKzBb2ix1jzq8QNV16QHxMVGryG3HTSLaeJ7 as did:key:z6MkhFij2YYFPRvdPhsah8X98vZmxRcVuBpMEQKCe8HKK4G7
+1 of 2 proofs
+witnessed 1-QmdfcTGSoaHKzBb2ix1jzq8QNV16QHxMVGryG3HTSLaeJ7 as did:key:z6MkjzEXcsWa9yArwyYwEyGiKz8LjF6DiqwRxFLxdDNUBhEH
+2 of 2 proofs
+published: site/example.org/objects/ticket-8812/did.jsonl
+published: site/example.org/objects/ticket-8812/did-witness.json
+published: site/example.org/objects/ticket-8812/did.json</code></pre>
+    <p><code>vt webvh custody change &lt;did&gt; --custodian ... --quorum N --request-out change.json</code> prepares a custodian-set change. It writes the next log entry, declaring the new set and its witnesses, and the controller-signed request for the object's writer. Running custody, the writer collects the old custodians' proofs over the custody transports and publishes the entry after the switch.</p>
+
+    <h3 id="webvh-publish">Publish and serve</h3>
+    <p><code>publish</code> writes to a directory (<code>--out</code>), into a git working copy that it commits and pushes (<code>--git DIR [--subdir docs] [--branch main]</code>), or to a directory followed by a command (<code>--root DIR --command aws s3 sync . s3://bucket</code>). A failed <code>git push</code> or command is reported with its exit status and error output. <code>vt webvh serve --root site [--domain example.org]</code> serves a site directory: <code>text/jsonl</code> logs, JSON witness files, CORS, a cache lifetime capped by the DID's <code>ttl</code>, and nothing outside the root. It belongs behind a TLS proxy, since <code>did:webvh</code> resolves over HTTPS.</p>
 
     <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
 
