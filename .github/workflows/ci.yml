@@ -122,6 +122,7 @@ jobs:
   wasm:
     name: WebAssembly core, bindings and npm packages
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.95.0
