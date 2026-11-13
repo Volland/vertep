@@ -29,6 +29,8 @@ agent = ["runtime", "dep:vertep-agent"]
 federation = ["runtime", "dep:vertep-federation", "vertep-federation/didcomm", "vertep-federation/tsp"]
 # Trusted clusters: membership, shard leases and placement, QUIC transport and worker pools.
 cluster = ["runtime", "dep:vertep-cluster", "vertep-cluster/gossip", "vertep-cluster/quic", "vertep-cluster/runtime"]
+# Durable objects: verifiable journals and decentralised custody over TSP.
+objects = ["runtime", "federation", "dep:vertep-objects", "vertep-objects/tsp"]
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
@@ -40,6 +42,7 @@ vertep-scxml = { workspace = true, optional = true }
 vertep-dm-ecma = { workspace = true, optional = true }
 vertep-agent = { workspace = true, optional = true }
 vertep-federation = { workspace = true, optional = true }
+vertep-objects = { workspace = true, optional = true }
 vertep-cluster = { workspace = true, optional = true }
 
 [dev-dependencies]

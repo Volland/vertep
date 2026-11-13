@@ -1,0 +1,11 @@
+{
+  "version": "0.2",
+  "language": "en,en-GB",
+  "ignorePaths": ["target/**", ".git/**", "Cargo.lock", "**/*.woff2", "**/*.svg", "**/*.nq", "**/*.ttl", "**/*.lock", "node_modules/**", ".omc/**", ".oxilite/**"],
+  "words": [
+    "Vertep", "vertep", "SCXML", "scxml", "statechart", "statecharts", "datamodel", "datamodels",
+    "SHACL", "SPARQL", "QUIC", "journaled", "formedness", "tiramemsu", "oxigraph", "openspec",
+    "Alatyr", "Pavlyshyn", "Pawlyschyn", "Datenschutz", "Impressum", "Leanpub", "TSP", "DIDComm",
+    "webvh", "Lean4", "pygments"
+  ]
+}

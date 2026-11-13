@@ -30,13 +30,14 @@ Vertep is a family of Rust crates, with JavaScript bindings, for long-lived proc
 ## What you get
 
 | | |
-|---|---|
+| --- | --- |
 | **Full SCXML** | The W3C SCXML algorithm in full, checked against the W3C conformance suite. Write charts in SCXML, YAML or the `statechart!` macro; all lower to one typed IR. |
 | **Durable actors** | Virtual actors addressed by IRI. Every accepted input is journaled before it is processed, with compare-and-set appends, a transactional outbox, durable timers and time travel. |
 | **Deterministic agents** | At a `vt:decide` state an LLM, a person or a guard picks among the enabled events. Decisions and model results are journaled, so a run replays without any model. |
 | **Charts as RDF** | Every chart projects losslessly to RDF 1.2 with SHACL shapes; its version is the hash of its canonical form, and journals can be queried with SPARQL as of any moment. |
+| **Durable objects** | An actor with a `did:webvh` address whose journal is kept by custodians in several organisations, talking over the Trust Spanning Protocol (TSP). One writer per epoch, won by a majority of promises: no coordinator and no clock. It survives the loss of any one organisation. A TSP mailbox mediator (`vt-mediator`) holds messages for parties that are offline. |
 | **Anywhere it must run** | Clusters with leased shards over QUIC, federation across trust boundaries with DIDs and relay mailboxes, and the same core in the browser through WebAssembly. |
-| **Proven in Lean** | A Lean 4 model of the semantics replays the Rust traces as a differential oracle. Decider safety, grant enforcement, legal configurations and type soundness of `step` are theorems. |
+| **Proven in Lean** | A Lean 4 model of the semantics replays the Rust traces as a differential oracle. Decider safety, grant enforcement, legal configurations, type soundness of `step`, and one writer per custody epoch are theorems. |
 
 ## Quick start
 
@@ -98,7 +99,7 @@ console.log((await order.getSnapshot()).configuration);
 ## Packages
 
 | Crate | What it is |
-|---|---|
+| --- | --- |
 | [`vertep`](https://crates.io/crates/vertep) | The facade: one dependency with features for every layer |
 | [`vertep-core`](https://crates.io/crates/vertep-core) | The `no_std` chart IR, type checker and pure `step` function |
 | [`vertep-scxml`](https://crates.io/crates/vertep-scxml) · [`vertep-yaml`](https://crates.io/crates/vertep-yaml) · [`vertep-macros`](https://crates.io/crates/vertep-macros) | The SCXML, YAML and `statechart!` surfaces |
@@ -108,10 +109,12 @@ console.log((await order.getSnapshot()).configuration);
 | [`vertep-runtime`](https://crates.io/crates/vertep-runtime) | The actor runtime: mailboxes, transports, the journal driver, durable timers |
 | [`vertep-agent`](https://crates.io/crates/vertep-agent) | Deciders, LLM and tool actors, capability grants, plan charts |
 | [`vertep-cluster`](https://crates.io/crates/vertep-cluster) · [`vertep-federation`](https://crates.io/crates/vertep-federation) | Clusters with leased shards; DID identities and relay mailboxes |
+| [`vertep-objects`](https://crates.io/crates/vertep-objects) | Durable objects: verifiable journals and decentralised custody over TSP |
+| [`vertep-tsp-mediator`](https://crates.io/crates/vertep-tsp-mediator) | A TSP mailbox mediator and the `vt-mediator` binary |
 | [`vertep-cli`](https://crates.io/crates/vertep-cli) | The `vt` command |
 
 | npm package | What it is |
-|---|---|
+| --- | --- |
 | [`@vertep/web`](https://www.npmjs.com/package/@vertep/web) | The actor system in a worker, compiled to WebAssembly, with a typed client for browsers and Node.js |
 | [`@vertep/dm-ecma`](https://www.npmjs.com/package/@vertep/dm-ecma) | The ECMAScript datamodel for `@vertep/web` |
 
@@ -129,6 +132,7 @@ console.log((await order.getSnapshot()).configuration);
 - `lean/`: the Lean model and proofs
 - `openspec/`: requirements and scenarios, one change per milestone ([OpenSpec](https://github.com/Fission-AI/OpenSpec))
 - `tg.md/`: decisions, constraints, components and architecture views as a typed graph, checked with `tg check`
+- `CHANGELOG.md`: what changed in each release
 
 Code links to the requirements it implements with `// @tg: implements::` comments, and tests link to the scenarios they verify with `// @tg: verifies::` comments.
 

@@ -32,7 +32,7 @@ flowchart TD
     examples["vertep-examples (examples)"]
     lean["vertep-lean (Lean 4)"]
 
-    facade --> agent & cluster & fed & runtime & macros & tira
+    facade --> agent & cluster & fed & objects & runtime & macros & tira
     cli --> scxml & yaml & rdf & lean
     wasm --> runtime & tira
     agent --> runtime & cel & rdf
@@ -521,6 +521,7 @@ The facade crate an application depends on, re-exporting the other crates behind
 - uses:: [[components#vertep-agent]] {kind: optional}
 - uses:: [[components#vertep-cluster]] {kind: optional}
 - uses:: [[components#vertep-federation]] {kind: optional}
+- uses:: [[components#vertep-objects]] {kind: optional, note: "feature objects"}
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
 Implemented 2026-11-11: re-exports core, store and RDF, plus runtime, tiramemsu and SCXML behind default features and ECMAScript on request; `examples/quickstart.rs` runs one virtual actor with a delayed send and a time-travel query.

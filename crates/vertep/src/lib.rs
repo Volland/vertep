@@ -12,6 +12,7 @@
 //! | `scxml` (default) | [`scxml`] | the SCXML reader and writer |
 //! | `ecmascript` | [`ecmascript`] | the ECMAScript datamodel |
 //! | `federation` | `federation` | DID identities, grants, DIDComm v2 and TSP relays |
+//! | `objects` | `objects` | durable objects: verifiable journals, custody over TSP |
 //!
 //! Start with [`prelude`] and `examples/quickstart.rs`: one virtual actor on tiramemsu, a
 //! durable delayed send, and a time-travel query.
@@ -46,6 +47,9 @@ pub use vertep_federation as federation;
 
 #[cfg(feature = "cluster")]
 pub use vertep_cluster as cluster;
+
+#[cfg(feature = "objects")]
+pub use vertep_objects as objects;
 
 /// The names most programs need.
 pub mod prelude {

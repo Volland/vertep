@@ -75,6 +75,7 @@ tokio = { version = "1", features = ["rt", "macros", "time"] }
 | `agent` | no | `vertep-agent` | `vertep::agent`: decide states, deciders, LLM and tool actors, grants and plan charts |
 | `cluster` | no | `vertep-cluster` | `vertep::cluster`: membership, shard leases, QUIC transport and worker pools |
 | `federation` | no | `vertep-federation` | `vertep::federation`: DID identities, grants, DIDComm v2 and TSP relays |
+| `objects` | no | `vertep-objects` | `vertep::objects`: durable objects with verifiable journals and decentralised custody over TSP |
 
 A node runs all its actors on one thread (some datamodels are not `Send`), so use tokio's
 current-thread runtime and a `LocalSet`, as below.
@@ -205,6 +206,8 @@ decider agent replayed without its decider, a typed order on CEL, and `@vertep/w
 | [`vertep-agent`](https://crates.io/crates/vertep-agent) | Deciders, LLM and tool actors, capability grants and sandboxed plan charts |
 | [`vertep-cluster`](https://crates.io/crates/vertep-cluster) | Membership, shard leases, QUIC transport and worker pools |
 | [`vertep-federation`](https://crates.io/crates/vertep-federation) | DID identities, grants and DIDComm v2 and TSP relay mailboxes |
+| [`vertep-objects`](https://crates.io/crates/vertep-objects) | Durable objects: verifiable journals and decentralised custody over TSP |
+| [`vertep-tsp-mediator`](https://crates.io/crates/vertep-tsp-mediator) | A TSP mailbox mediator and the `vt-mediator` binary |
 | [`vertep-cli`](https://crates.io/crates/vertep-cli) | The `vt` command: `typecheck`, `schema`, `validate`, `hash`, `convert`, `gen ts`, `certify` |
 
 For JavaScript, two npm packages wrap the core compiled to WebAssembly:

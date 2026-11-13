@@ -93,4 +93,4 @@ Delivered by the OpenSpec change `m6-wasm-js`.
 
 DID-addressed durable objects with verifiable journals, decentralised custody over TSP with quorum-promised epochs, the durable agent journal, and a TSP mailbox mediator.
 
-Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Proposed 2026-11-12.
+Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. Not yet done: creating and hosting `did:webvh` logs.
