@@ -19,6 +19,7 @@
       <a href="index.html" aria-current="page">Docs</a>
       <a href="../examples/index.html">Examples</a>
       <a href="../articles/index.html">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
       <a href="../about.html">About</a>
     </nav>
   </div>
@@ -72,26 +73,26 @@
 
     <h2 id="custodians">Custodians</h2>
     <p>The object's DID document names its custodians and the quorum in a <code>VertepCustody</code> service. A <em>host</em> may serve the object and write its journal. A <em>keeper</em> only stores entries; it sees a clear header (position, epoch, previous hash, signatures) and an encrypted body, so a storage provider can keep an object it cannot read. The quorum must be a majority.</p>
-    <pre data-lang="Rust"><code>let config = CustodyConfig::new(
-    vec![
-        Custodian::host("did:web:host.org1.example"),
-        Custodian::host("did:web:host.org2.example"),
-        Custodian::keeper("did:web:keeper.org3.example"),
+    <pre data-lang="Rust"><code><span class="kd">let</span> config <span class="o">=</span> CustodyConfig::new(
+    <span class="fm">vec!</span>[
+        Custodian::host(<span class="s">"did:web:host.org1.example"</span>),
+        Custodian::host(<span class="s">"did:web:host.org2.example"</span>),
+        Custodian::keeper(<span class="s">"did:web:keeper.org3.example"</span>),
     ],
-    2, // a majority of three
-)?;
-doc.service.push(config.to_service(object.as_str())); // publish in the did:webvh log</code></pre>
+    <span class="mi">2</span>, <span class="c1">// a majority of three
+</span>)<span class="o">?</span>;
+doc.service.push(config.to_service(object.as_str())); <span class="o">//</span> publish <span class="k">in</span> the did:<span class="nc">webvh</span> log</code></pre>
 
     <h2 id="epochs">One writer per epoch</h2>
     <p>A host becomes the writer by asking every custodian to promise a new custody epoch. A custodian promises an epoch only above every epoch it promised before, and then refuses anything older. With a majority of promises, the host adopts the chain accepted in the highest epoch (then the longest), stores it, and ships it to the custodians under its own epoch. An entry counts once a majority accepted it in one epoch; only then does the runtime perform the turn's sends and timers. Two hosts can never both win an epoch, a host that lost its epoch is refused on its next append, and no clock is ever consulted.</p>
-    <pre data-lang="Rust"><code>let host = Arc::new(CustodyHost::new(object, signer, keys, agreement_key, replica, directory)
-    .with_transport(tsp_to_org2)          // direct TSP
-    .with_transport(tsp_to_keeper));       // routed through the keeper's mediator
-let storage = Arc::new(ObjectStorage::new(inner_storage));
+    <pre data-lang="Rust"><code><span class="kd">let</span> host <span class="o">=</span> Arc::new(CustodyHost::new(object, signer, keys, agreement_key, replica, directory)
+    .with_transport(tsp_to_org2)          <span class="c1">// direct TSP
+</span>    .with_transport(tsp_to_keeper));       <span class="c1">// routed through the keeper's mediator
+</span><span class="kd">let</span> storage <span class="o">=</span> Arc::new(ObjectStorage::new(inner_storage));
 storage.custody().add(host.clone());
-let mut node = Node::builder(storage, shell).build();
-node.handle().bind_address(&amp;object_address, "https://example.org/charts/ticket", "8812");
-serve_object(&amp;mut node, &amp;object_address)?; // win custody, replay, re-arm timers</code></pre>
+<span class="kd">let</span> <span class="k">mut</span> node <span class="o">=</span> Node::builder(storage, shell).build();
+node.handle().bind_address(<span class="o">&amp;</span>object_address, <span class="s">"https://example.org/charts/ticket"</span>, <span class="s">"8812"</span>);
+serve_object(<span class="o">&amp;</span><span class="k">mut</span> node, <span class="o">&amp;</span>object_address)<span class="o">?</span>; <span class="o">//</span> win custody, replay, re<span class="o">-</span>arm timers</code></pre>
 
     <h2 id="failover">Handoff and failover</h2>
     <p><code>hand_off</code> moves an object on purpose: the old host brings the custodians level and stops writing, and the next host to activate wins a higher epoch. When a host disappears, any other host takes over the same way as long as a majority of custodians is reachable; with fewer, nothing is written and events wait in the object's mailbox. Timers are in the journal, so the new host re-arms them, and a timer that came due in between fires on activation. Sends of turns whose effects the old host may not have completed are dispatched again with their original message ids, which receivers deduplicate.</p>
@@ -139,7 +140,7 @@ org 2: agent in ["approved"] after 4 journaled inputs</code></pre>
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
   </div>
 </footer>
 </body>

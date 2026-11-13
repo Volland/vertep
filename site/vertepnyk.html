@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vertepnyk, the chart designer — Vertep</title>
+<meta name="description" content="Vertepnyk is a visual designer and simulator for Vertep statecharts: draw, edit, validate and run SCXML and YAML charts on Vertep's own engine, in VS Code, Obsidian or a desktop app.">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/fonts.css">
+<link rel="stylesheet" href="assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="index.html"><img src="assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="docs/index.html">Docs</a>
+      <a href="examples/index.html">Examples</a>
+      <a href="articles/index.html">Articles</a>
+      <a href="vertepnyk.html" aria-current="page">Vertepnyk</a>
+      <a href="about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero hatched">
+  <div class="hero-inner">
+    <div>
+      <p class="kicker">Designer · Simulator · Preview</p>
+      <h1>Vertepnyk</h1>
+      <p class="lede">Draw a statechart, edit it, validate it and drive it with events, without writing code. The chart stays a plain SCXML or YAML file, and Vertep's own engine runs it.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/Volland/vertepnyk/releases/tag/v0.1.0">Download</a>
+        <a class="btn" href="articles/co-design.html">Co-design with Claude Code</a>
+        <a class="btn" href="https://github.com/Volland/vertepnyk">Source on GitHub</a>
+      </div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="rays"></div>
+      <div class="disc"></div>
+      <div class="goat"><img src="assets/img/vertepnyk.svg" alt=""></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="band-inner">
+    <div class="split">
+      <div>
+        <h2 style="text-align:left">The puppeteer's workbench</h2>
+        <p>A <em>vertepnyk</em> (вертепник) is the puppeteer who builds the vertep box and runs the show. If a Vertep chart is the stage, with the slots its puppets move along, Vertepnyk is the bench where you cut the slots and try the play.</p>
+        <p>It reads and writes the same files Vertep runs: <code>*.scxml</code> and <code>*.vt.yaml</code>. The text is the source of truth. Every edit on the canvas becomes a minimal patch to the file, so comments and formatting survive and a git diff shows only what you changed. Layout is stored inline, in a layout namespace Vertep reserves for formatting, so moving a box never changes what the chart does.</p>
+        <p>Validation and simulation run on Vertep's interpreter, compiled to WebAssembly. The designer never computes a transition itself, so what you see in the simulator is what production runs.</p>
+      </div>
+      <div>
+        <h2 style="text-align:left">What it does</h2>
+        <ul>
+          <li><strong>Draw and edit</strong> atomic, compound, parallel, final and history states and their transitions; the datamodel and executable content go in an inspector beside the canvas.</li>
+          <li><strong>Validate as you type</strong>, with located diagnostics from Vertep and the chart's version IRI, the hash that names its behaviour.</li>
+          <li><strong>Simulate</strong>: send events with payloads, watch the active configuration and the context, and step forward, step back, travel through the run or fork it.</li>
+          <li><strong>Export</strong> the canvas as SVG.</li>
+          <li><strong>Work offline</strong>: nothing is sent over the network.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band hatched">
+  <div class="band-inner">
+    <h2>Where it runs</h2>
+    <p class="sub">One designer core, three hosts. Each opens your chart files in place.</p>
+    <div class="cards">
+      <div class="card"><div class="card-head"><span class="num">I</span><h3>VS Code</h3></div><div class="card-body"><p>A custom editor for <code>*.scxml</code>, <code>*.vt.yaml</code> and <code>*.vt.yml</code>. Edits are ordinary text edits, so undo, save, auto-save and source-control diffs work; open the text beside the canvas and either one follows the other. Problems go to the Problems panel.</p></div></div>
+      <div class="card"><div class="card-head"><span class="num">II</span><h3>Obsidian</h3></div><div class="card-body"><p>A plugin for chart files in your vault, and for charts in code blocks and embeds inside notes, so a design document can carry its live statechart.</p></div></div>
+      <div class="card"><div class="card-head"><span class="num">III</span><h3>Desktop app</h3></div><div class="card-body"><p>A standalone Electron app that opens <code>.scxml</code> files from the file manager, for people who do not live in an editor.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="band-inner">
+    <h2 id="install">Install</h2>
+    <p class="sub">Version 0.1.0 is a preview, released on GitHub. Marketplace listings follow.</p>
+    <div class="split">
+      <div>
+        <h3>VS Code</h3>
+        <p>Download <a href="https://github.com/Volland/vertepnyk/releases/download/v0.1.0/vertepnyk-vscode-0.1.0.vsix"><code>vertepnyk-vscode-0.1.0.vsix</code></a>, then run <strong>Extensions: Install from VSIX…</strong>, or:</p>
+<pre data-lang="Shell"><code>code --install-extension vertepnyk-vscode-0.1.0.vsix</code></pre>
+        <p>Right-click a chart and choose <strong>Open With… › Vertepnyk Designer</strong>, or set <code>vertepnyk.defaultEditor</code> to <code>designer</code>. The same file installs in Cursor, VSCodium and other VS Code builds.</p>
+
+        <h3>Obsidian</h3>
+        <p>Download <a href="https://github.com/Volland/vertepnyk/releases/download/v0.1.0/vertepnyk-obsidian-0.1.0.zip"><code>vertepnyk-obsidian-0.1.0.zip</code></a> and unpack it into your vault's <code>.obsidian/plugins/</code> folder, so the files sit in <code>.obsidian/plugins/vertepnyk/</code>. Then enable <strong>Vertepnyk</strong> under <strong>Settings › Community plugins</strong>. The plugin is desktop-only.</p>
+      </div>
+      <div>
+        <h3>Desktop app</h3>
+        <p>For macOS (Apple silicon and Intel): <a href="https://github.com/Volland/vertepnyk/releases/download/v0.1.0/Vertepnyk-0.1.0-universal.dmg"><code>Vertepnyk-0.1.0-universal.dmg</code></a>. The app is not notarized by Apple yet, so the first time, open it with right-click › <strong>Open</strong>, or allow it under <strong>System Settings › Privacy &amp; Security</strong>. A <a href="https://github.com/Volland/vertepnyk/releases/download/v0.1.0/Vertepnyk-0.1.0-universal-mac.zip"><code>.zip</code></a> of the same app and <a href="https://github.com/Volland/vertepnyk/releases/download/v0.1.0/SHA256SUMS">checksums</a> are in the release. Windows and Linux builds come from source for now.</p>
+
+        <h3>From source</h3>
+<pre data-lang="Shell"><code>git clone https://github.com/Volland/vertepnyk
+cd vertepnyk
+pnpm install
+pnpm build
+pnpm dev                                        # the web shell in a browser
+pnpm --filter vertepnyk-vscode run package      # the VS Code extension
+pnpm --filter vertepnyk-electron run dist       # the desktop app for this OS</code></pre>
+        <p>Building needs Node.js 22 and pnpm. Until <code>@vertep/web</code> is on npm, the workspace links Vertep's JavaScript packages from a sibling checkout; the repository's README explains how.</p>
+      </div>
+    </div>
+    <div class="nb warn">
+      <p>What "preview" means:</p>
+      <ul>
+        <li><strong>Layout and the chart hash.</strong> Vertepnyk writes layout as <code>vl:</code> attributes in SCXML and a <code>layout</code> key in YAML. Vertep 0.1.3 does not yet treat that namespace as formatting, so <code>vt hash</code> from crates.io reports a new version when layout changes. The engine bundled in Vertepnyk already ignores it, and the next Vertep release will too.</li>
+        <li><strong>The first open writes layout.</strong> A chart without layout gets one when it is first opened, so a fresh file shows as modified; in VS Code that first undo takes two presses.</li>
+        <li><strong>Obsidian</strong> is tested in a simulated host, not yet in Obsidian itself, and <code>.vt.yaml</code> files cannot be bound by extension in Obsidian or the desktop app.</li>
+        <li><strong>Not listed yet</strong> on the VS Code Marketplace, Open VSX or Obsidian's community plugins.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="band ink">
+  <div class="band-inner">
+    <h2>Read next</h2>
+    <div class="cards">
+      <a class="card" href="articles/co-design.html"><div class="card-head"><span class="num">✶</span><h3>Two hands on one chart</h3></div><div class="card-body"><p>Co-designing a statechart with Claude Code: the agent writes text, you shape it on the canvas, Vertep checks both.</p></div></a>
+      <a class="card" href="docs/charts.html"><div class="card-head"><span class="num">✶</span><h3>Writing charts</h3></div><div class="card-body"><p>SCXML with <code>vt:</code> extensions, YAML and the <code>statechart!</code> macro, and what validation reports.</p></div></a>
+      <a class="card" href="https://github.com/Volland/vertepnyk"><div class="card-head"><span class="num">✶</span><h3>The source</h3></div><div class="card-body"><p>SolidJS, SVG and elkjs over <code>@vertep/web</code>; specs and decisions in OpenSpec and a typed graph. MIT or Apache-2.0.</p></div></a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="docs/index.html" style="color:inherit">Docs</a><a href="examples/index.html" style="color:inherit">Examples</a><a href="articles/index.html" style="color:inherit">Articles</a><a href="vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="impressum.html" style="color:inherit">Impressum</a><a href="datenschutz.html" style="color:inherit">Datenschutz</a><a href="agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

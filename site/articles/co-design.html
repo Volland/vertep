@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two hands on one chart — Vertep</title>
+<meta name="description" content="Co-designing statecharts with Claude Code and Vertepnyk: the agent writes and checks the text, you shape and run the chart on a canvas, and Vertep's engine is the referee for both.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="index.html" aria-current="page">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+  <header class="article-head">
+    <p class="kicker">Article the third</p>
+    <h1>Two hands on one chart</h1>
+    <p class="byline">Co-designing statecharts with Claude Code and Vertepnyk</p>
+  </header>
+
+  <p class="opening">A statechart is a strange thing to design alone. Its shape is visual: boxes inside boxes, arrows that cross levels, regions that run side by side. But its truth is textual: guards, assignments, event names, the datamodel. People are good at the first and tired by the second. A coding agent is the other way round. This article is about letting each do its half, on one file, with Vertep as the referee.</p>
+
+  <h2>The arrangement</h2>
+  <p>Three parties work on the same chart file, and none of them owns a private copy of it.</p>
+  <ul>
+    <li><strong>Claude Code</strong> reads and writes the file as text. It drafts states and transitions from a description, writes guards and assignments, renames events everywhere at once, and runs <code>vt</code> to check its own work.</li>
+    <li><strong>You</strong> look at the chart in <a href="../vertepnyk.html">Vertepnyk</a>, beside the text. You move things until the shape says what the behaviour is. You spot the missing arrow, rename what reads badly, and run the chart with events to see whether it does what you meant.</li>
+    <li><strong>Vertep</strong> decides what the chart means. Vertepnyk validates and simulates with Vertep's own interpreter, and Claude checks with the <code>vt</code> command built from the same crates. Neither the agent nor the canvas has its own idea of the semantics.</li>
+  </ul>
+  <p>This works because of one decision in Vertepnyk: <strong>the text file is the source of truth</strong>. The designer does not keep a model of its own and export it. Every drag, rename or new transition on the canvas is a minimal edit to the file, preserving comments and formatting. So when Claude edits the file, the canvas follows; when you edit the canvas, Claude sees an ordinary diff.</p>
+
+  <h2>Setting up</h2>
+  <ol>
+    <li>Install the <a href="../vertepnyk.html#install">Vertepnyk extension</a> in VS Code (or Cursor).</li>
+    <li>Install the <code>vt</code> command, so the agent can check what it writes: <code>cargo install vertep-cli</code>.</li>
+    <li>Run Claude Code in the project, in the editor's terminal or through its VS Code extension.</li>
+    <li>Turn on <strong>Files: Auto Save</strong>. The designer and the agent meet on disk, and a saved file means neither overwrites the other's unsaved work.</li>
+  </ol>
+  <p>Then tell the agent the house rules once, in the project's <code>CLAUDE.md</code>:</p>
+<pre data-lang="Markdown"><code># Charts
+
+- Charts live in `charts/` as SCXML (`*.scxml`) or vertep YAML (`*.vt.yaml`).
+- After every edit to a chart, run `vt validate &lt;file&gt;` and `vt typecheck &lt;file&gt;`
+  and fix what they report before answering.
+- Report the chart version from `vt hash &lt;file&gt;` when behaviour changes.
+- Never edit `vl:` attributes (SCXML) or the `layout:` key (YAML): that is the
+  designer's layout. Leave them where they are when you move or rename states.
+- Keep comments. Prefer small edits over rewriting the file.</code></pre>
+  <p>The fourth rule matters. Layout belongs to the person at the canvas, and an agent that regenerates a file from scratch would throw it away.</p>
+
+  <h2>The loop</h2>
+
+  <h3>1. Say what should happen</h3>
+  <p>Start from words, not boxes:</p>
+<pre data-lang="Prompt"><code>Write charts/refund.scxml on the CEL datamodel: a refund agent.
+It starts idle; a `request` event carries an amount and moves it to review.
+In review a policy chooses approve, reject or escalate. Approval is only
+possible up to 100; above that the only ways out are reject or escalate
+to a manager, who approves or rejects. Make review and manager decide
+states for a decider called `policy`. Validate it.</code></pre>
+  <p>Claude writes the file, runs <code>vt validate</code>, and answers with the chart's version IRI:</p>
+<pre class="output" data-lang="vt validate charts/refund.scxml"><code>charts/refund.scxml: ok: urn:vertep:chart:sha256:c6282b762c855df3792c2fea39fc345df6ed5e317484461e5d0a7f8d68f292aa</code></pre>
+  <p>The interesting part of what it wrote is short. The rules are in the chart, not in the decider: with an amount over 100, <code>approve</code> is simply not offered in <code>review</code>, whatever the decider would like.</p>
+<pre data-lang="SCXML"><code><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"review"</span> <span class="na">vt:decide=</span><span class="s">"policy"</span> <span class="na">vt:candidates=</span><span class="s">"approve reject escalate"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">cond=</span><span class="s">"ctx.amount &amp;lt;= 100"</span> <span class="na">target=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"reject"</span> <span class="na">target=</span><span class="s">"rejected"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"escalate"</span> <span class="na">cond=</span><span class="s">"ctx.amount &gt; 100"</span> <span class="na">target=</span><span class="s">"manager"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/state&gt;</span></code></pre>
+
+  <h3>2. Look at it</h3>
+  <p>Open the file with <strong>Open With… › Vertepnyk Designer</strong> and run <strong>Vertepnyk: Open Text Editor to the Side</strong>. Now you have the canvas and the text side by side. Problems from Vertep's validator appear in the Problems panel, and selecting one reveals the element on the canvas.</p>
+  <p>This is where people earn their place. A chart that validates can still be wrong, and the canvas shows it in a way the text does not: a state with no way out, two arrows that should have been one transition out of a parent, a <code>manager</code> state that ought to be inside a compound <code>escalated</code> state with its own timeout. Arrange the boxes until the picture tells the story. That arrangement is saved as layout in the file, and it is yours.</p>
+
+  <h3>3. Run it</h3>
+  <p>Start the simulation. Send <code>request</code> with <code>{"amount": 250}</code> and watch <code>review</code> light up. The enabled events are <code>reject</code> and <code>escalate</code>; <code>approve</code> is not among them. Step back, fork the run, and send <code>{"amount": 40}</code> instead. The simulator runs Vertep's interpreter, so this is not a sketch of the behaviour; it is the behaviour.</p>
+  <p>Runs are where misunderstandings surface. Perhaps you expected a rejected refund to be re-requestable, and the chart ends in a final state. Say so, in the terms the simulator showed you:</p>
+<pre data-lang="Prompt"><code>In the simulator, after `reject` the chart stops in `rejected` and nothing
+is enabled. A customer should be able to send a new `request` from
+`rejected`, with the new amount. Keep my layout.</code></pre>
+
+  <h3>4. Let the agent edit, and watch the canvas follow</h3>
+  <p>Claude adds the transition and validates again. Because the file is the truth, the designer redraws from the saved text: the new arrow appears, and your arrangement stays. Had the canvas held unsaved changes, VS Code would have reported a conflict on save, which is why auto-save is on.</p>
+  <p>Edits flow the other way too. Rename <code>manager</code> to <code>supervisor</code> on the canvas, and the file changes exactly where that id appears: the state and the transitions that target it. Ask Claude to "follow the rename into the decider configuration and the tests", and it reads the change with <code>git diff</code> like any other.</p>
+
+  <h3>5. Check what changed, not just that it is valid</h3>
+  <p>A chart's version IRI is the hash of its behaviour, not of its bytes. That gives code review a sharp question: did this change alter what the chart does? Ask the agent to report <code>vt hash</code> before and after. A rename of a state, a new transition or a changed guard gives a new version; reflowed text and comments do not. When the version changes, the next step is to turn the runs you just made into tests, so the behaviour you checked by hand stays checked.</p>
+  <div class="nb warn">
+    <p>One caveat while Vertepnyk is a preview. Its layout lives in a namespace that Vertep reserves for formatting, so moving a box should not change the version. The engine bundled in Vertepnyk already ignores layout, but Vertep 0.1.3 from crates.io does not yet: with layout in the file, the published <code>vt hash</code> reports a new version after a drag. Compare versions from the same <code>vt</code>, or strip layout before hashing, until the next Vertep release.</p>
+  </div>
+
+  <h2>Who is good at what</h2>
+  <p>After a few rounds a division of labour settles in.</p>
+  <ul>
+    <li><strong>The agent drafts and refactors.</strong> It is quick at a first chart from prose, at the datamodel and executable content, and at structural edits that touch many lines: extracting a compound state, renaming an event everywhere, converting SCXML to YAML with <code>vt convert</code>, adding a <code>vt:decide</code> state with its candidates. With the rule in <code>CLAUDE.md</code>, it runs the validator after every edit without being asked.</li>
+    <li><strong>You judge the shape and the behaviour.</strong> You see the missing exit, the state that should be parallel, the timeout nobody asked for. You run the chart and notice that it does what was written, not what was meant.</li>
+    <li><strong>Vertep settles arguments.</strong> When the canvas and the agent disagree about what the chart does, neither wins: the interpreter does, the same one that will run the chart in production.</li>
+  </ul>
+  <p>It is the same idea as <a href="deterministic-agents.html">the goat that does not choose the play</a>, one level up. There, a language model picks among the moves a chart offers while the chart runs. Here, a coding agent proposes changes to the chart itself, and the chart's own checker and simulator decide whether the result is a play worth staging. Nobody, human or model, cuts a slot that the stage cannot hold.</p>
+
+  <h2>Small habits that help</h2>
+  <ul>
+    <li>Ask for small edits ("add a transition", "extract a compound state") rather than "rewrite the chart". Small edits keep your layout and make diffs readable.</li>
+    <li>Describe problems in the simulator's terms: the configuration, the enabled events, the event you sent and its payload. The agent can act on that exactly.</li>
+    <li>Keep one chart per file, and give states ids that read as sentences. Both the canvas and the agent work better with <code>awaiting_payment</code> than with <code>s3</code>.</li>
+    <li>Use <code>vt typecheck</code> with typed YAML charts: event payload types catch the mistakes a validator cannot.</li>
+    <li>Commit when the version changes, with the version IRI in the message. The history then reads as a list of behaviours.</li>
+  </ul>
+
+  <p>Install the designer from <a href="../vertepnyk.html">the Vertepnyk page</a>; the chart used here is <code>fixtures/refund.scxml</code> in its repository.</p>
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>
