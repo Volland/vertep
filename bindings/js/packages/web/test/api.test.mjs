@@ -94,6 +94,46 @@ test("create from SCXML text", async () => {
   }
 });
 
+// @tg: verifies:: [[openspec:scxml-format#Layout Namespace#Layout does not change the chart version]] {level: e2e}
+test("SCXML layout does not change the chart version", async () => {
+  const system = await createActorSystem({ storage: "memory" });
+  try {
+    const laidOut = ORDER.replace(
+      'version="1.0"',
+      'xmlns:vl="https://w3id.org/vertep/layout#" version="1.0"',
+    )
+      .replace('<state id="open">', '<state id="open" vl:x="40" vl:y="40" vl:w="120" vl:h="60" vl:collapsed="false">')
+      .replace('target="paid">', 'target="paid" vl:route="160,70 220,70" vl:label="190,60">');
+    assert.notEqual(laidOut, ORDER);
+    const plain = await (await system.spawn(ORDER, { key: "plain" })).getSnapshot();
+    const layout = await (await system.spawn(laidOut, { key: "layout" })).getSnapshot();
+    assert.deepEqual(layout.configuration, ["open"]);
+    assert.equal(layout.version, plain.version);
+  } finally {
+    await system.terminate();
+  }
+});
+
+// @tg: verifies:: [[openspec:yaml-format#Layout Block#Layout does not change the chart version]] {level: e2e}
+test("YAML layout does not change the chart version", async () => {
+  const system = await createActorSystem({ storage: "memory" });
+  try {
+    const yaml = "vertep: 1\nname: door\nstates:\n  idle:\n    on: { go: done }\n  done: { type: final }\n";
+    const laidOut = `${yaml}layout:
+  states:
+    idle: { x: 40, y: 40, w: 120, h: 60, collapsed: false }
+  transitions:
+    "idle#0": { route: [[160, 70], [240, 70]], label: [200, 60] }
+`;
+    const plain = await (await system.spawn(yaml, { key: "plain" })).getSnapshot();
+    const layout = await (await system.spawn(laidOut, { key: "layout" })).getSnapshot();
+    assert.deepEqual(layout.configuration, ["idle"]);
+    assert.equal(layout.version, plain.version);
+  } finally {
+    await system.terminate();
+  }
+});
+
 // @tg: verifies:: [[openspec:wasm-bindings#Actor Creation From Chart Sources#Invalid chart is rejected]] {level: e2e}
 test("invalid chart is rejected", async () => {
   const system = await createActorSystem({ storage: "memory" });

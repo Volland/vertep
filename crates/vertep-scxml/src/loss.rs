@@ -7,11 +7,15 @@ use vertep_core::ir::{Span, VT_NS};
 
 /// The kind of construct that was lost or kept only opaquely.
 ///
+/// Layout in the [`VL_NS`](crate::VL_NS) namespace is [`LossKind::Layout`], a formatting kind
+/// ([[openspec:scxml-format#Layout Namespace]]).
+///
 /// Kinds split into two groups. *Content* kinds ([`LossKind::is_formatting`] is false) can
 /// carry meaning; they make up [`LossReport::items`], and strict mode rejects a document that
 /// has any. *Formatting* kinds carry no meaning for an SCXML processor; they are listed in
 /// [`LossReport::formatting`] for completeness and never fail strict mode, so that comments
 /// and indentation do not make a document unreadable.
+// @tg: implements:: [[openspec:scxml-format#Layout Namespace]]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LossKind {
@@ -50,6 +54,10 @@ pub enum LossKind {
     /// An attribute stating its default value where the IR records no "explicit" flag
     /// (`autoforward="false"`, history `type="shallow"`). Formatting.
     RedundantAttribute,
+    /// An attribute or element in the layout namespace [`VL_NS`](crate::VL_NS) (`vl:x`, `vl:route`, ...):
+    /// visual layout written by a designer. It is dropped, so layout never reaches the IR or
+    /// the chart hash. Formatting.
+    Layout,
 }
 
 impl LossKind {
@@ -63,6 +71,7 @@ impl LossKind {
                 | LossKind::Whitespace
                 | LossKind::EmptyElement
                 | LossKind::RedundantAttribute
+                | LossKind::Layout
         )
     }
 }

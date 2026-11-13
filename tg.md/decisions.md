@@ -386,6 +386,18 @@ The namespace is `https://w3id.org/vertep/vt#`, chart versions are `urn:vertep:c
 - motivated_by:: [[decisions#Content-addressed chart versions]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[constraints#RDF is open-world]] {weight: secondary}
 
+## Layout is formatting in a reserved namespace
+
+A designer's visual layout lives in the chart file under the reserved namespace `https://w3id.org/vertep/layout#` (prefix `vl`) in SCXML and a top-level `layout` block in YAML; readers drop it.
+
+- motivated_by:: [[decisions#Content-addressed chart versions]] {weight: primary, since: "2026-11-13", note: "moving a box must not change the version IRI"}
+- motivated_by:: [[decisions#IR is the hub]] {weight: secondary, note: "layout is not chart semantics, so it has no IR node"}
+- motivated_by:: [[decisions#SCXML semantics are normative]] {weight: secondary, note: "a namespaced attribute keeps the file plain SCXML for other processors"}
+
+In SCXML every `vl` attribute and element is a formatting loss (`LossKind::Layout`): listed, never kept, never a strict-mode failure, while other foreign namespaces stay `ForeignExtension` content. The writers never emit layout. vertepnyk writes `vl:x`, `vl:y`, `vl:w`, `vl:h` and `vl:collapsed` on state elements, and `vl:route` and `vl:label` on transitions. Its YAML equivalent is `layout: { states, transitions }`.
+
+Rejected: keeping layout as `vt:` or foreign extension nodes, which puts it into the IR and the hash and fails strict mode, and a separate layout sidecar file, which separates a chart from its diagram.
+
 ## Document order is explicit in RDF
 
 Every ordered member of a projected chart carries `vt:order`; `rdf:List` is not used, because transition priority is document order and lists are awkward in SPARQL and fragile under partial updates (M0 design D8).

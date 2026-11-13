@@ -28,6 +28,7 @@ serde_json = "1"
 [dev-dependencies]
 vertep-testkit = { workspace = true }
 vertep-scxml = { workspace = true }
+vertep-yaml = { workspace = true }
 proptest = "1.12"
 # An independent JSON Schema 2020-12 validator for the projection agreement tests.
 jsonschema = { version = "0.61", default-features = false }

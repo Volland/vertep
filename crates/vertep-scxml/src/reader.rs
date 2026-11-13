@@ -8,7 +8,7 @@ use quick_xml::{NsReader, XmlVersion};
 use vertep_core::ir::{
     Binding, Chart, Content, Data, DoneData, Exec, ExecKind, Extension, ExtensionValue,
     HistoryType, IfBranch, Initial, Invoke, Param, SCXML_NS, Script, Send, Span, State,
-    StateElement, Transition, TransitionType, VT_NS,
+    StateElement, Transition, TransitionType, VL_NS, VT_NS,
 };
 use vertep_core::types::Type;
 use vertep_core::types::chart::{PARAM_TYPES_ATTR, TYPE_ATTR, set_param_type};
@@ -373,9 +373,21 @@ impl<'i, 'o> Parser<'i, 'o> {
 
     /// The next child element of `parent`, or `None` at its end tag. Whitespace is counted,
     /// other text is an error.
+    ///
+    /// Elements in the layout namespace [`VL_NS`] are skipped and reported as
+    /// [`LossKind::Layout`], so every caller sees the document as if they were absent.
+    // @tg: implements:: [[openspec:scxml-format#Layout Namespace]]
     fn child(&mut self, parent: &Elem) -> Option<Elem> {
         loop {
             match self.next() {
+                Node::Start(e) if e.ns.as_deref() == Some(VL_NS) => {
+                    self.loss(
+                        LossKind::Layout,
+                        e.span,
+                        format!("layout element <{}> not kept", e.qname),
+                    );
+                    self.skip();
+                }
                 Node::Start(e) => return Some(e),
                 Node::End => return None,
                 Node::Text(t, span) => {
@@ -468,7 +480,9 @@ impl<'i, 'o> Parser<'i, 'o> {
 
     /// Read the SCXML attributes of `el`: `allowed` unprefixed attributes are returned, other
     /// namespaced attributes become extension attributes in `exts` (sorted by namespace and
-    /// name) or, when the IR node has no extension slot, are reported as dropped.
+    /// name) or, when the IR node has no extension slot, are reported as dropped. Attributes in
+    /// the layout namespace [`VL_NS`] are dropped as [`LossKind::Layout`] formatting.
+    // @tg: implements:: [[openspec:scxml-format#Layout Namespace]]
     fn attrs(&mut self, el: &Elem, allowed: &[&str], exts: Option<&mut Vec<Extension>>) -> Attrs {
         let mut out = Attrs::default();
         let mut found = Vec::new();
@@ -492,6 +506,11 @@ impl<'i, 'o> Parser<'i, 'o> {
                         "attribute `{}` on <{}> is in the SCXML namespace",
                         a.qname, el.local
                     ),
+                ),
+                Some(ns) if ns == VL_NS => self.loss(
+                    LossKind::Layout,
+                    el.span,
+                    format!("layout attribute `{}` on <{}> not kept", a.qname, el.local),
                 ),
                 Some(ns) => found.push(Extension {
                     ns: ns.clone(),

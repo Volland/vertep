@@ -20,6 +20,10 @@ use crate::node::{Kind, Node, Pos, parse};
 use crate::types_yaml::type_from_node;
 use crate::{DEFAULT_DATAMODEL, Diagnostic, ErrorKind, LoadError, ReadOptions, SUPPORTED_VERSIONS};
 
+/// The top-level keys of a chart document. `layout` is accepted with any value and never read:
+/// it is the visual layout a designer keeps in the file, not chart content
+/// ([[decisions#Layout is formatting in a reserved namespace]]).
+// @tg: implements:: [[openspec:yaml-format#Layout Block]]
 pub(crate) const TOP_KEYS: &[&str] = &[
     "vertep",
     "name",
@@ -32,6 +36,7 @@ pub(crate) const TOP_KEYS: &[&str] = &[
     "script",
     "states",
     "extensions",
+    "layout",
 ];
 pub(crate) const STATE_KEYS: &[&str] = &[
     "type",

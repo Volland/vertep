@@ -21,7 +21,7 @@ The pure `step` function implementing the W3C SCXML interpretation algorithm: ma
 
 ## SCXML format
 
-Parsing and serializing SCXML documents to and from the IR, with `vt:` extension namespaces and declared loss for unsupported constructs. OpenSpec: `scxml-format`.
+Parsing and serializing SCXML documents to and from the IR, with `vt:` extension namespaces, a reserved `vl:` layout namespace dropped as formatting, and declared loss for unsupported constructs. OpenSpec: `scxml-format`.
 
 - scheduled_in:: [[roadmap#M0 SCXML core]]
 
@@ -63,7 +63,7 @@ The `statechart!` and `include_chart!` macros with compile-time checks, and the 
 
 ## YAML format
 
-A YAML surface for charts that maps one to one onto the IR, with a `types:` block. OpenSpec: `yaml-format`.
+A YAML surface for charts that maps one to one onto the IR, with a `types:` block and an ignored `layout:` block for a designer's layout. OpenSpec: `yaml-format`.
 
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
 

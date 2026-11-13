@@ -5428,6 +5428,7 @@ dependencies = [
  "vertep-core",
  "vertep-scxml",
  "vertep-testkit",
+ "vertep-yaml",
 ]
 
 [[package]]

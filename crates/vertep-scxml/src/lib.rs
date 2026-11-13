@@ -22,6 +22,12 @@
 //!   from outside are declared on the element, relative to a context whose default namespace
 //!   is SCXML. Inside executable content an extension element is an
 //!   [`vertep_core::ir::ExecKind::Extension`] whose position is its index in the block.
+//! - Attributes and elements in the layout namespace [`VL_NS`] (prefix `vl`: `vl:x`, `vl:y`,
+//!   `vl:w`, `vl:h`, `vl:collapsed` on states, `vl:route` and `vl:label` on transitions, or
+//!   anything else in that namespace) are visual layout, not chart content
+//!   ([[decisions#Layout is formatting in a reserved namespace]]). They are dropped and
+//!   listed in [`LossReport::formatting`] as [`LossKind::Layout`], so they never reach the
+//!   IR, never change the chart hash and never fail strict mode.
 //! - Inline content of `<data>`, `<assign>` and `<content>` is kept as text when it has no
 //!   child elements, and as serialized XML (elements as above, text escaped, whitespace-only
 //!   text between elements dropped) when it does. Whitespace-only content is absent.
@@ -43,6 +49,7 @@
 //!
 //! @tg: implements:: [[decisions#IR is the hub]]
 //! @tg: implements:: [[decisions#Full SCXML first]]
+//! @tg: implements:: [[decisions#Layout is formatting in a reserved namespace]]
 
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
@@ -60,7 +67,7 @@ mod writer;
 
 use vertep_core::identity::assign_generated_ids;
 use vertep_core::ir::Chart;
-pub use vertep_core::ir::{SCXML_NS, VT_NS};
+pub use vertep_core::ir::{SCXML_NS, VL_NS, VT_NS};
 
 pub use datamodels::{AnyDatamodel, DatamodelSet, Registered};
 pub use error::{ErrorKind, ParseError, ReadError};

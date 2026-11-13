@@ -90,6 +90,10 @@ SCXML 1.0 XML reader and writer to and from the IR, with `vt:` extension attribu
 
 Implemented 2026-11-11 on quick-xml: reader with spans, recoverable errors, `vt:` and foreign extensions, a caller-supplied `SourceResolver` and a `DatamodelSet` of registered names; writer; strict mode over a loss report that separates content losses from formatting losses. Every IRP chart and generated charts round-trip.
 
+Added 2026-11-13 per [[decisions#Layout is formatting in a reserved namespace]]: attributes and elements in the layout namespace `VL_NS` are dropped as the formatting loss `LossKind::Layout`, so vertepnyk's `vl:` layout never reaches the IR, the hash or a strict-mode failure.
+
+- realizes:: [[decisions#Layout is formatting in a reserved namespace]] {confidence: full}
+
 IR gaps it reports as losses, to close before the IR is frozen for M1: no extension slot on `<datamodel>`, executable-content blocks, `donedata`, `param`, `content`, `elseif`/`else` and the top-level script; inline content cannot tell text from XML; `<content src>` must be inlined; the xpath `<assign type attr>` form (optional IRP tests 474–480, 483) is not representable.
 
 ## vertep-dm-ecma
@@ -189,6 +193,10 @@ The YAML chart surface, mapped one to one onto the IR, with a `types:` block.
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
 
 Implemented 2026-11-11 per [[decisions#YAML on saphyr-parser with a self-verifying writer]]: reader with spans and located diagnostics, canonical byte-stable writer, version check and `cel` as the default datamodel; every SCXML corpus chart converts to YAML and back unchanged. The `vt convert` command and a real CEL expression parser are still open.
+
+Added 2026-11-13 per [[decisions#Layout is formatting in a reserved namespace]]: an optional top-level `layout` key with any value is accepted and ignored by the reader and never written.
+
+- realizes:: [[decisions#Layout is formatting in a reserved namespace]] {confidence: full}
 
 ## vertep-dm-rust
 

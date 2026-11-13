@@ -54,6 +54,11 @@ impl core::hash::Hash for Span {
 pub const VT_NS: &str = "https://w3id.org/vertep/vt#";
 /// The SCXML namespace.
 pub const SCXML_NS: &str = "http://www.w3.org/2005/07/scxml";
+/// The Vertep layout namespace, written with the `vl` prefix: visual layout a designer stores
+/// inline in a chart file (positions, sizes, routes). It is formatting, never chart content:
+/// readers drop it, so it is not in the IR and does not change the chart hash.
+// @tg: implements:: [[decisions#Layout is formatting in a reserved namespace]]
+pub const VL_NS: &str = "https://w3id.org/vertep/layout#";
 
 /// An attribute or element from the `vt:` namespace or a foreign namespace, kept on its owner.
 // @tg: implements:: [[openspec:chart-model#Extension Nodes]]

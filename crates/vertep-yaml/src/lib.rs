@@ -45,6 +45,8 @@
 //!             - { target: cart }
 //!       payment: { always: [ { cond: "ctx.total > 100", target: review } ] }
 //!       review: { type: final }
+//! layout:                   # optional; ignored by the reader, never written
+//!   states: { idle: { x: 40, y: 40, w: 120, h: 60 } }
 //! ```
 //!
 //! States are keyed by id under `states` (document order is kept) and take `type`
@@ -63,6 +65,15 @@
 //! parameters and context entries switch to list form when names repeat. Types ride on
 //! `vt:` extension nodes (see [`vertep_core::types`]); `type` on context entries, `payload_type`
 //! on `send`, `type` on list-form `params` and the `types`/`events` blocks are their spellings.
+//!
+//! The optional top-level `layout` key holds a designer's visual layout (any YAML value; the
+//! designer writes `states: { <id>: { x, y, w, h, collapsed } }` and
+//! `transitions: { "<source>#<index>": { route: [[x, y], ...], label: [x, y] } }`). It is
+//! formatting, not chart content ([[decisions#Layout is formatting in a reserved namespace]]):
+//! the reader accepts and ignores it, so it never reaches the IR or the chart hash, and the
+//! writer never emits it.
+//!
+//! @tg: implements:: [[decisions#Layout is formatting in a reserved namespace]]
 
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
