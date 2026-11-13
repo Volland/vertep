@@ -1342,3 +1342,74 @@ Every host of a durable object holds the object's TSP keys in its key manager, s
 - motivated_by:: [[decisions#Keys stay behind a key manager]] {weight: secondary}
 
 Rejected: one VID per host behind a routing indirection, which would make senders follow custody changes. Keys rotate through the `did:webvh` log when a host leaves.
+
+## did:webvh authoring builds on didwebvh-rs
+
+Authoring, witnessing, publishing and serving `did:webvh` logs live in a new crate `vertep-webvh`; SCIDs, entry hashes, proofs, pre-rotation and the witness proof format stay in the pinned DIF `didwebvh-rs` (M8 design D1).
+
+- motivated_by:: [[decisions#Pinned relay protocol libraries]] {weight: primary, since: "2026-11-13"}
+
+Rejected: a second implementation of a security-critical log format, and authoring inside `vertep-federation`, which every node links and which would then carry git, HTTP serving and file handling it does not need.
+
+## did:webvh entries are signed through the key manager
+
+`KmSigner` implements the `didwebvh-rs` `Signer` over `KeyManager`: Ed25519, with the `did:key` verification method of the key's public key. Update keys, witness keys and object keys are key-manager keys (M8 design D2).
+
+- motivated_by:: [[decisions#Keys stay behind a key manager]] {weight: primary, since: "2026-11-13"}
+
+Rejected: the library's `Secret`, which holds raw private keys in the caller's memory.
+
+## Custodians witness their object's DID log
+
+An object DID names every custodian as a `did:webvh` witness, by the `did:key` of its Ed25519 signing key, with the custody quorum as the threshold, so a published document needs the same majority as a custody commit (M8 design D3).
+
+- motivated_by:: [[decisions#Custody epochs are won by quorum promises]] {weight: primary, since: "2026-11-13"}
+
+A web host that serves an unwitnessed entry is caught by every resolver. Rejected: no witnesses (the controller alone could announce a set the custodians never accepted) and separate witness services (a second trust set to run and keep in step).
+
+## Witnessing is a custody request judged by a replica policy
+
+Custody gains a `witness` request each replica answers through an `EntryWitness` policy: a valid next entry, signed by a current update key, declaring the effective or pending configuration it accepted (M8 design D4).
+
+- motivated_by:: [[decisions#Custodian set changes use joint consensus]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[decisions#Replication rides TSP through a replica link]] {weight: secondary, note: "the request rides the existing custody transports"}
+
+The trait lives in `vertep-objects` and the policy in `vertep-webvh`, so the crates do not depend on each other in a cycle. Rejected: a separate witness HTTP API.
+
+## Custody changes carry their DID log entry
+
+`vt webvh custody change` puts the controller-signed log entry declaring the new set in the reconfiguration request; after the joint-consensus switch the writer collects witness proofs, verifies and publishes it (M8 design D5).
+
+- motivated_by:: [[constraints#did:webvh updates need the web host]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[decisions#Custodian set changes use joint consensus]] {weight: secondary, note: "published only after the switch"}
+
+The entry that changes the witness list is witnessed by the previous list, at its threshold. The custodians that accepted the joint phase hold the new set as pending or effective, so they can witness it.
+
+## Log publishers verify before they write
+
+One `LogPublisher` interface has directory, git and command implementations; each verifies the complete log with its witness file through the `did:webvh` resolver before writing anything (M8 design D6).
+
+- motivated_by:: [[decisions#Method resolvers behind one trait]] {weight: primary, since: "2026-11-13", note: "verification uses the resolution path"}
+
+Rejected: provider SDKs for S3 or Cloudflare; every provider has a command line the command publisher can run.
+
+## vt webvh serve is a static log server
+
+`vt webvh serve` is an axum file server: `text/jsonl` logs, `application/json` witness files and `did.json`, permissive CORS, a cache lifetime capped by the DID's `ttl`, HEAD and GET only, and no path outside its root (M8 design D7).
+
+- motivated_by:: [[constraints#did:webvh resolves domains over HTTPS]] {weight: primary, since: "2026-11-13", note: "TLS is the proxy's job"}
+
+## The mediator creates and serves its own did:webvh
+
+`did = "webvh:<host>[:<path>]"` makes `vt-mediator` create its DID on first start with its `TSPTransport` endpoint, keep the log in its data directory and serve it beside `/tsp` (M8 design D8).
+
+- motivated_by:: [[decisions#Vertep ships its own TSP mediator]] {weight: primary, since: "2026-11-13"}
+
+Switching an existing mediator to `webvh:` gives it a new DID; its users register again.
+
+## Tests route did:webvh domains through the fetcher
+
+Tests resolve through an `HttpFetcher` that maps `https://<domain>/...` onto a directory or a local server; the production resolver path is unchanged (M8 design D9).
+
+- motivated_by:: [[constraints#did:webvh resolves domains over HTTPS]] {weight: primary, since: "2026-11-13"}
+

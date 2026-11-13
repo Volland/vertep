@@ -1,6 +1,6 @@
 [package]
 name = "vertep-cli"
-description = "The vt command line: typecheck, schema, validate, hash, convert and certify"
+description = "The vt command line: typecheck, schema, validate, hash, convert, certify and did:webvh"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -27,6 +27,11 @@ vertep-cluster = { workspace = true, features = ["tiramemsu"] }
 oxrdf = { workspace = true }
 serde_json = "1"
 clap = { version = "4.6", features = ["derive"] }
+# vt webvh: did:webvh authoring, witnessing, publishing and serving.
+vertep-webvh = { workspace = true, features = ["custody", "server"] }
+vertep-federation = { workspace = true }
+vertep-objects = { workspace = true }
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 tempfile = "3"

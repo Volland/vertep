@@ -11,6 +11,7 @@ pub mod replica;
 #[cfg(feature = "tsp")]
 pub mod tsp_link;
 pub mod wire;
+pub mod witness;
 
 pub use config::{ConfigError, Custodian, CustodyConfig, Role};
 pub use history::History;
@@ -23,5 +24,6 @@ pub use link::{CustodianLink, CustodyTransport, LinkError, LocalTransport, Write
 pub use replica::{EvidenceSink, Replica};
 pub use wire::{
     AppendBatch, ContentKey, CustodyRequest, CustodyResponse, EpochPromise, Evidence, KeeperEntry,
-    KeyDirectory, KeyWrap, ResolverKeyDirectory, StaticKeyDirectory, WireEntry,
+    KeyDirectory, KeyWrap, ResolverKeyDirectory, StaticKeyDirectory, WireEntry, WitnessRequest,
 };
+pub use witness::{EntryWitness, WitnessSource};

@@ -194,3 +194,77 @@ retention_secs = 3600
     assert!(metrics.contains("vt_mediator_stored_total 1"), "{metrics}");
     assert!(metrics.contains("vt_mediator_pushed_total 1"), "{metrics}");
 }
+
+fn start_webvh(dir: &std::path::Path, port: u16) -> Running {
+    let config = dir.join("mediator.toml");
+    std::fs::write(
+        &config,
+        format!(
+            r#"
+listen = "127.0.0.1:{port}"
+public_url = "https://mediator.example.org/tsp"
+data_dir = "{data}"
+did = "webvh:mediator.example.org"
+shards = 1
+"#,
+            data = dir.join("data").display()
+        ),
+    )
+    .unwrap();
+    let r = Running(
+        Command::new(env!("CARGO_BIN_EXE_vt-mediator"))
+            .args(["serve", "--config"])
+            .arg(&config)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("vt-mediator starts"),
+    );
+    until("health", || {
+        get(&format!("http://127.0.0.1:{port}/health")).as_deref() == Some("ok")
+    });
+    r
+}
+
+/// Resolves `did` with the `did:webvh` resolver, its domain routed to the local server.
+fn resolve_webvh(did: &str, port: u16) -> DidDocument {
+    let fetcher = vertep_webvh::RoutedFetcher::new(Arc::new(HttpNetwork::default()))
+        .route("mediator.example.org", format!("http://127.0.0.1:{port}"));
+    vertep_federation::resolver::WebVhResolver::new(Arc::new(fetcher), Duration::from_secs(5))
+        .resolve(&Did::parse(did).unwrap())
+        .unwrap()
+        .document
+}
+
+// @tg: verifies:: [[openspec:webvh-hosting#Mediator Under did:webvh#Mediator serves its own log]] {level: e2e}
+// @tg: verifies:: [[openspec:webvh-hosting#Mediator Under did:webvh#Restart keeps the DID]] {level: e2e}
+#[test]
+fn the_binary_serves_its_own_did_webvh() {
+    let dir = tempfile::tempdir().unwrap();
+    let port = free_port();
+    let (did, log) = {
+        let _server = start_webvh(dir.path(), port);
+        let log = get(&format!("http://127.0.0.1:{port}/.well-known/did.jsonl")).unwrap();
+        let parsed = vertep_webvh::DidLog::from_files(&log, None).unwrap();
+        let did = parsed.did().to_owned();
+        assert!(did.starts_with("did:webvh:") && did.ends_with(":mediator.example.org"));
+        let doc = resolve_webvh(&did, port);
+        assert_eq!(
+            vertep_federation::tsp::tsp_uri(&doc).as_deref(),
+            Some("https://mediator.example.org/tsp")
+        );
+        let web: serde_json::Value = serde_json::from_str(
+            &get(&format!("http://127.0.0.1:{port}/.well-known/did.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(web["id"], "did:web:mediator.example.org");
+        (did, log)
+    };
+    // Restarted on the same data directory: the same DID and log.
+    let _server = start_webvh(dir.path(), port);
+    assert_eq!(
+        get(&format!("http://127.0.0.1:{port}/.well-known/did.jsonl")).as_deref(),
+        Some(log.as_str())
+    );
+    assert_eq!(resolve_webvh(&did, port).id, did);
+}

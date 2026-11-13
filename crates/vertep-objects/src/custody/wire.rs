@@ -488,6 +488,24 @@ pub enum CustodyRequest {
         /// The first position to return (from 1).
         from: u64,
     },
+    /// `https://w3id.org/vertep/custody/1.0#witness`: witness a `did:webvh` log entry of the
+    /// object.
+    #[serde(rename = "https://w3id.org/vertep/custody/1.0#witness")]
+    Witness(WitnessRequest),
+}
+
+/// A request to witness the next entry of an object's `did:webvh` log.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WitnessRequest {
+    /// The object (its DID).
+    pub object: String,
+    /// The log the entry follows, as `did.jsonl` text; empty for the genesis entry.
+    pub log: String,
+    /// The log's witness proofs, as `did-witness.json` text.
+    #[serde(default)]
+    pub witness: Option<String>,
+    /// The entry to witness.
+    pub entry: serde_json::Value,
 }
 
 /// Equivocation evidence: two validly signed entries for one position and epoch.
@@ -557,6 +575,14 @@ pub enum CustodyResponse {
         /// The pending configuration it accepted, if a change is in progress.
         #[serde(default)]
         next: Option<CustodyConfig>,
+    },
+    /// `witnessed`: a witness proof (a Data Integrity proof over the entry's `versionId`).
+    #[serde(rename = "https://w3id.org/vertep/custody/1.0#witnessed")]
+    Witnessed {
+        /// The custodian.
+        custodian: String,
+        /// The proof.
+        proof: serde_json::Value,
     },
     /// The request failed (malformed, bad signature, invalid entries, storage).
     #[serde(rename = "https://w3id.org/vertep/custody/1.0#failed")]

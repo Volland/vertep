@@ -5220,15 +5220,19 @@ version = "0.1.2"
 dependencies = [
  "clap",
  "oxrdf",
+ "serde",
  "serde_json",
  "tempfile",
  "vertep-cluster",
  "vertep-core",
  "vertep-dm-cel",
+ "vertep-federation",
+ "vertep-objects",
  "vertep-rdf",
  "vertep-scxml",
  "vertep-store",
  "vertep-tiramemsu",
+ "vertep-webvh",
  "vertep-yaml",
 ]
 
@@ -5513,6 +5517,7 @@ dependencies = [
  "vertep-scxml",
  "vertep-store",
  "vertep-tiramemsu",
+ "vertep-webvh",
 ]
 
 [[package]]
@@ -5547,6 +5552,30 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "vertep-webvh"
+version = "0.1.2"
+dependencies = [
+ "affinidi-data-integrity",
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "bs58",
+ "chrono",
+ "didwebvh-rs",
+ "futures",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "ureq",
+ "url",
+ "vertep-federation",
+ "vertep-objects",
+ "vertep-store",
+ "vertep-webvh",
 ]
 
 [[package]]

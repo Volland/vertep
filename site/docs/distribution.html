@@ -65,7 +65,7 @@
         <tr><td>Trust</td><td>all nodes trusted, mutual TLS</td><td>each party trusts only itself</td></tr>
         <tr><td>Addresses</td><td><code>vt:</code>-style IRIs</td><td>DIDs, opt-in per actor</td></tr>
         <tr><td>Directory</td><td>shard table: <code>hash(IRI) mod N</code> to the lease owner</td><td>DID resolver: the DID document's services</td></tr>
-        <tr><td>Mailbox</td><td>the shard owner's mailbox</td><td>a DIDComm mediator or TSP endpoint, which may be offline</td></tr>
+        <tr><td>Mailbox</td><td>the shard owner's mailbox</td><td>a DIDComm mediator, a TSP endpoint or a <code>vt-mediator</code> mailbox, which may be offline</td></tr>
         <tr><td>Transport</td><td>QUIC, one stream per sender and receiver pair</td><td>DIDComm v2 forward, TSP direct or routed</td></tr>
         <tr><td>Sender identity</td><td>cluster certificate</td><td>verified DID, journaled with the event</td></tr>
         <tr><td>Authorization</td><td>membership only</td><td>DID-scoped grants, inbound and outbound</td></tr>
@@ -247,10 +247,28 @@ cluster.attach(node.handle());</code></pre>
         <tr><td><code>did:key</code></td><td>offline</td><td>simple, keys only</td></tr>
         <tr><td><code>did:peer</code></td><td>offline</td><td>pairwise relationships</td></tr>
         <tr><td><code>did:web</code></td><td>over HTTP, through a fetcher you supply</td><td>actors with a web domain</td></tr>
-        <tr><td><code>did:webvh</code></td><td>over HTTP with log verification, feature <code>webvh</code></td><td>long-lived public actors with verifiable key history</td></tr>
+        <tr><td><code>did:webvh</code></td><td>over HTTP with log verification, feature <code>webvh</code></td><td>long-lived public actors with verifiable key history: durable objects and <code>vt-mediator</code>; created and hosted with <code>vt webvh</code> (<a href="#webvh">below</a>)</td></tr>
       </tbody>
     </table>
     <p>Resolution is cached with a bounded size and time to live, and re-resolved on expiry or endpoint failure. Applications can register or override method resolvers in the <code>ResolverRegistry</code>.</p>
+
+    <h3 id="which-address">Which address an actor gets</h3>
+    <p>Most actors, and most agents, never get a DID. An agent that runs on your node or in your cluster is addressed by an ordinary IRI, its chart type plus its key (<code>&lt;type&gt;/&lt;key&gt;</code>). Its mailbox is a store-backed queue in the same tiramemsu file as its journal. Inside a cluster, a message goes to the node that holds the actor's shard, over QUIC. None of this involves keys, signatures or a resolver.</p>
+    <p>An actor type opts into a DID when its instances talk across a trust boundary: to another organisation, or to parties that must verify who sent a message. The DID then becomes the actor's address, and the services in its DID document say where its mailbox is:</p>
+    <table>
+      <thead><tr><th>The actor is</th><th>Address</th><th>Mailbox</th></tr></thead>
+      <tbody>
+        <tr><td>local or in your cluster</td><td><code>&lt;type&gt;/&lt;key&gt;</code> IRI</td><td>store-backed queue beside its journal</td></tr>
+        <tr><td>in a pairwise relationship</td><td><code>did:peer</code></td><td>a DIDComm mediator or a TSP endpoint</td></tr>
+        <tr><td>public, on a domain you control</td><td><code>did:web</code></td><td>a DIDComm mediator or a TSP endpoint</td></tr>
+        <tr><td>public and long-lived, or a durable object</td><td><code>did:webvh</code></td><td>a TSP mediator (<code>vt-mediator</code>), a DIDComm mediator or a direct TSP endpoint</td></tr>
+      </tbody>
+    </table>
+    <p>Whatever the method, a relay mailbox acknowledges a message only after the turn that processed it is in the journal, so a crash means redelivery, never loss.</p>
+
+    <h3 id="keys">Keys, and what a wallet would add</h3>
+    <p>Every signature, decryption and key agreement goes through the <code>KeyManager</code> trait. Two implementations ship: <code>InMemoryKeyManager</code> and <code>FileKeyManager</code>. An HSM or a cloud KMS fits behind the same trait. An actor's identity (<code>ActorIdentity</code>) holds its DID and the names of its keys, never the keys. Keys rotate without changing the DID. TSP relationships are kept by the OpenWallet Foundation <code>tsp_sdk</code>, and capability grants can arrive as W3C verifiable credentials from a trusted issuer.</p>
+    <p>There is no agent wallet yet. Vertep does not store the credentials an agent holds or present them to others. It speaks no credential-exchange protocol (OpenID4VC, or DIDComm issue and present), offers no selective disclosure, and ships no key store beyond files. That is a candidate for a later milestone, with presentations going through a journaled decision rather than a model's say-so.</p>
     <p>Private keys stay behind the <code>KeyManager</code> trait (<code>InMemoryKeyManager</code>, <code>FileKeyManager</code>) and never enter journals, snapshots, the graph or datamodels: a never-forget store could only erase them by destroying the key that encrypts them. Rotating a key keeps the DID, with a grace period for retired keys. <code>Federation::provision</code> creates an actor's keys and DID and binds the DID to a chart type and key on the node.</p>
 
     <h3 id="admission">Authenticated senders and grants</h3>
@@ -285,6 +303,8 @@ SELECT ?grantee ?event ?until WHERE {
     <ul>
       <li><strong>DIDComm v2.</strong> The sender authcrypts (or anoncrypts) to the recipient and wraps one forward message per routing key. The receiving node picks up in batches. A remote mediator is bound through Mediator Coordination 2.0 and Message Pickup 3.0.</li>
       <li><strong>TSP.</strong> The actor's DID maps to a TSP identifier; messages go direct when the endpoint is reachable, or routed through intermediaries, nested so that only the final recipient opens them.</li>
+      <li><strong>The TSP mediator.</strong> TSP itself defines no store-and-forward, so Vertep ships one: <code>vt-mediator</code> (crate <code>vertep-tsp-mediator</code>) keeps a durable mailbox per recipient. A client (<code>tsp_mailbox::TspMailboxClient</code>) registers and picks up through a small protocol carried inside TSP. The mediator stores only sealed bytes. It runs as one binary or in Docker, with <code>did = "peer"</code>, <code>"web:&lt;host&gt;"</code> or <code>"webvh:&lt;host&gt;"</code>.</li>
+      <li><strong>Live delivery.</strong> Both kinds of mediator can push messages over a WebSocket instead of waiting for a pickup: Message Pickup 3.0 live delivery for DIDComm (<code>MediatorClient::with_live</code>), and live sessions for the TSP mediator.</li>
       <li><strong>Acknowledge after the append.</strong> The receiving mailbox acknowledges a message to the relay only after the turn that processed it is durable, or when it drops it as a duplicate. A crash causes redelivery, never loss.</li>
       <li><strong>Transport choice.</strong> The relay outbox tries the DID document's services in preference order, TSP first and then DIDComm by default, with fallback. <code>&lt;send type="tsp"&gt;</code> or <code>type="didcomm"</code> restricts a send to one transport.</li>
       <li><strong>Undeliverable.</strong> Unreachable recipients are retried with backoff (by default 5 attempts, starting at 1 s and doubling up to 60 s). After that the sending chart receives <code>error.communication</code> with the send id and the reason, without ever blocking.</li>
@@ -304,11 +324,27 @@ fed.attach(<span class="o">&amp;</span>node.handle());                         <
 mediator still holds 0 message(s)</code></pre>
     <p>The DID differs on every run, because the example generates fresh keys. The event's origin is the buyer's verified DID, its origin type is the DIDComm Event I/O Processor, and the mediator holds nothing once the shop's turn is durable.</p>
 
+    <h3 id="webvh">Hosting did:webvh</h3>
+    <p>A <code>did:webvh</code> DID is <code>did:web</code> with a history. Its <code>did.jsonl</code> log is a hash chain of signed entries on an ordinary web server. Each entry may announce the next update key by hash (pre-rotation), and may need proofs from a set of witnesses. Any resolver replays the whole log, so a web host that changes a document without the controller's key, or without enough witnesses, is caught.</p>
+    <p><code>vertep-webvh</code> and <code>vt webvh</code> write and host these logs with keys that stay in the key manager. Every publisher verifies the complete log first:</p>
+<pre data-lang="Shell"><code>vt webvh create --domain example.org --keys ./keys --out ./site --pre-rotation \
+    --service TSPTransport=https://example.org/tsp
+vt webvh rotate &lt;did&gt; --keys ./keys --out ./site
+vt webvh serve --root ./site --addr 127.0.0.1:8080        # behind a TLS proxy</code></pre>
+    <p>The publishers write the layout the specification fixes: <code>/.well-known/did.jsonl</code> for a DID without a path, or <code>/&lt;path&gt;/did.jsonl</code>. Beside the log go <code>did-witness.json</code> and a <code>did.json</code> for <code>did:web</code> resolvers. The site can be:</p>
+    <ul>
+      <li>a directory behind any web server;</li>
+      <li>a git repository behind GitHub or GitLab Pages (<code>--git</code>);</li>
+      <li>a bucket or CDN, through any command line such as <code>aws s3 sync</code> or <code>wrangler pages deploy</code> (<code>--command</code>).</li>
+    </ul>
+    <p>For a durable object, the custodians are the witnesses, at the custody quorum. A custodian witnesses an entry only if it is the valid next entry, signed by a current update key, and declares a custodian set that custodian accepted. So the published document can never name custodians who did not agree. <a href="durable-objects.html#webvh">Durable objects</a> shows how a custody change publishes itself; <a href="cli.html#webvh">the vt command</a> has every subcommand with its output.</p>
+
     <div class="nb warn">
       <p>Known gaps in federation:</p>
       <ul>
-        <li><strong>Live delivery over WebSocket from a mediator is not bound.</strong> Pickup from a remote mediator works in batches: <code>Federation::go_live</code> opens live sessions only on the in-process relays (the node's own inbound queue and the test mediator and intermediary), not through <code>pickup::MediatorClient</code>. Interop with a third-party mediator (Hyperledger Identus) is tested over HTTP, in Docker, when <code>VERTEP_MEDIATOR_INTEROP=1</code> is set, and skipped otherwise.</li>
-        <li><strong>The facade's <code>federation</code> feature does not enable <code>did:webvh</code>.</strong> Enable the <code>webvh</code> feature on <code>vertep-federation</code> for it.</li>
+        <li><strong>Third-party mediators are tested over HTTP only.</strong> Interop with Hyperledger Identus runs in Docker when <code>VERTEP_MEDIATOR_INTEROP=1</code> is set, and is skipped otherwise. The <code>vt-mediator</code> WebSocket client speaks <code>ws://</code> only, so TLS needs a proxy in front.</li>
+        <li><strong>The facade's <code>federation</code> feature does not enable <code>did:webvh</code>.</strong> Enable the <code>webvh</code> feature on <code>vertep-federation</code> to resolve it, and use <code>vertep-webvh</code> to write and host it.</li>
+        <li><strong>No agent wallet.</strong> Credentials are used only for capability grants (<a href="#keys">above</a>).</li>
         <li><strong>No Lean proofs cover federation.</strong> It is checked by interop and integration tests only.</li>
       </ul>
     </div>

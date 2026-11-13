@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in eight milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in nine milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -17,6 +17,8 @@ flowchart LR
     M3 --> M7["M7 Durable objects<br/>m7-durable-objects"]
     M4 --> M7
     M5 --> M7
+    M7 --> M8["M8 did:webvh hosting<br/>m8-webvh"]
+    M5 --> M8
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
@@ -78,6 +80,7 @@ Archived 2026-11-11 with 36 requirements. etcd and Kubernetes Lease membership a
 Actors across trust boundaries: DID identities, authenticated senders, capability grants, and DIDComm and TSP relay mailboxes and transports.
 
 - precedes:: [[roadmap#M7 Durable objects]] {note: "TSP, DID identities and relay mailboxes"}
+- precedes:: [[roadmap#M8 did:webvh hosting]] {note: "the did:webvh resolver"}
 
 Delivered by the OpenSpec change `m5-federation`.
 
@@ -93,4 +96,14 @@ Delivered by the OpenSpec change `m6-wasm-js`.
 
 DID-addressed durable objects with verifiable journals, decentralised custody over TSP with quorum-promised epochs, the durable agent journal, and a TSP mailbox mediator.
 
+- precedes:: [[roadmap#M8 did:webvh hosting]] {note: "custodian-set changes publish witnessed DID log entries"}
+
 Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. Not yet done: creating and hosting `did:webvh` logs.
+
+## M8 did:webvh hosting
+
+Creating, updating, witnessing, publishing and serving `did:webvh` DIDs with Vertep keys; custodians witness their object's DID log; `vt webvh`; `vt-mediator` under a `did:webvh`.
+
+Delivered by the OpenSpec change `m8-webvh` (capabilities `webvh-identity` and `webvh-hosting`), in [[components#vertep-webvh]].
+
+Implemented 2026-11-13: the crate, custodian witnessing in `vertep-objects`, `vt webvh`, and `vt-mediator` under `did:webvh`. Not released yet.

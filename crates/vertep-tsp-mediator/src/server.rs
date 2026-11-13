@@ -7,6 +7,7 @@
 //! | `GET /health` | `ok` |
 //! | `GET /metrics` | Prometheus text |
 //! | `GET /did.json`, `GET /.well-known/did.json` | the mediator's DID document (`did:web` resolves here) |
+//! | `GET <did path>/did.jsonl`, `GET <did path>/did.json` | with `did = "webvh:..."`: its DID log and the `did:web` form of its document |
 //!
 //! Message handling runs on the blocking pool: it appends to the mailbox journal and may post
 //! to the next hop.
@@ -72,19 +73,50 @@ pub fn build(config: &MediatorConfig) -> Result<Arc<Mediator>, ConfigError> {
 
 /// The routes of `mediator`, with the TSP endpoint at `tsp_path`.
 pub fn router(mediator: Arc<Mediator>, tsp_path: &str) -> Router {
+    router_with_log(mediator, tsp_path, None)
+}
+
+/// As [`router`], also serving the mediator's own `did:webvh` log: `did.jsonl` and the
+/// `did:web` form of its document as `did.json`, below `log.0` (`/.well-known` or the DID's
+/// path).
+pub fn router_with_log(
+    mediator: Arc<Mediator>,
+    tsp_path: &str,
+    log: Option<(String, vertep_webvh::DidLog)>,
+) -> Router {
     let live = if tsp_path == "/" {
         "/live".to_owned()
     } else {
         format!("{tsp_path}/live")
     };
-    Router::new()
+    let mut r = Router::new()
         .route(tsp_path, post(post_tsp))
         .route(&live, get(live_upgrade))
         .route("/health", get(|| async { "ok" }))
-        .route("/metrics", get(metrics))
-        .route("/did.json", get(did_document))
-        .route("/.well-known/did.json", get(did_document))
-        .with_state(mediator)
+        .route("/metrics", get(metrics));
+    let mut doc_paths = vec!["/did.json".to_owned(), "/.well-known/did.json".to_owned()];
+    if let Some((base, log)) = log {
+        let base = base.trim_end_matches('/').to_owned();
+        let jsonl = log.jsonl();
+        let web = log
+            .did_web_document()
+            .map(|d| d.to_string())
+            .unwrap_or_default();
+        r = r
+            .route(
+                &format!("{base}/did.jsonl"),
+                get(move || async move { ([(header::CONTENT_TYPE, "text/jsonl")], jsonl) }),
+            )
+            .route(
+                &format!("{base}/did.json"),
+                get(move || async move { ([(header::CONTENT_TYPE, "application/json")], web) }),
+            );
+        doc_paths.retain(|p| *p != format!("{base}/did.json"));
+    }
+    for p in doc_paths {
+        r = r.route(&p, get(did_document));
+    }
+    r.with_state(mediator)
 }
 
 async fn post_tsp(State(m): State<Arc<Mediator>>, body: Bytes) -> Response {
@@ -187,7 +219,11 @@ pub async fn serve(config: MediatorConfig) -> Result<(), ConfigError> {
             let _ = tokio::task::spawn_blocking(move || m.expire()).await;
         }
     });
-    let app = router(mediator.clone(), &tsp_path(&config.public_url));
+    let app = router_with_log(
+        mediator.clone(),
+        &tsp_path(&config.public_url),
+        config.webvh_log()?,
+    );
     let listener = tokio::net::TcpListener::bind(&config.listen)
         .await
         .map_err(|e| ConfigError(format!("{}: {e}", config.listen)))?;

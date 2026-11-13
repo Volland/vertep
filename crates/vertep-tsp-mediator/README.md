@@ -20,7 +20,7 @@ cargo run -p vertep-tsp-mediator --bin vt-mediator -- serve --config mediator.to
 listen = "0.0.0.0:8700"
 public_url = "https://mediator.example/tsp"   # published in the DID document
 data_dir = "/var/lib/vt-mediator"
-did = "web:mediator.example"                  # or "peer"
+did = "web:mediator.example"                  # or "peer", or "webvh:mediator.example[:path]"
 shards = 4
 
 [limits]

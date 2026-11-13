@@ -95,7 +95,24 @@ serve_object(&amp;mut node, &amp;object_address)?; // win custody, replay, re-ar
 
     <h2 id="failover">Handoff and failover</h2>
     <p><code>hand_off</code> moves an object on purpose: the old host brings the custodians level and stops writing, and the next host to activate wins a higher epoch. When a host disappears, any other host takes over the same way as long as a majority of custodians is reachable; with fewer, nothing is written and events wait in the object's mailbox. Timers are in the journal, so the new host re-arms them, and a timer that came due in between fires on activation. Sends of turns whose effects the old host may not have completed are dispatched again with their original message ids, which receivers deduplicate.</p>
-    <p>The controller changes the custodian set with a signed request: the writer ships the new set with the journal, switches once the old majority and every new custodian accepted it, and publishes the <code>did:webvh</code> update. Hosts that join receive the content keys; when a host leaves, a new key generation starts.</p>
+    <p>The controller changes the custodian set with a signed request. The writer replicates the new set as pending; meanwhile every commit and election needs a majority of both sets. It switches once both majorities hold the journal, then publishes the <code>did:webvh</code> update. Hosts that join receive the content keys; when a host leaves, a new key generation starts.</p>
+
+    <h2 id="webvh">Hosting the object's did:webvh</h2>
+    <p><code>vertep-webvh</code> writes and hosts the object's DID log, with keys that stay in the key manager. The log names the custodians as <code>did:webvh</code> witnesses, each by the <code>did:key</code> of its signing key, with the custody quorum as the threshold. A web host that serves an unwitnessed entry is caught by every resolver.</p>
+    <p>A custodian witnesses an entry only if the entry is the valid next entry, signed by a current update key, and declares a custodian set the custodian accepted. A custody change therefore carries its log entry: the old custodians witness it after the switch, and the writer publishes it.</p>
+    <pre data-lang="Text"><code>vt webvh object create --domain example.org --path objects:ticket-8812 --keys ./keys \
+    --custodian host,did:web:a.example,z6Mk... --custodian host,did:web:b.example,z6Mk... \
+    --custodian keeper,did:web:k.example,z6Mk... --quorum 2
+vt webvh witness ./keys/dids/&lt;did&gt;/did.jsonl --keys ./custodian-keys --key &lt;key&gt;   # each custodian
+vt webvh publish &lt;did&gt; --keys ./keys --git ./pages --subdir docs --branch main
+vt webvh custody change &lt;did&gt; --keys ./keys --custodian ... --quorum 2 --request-out change.json</code></pre>
+    <p>The publishers write the <code>did:webvh</code> 1.0 layout (<code>did.jsonl</code>, <code>did-witness.json</code> and the <code>did:web</code> form <code>did.json</code>), and each refuses a log that does not verify:</p>
+    <ul>
+      <li>a directory behind any web server;</li>
+      <li>a git repository behind GitHub or GitLab Pages;</li>
+      <li>any command line, such as <code>aws s3 sync</code> or <code>wrangler pages deploy</code>.</li>
+    </ul>
+    <p><code>vt webvh serve</code> serves such a directory behind a TLS proxy. <code>vt-mediator</code> with <code>did = "webvh:mediator.example"</code> creates its own DID and serves the log beside <code>/tsp</code>.</p>
 
     <h2 id="verification">What is checked</h2>
     <p>Every entry carries its object, position, epoch, writer, the previous entry's hash, its own hash and the writer's signature, so any party verifies a replica from genesis without trusting whoever served it. Two validly signed entries of one epoch at one position are kept as equivocation evidence and reported to the controller. A randomised fault test drives partitions, colliding elections, crashes and late duplicate messages through many seeds, checks that one writer holds each epoch and that nothing committed is ever lost, and exports each history for the Lean custody model.</p>

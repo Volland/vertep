@@ -26,8 +26,9 @@ use super::link::{CustodianLink, CustodyTransport, WriterBatch};
 use super::replica::Replica;
 use super::wire::{
     AppendBatch, ContentKey, CustodyRequest, CustodyResponse, EpochPromise, KeyDirectory, KeyWrap,
-    WireEntry, entry_from_nquads, open_keeper_entry, record_rank, signing_bytes,
+    WireEntry, WitnessRequest, entry_from_nquads, open_keeper_entry, record_rank, signing_bytes,
 };
+use super::witness::WitnessSource;
 use crate::chain::{
     ChainHead, ChainLink, Digest, EntrySigner, HostKeys, content_hash, read_link, seal,
     verify_chain,
@@ -150,12 +151,18 @@ impl Backoff {
 /// Publishes a durable object's DID document update (a signed `did:webvh` log entry) to the
 /// web host serving the log.
 pub trait DocumentPublisher: Send + Sync {
-    /// Publishes `log_entry` for `object`.
+    /// Publishes `log_entry` for `object`, collecting the witness proofs it needs from
+    /// `witnesses` (the object's custodians).
     ///
     /// # Errors
     ///
-    /// Why the web host refused or could not be reached.
-    fn publish(&self, object: &str, log_entry: &serde_json::Value) -> Result<(), String>;
+    /// Why the entry could not be witnessed, or the web host refused or could not be reached.
+    fn publish(
+        &self,
+        object: &str,
+        log_entry: &serde_json::Value,
+        witnesses: &dyn WitnessSource,
+    ) -> Result<(), String>;
 }
 
 /// A publisher that records what it was given (tests, and deployments that publish out of
@@ -176,7 +183,12 @@ impl RecordingPublisher {
 }
 
 impl DocumentPublisher for RecordingPublisher {
-    fn publish(&self, object: &str, log_entry: &serde_json::Value) -> Result<(), String> {
+    fn publish(
+        &self,
+        object: &str,
+        log_entry: &serde_json::Value,
+        _witnesses: &dyn WitnessSource,
+    ) -> Result<(), String> {
         self.published
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -232,6 +244,40 @@ impl ReconfigurationRequest {
         };
         let input = signing_bytes("vertep-custody-reconfigure-v1", &self.unsigned());
         keys.iter().any(|k| k.verify(&input, &sig))
+    }
+}
+
+impl WitnessSource for CustodyHost {
+    /// Asks this host's replica and every custodian it has a transport to.
+    // @tg: implements:: [[openspec:webvh-identity#Custody Changes Publish As Log Entries]] {confidence: partial, note: "witness requests over the custody transports"}
+    fn request_witnesses(
+        &self,
+        request: &WitnessRequest,
+    ) -> Vec<(String, Result<serde_json::Value, String>)> {
+        let answer = |r: CustodyResponse| match r {
+            CustodyResponse::Witnessed { proof, .. } => Ok(proof),
+            CustodyResponse::Refused { reason, .. } | CustodyResponse::Failed { reason } => {
+                Err(reason)
+            }
+            other => Err(format!("unexpected answer {other:?}")),
+        };
+        let wrapped = CustodyRequest::Witness(request.clone());
+        let mut out = vec![(self.host().to_owned(), answer(self.local.handle(&wrapped)))];
+        let transports: Vec<Arc<dyn CustodyTransport>> = self
+            .transports
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .values()
+            .cloned()
+            .collect();
+        for t in transports {
+            if t.custodian() == self.host() {
+                continue;
+            }
+            let r = t.call(&wrapped).map_err(|e| e.to_string()).and_then(answer);
+            out.push((t.custodian().to_owned(), r));
+        }
+        out
     }
 }
 
@@ -405,11 +451,16 @@ impl CustodyHost {
 
     /// Publishes custodian-set changes with `publisher`.
     pub fn with_publisher(self, publisher: Arc<dyn DocumentPublisher>) -> Self {
+        self.set_publisher(publisher);
+        self
+    }
+
+    /// Sets or replaces the publisher of custodian-set changes.
+    pub fn set_publisher(&self, publisher: Arc<dyn DocumentPublisher>) {
         *self
             .publisher
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(publisher);
-        self
     }
 
     /// Keeps this host from electing on first use: a standby host serves the object only
@@ -1344,7 +1395,7 @@ impl CustodyHost {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .clone();
             if let Some(p) = publisher {
-                p.publish(self.object.as_str(), entry)
+                p.publish(self.object.as_str(), entry, self)
                     .map_err(CustodyError::NotAccepted)?;
             }
         }

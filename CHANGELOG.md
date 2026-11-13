@@ -6,6 +6,56 @@ All notable changes to Vertep are recorded here. The format follows
 
 All crates of the workspace and both npm packages share one version.
 
+## [Unreleased]
+
+Milestone M8: `did:webvh` hosting. Change `m8-webvh`; design in
+`tg.md/views/durable-objects.md`.
+
+### Added
+
+- **`vertep-webvh`** (new crate): `did:webvh` authoring and hosting.
+  - **Authoring:** create, update, rotate with pre-rotation, and deactivate DID logs. Every
+    signature goes through the `KeyManager` (`KmSigner`); no private key reaches a log, a file
+    or the caller.
+  - **Documents:** built from Vertep identities, with `TSPTransport`, `DIDCommMessaging` and
+    `VertepCustody` services and the object controller's key.
+  - **Verification before publishing:** errors name the first failing entry, or say how many
+    witness proofs are missing.
+  - **Custodians as witnesses** (feature `custody`):
+    - an object's log names its custodians as witnesses at the custody quorum;
+    - a custodian witnesses only valid next entries, signed by a current update key, that
+      declare a custodian set it accepted;
+    - custody changes carry their log entry, and the writer publishes it after the switch
+      (`WebvhPublisher`).
+  - **Publishers:** directory, git and command, writing the `did:webvh` 1.0 layout
+    (`did.jsonl`, `did-witness.json`, `did.json`).
+  - **Log server** (feature `server`): content types, CORS, a cache lifetime capped by `ttl`,
+    GET and HEAD only, no path traversal.
+  - **Fetchers:** `DirectoryFetcher` and `RoutedFetcher` map domains to directories or local
+    servers.
+- **`vt webvh`:** `create`, `update`, `rotate`, `deactivate`, `verify`, `witness`, `publish`,
+  `serve`, `object create` and `custody change`.
+- **`vt-mediator`:** `did = "webvh:<host>[:<path>]"` creates the mediator's own `did:webvh` on
+  first start, keeps it across restarts and serves its log beside `/tsp`.
+- **`vertep-objects`:**
+  - a custody `witness` request and `witnessed` response (also in the custody ontology);
+  - an `EntryWitness` policy for replicas (`Replica::set_witness`);
+  - `WitnessSource`, implemented by `CustodyHost`;
+  - `CustodyHost::set_publisher`;
+  - `CustodyFixture::for_object` and `rebind` in the testkit.
+
+### Changed
+
+- **Breaking:** `DocumentPublisher::publish` takes a `&dyn WitnessSource`, through which the
+  publisher collects the custodians' witness proofs.
+
+### Known limitations
+
+- **Interop:** the DIF test-suite vector `witness-update` lowers its own witness threshold and is
+  refused, as `didwebvh-rs` refuses it. A witness change applies only after the entry that makes
+  it.
+- **Not supported:** moving a DID to another domain, and watchers.
+
 ## [0.1.2] - 2026-11-13
 
 Milestone M7: durable objects. Change `m7-durable-objects`; design in

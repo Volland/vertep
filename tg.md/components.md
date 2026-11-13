@@ -14,6 +14,7 @@ flowchart TD
     agent["vertep-agent"]
     objects["vertep-objects"]
     mediator["vertep-tsp-mediator"]
+    webvh["vertep-webvh"]
     cluster["vertep-cluster"]
     fed["vertep-federation"]
     runtime["vertep-runtime"]
@@ -33,11 +34,12 @@ flowchart TD
     lean["vertep-lean (Lean 4)"]
 
     facade --> agent & cluster & fed & objects & runtime & macros & tira
-    cli --> scxml & yaml & rdf & lean
+    cli --> scxml & yaml & rdf & lean & webvh
     wasm --> runtime & tira
     agent --> runtime & cel & rdf
     objects --> runtime & store & fed & cluster
-    mediator --> fed & store & tira
+    mediator --> fed & store & tira & webvh
+    webvh --> fed & objects
     cluster --> runtime & store
     fed --> runtime
     runtime --> core & store & rdf
@@ -411,6 +413,7 @@ Durable objects: DID-addressed virtual actors with hash-chained, signed journals
 - realizes:: [[decisions#Equivocation is kept as evidence]]
 - realizes:: [[decisions#Custodian set changes use joint consensus]]
 - realizes:: [[decisions#Hosts share the object VID and only the writer acknowledges]]
+- realizes:: [[decisions#Witnessing is a custody request judged by a replica policy]] {note: "the witness request, EntryWitness and WitnessSource"}
 - scheduled_in:: [[roadmap#M7 Durable objects]]
 
 Modules: `chain` (sealing and verifying entries), `identity` (`DurableObjectId`, `did:webvh` or `did:web` only), `custody` (`config`, `wire`, `replica`, `host`, `link`, `keys`, `history`, and `tsp_link` with feature `tsp`), `runtime` (`ObjectStorage`, `serve_object`), and `testkit` (feature `testkit`). The ontology module is `ontology/custody.ttl`.
@@ -443,7 +446,11 @@ A TSP mailbox mediator: routed-mode intermediary, durable store-and-forward mail
 - realizes:: [[decisions#TSP pickup is a versioned protocol inside TSP]]
 - realizes:: [[decisions#The mediator stores opaque sealed bytes in its own journal]]
 - realizes:: [[decisions#Live delivery is a WebSocket binding of pickup]]
+- realizes:: [[decisions#The mediator creates and serves its own did:webvh]]
+- uses:: [[components#vertep-webvh]] {kind: required, note: "did = \"webvh:...\""}
+- provides:: [[capabilities#webvh hosting]] {confidence: partial, note: "Mediator Under did:webvh"}
 - scheduled_in:: [[roadmap#M7 Durable objects]]
+- scheduled_in:: [[roadmap#M8 did:webvh hosting]] {note: "the mediator under did:webvh"}
 
 The library has four parts:
 
@@ -459,6 +466,45 @@ Known limits:
 - The WebSocket client speaks `ws://` only, so TLS needs a terminating proxy.
 - A replicated deployment is assembled in code (a `ReplicatedJournal` under the store); the binary runs one node.
 - Acknowledged ciphertext stays in the journal history until `compact`.
+
+## vertep-webvh
+
+`did:webvh` authoring and hosting: create, update, rotate and deactivate DID logs with key-manager keys, custodians as witnesses, log publishers, and a log server.
+
+- provides:: [[capabilities#webvh identity]] {confidence: full}
+- provides:: [[capabilities#webvh hosting]] {confidence: partial, note: "the vt webvh commands live in vertep-cli and mediator support in vertep-tsp-mediator"}
+- uses:: [[components#vertep-federation]] {kind: required, note: "the key manager, DID documents, the webvh resolver and the fetcher"}
+- uses:: [[components#vertep-objects]] {kind: optional, note: "feature custody: custodian witnessing and the DocumentPublisher"}
+- realizes:: [[decisions#did:webvh authoring builds on didwebvh-rs]]
+- realizes:: [[decisions#did:webvh entries are signed through the key manager]]
+- realizes:: [[decisions#Custodians witness their object's DID log]]
+- realizes:: [[decisions#Custody changes carry their DID log entry]]
+- realizes:: [[decisions#Log publishers verify before they write]]
+- realizes:: [[decisions#vt webvh serve is a static log server]]
+- realizes:: [[decisions#Tests route did:webvh domains through the fetcher]]
+- scheduled_in:: [[roadmap#M8 did:webvh hosting]]
+
+Log mechanics (SCID, entry hashes, proofs, pre-rotation, witness proof format) stay in the pinned DIF `didwebvh-rs`; this crate connects them to Vertep keys, custody and hosting.
+
+Modules:
+
+- `signer` (`KmSigner`);
+- `author` (`Author`, `CreateOptions`, `EntryChange`);
+- `document`;
+- `log` (`DidLog`, verification that names the failing entry or the missing proofs);
+- `publish` (the layout, `DirectoryPublisher`, `GitPublisher`, `CommandPublisher`);
+- `fetch` (`DirectoryFetcher`, `RoutedFetcher`);
+- `witness` (feature `custody`: `CustodianWitness`, `custody_witnessing`, `publish_witnessed`, `WebvhPublisher`, `custody_change`);
+- `server` (feature `server`).
+
+The tests cover every scenario of `webvh-identity` and `webvh-hosting`:
+
+- custody changes witnessed in process and over TSP;
+- git publishing into a bare remote;
+- the server over a socket;
+- the DIF test-suite vectors.
+
+Found while building it: the DIF `witness-update` vector lowers its own witness threshold. `didwebvh-rs` and Vertep both refuse it, because a witness change applies only after the entry that makes it.
 
 ## vertep-wasm
 
@@ -507,9 +553,14 @@ The `vt` command: convert between SCXML, YAML and RDF, validate and hash charts,
 - uses:: [[components#vertep-rdf]] {kind: required}
 - uses:: [[components#vertep-dm-cel]] {kind: required, note: "CEL checking in vt typecheck; vertep_cli::cel re-exports the CEL type environment projection"}
 - uses:: [[components#vertep-lean]] {kind: optional, note: "vt certify"}
+- uses:: [[components#vertep-webvh]] {kind: required, note: "vt webvh"}
+- provides:: [[capabilities#webvh hosting]] {confidence: partial, note: "the vt webvh commands"}
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
+- scheduled_in:: [[roadmap#M8 did:webvh hosting]] {note: "vt webvh"}
 
 Implemented 2026-11-11: the `vt` binary with `typecheck`, `schema` (JSON Schema, SHACL, CEL; Rust waits for the macro crate), `validate`, `hash`, `convert` between SCXML, YAML and RDF formats, and `certify` per [[decisions#vt certify runs the Lean checker as a process]]. Exit codes: 0 success, 1 the chart fails, 2 usage or I/O.
+
+Since M8, `vt webvh` creates, updates, rotates, deactivates, verifies, witnesses, publishes and serves `did:webvh` DIDs, creates durable-object DIDs (`object create`) and prepares custody changes (`custody change`). Keys stay in a file key manager directory; `dids/<did>/` beside them holds the update-key names and the working log.
 
 ## vertep
 

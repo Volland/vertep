@@ -1,7 +1,7 @@
 ---
 type: Capability
 status: draft
-openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator]
+openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting]
 ---
 # Capabilities
 
@@ -206,3 +206,19 @@ Implemented in [[components#vertep-tsp-mediator]] (library and `vt-mediator` bin
 - an opt-in Docker test of two mediators in a route.
 
 The architecture is in [[views/distribution#Distribution#TSP mediator]].
+
+## webvh identity
+
+Creating `did:webvh` DIDs from Vertep identities with key-manager keys, updates, pre-rotated key rotation, deactivation, custodians witnessing their object's log, and custody changes published as witnessed log entries. OpenSpec: `webvh-identity`.
+
+- scheduled_in:: [[roadmap#M8 did:webvh hosting]]
+
+Implemented in [[components#vertep-webvh]]; the custody side of witnessing is in [[components#vertep-objects]].
+
+## webvh hosting
+
+The `did:webvh` 1.0 file layout, directory, git and command publishers, serving logs over HTTP, the `vt webvh` commands, `vt-mediator` under `did:webvh`, and interop with third-party logs. OpenSpec: `webvh-hosting`.
+
+- scheduled_in:: [[roadmap#M8 did:webvh hosting]]
+
+Implemented in [[components#vertep-webvh]], [[components#vertep-cli]] and [[components#vertep-tsp-mediator]].
