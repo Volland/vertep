@@ -31,7 +31,7 @@ vt --version
 ```
 
 ```text
-vt 0.1.2
+vt 0.1.3
 ```
 
 To use the commands from Rust:

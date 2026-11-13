@@ -98,7 +98,7 @@ DID-addressed durable objects with verifiable journals, decentralised custody ov
 
 - precedes:: [[roadmap#M8 did:webvh hosting]] {note: "custodian-set changes publish witnessed DID log entries"}
 
-Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. Not yet done: creating and hosting `did:webvh` logs.
+Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. Creating and hosting `did:webvh` logs followed in [[roadmap#M8 did:webvh hosting]].
 
 ## M8 did:webvh hosting
 
@@ -106,4 +106,4 @@ Creating, updating, witnessing, publishing and serving `did:webvh` DIDs with Ver
 
 Delivered by the OpenSpec change `m8-webvh` (capabilities `webvh-identity` and `webvh-hosting`), in [[components#vertep-webvh]].
 
-Implemented 2026-11-13: the crate, custodian witnessing in `vertep-objects`, `vt webvh`, and `vt-mediator` under `did:webvh`. Not released yet.
+Implemented 2026-11-13: the crate, custodian witnessing in `vertep-objects`, `vt webvh`, and `vt-mediator` under `did:webvh`. Merged 2026-11-13 (pull request 2) and released in 0.1.3 the same day.

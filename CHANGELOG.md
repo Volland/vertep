@@ -6,7 +6,7 @@ All notable changes to Vertep are recorded here. The format follows
 
 All crates of the workspace and both npm packages share one version.
 
-## [Unreleased]
+## [0.1.3] - 2026-11-13
 
 Milestone M8: `did:webvh` hosting. Change `m8-webvh`; design in
 `tg.md/views/durable-objects.md`.
@@ -191,6 +191,7 @@ The first release: milestones M0 to M6.
 - **M6, WebAssembly and JavaScript:** the core and a browser shell in WebAssembly, the
   `@vertep/web` and `@vertep/dm-ecma` npm packages, and a tiramemsu journal in OPFS.
 
+[0.1.3]: https://github.com/Volland/vertep/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Volland/vertep/compare/9904604...v0.1.2
 [0.1.1]: https://github.com/Volland/vertep/commit/9904604
 [0.1.0]: https://github.com/Volland/vertep/commit/85d5d31

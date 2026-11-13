@@ -1,6 +1,6 @@
 {
   "name": "@vertep/web",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Vertep statecharts as durable actors in browsers and Node.js: SCXML semantics, typed events and a time-travelling journal, running in a worker",
   "license": "MIT OR Apache-2.0",
   "repository": {

@@ -34,4 +34,4 @@ export type { JsonValue, Snapshot } from "./snapshot.js";
 export { lockName, takeStoreLock } from "./locks.js";
 
 /** The version of the package, equal to the Rust crates it was built from. */
-export const VERSION = "0.1.2";
+export const VERSION = "0.1.3";
