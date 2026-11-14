@@ -172,10 +172,29 @@ fn clock_skew_does_not_matter() {
     let (n1, e1, carried) = run();
     let (n2, e2, _) = run();
     assert_eq!((n1, e1), (n2, e2));
+    // Check member names, not the text: sealed entries carry random base64 that may spell a
+    // clock word by chance.
+    fn keys(v: &serde_json::Value, out: &mut Vec<String>) {
+        match v {
+            serde_json::Value::Object(o) => {
+                for (k, x) in o {
+                    out.push(k.to_ascii_lowercase());
+                    keys(x, out);
+                }
+            }
+            serde_json::Value::Array(a) => a.iter().for_each(|x| keys(x, out)),
+            _ => {}
+        }
+    }
     for m in carried {
-        for clocky in ["\"ts\"", "time", "lease", "expires", "deadline"] {
+        let v: serde_json::Value = serde_json::from_str(&m).expect("custody messages are JSON");
+        let mut names = Vec::new();
+        keys(&v, &mut names);
+        for clocky in ["ts", "time", "lease", "expires", "deadline"] {
             assert!(
-                !m.contains(clocky),
+                !names
+                    .iter()
+                    .any(|k| k == clocky || k.contains(clocky) && clocky != "ts"),
                 "a custody message carries {clocky}: {m}"
             );
         }
