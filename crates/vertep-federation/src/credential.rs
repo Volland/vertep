@@ -10,8 +10,8 @@
 use std::fmt;
 
 use serde_json::{Map, Value, json};
-use sha2::{Digest, Sha256};
 
+use crate::data_integrity::{self, ProofError, ProofOptions};
 use crate::did::Did;
 use crate::grants::Grant;
 use crate::identity::ActorIdentity;
@@ -22,7 +22,7 @@ use crate::vocab::{GRANT_CONTEXT, GRANT_CREDENTIAL_TYPE};
 
 /// The VCDM 2.0 context.
 pub const VC_CONTEXT: &str = "https://www.w3.org/ns/credentials/v2";
-const CRYPTOSUITE: &str = "eddsa-jcs-2022";
+const CRYPTOSUITE: &str = data_integrity::EDDSA_JCS_2022;
 
 /// A credential that does not yield a grant.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,18 +59,6 @@ impl fmt::Display for CredentialError {
 
 impl std::error::Error for CredentialError {}
 
-fn jcs(v: &Value) -> Result<Vec<u8>, CredentialError> {
-    serde_json_canonicalizer::to_vec(v).map_err(|e| CredentialError::Malformed(e.to_string()))
-}
-
-/// The `eddsa-jcs-2022` hash data: SHA-256 of the canonical proof configuration followed by
-/// SHA-256 of the canonical unsecured document.
-fn hash_data(unsecured: &Value, proof_config: &Value) -> Result<Vec<u8>, CredentialError> {
-    let mut out = Sha256::digest(jcs(proof_config)?).to_vec();
-    out.extend_from_slice(&Sha256::digest(jcs(unsecured)?));
-    Ok(out)
-}
-
 /// Issues `grant` as a credential signed by `issuer`'s assertion key, valid from `valid_from`
 /// until the grant's expiry.
 ///
@@ -98,29 +86,25 @@ pub fn issue_grant_credential(
         "credentialSubject".into(),
         json!({"id": grant.grantee, "target": grant.target, "events": grant.events}),
     );
-    let unsecured = Value::Object(cred.clone());
-    let proof_config = json!({
-        "@context": [VC_CONTEXT, GRANT_CONTEXT],
-        "type": "DataIntegrityProof",
-        "cryptosuite": CRYPTOSUITE,
-        "created": valid_from.to_rfc3339(),
-        "verificationMethod": issuer.signing.kid,
-        "proofPurpose": "assertionMethod",
-    });
-    let data = hash_data(&unsecured, &proof_config)?;
-    let sig = km
-        .sign(&issuer.signing.key_name, &data)
-        .map_err(CredentialError::Signing)?;
-    let mut proof = proof_config;
-    if let Some(p) = proof.as_object_mut() {
-        p.remove("@context");
-        p.insert(
-            "proofValue".into(),
-            json!(format!("z{}", bs58::encode(sig).into_string())),
-        );
-    }
-    cred.insert("proof".into(), proof);
-    Ok(Value::Object(cred))
+    let options = ProofOptions {
+        cryptosuite: CRYPTOSUITE.into(),
+        verification_method: issuer.signing.kid.clone(),
+        purpose: "assertionMethod".into(),
+        created: valid_from.to_rfc3339(),
+        challenge: None,
+        domain: None,
+    };
+    data_integrity::sign(
+        km,
+        &issuer.signing.key_name,
+        &Value::Object(cred),
+        &options,
+        &data_integrity::jcs,
+    )
+    .map_err(|e| match e {
+        ProofError::Signing(k) => CredentialError::Signing(k),
+        other => CredentialError::Malformed(other.to_string()),
+    })
 }
 
 fn str_field<'a>(v: &'a Value, name: &str) -> Result<&'a str, CredentialError> {
@@ -162,16 +146,12 @@ pub fn verify_grant_credential(
     if !trusted_issuers.iter().any(|t| t == issuer) {
         return Err(CredentialError::UntrustedIssuer(issuer.to_owned()));
     }
-    let proof = credential
-        .get("proof")
-        .and_then(Value::as_object)
-        .ok_or_else(|| CredentialError::Malformed("no proof".into()))?;
-    if proof.get("type").and_then(Value::as_str) != Some("DataIntegrityProof")
-        || proof.get("cryptosuite").and_then(Value::as_str) != Some(CRYPTOSUITE)
-        || proof.get("proofPurpose").and_then(Value::as_str) != Some("assertionMethod")
-    {
-        return Err(CredentialError::BadProof("unsupported proof".into()));
-    }
+    let proof = data_integrity::proof_of(credential, CRYPTOSUITE, "assertionMethod").map_err(|e| {
+        match e {
+            ProofError::Malformed(m) if m == "no proof" => CredentialError::Malformed(m),
+            _ => CredentialError::BadProof("unsupported proof".into()),
+        }
+    })?;
     let vm_id = proof
         .get("verificationMethod")
         .and_then(Value::as_str)
@@ -192,28 +172,10 @@ pub fn verify_grant_credential(
         .find(|m| m.id == vm_id)
         .ok_or_else(|| CredentialError::BadProof(format!("{vm_id} is not an assertion key")))?
         .public_key;
-    let proof_value = proof
-        .get("proofValue")
-        .and_then(Value::as_str)
-        .and_then(|p| p.strip_prefix('z'))
-        .ok_or_else(|| CredentialError::BadProof("no base58btc proofValue".into()))?;
-    let sig = bs58::decode(proof_value)
-        .into_vec()
-        .map_err(|e| CredentialError::BadProof(e.to_string()))?;
-    let mut unsecured = credential.clone();
-    if let Some(o) = unsecured.as_object_mut() {
-        o.remove("proof");
-    }
-    let mut proof_config = Value::Object(proof.clone());
-    if let Some(p) = proof_config.as_object_mut() {
-        p.remove("proofValue");
-        if let Some(ctx) = credential.get("@context") {
-            p.insert("@context".into(), ctx.clone());
-        }
-    }
-    if !key.verify(&hash_data(&unsecured, &proof_config)?, &sig) {
-        return Err(CredentialError::BadProof("signature mismatch".into()));
-    }
+    data_integrity::verify(credential, &key, &data_integrity::jcs).map_err(|e| match e {
+        ProofError::BadSignature => CredentialError::BadProof("signature mismatch".into()),
+        other => CredentialError::BadProof(other.to_string()),
+    })?;
     let valid_from = credential
         .get("validFrom")
         .and_then(Value::as_str)

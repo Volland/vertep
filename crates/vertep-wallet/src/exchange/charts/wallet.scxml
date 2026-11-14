@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The wallet actor (vertep-wallet design D2): one per identity. Its journal records the
+  metadata of every credential stored and deleted (types, issuer, validity, status reference,
+  digest; never claim values) and the exchanges it started; its datamodel is the live list.
+  Requirement: agent-wallet Wallet Actor.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" initial="open" name="vertep-wallet">
+  <datamodel>
+    <data id="did" expr="''"/>
+    <data id="credentials" expr="[]"/>
+    <data id="exchanges" expr="0"/>
+  </datamodel>
+  <state id="open">
+    <transition event="wallet.created">
+      <assign location="did" expr="ev.data.did"/>
+    </transition>
+    <transition event="credential.stored">
+      <assign location="credentials" expr="ctx.credentials.filter(c, c.digest != ev.data.digest) + [ev.data]"/>
+    </transition>
+    <transition event="credential.deleted">
+      <assign location="credentials" expr="ctx.credentials.filter(c, c.digest != ev.data.digest)"/>
+    </transition>
+    <transition event="exchange.started">
+      <assign location="exchanges" expr="ctx.exchanges + 1"/>
+    </transition>
+  </state>
+</scxml>

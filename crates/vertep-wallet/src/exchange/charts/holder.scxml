@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The holder role of a credential exchange (protocol-independent; vertep-wallet design D2, D7).
+  Issuance: an offer leads to one possession proof, and a credential the wallet verified and
+  stored ends the exchange. Presentation: a request leads to the consent decide state, whose
+  candidates are the disclosures the consent policy allowed (ctx.options); a decision outside
+  them fails the guard, is rejected (error.decide.invalid) and nothing is presented.
+  Requirements: agent-wallet Consent Before Disclosure; credential-exchange Role Charts.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" initial="idle" name="vertep-wallet-holder">
+  <datamodel>
+    <data id="outcome" expr="''"/>
+    <data id="exchange" expr="''"/>
+    <data id="peer" expr="''"/>
+    <data id="nonce" expr="''"/>
+    <data id="requested" expr="[]"/>
+    <data id="purpose" expr="''"/>
+    <data id="options" expr="[]"/>
+    <data id="credential" expr="''"/>
+    <data id="disclosed" expr="[]"/>
+    <data id="reason" expr="''"/>
+  </datamodel>
+  <state id="idle">
+    <transition event="exchange.offer" target="proving">
+      <assign location="exchange" expr="ev.data.exchange"/>
+      <assign location="peer" expr="ev.data.issuer"/>
+      <assign location="nonce" expr="ev.data.nonce"/>
+      <send event="wire.pop" target="wire:out">
+        <param name="exchange" expr="ev.data.exchange"/>
+      </send>
+    </transition>
+    <transition event="exchange.request" target="consent">
+      <assign location="exchange" expr="ev.data.exchange"/>
+      <assign location="peer" expr="ev.data.verifier"/>
+      <assign location="nonce" expr="ev.data.nonce"/>
+      <assign location="requested" expr="ev.data.claims"/>
+      <assign location="purpose" expr="ev.data.purpose"/>
+      <assign location="options" expr="ev.data.options"/>
+    </transition>
+  </state>
+  <state id="proving">
+    <transition event="credential.valid" target="stored">
+      <assign location="credential" expr="ev.data.credential"/>
+    </transition>
+    <transition event="credential.invalid">
+      <assign location="reason" expr="ev.data.reason"/>
+    </transition>
+    <transition event="exchange.problem" target="failed">
+      <assign location="reason" expr="ev.data.reason"/>
+    </transition>
+  </state>
+  <state id="consent" vt:decide="consent" vt:candidates="consent.disclose consent.refuse">
+    <transition event="consent.disclose" target="presented"
+                cond="size(ev.data.claims) > 0 &amp;&amp; ctx.options.exists(o, o.credential == ev.data.credential &amp;&amp; ev.data.claims.all(c, c in o.claims))">
+      <assign location="credential" expr="ev.data.credential"/>
+      <assign location="disclosed" expr="ev.data.claims"/>
+      <send event="wire.present" target="wire:out">
+        <param name="exchange" expr="ctx.exchange"/>
+        <param name="credential" expr="ev.data.credential"/>
+        <param name="claims" expr="ev.data.claims"/>
+      </send>
+    </transition>
+    <transition event="consent.refuse" target="refused">
+      <assign location="reason" expr="'consent'"/>
+      <send event="wire.refuse" target="wire:out">
+        <param name="exchange" expr="ctx.exchange"/>
+        <param name="reason" expr="'consent'"/>
+      </send>
+    </transition>
+    <transition event="error.decide.invalid" target="refused">
+      <assign location="reason" expr="'out-of-bounds'"/>
+      <send event="wire.refuse" target="wire:out">
+        <param name="exchange" expr="ctx.exchange"/>
+        <param name="reason" expr="'out-of-bounds'"/>
+      </send>
+    </transition>
+    <transition event="vt.decide.refused" target="refused">
+      <assign location="reason" expr="'refused'"/>
+      <send event="wire.refuse" target="wire:out">
+        <param name="exchange" expr="ctx.exchange"/>
+        <param name="reason" expr="'refused'"/>
+      </send>
+    </transition>
+  </state>
+  <final id="stored"><onentry><assign location="outcome" expr="'stored'"/></onentry></final>
+  <final id="presented"><onentry><assign location="outcome" expr="'presented'"/></onentry></final>
+  <final id="refused"><onentry><assign location="outcome" expr="'refused'"/></onentry></final>
+  <final id="failed"><onentry><assign location="outcome" expr="'failed'"/></onentry></final>
+</scxml>

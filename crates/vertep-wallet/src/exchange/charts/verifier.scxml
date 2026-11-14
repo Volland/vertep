@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The verifier role of a credential exchange (protocol-independent; vertep-wallet design D2).
+  It requests once with a fresh nonce, accepts at most one presentation for it (one the
+  verifier's wallet checked: signatures, holder binding, audience, nonce, trust, validity,
+  status, requested claims), refuses the others, and ends on acceptance or the holder's refusal.
+  Requirements: credential-exchange Bound And Fresh Presentations, Role Charts.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" initial="idle" name="vertep-wallet-verifier">
+  <datamodel>
+    <data id="outcome" expr="''"/>
+    <data id="exchange" expr="''"/>
+    <data id="holder" expr="''"/>
+    <data id="nonce" expr="''"/>
+    <data id="requested" expr="[]"/>
+    <data id="credential" expr="''"/>
+    <data id="disclosed" expr="[]"/>
+    <data id="refusals" expr="0"/>
+  </datamodel>
+  <state id="idle">
+    <transition event="exchange.start" target="requested">
+      <assign location="exchange" expr="ev.data.exchange"/>
+      <assign location="holder" expr="ev.data.peer"/>
+      <assign location="nonce" expr="ev.data.nonce"/>
+      <assign location="requested" expr="ev.data.claims"/>
+      <send event="wire.request" target="wire:out">
+        <param name="exchange" expr="ev.data.exchange"/>
+      </send>
+    </transition>
+  </state>
+  <state id="requested">
+    <transition event="presentation.valid" target="accepted">
+      <assign location="credential" expr="ev.data.credential"/>
+      <assign location="disclosed" expr="ev.data.claims"/>
+      <send event="wire.verify" target="wire:out">
+        <param name="exchange" expr="ctx.exchange"/>
+        <param name="msg" expr="ev.data.msg"/>
+        <param name="result" expr="'accept'"/>
+        <param name="reason" expr="''"/>
+      </send>
+    </transition>
+    <transition event="presentation.invalid">
+      <assign location="refusals" expr="ctx.refusals + 1"/>
+      <send event="wire.verify" target="wire:out">
+        <param name="exchange" expr="ctx.exchange"/>
+        <param name="msg" expr="ev.data.msg"/>
+        <param name="result" expr="'refuse'"/>
+        <param name="reason" expr="ev.data.reason"/>
+      </send>
+    </transition>
+    <transition event="exchange.problem" target="refused"/>
+  </state>
+  <final id="accepted"><onentry><assign location="outcome" expr="'accepted'"/></onentry></final>
+  <final id="refused"><onentry><assign location="outcome" expr="'refused'"/></onentry></final>
+</scxml>

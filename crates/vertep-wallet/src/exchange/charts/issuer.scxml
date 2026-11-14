@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The issuer role of a credential exchange (protocol-independent; vertep-wallet design D2).
+  One instance per offer: it offers once, issues at most once, to a key whose possession proof
+  over this offer's nonce the issuer's wallet verified (possession.valid), and then ends.
+  Requirements: credential-exchange Possession Before Issuance, Issuance At Most Once Per Offer.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" initial="idle" name="vertep-wallet-issuer">
+  <datamodel>
+    <data id="outcome" expr="''"/>
+    <data id="exchange" expr="''"/>
+    <data id="holder" expr="''"/>
+    <data id="nonce" expr="''"/>
+    <data id="key" expr="''"/>
+  </datamodel>
+  <state id="idle">
+    <transition event="exchange.start" target="offered">
+      <assign location="exchange" expr="ev.data.exchange"/>
+      <assign location="holder" expr="ev.data.peer"/>
+      <assign location="nonce" expr="ev.data.nonce"/>
+      <send event="wire.offer" target="wire:out">
+        <param name="exchange" expr="ev.data.exchange"/>
+      </send>
+    </transition>
+  </state>
+  <state id="offered">
+    <transition event="possession.valid" target="issued">
+      <assign location="key" expr="ev.data.key"/>
+      <send event="wire.issue" target="wire:out">
+        <param name="exchange" expr="ctx.exchange"/>
+        <param name="key" expr="ev.data.key"/>
+      </send>
+    </transition>
+    <transition event="possession.invalid">
+      <send event="wire.problem" target="wire:out">
+        <param name="exchange" expr="ctx.exchange"/>
+        <param name="reason" expr="ev.data.reason"/>
+      </send>
+    </transition>
+    <transition event="exchange.cancel" target="cancelled"/>
+  </state>
+  <final id="issued"><onentry><assign location="outcome" expr="'issued'"/></onentry></final>
+  <final id="cancelled"><onentry><assign location="outcome" expr="'cancelled'"/></onentry></final>
+</scxml>

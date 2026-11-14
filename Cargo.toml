@@ -24,6 +24,7 @@ members = [
     "crates/vertep-objects",
     "crates/vertep-tsp-mediator",
     "crates/vertep-webvh",
+    "crates/vertep-wallet",
     "examples",
 ]
 
@@ -55,6 +56,7 @@ vertep-cluster = { path = "crates/vertep-cluster", version = "0.1.4", default-fe
 vertep-objects = { path = "crates/vertep-objects", version = "0.1.4" }
 vertep-tsp-mediator = { path = "crates/vertep-tsp-mediator", version = "0.1.4" }
 vertep-webvh = { path = "crates/vertep-webvh", version = "0.1.4", default-features = false }
+vertep-wallet = { path = "crates/vertep-wallet", version = "0.1.4", default-features = false }
 # vertep-macros: token parsing and code generation for statechart! and include_chart!.
 # `span-locations` gives the line and column of macro input tokens for IR spans.
 syn = { version = "2.0.119", features = ["full", "extra-traits"] }
