@@ -6,6 +6,41 @@ All notable changes to Vertep are recorded here. The format follows
 
 All crates of the workspace and both npm packages share one version.
 
+## [Unreleased]
+
+## [0.1.6] - 2026-11-14
+
+Milestones M10 (agent protocols, core) and M11 (Python bindings), plus the regulated-work documentation. Changes `m10-agent-protocols` (core) and `m11-python-bindings`; designs in `tg.md/views/kolyada.md` and `tg.md/views/python.md`.
+
+Milestone M11: Python bindings. Change `m11-python-bindings`; design in `tg.md/views/python.md`.
+
+### Added
+
+- **`vertep-kolyada`** (new crate, first published in this release): verifiable role-based agent
+  protocols, hash-identified JSON-LD choreographies that any peer can project, check and run, with
+  signed envelopes, causal delivery and conformance vectors. The join policy, sealed fan-out, the
+  mailbox binding, `vt kolyada` and the Lean model are not yet there.
+- **`examples/credit-decision`**: a regulated lending decision with a model underwriter, a policy
+  ceiling, a human officer and an audit from the journal alone; the site pages `why`, `regulated`
+  and two articles on explainable decisions; drafts of `m12-decision-records` and
+  `m13-production-readiness`.
+- **`vertep-py`** (new crate, not published to crates.io) and the **`vertep` Python package**
+  (`bindings/python`, for PyPI): the actor system's command bridge as a PyO3 extension and a
+  plain-Python API on top.
+  - `ActorSystem`, `Actor`, `Snapshot` and `Subscription`: charts from SCXML, YAML or RDF, virtual
+    actors by type and key, events as a name plus keyword payload, one snapshot per changing
+    macrostep, `journal`, `as_of`, `can`, SPARQL, and typed errors with the bridge's stable codes.
+  - **Explicit time:** a system clock (`wait`) or a virtual clock (`advance`), so tests never sleep.
+  - **Durable files:** `storage="file"` is a tiramemsu file the Rust runtime and `@vertep/web`
+    open too; durable timers that fell due while closed fire once at start.
+  - **Guards and actions in Python**, bound by IRI with the JavaScript contract; `dev=True`
+    reports impure ones.
+  - One `abi3` wheel per platform for CPython 3.9 and later, plus an sdist.
+- Python examples in `examples/python`, each checked against its recorded output.
+- Docs page `site/docs/python.html`; release workflow `python-release.yml` (wheels for five
+  platforms, smoke tests, TestPyPI dry run, PyPI Trusted Publishing) and
+  `bindings/python/RELEASING.md`; a `python` CI job.
+
 ## [0.1.5] - 2026-11-14
 
 Milestone M9: agent wallets. Change `m9-agent-wallet`; design in `tg.md/views/wallet.md`.
@@ -264,6 +299,7 @@ The first release: milestones M0 to M6.
 - **M6, WebAssembly and JavaScript:** the core and a browser shell in WebAssembly, the
   `@vertep/web` and `@vertep/dm-ecma` npm packages, and a tiramemsu journal in OPFS.
 
+[0.1.6]: https://github.com/Volland/vertep/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Volland/vertep/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Volland/vertep/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Volland/vertep/compare/v0.1.2...v0.1.3

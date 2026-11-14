@@ -160,3 +160,40 @@ jobs:
       - name: Bundle size budget
         working-directory: bindings/js
         run: npm run check:size
+
+  python:
+    name: Python bindings on Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        # the oldest and the newest CPython the abi3 wheel supports
+        python: ["3.9", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Package version equals the workspace version
+        if: matrix.python == '3.13'
+        run: python bindings/python/scripts/check_version.py
+      - name: Build the extension and install it
+        working-directory: bindings/python
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install maturin pytest
+          maturin develop
+      - name: Tests, including every example against its recorded output
+        working-directory: bindings/python
+        run: |
+          . .venv/bin/activate
+          pytest -q
+      - name: The sdist builds
+        if: matrix.python == '3.13'
+        working-directory: bindings/python
+        run: |
+          . .venv/bin/activate
+          maturin sdist

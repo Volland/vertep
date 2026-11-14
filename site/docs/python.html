@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Python — Vertep docs</title>
+<meta name="description" content="Use Vertep from Python: pip install vertep, then journaled SCXML actors with typed events, subscriptions, time travel, SPARQL, durable file storage and guards and actions written in Python.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
+      <li><a href="wallet.html">Agent wallets</a></li>
+      <li><a href="protocols.html">Agent protocols</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+      <li><a href="python.html" aria-current="page">Python</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
+    <h1>Python</h1>
+    <p class="lede">The same actor system as the Rust runtime and <code>@vertep/web</code>, as a Python package. This page shows how to install it, create actors from SCXML, send events, subscribe to snapshots, read journals and travel in time, keep actors in a file, and write guards and actions in Python.</p>
+
+    <h2 id="install">Install</h2>
+    <pre data-lang="Shell"><code>pip install vertep</code></pre>
+    <p>CPython 3.9 or later. The wheel is built once per platform against the stable ABI (<code>abi3</code>), so it works on every CPython from 3.9 on; it holds the Vertep core, the CEL and <code>rust</code> datamodels and tiramemsu, and needs no Rust toolchain. To build from this repository instead, see <a href="#build">Building from source</a>.</p>
+
+    <h2 id="quickstart">Quick start</h2>
+    <p>An order actor is addressed by its chart type and key. Paying it schedules a delayed <code>ship</code> event, a durable timer in the journal. A virtual clock makes the run deterministic: time moves only when <code>advance</code> says so.</p>
+    <pre data-lang="Python"><code>from vertep import ActorSystem
+
+ORDER = """&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="open"&gt;
+  &lt;state id="open"&gt;
+    &lt;transition event="pay" target="paid"&gt;&lt;send event="ship" delay="200ms"/&gt;&lt;/transition&gt;
+  &lt;/state&gt;
+  &lt;state id="paid"&gt;&lt;transition event="ship" target="shipped"/&gt;&lt;/state&gt;
+  &lt;state id="shipped"/&gt;
+&lt;/scxml&gt;"""
+
+ORDER_TYPE = "https://example.org/charts/order"
+
+with ActorSystem(storage="memory", clock="virtual") as system:
+    # A virtual actor exists for every key: no create call, the first message activates it.
+    order = system.spawn(ORDER, type=ORDER_TYPE, key="42")
+    print("actor", order.address)
+    print("start:", order.snapshot().configuration)
+
+    order.send("pay")
+    print("after pay:", order.snapshot().configuration)
+    print("pending timers:", [(t["event"], t["due"]) for t in system.pending_timers()])
+
+    system.advance(0.1)
+    print("after 100 ms:", order.snapshot().configuration)
+    system.advance(0.1)
+    print("after 200 ms:", order.snapshot().configuration)
+
+    print("journal:")
+    for entry in order.journal():
+        taken = [t.split("#")[1] for t in entry["transitions"]]
+        print(f"  {entry['position']} {entry['event']['name']:&lt;5} -&gt; {taken}")
+
+    # Time travel: the state after entry 1, rebuilt from the journal.
+    print("as of entry 1:", order.as_of(position=1).configuration)</code></pre>
+    <p>It prints the real output recorded in <code>examples/python/quickstart.expected-output.txt</code>, and the test suite runs every example and compares.</p>
+
+    <h2 id="actors">Systems, charts and actors</h2>
+    <table>
+      <thead><tr><th>Call</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>ActorSystem(storage, path=, clock=, start=, dev=, idle_timeout=, guards=, actions=)</code></td><td>Opens a system. <code>storage</code> is <code>"memory"</code> or <code>"file"</code> and has no default fallback. Use it as a context manager, or call <code>close()</code>.</td></tr>
+        <tr><td><code>system.register(source, type=, format=)</code></td><td>Validates and registers a chart (SCXML, YAML or an RDF chart graph; the format is sniffed when absent). Returns <code>{"type", "version"}</code>; the version is the content-addressed chart IRI.</td></tr>
+        <tr><td><code>system.spawn(source, type=, key=)</code></td><td>Registers <code>source</code> and returns the <code>Actor</code> of that chart type and key. Without <code>source</code>, the type must be registered already; without <code>key</code>, one is generated.</td></tr>
+        <tr><td><code>system.actor(type, key)</code></td><td>The actor of a registered type and key. A virtual actor exists for every key: the first message activates it.</td></tr>
+        <tr><td><code>system.actors()</code></td><td>The addresses of every actor that has a journal in the store.</td></tr>
+      </tbody>
+    </table>
+    <p>An event is its name plus its payload's fields: <code>actor.send("add", qty=2)</code> and <code>actor.send({"type": "add", "qty": 2})</code> are the same event. <code>send</code> runs everything that falls due and returns the message id; a repeated <code>message_id=</code> is a duplicate and is applied once. <code>actor.can("checkout")</code> reports whether an event would take a transition, without sending it. It is <code>False</code> before the actor's first message, because nothing is activated yet.</p>
+
+    <h2 id="snapshots">Snapshots and subscriptions</h2>
+    <p><code>actor.snapshot()</code> is a frozen <code>Snapshot</code>: <code>address</code>, <code>position</code> (the journal position it is after, 0 before the first entry), <code>version</code>, <code>configuration</code> (active state ids), <code>context</code> (the datamodel as plain Python values), <code>terminated</code>, and <code>matches(state)</code>. A terminated session has an empty configuration.</p>
+    <p><code>actor.subscribe(callback, transitions=)</code> calls <code>callback(snapshot)</code> once per macrostep that changed the configuration or the context, in journal order; an event that no transition takes is journaled and tells nobody. With <code>transitions=</code> a second callback hears every macrostep that took a transition, with its <code>position</code>, <code>event</code> and <code>transitions</code>. Callbacks run on the thread that drives the system, during <code>send</code>, <code>wait</code> or <code>pump</code>, and may send events themselves. <code>subscription.cancel()</code> stops delivery; so does leaving a <code>with subscription:</code> block.</p>
+
+    <h2 id="journal">Journal and time travel</h2>
+    <p>Every accepted event is one journal entry, with the transitions it took. <code>actor.journal(start=0)</code> lists them as dictionaries (<code>position</code>, <code>kind</code>, <code>event</code>, <code>transitions</code>, <code>timers</code>, <code>sends</code>, <code>timestamp</code>, <code>digest</code>). <code>actor.as_of(position=1)</code>, or <code>as_of(time=seconds_since_epoch)</code>, rebuilds the state by replaying the journal and leaves the live actor alone. <code>system.query(sparql, at=)</code> runs SPARQL on the state graph; with <code>at=</code> it sees the graph as it was then, which needs <code>storage="file"</code>. Rows are dictionaries of N-Triples terms.</p>
+
+    <h2 id="time">Time is explicit</h2>
+    <p>Wall-clock time enters an actor only as a journaled timestamp, so the step never reads a clock and replay gives the same states at any later time. You choose how the system's own clock moves:</p>
+    <table>
+      <thead><tr><th>Clock</th><th>Timers fire</th><th>Use it for</th></tr></thead>
+      <tbody>
+        <tr><td><code>clock="system"</code> (default)</td><td>While you call <code>wait(seconds)</code>, <code>send</code> or <code>pump()</code>. <code>wait</code> sleeps with the interpreter free for other threads and Ctrl-C interrupting.</td><td>Services and scripts that run in real time.</td></tr>
+        <tr><td><code>clock="virtual", start=</code></td><td>When you call <code>advance(seconds)</code>, in due order, all at once.</td><td>Tests, simulations, replays; no sleeping.</td></tr>
+      </tbody>
+    </table>
+    <p>Timers are durable: a timer scheduled by one system and overdue when another opens the same file fires once, as that system starts. SCXML delays are CSS2 times, so <code>delay="200ms"</code> and <code>delay="3600s"</code> are valid and <code>delay="1h"</code> is not.</p>
+
+    <h2 id="storage">Durable file storage</h2>
+    <p><code>ActorSystem(storage="file", path="orders.db")</code> keeps the journal and the state graph in a tiramemsu file, the same format the Rust runtime and <code>@vertep/web</code> use. The file is exclusive: a second system on it raises <code>StoreLocked</code> until the first is closed. <code>system.export_journal()</code> returns the file's bytes. <code>storage="memory"</code> keeps everything in the process and has no history to query.</p>
+    <pre data-lang="Python"><code>import tempfile
+from pathlib import Path
+
+from vertep import ActorSystem
+
+ORDER = """&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="open"&gt;
+  &lt;state id="open"&gt;
+    &lt;transition event="pay" target="paid"&gt;&lt;send event="ship" delay="3600s"/&gt;&lt;/transition&gt;
+  &lt;/state&gt;
+  &lt;state id="paid"&gt;&lt;transition event="ship" target="shipped"/&gt;&lt;/state&gt;
+  &lt;state id="shipped"/&gt;
+&lt;/scxml&gt;"""
+
+ORDER_TYPE = "https://example.org/charts/order"
+
+with tempfile.TemporaryDirectory() as directory:
+    journal = Path(directory) / "orders.db"
+
+    with ActorSystem(storage="file", path=journal, clock="virtual", start=0) as system:
+        order = system.spawn(ORDER, type=ORDER_TYPE, key="7")
+        order.send("pay")
+        print("first run:", order.snapshot().configuration, "timers:", len(system.pending_timers()))
+    # The system is closed: the file is released and the process holds nothing of the actor.
+
+    # A day later, by a different clock, in a fresh system on the same file. The durable timer
+    # was journaled and is overdue, so it fires once, as the system starts.
+    with ActorSystem(storage="file", path=journal, clock="virtual", start=86_400) as system:
+        system.register(ORDER, type=ORDER_TYPE)
+        order = system.actor(ORDER_TYPE, "7")
+        snapshot = order.snapshot()
+        print("reopened:", snapshot.configuration, "at position", snapshot.position)
+        print("timers left:", len(system.pending_timers()))
+
+        # The state graph, as SPARQL sees it now.
+        rows = system.query(
+            "SELECT (COUNT(*) AS ?n) WHERE { GRAPH ?g { ?s ?p ?o } }"
+        )["rows"]
+        print("graph holds triples:", int(rows[0]["n"].split('"')[1]) &gt; 0)
+        print("journal file is SQLite:", system.export_journal()[:15].decode())</code></pre>
+
+    <h2 id="functions">Guards and actions in Python</h2>
+    <p>A chart on the <code>rust</code> datamodel names its guards and actions by IRI. Python callables registered under those IRIs run inside the step. A guard receives <code>(context, event)</code> and returns a bool. An action receives the same and returns what it changes: <code>{"context": {...}, "raise": [...], "send": [...]}</code>, or <code>None</code> for nothing. The event is a dictionary <code>{"type": name, ...payload fields, "_meta": {...}}</code>, as in <code>@vertep/web</code>; an emitted event is written the same way, <code>{"type": "receipt", "amount": 5}</code>, and a <code>send</code> may add <code>target</code> and <code>delay</code> (milliseconds).</p>
+    <p>Both must be pure: the journal is replayed, and a guard or action that answers differently the second time breaks replay. <code>dev=True</code> replays every macrostep from the journal and compares it with the live result, and a difference becomes an <code>ImpurityWarning</code>.</p>
+    <pre data-lang="Python"><code>import warnings
+
+from vertep import ActorSystem, ImpurityWarning
+
+CHART = """&lt;scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="idle" datamodel="rust"&gt;
+  &lt;datamodel&gt;&lt;data id="total" expr="0"/&gt;&lt;/datamodel&gt;
+  &lt;state id="idle"&gt;
+    &lt;transition event="pay" cond="vt:guard/order/positive" target="paid"&gt;
+      &lt;foreach array="vt:action/order/record" item="_vt_emit"&gt;
+        &lt;send eventexpr="_vt_emit.event" targetexpr="_vt_emit.target" typeexpr="_vt_emit.type" delayexpr="_vt_emit.delay"&gt;&lt;content expr="_vt_emit.data"/&gt;&lt;/send&gt;
+      &lt;/foreach&gt;
+    &lt;/transition&gt;
+  &lt;/state&gt;
+  &lt;state id="paid"&gt;&lt;transition event="receipt" target="done"/&gt;&lt;/state&gt;
+  &lt;final id="done"/&gt;
+&lt;/scxml&gt;"""
+
+TYPE = "https://example.org/charts/payment"
+
+
+def positive(context, event):
+    return event["amount"] &gt; 0
+
+
+def record(context, event):
+    # What the action changes, and the event it raises (its fields are the payload).
+    return {
+        "context": {"total": context["total"] + event["amount"]},
+        "raise": [{"type": "receipt", "amount": event["amount"]}],
+    }
+
+
+with ActorSystem(
+    storage="memory",
+    clock="virtual",
+    guards={"vt:guard/order/positive": positive},
+    actions={"vt:action/order/record": record},
+) as system:
+    payment = system.spawn(CHART, type=TYPE, key="1")
+    payment.send("pay", amount=0)
+    print("pay 0 :", payment.snapshot().configuration, "(the guard refused)")
+    payment.send("pay", amount=25)
+    snapshot = payment.snapshot()
+    print("pay 25:", snapshot.configuration, "terminated:", snapshot.terminated, "total:", snapshot.context["total"])
+
+# An impure guard answers differently when the journal is replayed; development mode says so.
+calls = []
+
+
+def flaky(context, event):
+    calls.append(event)
+    return len(calls) == 1
+
+
+with ActorSystem(
+    storage="memory",
+    clock="virtual",
+    dev=True,
+    guards={"vt:guard/order/positive": flaky},
+    actions={"vt:action/order/record": lambda context, event: None},
+) as system:
+    payment = system.spawn(CHART, type=TYPE, key="2")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        payment.send("pay", amount=1)
+    for w in caught:
+        if issubclass(w.category, ImpurityWarning):
+            print("dev mode:", str(w.message).split(":")[0])</code></pre>
+
+    <h2 id="errors">Errors</h2>
+    <p>Every error is a <code>vertep.VertepError</code> with a stable <code>code</code>, the same codes <code>@vertep/web</code> reports.</p>
+    <table>
+      <thead><tr><th>Exception</th><th>Raised when</th></tr></thead>
+      <tbody>
+        <tr><td><code>ChartInvalid</code></td><td>A chart source fails to read or validate. <code>.violations</code> lists every problem with its line and column.</td></tr>
+        <tr><td><code>InvalidArgument</code></td><td>A call's arguments are malformed. It is also a <code>ValueError</code>.</td></tr>
+        <tr><td><code>NotFound</code></td><td>A chart type, actor or subscription does not exist.</td></tr>
+        <tr><td><code>StoreLocked</code></td><td>Another system holds the file open.</td></tr>
+        <tr><td><code>ActivationError</code>, <code>DeliveryError</code>, <code>StoreError</code></td><td>An actor cannot be activated or replayed; a message cannot be delivered; the store fails.</td></tr>
+        <tr><td><code>SystemClosed</code></td><td>The system was closed. It is also a <code>RuntimeError</code>.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="limits">What to know before you rely on it</h2>
+    <ul>
+      <li><strong>One thread.</strong> Datamodels need not be <code>Send</code>, so a system belongs to the thread that created it; another thread touching it raises an error. Create it where you use it.</li>
+      <li><strong>Synchronous.</strong> There is no <code>asyncio</code> API yet. Calls return when the macrostep is done; <code>wait</code> blocks the calling thread.</li>
+      <li><strong>Numbers are floats.</strong> The CEL datamodel's integers arrive as Python <code>float</code>s, as they do as JavaScript numbers (<code>3.0 == 3</code> holds).</li>
+      <li><strong>Not yet bound:</strong> <code>request</code>/reply, the WebSocket transport, agents and deciders, federation and the cluster. Use the Rust crates or the JavaScript packages for those.</li>
+      <li><strong>No ECMAScript datamodel in the default wheel.</strong> boa adds several megabytes; build with <code>maturin develop --features ecmascript</code> if you need it.</li>
+    </ul>
+
+    <h2 id="build">Building from source</h2>
+    <p>You need the Rust toolchain pinned in <code>rust-toolchain.toml</code>, Python 3.9 or later and <a href="https://www.maturin.rs/">maturin</a>. The Rust side is the crate <code>crates/vertep-py</code>, a thin PyO3 layer over the actor system's command bridge in <code>vertep-wasm</code>; the Python API is plain Python in <code>bindings/python/python/vertep</code>.</p>
+    <pre data-lang="Shell"><code>cd bindings/python
+python -m venv .venv &amp;&amp; . .venv/bin/activate
+pip install maturin pytest
+maturin develop            # builds the extension and installs it editable
+pytest                     # the bindings, and every example against its recorded output</code></pre>
+    <p>Release builds, wheels for each platform and the PyPI publishing workflow are described in <code>bindings/python/RELEASING.md</code>. <code>bindings/python/scripts/check_version.py</code> fails when the Python package version differs from the Rust workspace version, as <code>check-version.mjs</code> does for the npm packages.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="browser.html">← Browser and JavaScript</a>
+      <a href="rdf.html">RDF and versions →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

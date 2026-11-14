@@ -156,6 +156,7 @@ console.log((await order.getSnapshot()).configuration);
 
 - `crates/`: the Rust workspace
 - `bindings/js/`: the npm packages
+- `bindings/python/`: the `vertep` Python package (PyO3 extension in `crates/vertep-py`; release steps in `RELEASING.md`)
 - `examples/`: runnable examples, held to their recorded output by tests
 - `site/`: the website, plain static HTML
 - `lean/`: the Lean model and proofs

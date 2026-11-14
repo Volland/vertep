@@ -1,0 +1,5 @@
+first run: ('paid',) timers: 1
+reopened: ('shipped',) at position 2
+timers left: 0
+graph holds triples: True
+journal file is SQLite: SQLite format 3
