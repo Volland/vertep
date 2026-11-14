@@ -1,0 +1,69 @@
+[package]
+name = "vertep-wallet"
+description = "Agent wallets for Vertep: sealed credentials, consent, pluggable exchange protocols and formats, and an exchange model checked in Lean"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+homepage = "https://volland.github.io/vertep/"
+documentation = "https://docs.rs/vertep-wallet"
+keywords = ["wallet", "verifiable-credentials", "sd-jwt", "openid4vc", "did"]
+categories = ["cryptography", "authentication"]
+
+[features]
+default = ["sd-jwt"]
+# The Vertep Credential Exchange over TSP relationships.
+tsp = ["vertep-federation/tsp"]
+# SD-JWT VC with EdDSA (selective disclosure).
+sd-jwt = []
+# OpenID4VCI (pre-authorised code) and OpenID4VP (DCQL, direct_post) over HTTPS.
+oid4vc = ["sd-jwt", "dep:axum", "dep:tokio", "dep:ureq"]
+# Status lists fetched over HTTP.
+http-status = ["dep:ureq"]
+# The conformance kit: an adversarial network between role charts that records exchange
+# histories for the Lean checker `vertep-wallet`.
+testkit = []
+
+[dependencies]
+vertep-core = { workspace = true, features = ["std", "serde"] }
+vertep-runtime = { workspace = true }
+vertep-federation = { workspace = true }
+vertep-agent = { workspace = true }
+vertep-scxml = { workspace = true }
+vertep-rdf = { workspace = true }
+vertep-store = { workspace = true }
+oxrdf = { workspace = true }
+oxjsonld = { version = "0.2.7", features = ["rdf-12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_json_canonicalizer = "0.3"
+sha2 = "0.10"
+base64 = "0.22"
+bs58 = "0.5"
+getrandom = "0.3"
+chacha20poly1305 = "0.10"
+zeroize = "1"
+# Bitstring Status List: GZIP-compressed bitstrings.
+flate2 = "1"
+percent-encoding = "2"
+url = "2"
+futures = { workspace = true, features = ["executor"] }
+axum = { version = "0.7.9", default-features = false, features = ["http1", "tokio", "json", "form", "query"], optional = true }
+tokio = { workspace = true, optional = true, features = ["rt-multi-thread", "net", "macros"] }
+ureq = { version = "2.12.1", default-features = false, features = ["json"], optional = true }
+
+[dev-dependencies]
+vertep-wallet = { path = ".", features = ["testkit", "sd-jwt", "oid4vc", "http-status", "tsp"] }
+vertep-federation = { workspace = true, features = ["testkit", "tsp"] }
+tempfile = "3"
+axum = { version = "0.7.9", default-features = false, features = ["http1", "tokio"] }
+ureq = { version = "2.12.1", default-features = false, features = ["json"] }
+percent-encoding = "2"
+serde = { version = "1", features = ["derive"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "macros", "time"] }
+
+[lints]
+workspace = true

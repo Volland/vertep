@@ -31,6 +31,8 @@ federation = ["runtime", "dep:vertep-federation", "vertep-federation/didcomm", "
 cluster = ["runtime", "dep:vertep-cluster", "vertep-cluster/gossip", "vertep-cluster/quic", "vertep-cluster/runtime"]
 # Durable objects: verifiable journals and decentralised custody over TSP.
 objects = ["runtime", "federation", "dep:vertep-objects", "vertep-objects/tsp"]
+# Agent wallets: sealed credentials, consent, pluggable exchange protocols and formats.
+wallet = ["agent", "federation", "dep:vertep-wallet", "vertep-wallet/tsp", "vertep-wallet/sd-jwt"]
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
@@ -44,6 +46,7 @@ vertep-agent = { workspace = true, optional = true }
 vertep-federation = { workspace = true, optional = true }
 vertep-objects = { workspace = true, optional = true }
 vertep-cluster = { workspace = true, optional = true }
+vertep-wallet = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "time"] }

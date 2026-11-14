@@ -1,0 +1,5 @@
+{"kind":"setup","agents":[{"id":"did:example:issuer","keys":["k-issuer"]},{"id":"did:example:holder","keys":["k-holder"]},{"id":"did:example:verifier","keys":["k-verifier"]},{"id":"did:example:verifier2","keys":["k-verifier2"]}],"trust":[{"verifier":"did:example:verifier","issuer":"did:example:issuer"},{"verifier":"did:example:verifier2","issuer":"did:example:issuer"}],"compromised":[]}
+{"kind":"offer","issuer":"did:example:issuer","to":"did:example:holder","nonce":"o1","msg":"m1"}
+{"kind":"deliver","msg":"m1","to":"did:example:holder"}
+{"kind":"issue","issuer":"did:example:issuer","ikey":"k-issuer","credential":"sha256:c1","key":"k-holder","nonce":"o1","claims":["age","name"],"msg":"m2"}
+{"kind":"deliver","msg":"m2","to":"did:example:holder"}

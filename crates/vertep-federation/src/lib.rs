@@ -35,6 +35,7 @@
 //! @tg: implements:: [[decisions#Modular vt ontology on RDF 1.2]] {confidence: partial, note: "the vt-id identity module and its shapes"}
 
 pub mod credential;
+pub mod data_integrity;
 pub mod did;
 #[cfg(feature = "didcomm")]
 pub mod didcomm;

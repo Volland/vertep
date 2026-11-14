@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent wallets — Vertep docs</title>
+<meta name="description" content="Agent wallets: credentials received, sealed, presented with consent, issued and verified over pluggable protocols and formats, with the exchange protocol proven in Lean and every plugin checked against it.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
+      <li><a href="wallet.html" aria-current="page">Agent wallets</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
+    <h1>Agent wallets</h1>
+    <p class="lede">A wallet gives a Vertep identity verifiable credentials: it receives them, keeps them sealed, presents them only with consent, and issues and verifies them for other agents. Every exchange is a statechart run, every protocol and format is a plugin, and the exchange protocol is proven in Lean, with every plugin's runs checked against the proof.</p>
+
+    <h2 id="why">Why a wallet is built from charts</h2>
+    <p>Wallet protocols are where agents fail dangerously: an LLM agent discloses more than it should, a presentation is replayed to a second verifier, a credential is issued to a key nobody proved they hold. Vertep already handles protocols like these: it models them as statecharts, journals every step and proves its distributed protocols in Lean. The wallet uses the same machinery.</p>
+    <ul>
+      <li><strong>Protocol-based.</strong> A wallet is the actor <code>wallet/&lt;DID&gt;</code>. Each exchange runs a role chart, issuer, holder or verifier, as a journaled agent actor, so it survives restarts, replays without its peers and is certified by <code>vt certify</code> like any chart.</li>
+      <li><strong>Pluggable.</strong> Protocols, formats, stores, consent policies and status resolvers are interfaces registered by IRI. Applications add their own or replace the built-ins.</li>
+      <li><strong>Verified.</strong> Every protocol reports its steps in one vocabulary. A Lean model of that vocabulary proves the safety properties, and a Lean checker judges what every plugin does under an adversarial network.</li>
+    </ul>
+
+    <h2 id="plugins">Plugins</h2>
+    <table>
+      <thead><tr><th>Interface</th><th>What it does</th><th>Built in</th></tr></thead>
+      <tbody>
+        <tr><td><code>ExchangeProtocol</code></td><td>Role charts and a codec between wire messages and the exchange vocabulary</td><td>Vertep Credential Exchange 1.0 over TSP; OpenID4VCI 1.0 (pre-authorised code); OpenID4VP 1.0 (DCQL, <code>direct_post</code>)</td></tr>
+        <tr><td><code>CredentialFormat</code></td><td>Issue, verify, derive a presentation, check holder binding</td><td>VCDM 2.0 with Data Integrity <code>eddsa-jcs-2022</code> and <code>eddsa-rdfc-2022</code>; SD-JWT VC with EdDSA</td></tr>
+        <tr><td><code>CredentialStore</code></td><td>Keep credentials</td><td>The sealed store: XChaCha20-Poly1305 under a content key wrapped with HPKE to the key manager's key</td></tr>
+        <tr><td><code>ConsentPolicy</code></td><td>The disclosures allowed for a request</td><td>Rule policies; the default refuses everything</td></tr>
+        <tr><td><code>StatusResolver</code></td><td>Whether a credential is revoked</td><td>W3C Bitstring Status List, local or over HTTP, failing closed</td></tr>
+      </tbody>
+    </table>
+    <pre data-lang="Rust"><code><span class="kd">let</span> registry <span class="o">=</span> WalletRegistry::with_builtins();
+registry.register_format(Arc::new(MyFormat));                      <span class="c">// a new format under its own IRI</span>
+registry.register_store(vocab::STORE_SEALED, Arc::new(my_store));   <span class="c">// replace a built-in</span></code></pre>
+
+    <h2 id="consent">Consent</h2>
+    <p>Before any presentation the holder's chart reaches a <code>vt:decide</code> state. Its candidates are computed by the consent policy: the requested claims that the policy allows for this verifier and that a live credential holds. A rule decider, a person or an LLM picks one, or refuses. A choice outside the candidates fails the transition's guard and is never taken; the decision is journaled as out of bounds and nothing is presented. That is the decider-safety theorem of the agent model at work, and an LLM decider sees claim names, the verifier and the purpose, never claim values.</p>
+
+    <h2 id="protocols">Protocols</h2>
+    <p>The <strong>Vertep Credential Exchange</strong> carries offers, credential requests (with a possession proof over the issuer's nonce), credentials, presentation requests and presentations as TSP messages between DIDs: direct inside a TSP relationship, or routed through a mediator that only ever sees sealed bytes. <strong>OpenID4VCI</strong> issuers serve metadata, token, nonce and credential endpoints; holders redeem <code>openid-credential-offer://</code> URIs, with transaction codes. <strong>OpenID4VP</strong> verifiers send DCQL queries in requests signed by their DID (<code>decentralized_identifier:</code>) or by value (<code>redirect_uri:</code>), and receive presentations by <code>direct_post</code>. The key manager signs with Ed25519, so OpenID4VC interoperates with wallets and verifiers that accept EdDSA.</p>
+
+    <h2 id="model">The exchange model in Lean</h2>
+    <p><code>VertepLean/Wallet.lean</code> models issuers, holders and verifiers over a network the adversary controls: it sees every message, delivers any of them to anyone any number of times, drops and reorders them, and builds new messages from what it knows, but signs only with compromised keys. These theorems hold in every reachable state:</p>
+    <table>
+      <thead><tr><th>Theorem</th><th>Statement</th></tr></thead>
+      <tbody>
+        <tr><td><code>issue_needs_possession</code></td><td>A credential is issued only to a key that proved possession over the issuer's own nonce</td></tr>
+        <tr><td><code>issue_once_per_offer</code></td><td>At most one credential per offer</td></tr>
+        <tr><td><code>present_needs_consent</code></td><td>No presentation without a consent for that verifier and nonce</td></tr>
+        <tr><td><code>disclosure_within_consent</code></td><td>Disclosed ⊆ consented ⊆ requested</td></tr>
+        <tr><td><code>accept_sound</code></td><td>A verifier accepts only genuine, unrevoked, holder-bound presentations made for it and its nonce</td></tr>
+        <tr><td><code>accept_once_per_nonce</code></td><td>At most one acceptance per nonce</td></tr>
+      </tbody>
+    </table>
+    <p>A second model drops the verifier's audience check, and Lean exhibits a run in which a presentation made for one verifier is accepted by another: the check is necessary, not decoration.</p>
+
+    <h2 id="conformance">Conformance</h2>
+    <p>The conformance kit owns the network between the parties. A seeded scheduler duplicates, reorders, drops, replays messages to other parties and injects garbage; every step lands in an exchange history, and the Lean checker <code>vertep-wallet</code> replays it against the model. A protocol plugin is conformant when the checker accepts every history, so third-party plugins inherit the theorems for the runs tested without writing any Lean. The kit catches a deliberately faulty plugin whose verifier accepts a duplicate presentation.</p>
+    <pre data-lang="Text"><code>$ vt wallet conformance --seeds 4
+vce: 9 histories, 6 presentations accepted, 9 of 9 accepted by the Lean checker
+oid4vc: 9 histories, 6 presentations accepted, 9 of 9 accepted by the Lean checker</code></pre>
+
+    <h2 id="cli">vt wallet</h2>
+    <p>A wallet on disk is a directory with a file key manager, the sealed records and <code>wallet.json</code> (DID, trusted issuers, consent policy). A recorded session: the verifier asks for <code>nationality</code> and <code>name</code>, and the holder's policy lets it have <code>nationality</code> only.</p>
+    <pre data-lang="Text"><code>$ vt wallet create --dir holder
+did: did:key:z6MkhQ4mKxGrrKcdCbtUpRT6CLHyvYYfXsgjjqu3866g7kMB
+$ vt wallet issue --dir issuer --to &lt;holder&gt; --type https://example.org/IdentityCredential \
+    --claims '{"name":"Olena","nationality":"UA"}' --out cred.json
+issued: sha256:aff2cad12de34d2d208307ee1a39d3888ef34ac7d1851b4215f3b3c830d6436d
+$ vt wallet accept --dir holder cred.json
+stored: sha256:aff2cad12de34d2d208307ee1a39d3888ef34ac7d1851b4215f3b3c830d6436d
+issuer: did:key:z6MktPXykAZNrjumiFLcDuJXd759osRJ6oUXE7ZJQ3DESwLS
+$ vt wallet request --dir verifier --claims nationality,name --out req.json
+$ vt wallet present --dir holder req.json --out pres.json
+presented: sha256:aff2cad12de34d2d208307ee1a39d3888ef34ac7d1851b4215f3b3c830d6436d
+disclosed: nationality
+$ vt wallet verify --dir verifier req.json pres.json
+valid
+issuer: did:key:z6MktPXykAZNrjumiFLcDuJXd759osRJ6oUXE7ZJQ3DESwLS
+disclosed: {"nationality":"UA"}</code></pre>
+    <p><code>vt wallet offer</code> serves an OpenID4VCI issuer and prints the offer URI; <code>accept</code> and <code>present</code> also take <code>openid-credential-offer://</code> and <code>openid4vp://</code> URIs; <code>revoke</code> sets a status entry and republishes the list under <code>public/</code>. Grant credentials are ordinary wallet credentials: presented over any protocol, they become grants the federation enforces before the journal.</p>
+
+    <p>The design notes are in <code>tg.md/views/wallet.md</code>; the requirements in <code>openspec/changes/m9-agent-wallet</code> (capabilities <code>agent-wallet</code>, <code>credential-exchange</code> and <code>oid4vc</code>); the history format in <code>crates/vertep-wallet/docs/exchange-history.md</code>.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="durable-objects.html">← Durable objects</a>
+      <a href="browser.html">Browser and JavaScript →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

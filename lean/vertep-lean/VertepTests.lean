@@ -10,5 +10,6 @@ import VertepTests.Agent
 import VertepTests.Lease
 import VertepTests.Custody
 import VertepTests.CustodyJoint
+import VertepTests.Wallet
 import VertepTests.Types
 import VertepTests.Shacl

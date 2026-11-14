@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in nine milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in ten milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -19,6 +19,9 @@ flowchart LR
     M5 --> M7
     M7 --> M8["M8 did:webvh hosting<br/>m8-webvh"]
     M5 --> M8
+    M3 --> M9["M9 Agent wallet<br/>m9-agent-wallet"]
+    M5 --> M9
+    M8 --> M9
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
@@ -59,6 +62,7 @@ Archived 2026-11-11 with 68 requirements. The Lean journal-protocol proofs moved
 Deciders at choice points, LLM actors with journaled results and tool actors, and LLM-written plan charts run as sandboxed children.
 
 - precedes:: [[roadmap#M7 Durable objects]] {note: "the durable agent journal"}
+- precedes:: [[roadmap#M9 Agent wallet]] {note: "consent is a decide state"}
 
 Delivered by the OpenSpec change `m3-agents`.
 
@@ -81,6 +85,7 @@ Actors across trust boundaries: DID identities, authenticated senders, capabilit
 
 - precedes:: [[roadmap#M7 Durable objects]] {note: "TSP, DID identities and relay mailboxes"}
 - precedes:: [[roadmap#M8 did:webvh hosting]] {note: "the did:webvh resolver"}
+- precedes:: [[roadmap#M9 Agent wallet]] {note: "keys, DIDs, TSP and grant credentials"}
 
 Delivered by the OpenSpec change `m5-federation`.
 
@@ -104,6 +109,16 @@ Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-obj
 
 Creating, updating, witnessing, publishing and serving `did:webvh` DIDs with Vertep keys; custodians witness their object's DID log; `vt webvh`; `vt-mediator` under a `did:webvh`.
 
+- precedes:: [[roadmap#M9 Agent wallet]] {note: "status lists publish through the webvh publishers"}
+
 Delivered by the OpenSpec change `m8-webvh` (capabilities `webvh-identity` and `webvh-hosting`), in [[components#vertep-webvh]].
 
 Implemented 2026-11-13: the crate, custodian witnessing in `vertep-objects`, `vt webvh`, and `vt-mediator` under `did:webvh`. Merged 2026-11-13 (pull request 2) and released in 0.1.3 the same day.
+
+## M9 Agent wallet
+
+A wallet for every Vertep identity: credentials received, sealed, presented with consent, issued and verified, over pluggable exchange protocols and formats, with the exchange protocol modelled and proven in Lean.
+
+Delivered by the OpenSpec change `m9-agent-wallet` (capabilities `agent-wallet`, `credential-exchange` and `oid4vc`, and one addition to `did-identity`), in [[components#vertep-wallet]]. The design is in [[views/wallet#Wallet]].
+
+Implemented 2026-11-14: the crate with its formats, sealed store, consent, status lists, role charts and exchange engine; the Vertep Credential Exchange over TSP; OpenID4VCI and OpenID4VP with their HTTP bindings; grant credentials from a wallet; `vt wallet`. The Lean exchange model proves its six theorems, and the conformance kit's histories of every built-in protocol are accepted by its checker. Archived 2026-11-14 as `openspec/changes/archive/2026-11-14-m9-agent-wallet` and released in 0.1.5 the same day.

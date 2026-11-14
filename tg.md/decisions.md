@@ -1425,3 +1425,122 @@ Tests resolve through an `HttpFetcher` that maps `https://<domain>/...` onto a d
 
 - motivated_by:: [[constraints#did:webvh resolves domains over HTTPS]] {weight: primary, since: "2026-11-13"}
 
+
+## The wallet is its own crate over federation, agents and the runtime
+
+`vertep-wallet` holds the wallet actor, the plugin interfaces, the formats, the protocols and the conformance kit, on `vertep-federation`, `vertep-agent` and `vertep-runtime`; features `tsp`, `sd-jwt`, `oid4vc` and `testkit` (M9 design D1).
+
+- motivated_by:: [[decisions#Keys stay behind a key manager]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary, since: "2026-11-13"}
+
+Rejected: growing `vertep-federation`, which every DID actor needs while most need no wallet; an external SSI stack, whose own key handling conflicts with the key manager and whose protocol state would live outside the journal.
+
+## Wallets are virtual actors and exchanges are role charts
+
+A wallet is the actor `…/charts/wallet/<percent-encoded DID>`; each exchange is an agent actor of the wallet's host running its protocol's issuer, holder or verifier chart, so every exchange is journaled, replayable and certifiable (M9 design D2).
+
+- motivated_by:: [[decisions#Virtual actor addresses append the key to the type]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[decisions#Full SCXML first]] {weight: secondary, since: "2026-11-13"}
+
+Rejected: a hand-written Rust state machine per protocol, which would duplicate persistence and could be neither certified nor replayed.
+
+## Wallet plugins behind five interfaces registered by IRI
+
+Exchange protocols, credential formats, credential stores, consent policies and status resolvers are traits that a registry maps from IRIs to implementations (M9 design D3).
+
+- motivated_by:: [[decisions#Membership behind one trait]] {weight: secondary, since: "2026-11-13", note: "one interface, many implementations, one shared test kit"}
+
+Built-ins live under `https://w3id.org/vertep/wallet#`; applications add plugins or replace built-ins.
+
+Rejected: one `Wallet` trait; formats and protocols vary independently.
+
+## One exchange vocabulary with value-free histories
+
+Every protocol labels its messages with steps of one vocabulary, and exchange histories are JSONL of these steps with claim names and digests in place of values (M9 design D4).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-13"}
+
+The steps are offer, prove-possession, issue, store, request-presentation, consent, present, verify, refuse and revoke; histories also carry the network events send, deliver, drop, duplicate and inject.
+
+Rejected: checking each protocol's wire format in Lean, which needs a model per protocol and version.
+
+## The exchange model is symbolic over a network adversary
+
+The Lean model `Wallet` treats messages and signatures symbolically under an adversary that controls the network; its theorems are invariants of every reachable state (M9 design D5).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-13"}
+
+Issuers, holders and verifiers hold keys; a signature can be made only by its key's holder, or by the adversary when the key is compromised; nonces are fresh; the adversary delivers any message it has seen to anyone, any number of times, and builds new messages from known terms.
+
+Rejected: ProVerif or Tamarin; a second toolchain whose results stay outside the graph's Lean certificates and have no oracle tie to the Rust runs. Cryptography is assumed perfect; specification test vectors cover the implementation.
+
+## Plugin conformance is trace refinement judged in Lean
+
+A plugin is conformant when the Lean checker `vertep-wallet` accepts every exchange history the conformance kit records for it (M9 design D6).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-13"}
+
+The kit owns the network between role charts, schedules adversarial deliveries from a seed and records each history; the checker replays it in strict mode.
+
+Rejected: per-plugin Lean refinement proofs, which bar most plugin authors. The guarantee covers the runs tested, not every run.
+
+## Consent is a decide state with policy-computed candidates
+
+The holder chart's consent state is a `vt:decide` state whose candidates the consent policy computes, so no decider can widen a disclosure (M9 design D7).
+
+- motivated_by:: [[decisions#Offer-time decider safety]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[decisions#Deciders at choice points]] {weight: secondary, since: "2026-11-13"}
+
+The candidates are the requested claims the policy allows for that verifier and a live credential holds, plus refuse; rule, human and LLM deciders choose among them.
+
+Rejected: a Rust consent callback, which is neither journaled as a decision nor covered by the Agent-model theorems.
+
+## Credentials are sealed under a wallet content key
+
+Credential records are encrypted under a wallet content key that only the key manager can unwrap, and the RDF holds metadata and the digest only (M9 design D8).
+
+- motivated_by:: [[decisions#Keepers store ciphertext under a per-object content key]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[decisions#Keys stay behind a key manager]] {weight: primary, since: "2026-11-13"}
+
+Records use XChaCha20-Poly1305 with the credential digest as associated data; the content key is wrapped with HPKE to the wallet's key-agreement key.
+
+Rejected: clear credentials in the journal; journals are replicated and exported for audit.
+
+## Credential formats are implemented over the key manager
+
+Data Integrity `eddsa-jcs-2022` (moved from the grant credential code) and `eddsa-rdfc-2022` (`oxjsonld` with bundled contexts, `vertep-rdf` canonicalisation), and SD-JWT VC with EdDSA, all sign through the key manager (M9 design D9).
+
+- motivated_by:: [[decisions#Keys stay behind a key manager]] {weight: primary, since: "2026-11-13"}
+
+Rejected: external SD-JWT crates, whose signers would be adapted anyway; the format is small and tested against the specification's vectors.
+
+## The Vertep Credential Exchange is a versioned protocol inside TSP
+
+Offers, credential requests, credentials, presentation requests, presentations, results and problems are TSP messages typed under `https://w3id.org/vertep/exchange/1.0#`, direct, routed or through a mediator (M9 design D10).
+
+- motivated_by:: [[decisions#TSP pickup is a versioned protocol inside TSP]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[decisions#TSP direct when reachable, routed otherwise]] {weight: secondary, since: "2026-11-13"}
+
+## OpenID4VC endpoints are bindings of the role charts
+
+OpenID4VCI issuer endpoints and OpenID4VP verifier endpoints are axum handlers and the holder side uses `ureq`; every request and response becomes an event of the role chart, so HTTP is a binding, not the protocol state (M9 design D11).
+
+- motivated_by:: [[decisions#Wallets are virtual actors and exchanges are role charts]] {weight: primary, since: "2026-11-13"}
+
+Rejected: the holder side only; agents could then neither issue to nor verify ecosystem wallets.
+
+As built: the nonce endpoint binds its nonce to the access token, and the token response also carries `c_nonce`, so wallets reading either work; the engine is not `Send`, so the endpoints reach it through an engine thread.
+
+## Status lists are published credentials with a bounded cache
+
+Issuers keep a Bitstring Status List per purpose, published over HTTP or a `vertep-webvh` publisher; verifiers verify and cache it no longer than its `ttl` and their policy, and fail closed on unknown status (M9 design D12).
+
+- motivated_by:: [[decisions#Log publishers verify before they write]] {weight: secondary, since: "2026-11-13", note: "the same publishers"}
+
+The cache is a revocation window: the model's verifier reads status fresh, so the theorems cover a zero-length cache.
+
+## Grant credentials are wallet credentials
+
+A grant credential is held and presented like any credential; the target verifies format and status, then installs the `Grant` with its issuer and id, still enforced before the journal (M9 design D13).
+
+- motivated_by:: [[decisions#Grants enforced before the journal]] {weight: primary, since: "2026-11-13"}

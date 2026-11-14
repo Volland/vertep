@@ -1,0 +1,725 @@
+{
+ "source": "OpenID for Verifiable Presentations 1.0 (openid.net/specs/openid-4-verifiable-presentations-1_0.html), examples",
+ "authorization_requests": [
+  {
+   "iss": "redirect_uri:https://client.example.org/cb",
+   "aud": "https://self-issued.me/v2",
+   "response_type": "vp_token",
+   "client_id": "redirect_uri:https://client.example.org/cb",
+   "redirect_uri": "https//client.example.org/cb",
+   "dcql_query": {
+    "credentials": [
+     {
+      "id": "some_identity_credential",
+      "format": "dc+sd-jwt",
+      "meta": {
+       "vct_values": [
+        "https://credentials.example.com/identity_credential"
+       ]
+      },
+      "claims": [
+       {
+        "path": [
+         "last_name"
+        ]
+       },
+       {
+        "path": [
+         "first_name"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "nonce": "n-0S6_WzA2Mj"
+  },
+  {
+   "response_type": "vp_token",
+   "response_mode": "dc_api.jwt",
+   "nonce": "xyz123ltcaccescbwc777",
+   "dcql_query": {
+    "credentials": [
+     {
+      "id": "my_credential",
+      "format": "dc+sd-jwt",
+      "meta": {
+       "vct_values": [
+        "https://credentials.example.com/identity_credential"
+       ]
+      },
+      "claims": [
+       {
+        "path": [
+         "last_name"
+        ]
+       },
+       {
+        "path": [
+         "first_name"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "postal_code"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "client_metadata": {
+    "jwks": {
+     "keys": [
+      {
+       "kty": "EC",
+       "kid": "ac",
+       "use": "enc",
+       "crv": "P-256",
+       "alg": "ECDH-ES",
+       "x": "YO4epjifD-KWeq1sL2tNmm36BhXnkJ0He-WqMYrp9Fk",
+       "y": "Hekpm0zfK7C-YccH5iBjcIXgf6YdUvNUac_0At55Okk"
+      },
+      {
+       "kty": "OKP",
+       "kid": "jc",
+       "use": "enc",
+       "crv": "X25519",
+       "alg": "ECDH-ES",
+       "x": "WPX7wnwq10hFNK9aDSyG1QlLswE_CJY14LdhcFUIVVc"
+      },
+      {
+       "kty": "EC",
+       "kid": "lc",
+       "use": "enc",
+       "crv": "P-384",
+       "alg": "ECDH-ES",
+       "x": "iHytgLNtXjEyYMAIGwfgjINZRmLfObYbmjPhkaPD8OiTkJtRHjegTNdH31Mxg4nV",
+       "y": "MizXWSqNB7sSt_SNjg3spvaJnmjB-LpxsPpLUaea33rvINL3Mq-gEaANErRQpbLx"
+      },
+      {
+       "kty": "OKP",
+       "kid": "bc",
+       "use": "enc",
+       "crv": "X448",
+       "alg": "ECDH-ES",
+       "x": "pK5IRpLlX-8XcsRYWHejpzkfsHoDOmAYuBzAC7aTpewWOw_QFHSa64t9p2kuommI8JQQLohS2AIA"
+      }
+     ]
+    },
+    "encrypted_response_enc_values_supported": [
+     "A128GCM",
+     "A128CBC-HS256"
+    ]
+   }
+  }
+ ],
+ "dcql_queries": [
+  {
+   "credentials": [
+    {
+     "id": "my_credential",
+     "format": "dc+sd-jwt",
+     "meta": {
+      "vct_values": [
+       "https://credentials.example.com/identity_credential"
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "last_name"
+       ]
+      },
+      {
+       "path": [
+        "first_name"
+       ]
+      },
+      {
+       "path": [
+        "address",
+        "street_address"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "credentials": [
+    {
+     "id": "example_jwt_vc",
+     "format": "jwt_vc_json",
+     "meta": {
+      "type_values": [
+       [
+        "IDCredential"
+       ]
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "credentialSubject",
+        "family_name"
+       ]
+      },
+      {
+       "path": [
+        "credentialSubject",
+        "given_name"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "credentials": [
+    {
+     "id": "example_ldp_vc",
+     "format": "ldp_vc",
+     "meta": {
+      "type_values": [
+       [
+        "IDCredential"
+       ]
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "credentialSubject",
+        "family_name"
+       ]
+      },
+      {
+       "path": [
+        "credentialSubject",
+        "given_name"
+       ]
+      },
+      {
+       "path": [
+        "credentialSubject",
+        "birthdate"
+       ]
+      },
+      {
+       "path": [
+        "credentialSubject",
+        "address",
+        "street_address"
+       ]
+      },
+      {
+       "path": [
+        "credentialSubject",
+        "address",
+        "locality"
+       ]
+      },
+      {
+       "path": [
+        "credentialSubject",
+        "address",
+        "postal_code"
+       ]
+      },
+      {
+       "path": [
+        "credentialSubject",
+        "address",
+        "country"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "credentials": [
+    {
+     "id": "my_credential",
+     "format": "mso_mdoc",
+     "meta": {
+      "doctype_value": "org.iso.7367.1.mVRC"
+     },
+     "claims": [
+      {
+       "path": [
+        "org.iso.7367.1",
+        "vehicle_holder"
+       ]
+      },
+      {
+       "path": [
+        "org.iso.18013.5.1",
+        "first_name"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "credentials": [
+    {
+     "id": "pid",
+     "format": "dc+sd-jwt",
+     "meta": {
+      "vct_values": [
+       "https://credentials.example.com/identity_credential"
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "given_name"
+       ]
+      },
+      {
+       "path": [
+        "family_name"
+       ]
+      },
+      {
+       "path": [
+        "address",
+        "street_address"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "mdl",
+     "format": "mso_mdoc",
+     "meta": {
+      "doctype_value": "org.iso.7367.1.mVRC"
+     },
+     "claims": [
+      {
+       "path": [
+        "org.iso.7367.1",
+        "vehicle_holder"
+       ]
+      },
+      {
+       "path": [
+        "org.iso.18013.5.1",
+        "first_name"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "credentials": [
+    {
+     "id": "pid",
+     "format": "dc+sd-jwt",
+     "meta": {
+      "vct_values": [
+       "https://credentials.example.com/identity_credential"
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "given_name"
+       ]
+      },
+      {
+       "path": [
+        "family_name"
+       ]
+      },
+      {
+       "path": [
+        "address",
+        "street_address"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "other_pid",
+     "format": "dc+sd-jwt",
+     "meta": {
+      "vct_values": [
+       "https://othercredentials.example/pid"
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "given_name"
+       ]
+      },
+      {
+       "path": [
+        "family_name"
+       ]
+      },
+      {
+       "path": [
+        "address",
+        "street_address"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "pid_reduced_cred_1",
+     "format": "dc+sd-jwt",
+     "meta": {
+      "vct_values": [
+       "https://credentials.example.com/reduced_identity_credential"
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "family_name"
+       ]
+      },
+      {
+       "path": [
+        "given_name"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "pid_reduced_cred_2",
+     "format": "dc+sd-jwt",
+     "meta": {
+      "vct_values": [
+       "https://cred.example/residence_credential"
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "postal_code"
+       ]
+      },
+      {
+       "path": [
+        "locality"
+       ]
+      },
+      {
+       "path": [
+        "region"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "nice_to_have",
+     "format": "dc+sd-jwt",
+     "meta": {
+      "vct_values": [
+       "https://company.example/company_rewards"
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "rewards_number"
+       ]
+      }
+     ]
+    }
+   ],
+   "credential_sets": [
+    {
+     "options": [
+      [
+       "pid"
+      ],
+      [
+       "other_pid"
+      ],
+      [
+       "pid_reduced_cred_1",
+       "pid_reduced_cred_2"
+      ]
+     ]
+    },
+    {
+     "required": false,
+     "options": [
+      [
+       "nice_to_have"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "credentials": [
+    {
+     "id": "mdl-id",
+     "format": "mso_mdoc",
+     "meta": {
+      "doctype_value": "org.iso.18013.5.1.mDL"
+     },
+     "claims": [
+      {
+       "id": "given_name",
+       "path": [
+        "org.iso.18013.5.1",
+        "given_name"
+       ]
+      },
+      {
+       "id": "family_name",
+       "path": [
+        "org.iso.18013.5.1",
+        "family_name"
+       ]
+      },
+      {
+       "id": "portrait",
+       "path": [
+        "org.iso.18013.5.1",
+        "portrait"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "mdl-address",
+     "format": "mso_mdoc",
+     "meta": {
+      "doctype_value": "org.iso.18013.5.1.mDL"
+     },
+     "claims": [
+      {
+       "id": "resident_address",
+       "path": [
+        "org.iso.18013.5.1",
+        "resident_address"
+       ]
+      },
+      {
+       "id": "resident_country",
+       "path": [
+        "org.iso.18013.5.1",
+        "resident_country"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "photo_card-id",
+     "format": "mso_mdoc",
+     "meta": {
+      "doctype_value": "org.iso.23220.photoid.1"
+     },
+     "claims": [
+      {
+       "id": "given_name",
+       "path": [
+        "org.iso.18013.5.1",
+        "given_name"
+       ]
+      },
+      {
+       "id": "family_name",
+       "path": [
+        "org.iso.18013.5.1",
+        "family_name"
+       ]
+      },
+      {
+       "id": "portrait",
+       "path": [
+        "org.iso.18013.5.1",
+        "portrait"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "photo_card-address",
+     "format": "mso_mdoc",
+     "meta": {
+      "doctype_value": "org.iso.23220.photoid.1"
+     },
+     "claims": [
+      {
+       "id": "resident_address",
+       "path": [
+        "org.iso.18013.5.1",
+        "resident_address"
+       ]
+      },
+      {
+       "id": "resident_country",
+       "path": [
+        "org.iso.18013.5.1",
+        "resident_country"
+       ]
+      }
+     ]
+    }
+   ],
+   "credential_sets": [
+    {
+     "options": [
+      [
+       "mdl-id"
+      ],
+      [
+       "photo_card-id"
+      ]
+     ]
+    },
+    {
+     "required": false,
+     "options": [
+      [
+       "mdl-address"
+      ],
+      [
+       "photo_card-address"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "credentials": [
+    {
+     "id": "pid",
+     "format": "dc+sd-jwt",
+     "meta": {
+      "vct_values": [
+       "https://credentials.example.com/identity_credential"
+      ]
+     },
+     "claims": [
+      {
+       "id": "a",
+       "path": [
+        "last_name"
+       ]
+      },
+      {
+       "id": "b",
+       "path": [
+        "postal_code"
+       ]
+      },
+      {
+       "id": "c",
+       "path": [
+        "locality"
+       ]
+      },
+      {
+       "id": "d",
+       "path": [
+        "region"
+       ]
+      },
+      {
+       "id": "e",
+       "path": [
+        "date_of_birth"
+       ]
+      }
+     ],
+     "claim_sets": [
+      [
+       "a",
+       "c",
+       "d",
+       "e"
+      ],
+      [
+       "a",
+       "b",
+       "e"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "credentials": [
+    {
+     "id": "my_credential",
+     "format": "dc+sd-jwt",
+     "meta": {
+      "vct_values": [
+       "https://credentials.example.com/identity_credential"
+      ]
+     },
+     "claims": [
+      {
+       "path": [
+        "last_name"
+       ],
+       "values": [
+        "Doe"
+       ]
+      },
+      {
+       "path": [
+        "first_name"
+       ]
+      },
+      {
+       "path": [
+        "address",
+        "street_address"
+       ]
+      },
+      {
+       "path": [
+        "postal_code"
+       ],
+       "values": [
+        "90210",
+        "90211"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "authorization_responses": [
+  {
+   "vp_token": {
+    "example_credential_id": [
+     "eyJhb...YMetA"
+    ]
+   }
+  },
+  {
+   "vp_token": {
+    "example_jwt_vc": [
+     "eY...QMA"
+    ]
+   }
+  }
+ ],
+ "error_responses": [
+  {
+   "error": "invalid_request"
+  }
+ ],
+ "response_endpoint_answers": [
+  {
+   "redirect_uri": "https://client.example.org/cb#response_code=091535f699ea575c7937fa5f0f454aee"
+  }
+ ]
+}

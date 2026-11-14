@@ -6,6 +6,50 @@ All notable changes to Vertep are recorded here. The format follows
 
 All crates of the workspace and both npm packages share one version.
 
+## [0.1.5] - 2026-11-14
+
+Milestone M9: agent wallets. Change `m9-agent-wallet`; design in `tg.md/views/wallet.md`.
+
+### Added
+
+- **`vertep-wallet`** (new crate): a wallet per identity that receives, keeps, presents, issues
+  and verifies verifiable credentials.
+  - **Protocol-based:** every exchange is a journaled run of a role chart (issuer, holder,
+    verifier) in an agent host; restarts and replays need no wallet-specific code, and the
+    role charts are certified by `vt certify`.
+  - **Pluggable:** exchange protocols, credential formats, credential stores, consent
+    policies and status resolvers are traits in a `WalletRegistry`, registered by IRI.
+  - **Consent** is a `vt:decide` state whose candidates the consent policy computes, so no
+    decider (an LLM included) can disclose more than the policy allows.
+  - **Sealed store:** credentials encrypted at rest under a content key only the key manager
+    unwraps; the graph and the journal hold metadata and digests only.
+  - **Formats:** VCDM 2.0 with Data Integrity `eddsa-jcs-2022` and `eddsa-rdfc-2022`
+    (bundled JSON-LD contexts, W3C test vectors), and SD-JWT VC with EdDSA.
+  - **Protocols:** the Vertep Credential Exchange over TSP (relationships, routed through a
+    mediator); OpenID4VCI 1.0 with the pre-authorised code flow and OpenID4VP 1.0 with DCQL and
+    `direct_post`, with axum endpoints and a `ureq` holder.
+  - **Status:** W3C Bitstring Status List, local or over HTTP, failing closed.
+  - **Conformance kit** (feature `testkit`): an adversarial network that records exchange
+    histories for the Lean checker.
+  - **Grant credentials** are wallet credentials: presented over any protocol, they become
+    grants the federation enforces before the journal.
+- **Lean:** the exchange model `Wallet` with six theorems proven over every interleaving and a
+  network adversary (possession before issuance, one issuance per offer, consent before
+  presentation, disclosure within consent, sound acceptance, one acceptance per nonce), a
+  counterexample showing the audience check is necessary, and the checker `vertep-wallet`
+  (proven sound) that replays exchange histories.
+- **`vt wallet`:** `create`, `trust`, `allow`, `list`, `show`, `issue`, `offer`, `accept`,
+  `request`, `present`, `verify`, `revoke` and `conformance`.
+- **Facade:** feature `wallet`.
+
+### Changed
+
+- `vertep-federation`: Data Integrity signing and verification moved to
+  `data_integrity` (any EdDSA cryptosuite's canonicalisation); grant credentials use it, with
+  the same API.
+- The `m9-agent-wallet` change is archived; its requirements are in `openspec/specs/agent-wallet`,
+  `credential-exchange`, `oid4vc` and `did-identity`.
+
 ## [0.1.4] - 2026-11-13
 
 Layout is formatting: charts drawn in the Vertepnyk designer keep their version. Change
@@ -220,6 +264,7 @@ The first release: milestones M0 to M6.
 - **M6, WebAssembly and JavaScript:** the core and a browser shell in WebAssembly, the
   `@vertep/web` and `@vertep/dm-ecma` npm packages, and a tiramemsu journal in OPFS.
 
+[0.1.5]: https://github.com/Volland/vertep/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Volland/vertep/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Volland/vertep/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Volland/vertep/compare/9904604...v0.1.2

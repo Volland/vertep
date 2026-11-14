@@ -235,3 +235,40 @@ Electron hosts that enable Node integration in workers, Obsidian among them, set
 - constrains:: [[bindings/js/packages/web/src/client.ts#isNode]] {strength: must, source: "Electron nodeIntegrationInWorker; seen in Obsidian 1.14"}
 
 `@vertep/web` treats any scope with `WorkerGlobalScope` as a Web Worker, so the worker uses `postMessage` and fetches its WebAssembly by URL there (fixed in 0.1.4).
+
+## OpenID4VC 1.0 fixes the exchange messages
+
+OpenID4VCI 1.0 and OpenID4VP 1.0 fix the nonce endpoint and `invalid_nonce`, the `openid4vci-proof+jwt` proof type, DCQL, the `direct_post` response mode and client identifier prefixes.
+
+- constrains:: [[decisions#OpenID4VC endpoints are bindings of the role charts]] {strength: must, source: "OpenID Foundation, OpenID4VCI 1.0 and OpenID4VP 1.0"}
+
+## Data Integrity EdDSA fixes proof hashing
+
+The EdDSA cryptosuites hash the transformed document and the proof configuration separately and sign their concatenation; `eddsa-jcs-2022` transforms with JCS and `eddsa-rdfc-2022` with RDF Dataset Canonicalization.
+
+- constrains:: [[decisions#Credential formats are implemented over the key manager]] {strength: must, source: "W3C Data Integrity EdDSA Cryptosuites v1.0, VCDM 2.0"}
+
+## SD-JWT fixes disclosure and key binding
+
+SD-JWT fixes salted disclosure hashing, the `_sd` arrays, `_sd_alg`, and a key-binding JWT that carries `nonce`, `aud`, `iat` and `sd_hash`; SD-JWT VC fixes `vct` and the `dc+sd-jwt` type.
+
+- constrains:: [[decisions#Credential formats are implemented over the key manager]] {strength: must, source: "IETF SD-JWT and SD-JWT VC"}
+
+## Bitstring Status List fixes status encoding
+
+A status list is a GZIP-compressed, base64url-encoded bitstring of at least 16KB (131,072 entries) inside a credential, addressed by `statusListIndex` and `statusPurpose`.
+
+- constrains:: [[decisions#Status lists are published credentials with a bounded cache]] {strength: must, source: "W3C Bitstring Status List v1.0"}
+
+## The key manager signs only Ed25519
+
+`KeyManager` signs with Ed25519 and agrees keys with X25519, so every wallet signature is EdDSA; verifiers and wallets that accept only ES256 cannot interoperate until a P-256 key type exists.
+
+- constrains:: [[decisions#Credential formats are implemented over the key manager]] {strength: must, source: "vertep-federation KeyManager"}
+- constrains:: [[decisions#OpenID4VC endpoints are bindings of the role charts]] {strength: must, source: "vertep-federation KeyManager"}
+
+## JSON-LD remote contexts are not loaded
+
+Loading `@context` URLs at verification time lets a context server change a credential's meaning and track verifiers, so only bundled contexts are used and a credential needing another is refused.
+
+- constrains:: [[decisions#Credential formats are implemented over the key manager]] {strength: must, source: "W3C VCDM 2.0 security considerations"}

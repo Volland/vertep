@@ -15,6 +15,7 @@ flowchart TD
     objects["vertep-objects"]
     mediator["vertep-tsp-mediator"]
     webvh["vertep-webvh"]
+    wallet["vertep-wallet"]
     cluster["vertep-cluster"]
     fed["vertep-federation"]
     runtime["vertep-runtime"]
@@ -33,13 +34,15 @@ flowchart TD
     examples["vertep-examples (examples)"]
     lean["vertep-lean (Lean 4)"]
 
-    facade --> agent & cluster & fed & objects & runtime & macros & tira
-    cli --> scxml & yaml & rdf & lean & webvh
+    facade --> agent & cluster & fed & objects & runtime & macros & tira & wallet
+    cli --> scxml & yaml & rdf & lean & webvh & wallet
     wasm --> runtime & tira
     agent --> runtime & cel & rdf
     objects --> runtime & store & fed & cluster
     mediator --> fed & store & tira & webvh
     webvh --> fed & objects
+    wallet --> fed & agent & runtime & rdf & webvh
+    wallet -. conformance oracle .-> lean
     cluster --> runtime & store
     fed --> runtime
     runtime --> core & store & rdf
@@ -152,6 +155,11 @@ The custody model landed 2026-11-12 (M7).
 - **Old rule** (`CustodyReconfigUnsafe`): Lean-checked counterexamples show that switching on a quorum of the old set plus every newcomer loses committed entries and can elect two writers in one epoch. That is why the Rust protocol changed to joint consensus.
 - **Oracle:** `vertep-custody --history` replays fault histories in strict mode, with the joint model for histories that carry configuration records.
 - **Axioms:** pinned to `propext`, `Classical.choice` and `Quot.sound`.
+
+The wallet exchange model landed 2026-11-14 (M9: `Wallet`, `WalletTheorems`, `WalletUnsafe`, `WalletCheck`, executable `vertep-wallet`): credential exchange among issuers, holders and verifiers under a network adversary with symbolic signatures; six safety theorems proven over every reachable state (possession before issuance, one issuance per offer, consent before presentation, disclosure within consent, sound acceptance, one acceptance per nonce), a Lean-checked counterexample showing the audience check is necessary, and a checker proven sound (`replay_sound`). Axioms: `propext` and `Quot.sound`.
+
+- realizes:: [[decisions#The exchange model is symbolic over a network adversary]] {confidence: full}
+- scheduled_in:: [[roadmap#M9 Agent wallet]] {note: "the wallet exchange model"}
 
 - realizes:: [[decisions#Custody epochs are won by quorum promises]] {confidence: partial, note: "proven for a fixed custodian set; safety under custodian-set changes is a checked conjecture"}
 - realizes:: [[decisions#Custodian set changes use joint consensus]] {confidence: partial, note: "modelled and replayed; not yet proven"}
@@ -513,6 +521,34 @@ The tests cover every scenario of `webvh-identity` and `webvh-hosting`:
 - the DIF test-suite vectors.
 
 Found while building it: the DIF `witness-update` vector lowers its own witness threshold. `didwebvh-rs` and Vertep both refuse it, because a witness change applies only after the entry that makes it.
+
+## vertep-wallet
+
+The agent wallet: a wallet actor per identity with a sealed credential store, role charts for issuer, holder and verifier, five plugin interfaces, credential formats, exchange protocols and a conformance kit.
+
+- provides:: [[capabilities#Agent wallet]] {confidence: partial, note: "vt wallet lives in vertep-cli"}
+- provides:: [[capabilities#Credential exchange]] {confidence: partial, note: "the model and checker live in vertep-lean"}
+- provides:: [[capabilities#OID4VC]] {confidence: full}
+- uses:: [[components#vertep-federation]] {kind: required, note: "keys, DIDs, resolver, TSP and grant credentials"}
+- uses:: [[components#vertep-agent]] {kind: required, note: "the consent decide state and deciders"}
+- uses:: [[components#vertep-runtime]] {kind: required, note: "the wallet actor and role charts run as actors"}
+- uses:: [[components#vertep-rdf]] {kind: required, note: "canonicalisation for eddsa-rdfc-2022"}
+- uses:: [[components#vertep-webvh]] {kind: optional, note: "publishers for status lists"}
+- realizes:: [[decisions#The wallet is its own crate over federation, agents and the runtime]]
+- realizes:: [[decisions#Wallets are virtual actors and exchanges are role charts]]
+- realizes:: [[decisions#Wallet plugins behind five interfaces registered by IRI]]
+- realizes:: [[decisions#One exchange vocabulary with value-free histories]]
+- realizes:: [[decisions#Plugin conformance is trace refinement judged in Lean]]
+- realizes:: [[decisions#Consent is a decide state with policy-computed candidates]]
+- realizes:: [[decisions#Credentials are sealed under a wallet content key]]
+- realizes:: [[decisions#Credential formats are implemented over the key manager]]
+- realizes:: [[decisions#The Vertep Credential Exchange is a versioned protocol inside TSP]]
+- realizes:: [[decisions#OpenID4VC endpoints are bindings of the role charts]]
+- realizes:: [[decisions#Status lists are published credentials with a bounded cache]]
+- realizes:: [[decisions#Grant credentials are wallet credentials]]
+- scheduled_in:: [[roadmap#M9 Agent wallet]]
+
+Implemented 2026-11-14 by the OpenSpec change `m9-agent-wallet`; the design is in [[views/wallet#Wallet]]. Modules: `wallet` (the three roles' operations), `store` (sealed records), `consent`, `status`, `format` (`di`, `sdjwt`), `exchange` (the engine and the role charts), `protocol` (`native`, `tsp`, `oid4vc`, `oid4vc_http`), `grants`, `testkit` (the conformance kit). 38 of 38 requirements implemented and verified; every history the kit records is replayed by the Lean checker `vertep-wallet`.
 
 ## vertep-wasm
 

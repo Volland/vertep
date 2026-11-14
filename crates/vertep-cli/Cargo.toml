@@ -32,9 +32,16 @@ vertep-webvh = { workspace = true, features = ["custody", "server"] }
 vertep-federation = { workspace = true }
 vertep-objects = { workspace = true }
 serde = { version = "1", features = ["derive"] }
+# vt wallet: agent wallets, OpenID4VCI offers and the conformance kit.
+vertep-wallet = { workspace = true, features = ["sd-jwt", "oid4vc", "testkit"] }
+vertep-runtime = { workspace = true }
+getrandom = "0.3"
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "macros", "time"] }
+axum = { version = "0.7.9", default-features = false, features = ["http1", "tokio"] }
 
 [dev-dependencies]
 tempfile = "3"
+vertep-wallet = { workspace = true }
 vertep-tiramemsu = { workspace = true }
 vertep-store = { workspace = true, features = ["testkit"] }
 
