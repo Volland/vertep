@@ -59,7 +59,7 @@
 - [x] 8.3 Create the npm workspace `bindings/js` with `@vertep/web` and `@vertep/dm-ecma` as ES modules with declarations and the worker entry
 - [x] 8.4 Fail releases whose package version differs from the workspace crate version
 - [x] 8.5 Add the CI size check: 1.2 MB gzip without storage, 2.5 MB gzip with the tiramemsu journal (the check runs in CI and in the tests and passes: the core build is 1,159.7 KB gzip, the journal build 2,198.0 KB. The budget was 600 KB until 2026-11-11, raised by the user because 600 KB is out of reach while `GraphStore` reads only through SPARQL: the SPARQL engine that `GraphStore` reads through is 637 KB gzip on its own, and core, SCXML and CEL add 148 KB to it; see `decisions#Separate packages keep the bundle budget`)
-- [ ] 8.6 Publish to npm under the `next` tag, then `latest` after the budget and round-trip tests hold (OPEN: not published, by instruction; the packages carry publishConfig tag next)
+- [x] 8.6 Publish to npm under the `next` tag, then `latest` after the budget and round-trip tests hold (published: `next` is 0.1.3 and `latest` is 0.1.2 on npm as of 2026-11-14)
 
 ## 9. Traceability and docs
 
