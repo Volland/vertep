@@ -329,6 +329,31 @@ impl StatusResolver for HttpStatus {
     }
 }
 
+/// Publishes status list credentials as files in a directory, named by the last segment of
+/// their URL, for any static web host (`vt webvh serve`, a git or command publisher of
+/// `vertep-webvh`, a CDN).
+#[derive(Clone, Debug)]
+pub struct DirectoryStatusPublisher(pub std::path::PathBuf);
+
+impl DirectoryStatusPublisher {
+    /// Writes `list`, published at `url`.
+    ///
+    /// # Errors
+    ///
+    /// [`WalletError::Storage`] when the file cannot be written.
+    pub fn publish(&self, url: &str, list: &Credential) -> Result<std::path::PathBuf, WalletError> {
+        let name = url
+            .rsplit('/')
+            .next()
+            .filter(|n| !n.is_empty() && !n.contains(".."))
+            .ok_or_else(|| WalletError::Storage(format!("no file name in {url}")))?;
+        std::fs::create_dir_all(&self.0).map_err(|e| WalletError::Storage(e.to_string()))?;
+        let path = self.0.join(name);
+        std::fs::write(&path, &list.raw).map_err(|e| WalletError::Storage(e.to_string()))?;
+        Ok(path)
+    }
+}
+
 /// Registers `resolver` as the built-in Bitstring Status List resolver of `registry`.
 pub fn register(registry: &WalletRegistry, resolver: Arc<dyn StatusResolver>) {
     registry.register_status(crate::vocab::STATUS_BITSTRING, resolver);

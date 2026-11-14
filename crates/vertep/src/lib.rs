@@ -51,6 +51,9 @@ pub use vertep_cluster as cluster;
 #[cfg(feature = "objects")]
 pub use vertep_objects as objects;
 
+#[cfg(feature = "wallet")]
+pub use vertep_wallet as wallet;
+
 /// The names most programs need.
 pub mod prelude {
     pub use vertep_core::datamodel::{Event, EventType, Value};

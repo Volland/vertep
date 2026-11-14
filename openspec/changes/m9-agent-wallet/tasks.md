@@ -41,72 +41,72 @@
 
 ## 3. Crate, interfaces and vocabulary
 
-- [ ] 3.1 Create the crate `vertep-wallet` (workspace member and workspace dependency) with features `tsp`, `sd-jwt`, `oid4vc` and `testkit`. Add facade feature `wallet` to `vertep`
-- [ ] 3.2 Define the traits `ExchangeProtocol`, `CredentialFormat`, `CredentialStore`, `ConsentPolicy` and `StatusResolver`, and `WalletRegistry` with built-in IRIs under `https://w3id.org/vertep/wallet#` (D3, `Pluggable Wallet Interfaces`)
-- [ ] 3.3 Define the exchange vocabulary and history JSONL (D4, `Exchange Vocabulary`), with no claim values and no keys in histories
-- [ ] 3.4 Write the wallet ontology terms in `ontology/wallet.ttl`: credential metadata, exchange and consent records
-- [ ] 3.5 Tests: `Application registers a credential format`, `Built-in plugin replaced`, `Unknown protocol refused`, `History in the vocabulary` and `Unmapped message refused`, each with `@tg: verifies::`
+- [x] 3.1 Create the crate `vertep-wallet` (workspace member and workspace dependency) with features `tsp`, `sd-jwt`, `oid4vc` and `testkit`. Add facade feature `wallet` to `vertep`
+- [x] 3.2 Define the traits `ExchangeProtocol`, `CredentialFormat`, `CredentialStore`, `ConsentPolicy` and `StatusResolver`, and `WalletRegistry` with built-in IRIs under `https://w3id.org/vertep/wallet#` (D3, `Pluggable Wallet Interfaces`)
+- [x] 3.3 Define the exchange vocabulary and history JSONL (D4, `Exchange Vocabulary`), with no claim values and no keys in histories
+- [x] 3.4 Write the wallet ontology terms in `ontology/wallet.ttl`: credential metadata, exchange and consent records
+- [x] 3.5 Tests: `Application registers a credential format`, `Built-in plugin replaced`, `Unknown protocol refused`, `History in the vocabulary` and `Unmapped message refused`, each with `@tg: verifies::`
 
 ## 4. Wallet actor and sealed store
 
-- [ ] 4.1 Write the wallet chart and the virtual actor `wallet/<DID>` (D2, `Wallet Actor`), one per identity
-- [ ] 4.2 Implement the sealed store (D8, `Sealed Credential Store`):
+- [x] 4.1 Write the wallet chart and the virtual actor `wallet/<DID>` (D2, `Wallet Actor`), one per identity
+- [x] 4.2 Implement the sealed store (D8, `Sealed Credential Store`):
   - an XChaCha20-Poly1305 content key, wrapped by HPKE to the key manager's X25519 key;
   - the digest as associated data;
   - metadata-only RDF;
   - erasure on delete
-- [ ] 4.3 Implement holder-binding keys through `KeyManager` (`Holder Binding Keys`)
-- [ ] 4.4 Implement lifecycle: list, show, delete, and selection that excludes expired, revoked and deleted credentials (`Credential Lifecycle`)
-- [ ] 4.5 Tests for every scenario of `Wallet Actor`, `Sealed Credential Store`, `Holder Binding Keys` and `Credential Lifecycle`, each with `@tg: verifies::`
+- [x] 4.3 Implement holder-binding keys through `KeyManager` (`Holder Binding Keys`)
+- [x] 4.4 Implement lifecycle: list, show, delete, and selection that excludes expired, revoked and deleted credentials (`Credential Lifecycle`)
+- [x] 4.5 Tests for every scenario of `Wallet Actor`, `Sealed Credential Store`, `Holder Binding Keys` and `Credential Lifecycle`, each with `@tg: verifies::`
 
 ## 5. Credential formats
 
-- [ ] 5.1 Move the Data Integrity code from `vertep-federation::credential` into a `DataIntegrity` format with `eddsa-jcs-2022`. `verify_grant_credential` keeps its API, and the M5 grant tests still pass
-- [ ] 5.2 Add `eddsa-rdfc-2022`:
+- [x] 5.1 Move the Data Integrity code from `vertep-federation::credential` into a `DataIntegrity` format with `eddsa-jcs-2022`. `verify_grant_credential` keeps its API, and the M5 grant tests still pass
+- [x] 5.2 Add `eddsa-rdfc-2022`:
   - `oxjsonld` with bundled contexts only (VCDM 2.0, Data Integrity, status list, Vertep);
   - canonicalisation by `vertep-rdf::canon`;
   - a document with a remote context is refused
-- [ ] 5.3 Implement SD-JWT VC behind `sd-jwt`:
+- [x] 5.3 Implement SD-JWT VC behind `sd-jwt`:
   - JWS EdDSA through the key manager;
   - salted disclosures;
   - `_sd` arrays;
   - a key-binding JWT with `sd_hash`, nonce and audience
-- [ ] 5.4 Add the test vectors of the Data Integrity EdDSA and SD-JWT VC specifications, valid and invalid
-- [ ] 5.5 Tests for `Data Integrity round trip`, `RDF canonical proof survives reserialisation`, `Selective disclosure` and `Interoperable examples`, each with `@tg: verifies::`
+- [x] 5.4 Add the test vectors of the Data Integrity EdDSA and SD-JWT VC specifications, valid and invalid
+- [x] 5.5 Tests for `Data Integrity round trip`, `RDF canonical proof survives reserialisation`, `Selective disclosure` and `Interoperable examples`, each with `@tg: verifies::`
 
 ## 6. Consent
 
-- [ ] 6.1 Implement `ConsentPolicy` (D7), which computes candidates: request ∩ policy for that verifier ∩ live credentials, plus `refuse`. The default policy refuses everything
-- [ ] 6.2 Write the holder role chart's consent `vt:decide` state, with rule, human and LLM deciders through `Decider`. The LLM sees claim names, verifier and purpose only
-- [ ] 6.3 Tests for every scenario of `Consent Before Disclosure`, including the out-of-bounds LLM answer, each with `@tg: verifies::`
+- [x] 6.1 Implement `ConsentPolicy` (D7), which computes candidates: request ∩ policy for that verifier ∩ live credentials, plus `refuse`. The default policy refuses everything
+- [x] 6.2 Write the holder role chart's consent `vt:decide` state, with rule, human and LLM deciders through `Decider`. The LLM sees claim names, verifier and purpose only
+- [x] 6.3 Tests for every scenario of `Consent Before Disclosure`, including the out-of-bounds LLM answer, each with `@tg: verifies::`
 
 ## 7. Status lists
 
-- [ ] 7.1 Implement Bitstring Status List issuing and revocation, published through the HTTP endpoint or a `vertep-webvh` publisher (D12)
-- [ ] 7.2 Implement `StatusResolver` over `ureq`, with verification, a cache bounded by `ttl` and policy, and fail-closed on unknown status
-- [ ] 7.3 Tests for `Revoked credential refused` and `Unreachable status fails closed`, each with `@tg: verifies::`
+- [x] 7.1 Implement Bitstring Status List issuing and revocation, published through the HTTP endpoint or a `vertep-webvh` publisher (D12)
+- [x] 7.2 Implement `StatusResolver` over `ureq`, with verification, a cache bounded by `ttl` and policy, and fail-closed on unknown status
+- [x] 7.3 Tests for `Revoked credential refused` and `Unreachable status fails closed`, each with `@tg: verifies::`
 
 ## 8. Native exchange over TSP
 
 - [ ] 8.1 Write the issuer, holder and verifier role charts of the Vertep Credential Exchange 1.0. `vt validate` and `vt certify` must pass on each (`Role Charts`)
-- [ ] 8.2 Implement the codec for messages under `https://w3id.org/vertep/exchange/1.0#` and the TSP binding: direct, routed and through a mediator (D10, `Native Exchange Over TSP`)
-- [ ] 8.3 Enforce, in the role charts and formats:
+- [x] 8.2 Implement the codec for messages under `https://w3id.org/vertep/exchange/1.0#` and the TSP binding: direct, routed and through a mediator (D10, `Native Exchange Over TSP`)
+- [x] 8.3 Enforce, in the role charts and formats:
   - possession over the issuer's own fresh nonce, one issuance per offer;
   - audience, nonce freshness and single use;
   - holder binding, trusted issuer, status and requested claims only
 
   These are `Possession Before Issuance`, `Issuance At Most Once Per Offer` and `Bound And Fresh Presentations`
-- [ ] 8.4 Tests for every scenario of `Role Charts`, `Possession Before Issuance`, `Issuance At Most Once Per Offer`, `Bound And Fresh Presentations` and `Native Exchange Over TSP`, each with `@tg: verifies::`
+- [x] 8.4 Tests for every scenario of `Role Charts`, `Possession Before Issuance`, `Issuance At Most Once Per Offer`, `Bound And Fresh Presentations` and `Native Exchange Over TSP`, each with `@tg: verifies::`
 
 ## 9. Conformance kit
 
-- [ ] 9.1 Implement `testkit`, the network between role charts (D6):
+- [x] 9.1 Implement `testkit`, the network between role charts (D6):
   - an in-memory transport for TSP and a loopback HTTP proxy for OpenID4VC;
   - a seeded adversarial scheduler: drop, duplicate, reorder, replay to the same and another verifier, inject from knowledge;
   - complete history recording
-- [ ] 9.2 Run `vertep-wallet` over recorded histories from the Rust tests, as the custody and lease oracles run; the test fails if the Lean build is missing and feature `differential` is on
-- [ ] 9.3 Write a deliberately faulty test plugin whose verifier skips the nonce check
-- [ ] 9.4 Tests for `Conformant history accepted`, `Disabled step reported`, `Built-in plugins conformant` and `Faulty plugin caught`, each with `@tg: verifies::`
+- [x] 9.2 Run `vertep-wallet` over recorded histories from the Rust tests, as the custody and lease oracles run; the test fails if the Lean build is missing and feature `differential` is on
+- [x] 9.3 Write a deliberately faulty test plugin whose verifier skips the nonce check
+- [x] 9.4 Tests for `Conformant history accepted`, `Disabled step reported`, `Built-in plugins conformant` and `Faulty plugin caught`, each with `@tg: verifies::`
 
 ## 10. OpenID4VC
 

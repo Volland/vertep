@@ -31,6 +31,9 @@ pub const CONSENT_RULES: &str = "https://w3id.org/vertep/wallet#consent/rules";
 /// Built-in status resolver: W3C Bitstring Status List.
 pub const STATUS_BITSTRING: &str = "https://w3id.org/vertep/wallet#status/bitstring";
 
+/// The wallet module of the vt ontology (Turtle).
+pub const WALLET_ONTOLOGY_TTL: &str = include_str!("../ontology/wallet.ttl");
+
 /// The exchange vocabulary: the abstract steps every protocol maps each message onto
 /// (`credential-exchange` requirement `Exchange Vocabulary`).
 // @tg: implements:: [[openspec:credential-exchange#Exchange Vocabulary]]

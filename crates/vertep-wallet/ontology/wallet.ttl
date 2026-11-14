@@ -1,0 +1,49 @@
+@prefix vt:     <https://w3id.org/vertep/vt#> .
+@prefix wallet: <https://w3id.org/vertep/wallet#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:    <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+# The wallet module of the vt ontology (M9, m9-agent-wallet). Credential metadata, exchanges and
+# consent records. Claim values never appear in the graph: a credential is named by its digest.
+
+wallet:Wallet a owl:Class ;
+    rdfs:label "wallet" ;
+    rdfs:comment "The virtual actor that holds, presents, issues and verifies credentials for one identity." .
+
+wallet:CredentialRecord a owl:Class ;
+    rdfs:label "credential record" ;
+    rdfs:comment "The metadata of a stored credential: types, issuer, validity, status reference and digest; the credential itself is sealed outside the graph." .
+
+wallet:Exchange a owl:Class ;
+    rdfs:label "exchange" ;
+    rdfs:comment "One run of a role chart (issuer, holder or verifier) of an exchange protocol." .
+
+wallet:ConsentRecord a owl:Class ;
+    rdfs:label "consent record" ;
+    rdfs:comment "A holder's decision to disclose claim names to a verifier for one nonce, or to refuse." .
+
+wallet:holds a owl:ObjectProperty ; rdfs:domain wallet:Wallet ; rdfs:range wallet:CredentialRecord .
+wallet:digest a owl:DatatypeProperty ; rdfs:domain wallet:CredentialRecord ; rdfs:range xsd:string ;
+    rdfs:comment "sha256:<hex> of the credential (for SD-JWT VC, of the issuer-signed JWT)." .
+wallet:format a owl:ObjectProperty ; rdfs:domain wallet:CredentialRecord ;
+    rdfs:comment "The credential format plugin's IRI." .
+wallet:credentialType a owl:DatatypeProperty ; rdfs:domain wallet:CredentialRecord ; rdfs:range xsd:anyURI .
+wallet:issuer a owl:ObjectProperty ; rdfs:domain wallet:CredentialRecord .
+wallet:holderKey a owl:DatatypeProperty ; rdfs:domain wallet:CredentialRecord ; rdfs:range xsd:anyURI ;
+    rdfs:comment "The did:key the credential is bound to." .
+wallet:validFrom a owl:DatatypeProperty ; rdfs:domain wallet:CredentialRecord ; rdfs:range xsd:dateTime .
+wallet:validUntil a owl:DatatypeProperty ; rdfs:domain wallet:CredentialRecord ; rdfs:range xsd:dateTime .
+wallet:statusList a owl:DatatypeProperty ; rdfs:domain wallet:CredentialRecord ; rdfs:range xsd:anyURI .
+wallet:statusIndex a owl:DatatypeProperty ; rdfs:domain wallet:CredentialRecord ; rdfs:range xsd:integer .
+wallet:claimName a owl:DatatypeProperty ; rdfs:range xsd:string ;
+    rdfs:comment "The name (never the value) of a claim a credential holds or a consent discloses." .
+
+wallet:protocol a owl:ObjectProperty ; rdfs:domain wallet:Exchange ;
+    rdfs:comment "The exchange protocol plugin's IRI." .
+wallet:role a owl:DatatypeProperty ; rdfs:domain wallet:Exchange ; rdfs:range xsd:string ;
+    rdfs:comment "issuer, holder or verifier." .
+wallet:peer a owl:ObjectProperty ; rdfs:domain wallet:Exchange .
+wallet:nonce a owl:DatatypeProperty ; rdfs:range xsd:string .
+wallet:verifier a owl:ObjectProperty ; rdfs:domain wallet:ConsentRecord .
+wallet:consentOf a owl:ObjectProperty ; rdfs:domain wallet:ConsentRecord ; rdfs:range wallet:Exchange .
