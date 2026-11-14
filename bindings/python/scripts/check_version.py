@@ -6,14 +6,21 @@ The Rust workspace, the npm packages and the PyPI package share one version. Run
 
 import re
 import sys
-import tomllib
 from pathlib import Path
 
 # @tg: implements:: [[openspec:python-bindings#Package Publishing]] {confidence: partial, note: "the version gate; the workflow is .github/workflows/python-release.yml"}
 # @tg: implements:: [[openspec:python-bindings#Native Extension Module]] {confidence: partial, note: "the version gate"}
 root = Path(__file__).resolve().parents[3]
-workspace = tomllib.loads((root / "Cargo.toml").read_text())["workspace"]["package"]["version"]
-package = tomllib.loads((root / "bindings/python/pyproject.toml").read_text())["project"]["version"]
+
+
+def first_version(text, section):
+    """The first `version = "..."` after the `[section]` header (no tomllib: it needs Python 3.11)."""
+    body = text.split(f"[{section}]", 1)[1]
+    return re.search(r'^version\s*=\s*"([^"]+)"', body, re.M).group(1)
+
+
+workspace = first_version((root / "Cargo.toml").read_text(), "workspace.package")
+package = first_version((root / "bindings/python/pyproject.toml").read_text(), "project")
 
 problems = []
 if package != workspace:
