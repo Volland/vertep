@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vertep</title>
-<meta name="description" content="Vertep is a family of Rust crates for W3C SCXML statecharts that run as durable actors, keep their history as RDF, let LLMs choose only among the moves a chart allows, and agree step for step with a model proven in Lean.">
+<title>Vertep — explainable agents for decisions that matter</title>
+<meta name="description" content="Let a language model choose only among the moves a statechart allows. Vertep writes every step down before it happens, so a decision can be replayed and explained without the model. Rust and WebAssembly; the core is checked against the W3C SCXML suite and a Lean 4 model.">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/css/fonts.css">
 <link rel="stylesheet" href="assets/css/vertep.css">
@@ -16,6 +16,8 @@
   <div class="masthead-inner">
     <a class="brand" href="index.html"><img src="assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
     <nav class="topnav" aria-label="Main">
+      <a href="why.html">Why</a>
+      <a href="regulated.html">Regulated</a>
       <a href="docs/index.html">Docs</a>
       <a href="examples/index.html">Examples</a>
       <a href="articles/index.html">Articles</a>
@@ -30,13 +32,15 @@
 <section class="hero hatched">
   <div class="hero-inner">
     <div>
-      <p class="kicker">Statecharts · Actors · Agents · Proofs</p>
+      <p class="kicker">Explainable agents for decisions that matter</p>
       <h1>Vertep</h1>
-      <p class="lede">Statecharts that run as durable actors, write down every step they take, let a language model choose only among the moves the chart allows, and agree step for step with a model proven in Lean.</p>
+      <p class="lede">Let a language model choose, but only among the moves your policy allows. Vertep writes every step down before it happens, so any decision can be replayed and explained later, without the model.</p>
+      <p style="max-width:34rem;margin:0 0 1.4rem;color:var(--ink-2)">Statecharts that run as durable actors, in Rust and the browser, with a core checked against the W3C SCXML suite and a model proven in Lean.</p>
       <div class="actions">
-        <a class="btn primary" href="docs/index.html">Begin here</a>
-        <a class="btn" href="examples/index.html">See the examples</a>
-        <a class="btn" href="articles/deterministic-agents.html">Why deterministic agents</a>
+        <a class="btn primary" href="why.html">Why Vertep</a>
+        <a class="btn" href="examples/credit-decision.html">Watch a loan decision</a>
+        <a class="btn" href="regulated.html">For regulated work</a>
+        <a class="btn" href="docs/index.html">Docs</a>
       </div>
     </div>
     <div class="hero-art" aria-hidden="true">
@@ -44,6 +48,28 @@
       <div class="disc"></div>
       <div class="goat"><img src="assets/img/goat.svg" alt=""></div>
     </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="band-inner">
+    <h2>When an AI makes a decision that matters</h2>
+    <p class="sub">Someone will ask why, months later. Vertep makes the answer a replay, not a reconstruction.</p>
+    <div class="cards">
+      <a class="card" href="examples/credit-decision.html">
+        <div class="card-head"><span class="num">I</span><h3>Lending</h3></div>
+        <div class="card-body"><p>A model underwrites loans. A policy limit declines by rule, approval is never offered above the ceiling, and an officer decides referrals. Three real applications, with the audit read from the journal alone.</p><span class="more">Run the example →</span></div>
+      </a>
+      <a class="card" href="articles/regulated-decisions.html#prior-auth">
+        <div class="card-head"><span class="num">II</span><h3>Healthcare</h3></div>
+        <div class="card-body"><p>A model approves routine prior authorisations or refers them. <em>Deny</em> exists in exactly one state, and a clinician decides it. Statutory deadlines become durable timers.</p><span class="more">See the chart →</span></div>
+      </a>
+      <a class="card" href="articles/regulated-decisions.html#claims">
+        <div class="card-head"><span class="num">III</span><h3>Insurance</h3></div>
+        <div class="card-body"><p>A model fast-tracks small, clean claims and flags the rest. Only an adjuster can refuse payment, and the reason is journaled with the decision.</p><span class="more">See the chart →</span></div>
+      </a>
+    </div>
+    <p style="max-width:46rem;margin:1.6rem auto 0">Three promises hold, each checked rather than claimed. The model <strong>cannot choose a move the chart does not offer</strong>. Every input and answer is <strong>journaled before it is acted on</strong>. And a run <strong>replays without the model</strong>, so the thing under examination is not needed to examine it. <a href="articles/explainable-by-construction.html">Read: Explainable by construction →</a></p>
   </div>
 </section>
 
@@ -236,10 +262,10 @@ npm install @vertep/web       # browsers and Node.js</code></pre>
 <section class="band ink">
   <div class="band-inner">
     <h2>Where it stands</h2>
-    <p class="sub">Ten milestones are built, from the SCXML core to durable objects, <code>did:webvh</code> hosting and agent wallets. Every requirement is traced from its spec to the code that implements it and the test or proof that checks it.</p>
+    <p class="sub">Version 0.1.x. Eleven milestones, from the SCXML core to agent protocols, are built or in progress. Every requirement is traced from its spec to the code that implements it and the test or proof that checks it. It is young software: try it on a small case first, and tell us what breaks.</p>
     <div class="cards">
-      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Specified</h3></div><div class="card-body"><p>356 requirements in OpenSpec, with scenarios, linked to decisions and constraints in a typed graph.</p></div></div>
-      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Built</h3></div><div class="card-body"><p>Twenty-four Rust crates and two npm packages: core, surfaces, runtime, agents, cluster, federation, durable objects, a TSP mediator, <code>did:webvh</code> hosting, agent wallets, WebAssembly.</p></div></div>
+      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Specified</h3></div><div class="card-body"><p>Nearly 400 requirements in OpenSpec, with scenarios, linked to decisions and constraints in a typed graph.</p></div></div>
+      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Built</h3></div><div class="card-body"><p>Twenty-five workspace crates and two npm packages: core, surfaces, runtime, agents, cluster, federation, durable objects, a TSP mediator, <code>did:webvh</code> hosting, agent wallets, agent protocols and WebAssembly.</p></div></div>
       <div class="card"><div class="card-head"><span class="num">✶</span><h3>Checked</h3></div><div class="card-body"><p>The W3C SCXML suite, Rust-against-Lean differential traces, container fault tests, and Lean theorems with no <code>sorry</code>.</p></div></div>
     </div>
   </div>
@@ -251,7 +277,7 @@ npm install @vertep/web       # browsers and Node.js</code></pre>
   <div class="colophon-inner">
     <div class="mark"><img src="assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="docs/index.html" style="color:inherit">Docs</a><a href="examples/index.html" style="color:inherit">Examples</a><a href="articles/index.html" style="color:inherit">Articles</a><a href="vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="impressum.html" style="color:inherit">Impressum</a><a href="datenschutz.html" style="color:inherit">Datenschutz</a><a href="agb.html" style="color:inherit">AGB</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="why.html" style="color:inherit">Why</a><a href="regulated.html" style="color:inherit">Regulated</a><a href="docs/index.html" style="color:inherit">Docs</a><a href="examples/index.html" style="color:inherit">Examples</a><a href="articles/index.html" style="color:inherit">Articles</a><a href="vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="impressum.html" style="color:inherit">Impressum</a><a href="datenschutz.html" style="color:inherit">Datenschutz</a><a href="agb.html" style="color:inherit">AGB</a></nav>
   </div>
 </footer>
 </body>

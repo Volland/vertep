@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  An insurance claim: a model may fast-track small, clean claims and flag the rest, a fraud
+  analyst investigates, and an adjuster, never the model, can refuse payment.
+
+  A chart shown in the article "Three regulated decisions"; it is validated with `vt validate`
+  but no example program runs it.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" name="claim" initial="reported">
+  <datamodel>
+    <data id="amount" expr="0"/>
+    <data id="flags" expr="0"/>
+  </datamodel>
+
+  <state id="reported">
+    <transition event="report" target="screening">
+      <assign location="amount" expr="ev.data.amount"/>
+      <assign location="flags" expr="ev.data.flags"/>
+    </transition>
+  </state>
+
+  <state id="screening" vt:decide="claims-model" vt:candidates="fast_track flag"
+         vt:maxDecisions="3">
+    <transition event="fast_track" cond="ctx.amount &lt;= 5000 &amp;&amp; ctx.flags == 0" target="paid"/>
+    <transition event="flag" target="adjuster_review"/>
+    <transition event="error.decide.invalid" target="adjuster_review"/>
+    <transition event="vt.agent.budget-exhausted" target="adjuster_review"/>
+  </state>
+
+  <!-- Refusing payment is an adjuster's decision; the reason is journaled with it. -->
+  <state id="adjuster_review" vt:decide="adjuster" vt:candidates="pay refuse investigate">
+    <transition event="pay" target="paid"/>
+    <transition event="refuse" target="refused"/>
+    <transition event="investigate" target="investigation"/>
+  </state>
+
+  <state id="investigation" vt:decide="adjuster" vt:candidates="pay refuse">
+    <transition event="pay" target="paid"/>
+    <transition event="refuse" target="refused"/>
+  </state>
+
+  <state id="paid"/>
+  <state id="refused"/>
+</scxml>

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Three regulated decisions — Vertep</title>
+<meta name="description" content="A loan, a prior authorisation and an insurance claim as statecharts that let a model handle routine cases while policy and people own the rest.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html" aria-current="page">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+
+  <header class="article-head">
+    <p class="kicker">Article the sixth</p>
+    <h1>Three regulated decisions</h1>
+    <p class="byline">A loan, a prior authorisation and an insurance claim, as charts that put a model where it belongs</p>
+  </header>
+
+  <p class="opening">The pattern in all three is the same, and it is worth saying before the details. A model is good at the routine middle of a caseload. Policy is good at the edges. A person must own whatever is consequential or contested. A chart lets you write down which is which, once, in a form that is checked and versioned, and then lets the model work inside it. This article shows the pattern three times. The first is a program you can run. The other two are charts that validate with <code>vt validate</code> and are shown, not run, and the difference is stated where it matters.</p>
+
+  <p><small>These are illustrative designs, not descriptions of any institution's practice, and not legal advice. What a lender, insurer or provider must do depends on jurisdiction and facts.</small></p>
+
+  <h2 id="lending">1. Lending: the ceiling the model cannot talk past</h2>
+
+  <p>A lender lets a model underwrite consumer loans. Policy has three rules. A debt-to-income ratio over 50% is declined without asking anyone. Approval is available only up to a ratio of 43% and an amount of 50&nbsp;000. And a model that tries to do something it was not offered goes to a person.</p>
+
+<pre data-lang="SCXML"><code>  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"screening"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">cond=</span><span class="s">"ctx.dti &gt; 50"</span> <span class="na">target=</span><span class="s">"declined"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">target=</span><span class="s">"underwriting"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"underwriting"</span> <span class="na">vt:decide=</span><span class="s">"underwriter"</span> <span class="na">vt:candidates=</span><span class="s">"approve decline refer"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">cond=</span><span class="s">"ctx.dti &amp;lt;= 43 &amp;amp;&amp;amp; ctx.amount &amp;lt;= 50000"</span> <span class="na">target=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"decline"</span> <span class="na">target=</span><span class="s">"declined"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"refer"</span> <span class="na">target=</span><span class="s">"officer_review"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"error.decide.invalid"</span> <span class="na">target=</span><span class="s">"officer_review"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span></code></pre>
+
+  <p>The first rule is a plain eventless transition in the <code>screening</code> state: no decider is consulted, so there is nothing to be talked out of. The second is the guard on <code>approve</code>. A guard that is false removes the event from the offer, and so the model never sees it. The third is <code>error.decide.invalid</code>, which the core raises when an answer was not offered.</p>
+
+  <p>The <a href="../examples/credit-decision.html">full example</a> runs three applications. Its output is quoted and read in <a href="explainable-by-construction.html">Explainable by construction</a>. What matters here is the design choice: <strong>the compliance-relevant rule is in the chart, not in the prompt</strong>. A prompt can be argued with, injected into or forgotten after a model upgrade. A guard is evaluated by the core every time, and the Lean model proves that whatever a decider returns, the transition taken was one that was enabled.</p>
+
+  <p>A lender would add reason codes to the <code>decline</code> event, so that an adverse-action notice can name specific reasons from the record. The chart can require the payload; the choice of lawful reasons is the lender's.</p>
+
+  <h2 id="prior-auth">2. Healthcare: deny exists in exactly one state</h2>
+
+  <p>A payer receives prior-authorisation requests. A model may approve routine requests, or refer them. Only a clinician may deny. That last rule is the interesting one, because it is not a guard or a prompt: it is a fact about the shape of the chart.</p>
+
+<pre data-lang="SCXML"><code>  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"triage"</span> <span class="na">vt:decide=</span><span class="s">"triage-model"</span> <span class="na">vt:candidates=</span><span class="s">"approve refer"</span>
+         <span class="na">vt:fallback=</span><span class="s">"clinician/on-call"</span> <span class="na">vt:deadline=</span><span class="s">"4h"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">cond=</span><span class="s">"ctx.routine"</span> <span class="na">target=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"refer"</span> <span class="na">target=</span><span class="s">"clinician_review"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"error.decide.invalid"</span> <span class="na">target=</span><span class="s">"clinician_review"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+
+  <span class="cm">&lt;!-- The only state in which `deny` exists, and its decider is a person. --&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"clinician_review"</span> <span class="na">vt:decide=</span><span class="s">"clinician/on-call"</span> <span class="na">vt:candidates=</span><span class="s">"approve deny request_info"</span>
+         <span class="na">vt:fallback=</span><span class="s">"clinician/medical-director"</span> <span class="na">vt:deadline=</span><span class="s">"72h"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">target=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"deny"</span> <span class="na">target=</span><span class="s">"denied"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"request_info"</span> <span class="na">target=</span><span class="s">"awaiting_info"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span></code></pre>
+
+  <p>Search the chart for <code>deny</code>. It appears once, in <code>clinician_review</code>, whose decider is a person. The triage model's candidates are <code>approve</code> and <code>refer</code>, so there is no sequence of model answers, prompts or tool calls that reaches <code>denied</code> without a clinician's journal entry on the way. A reviewer can establish this by reading, and a tool can establish it by querying the chart as RDF, since every chart is also a graph.</p>
+
+  <p>Two timing details are worth noticing. <code>vt:deadline="4h"</code> with a fallback hands an unanswered triage to the on-call clinician, as a durable timer: it survives a restart, and its firing is a journaled event. The clinician state has its own <code>72h</code> deadline that escalates to the medical director. Rules that say a decision must be reached within a period become states and timers, and so they are visible in the diagram and in the record.</p>
+
+  <p>This chart is shown, not run. It validates, which checks that it is well-formed and conforms to the shapes. No example program drives it, and the semantics of the deadlines is described in <a href="../docs/agents.html">the agents documentation</a>, not re-proved here.</p>
+
+  <h2 id="claims">3. Insurance: the model pays, the adjuster refuses</h2>
+
+  <p>An insurer lets a model fast-track small, clean claims. Anything else is flagged for an adjuster. Refusing to pay is a consequential act, and the chart reserves it for a person.</p>
+
+<pre data-lang="SCXML"><code>  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"screening"</span> <span class="na">vt:decide=</span><span class="s">"claims-model"</span> <span class="na">vt:candidates=</span><span class="s">"fast_track flag"</span>
+         <span class="na">vt:maxDecisions=</span><span class="s">"3"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"fast_track"</span> <span class="na">cond=</span><span class="s">"ctx.amount &amp;lt;= 5000 &amp;amp;&amp;amp; ctx.flags == 0"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"flag"</span> <span class="na">target=</span><span class="s">"adjuster_review"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"error.decide.invalid"</span> <span class="na">target=</span><span class="s">"adjuster_review"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"vt.agent.budget-exhausted"</span> <span class="na">target=</span><span class="s">"adjuster_review"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+
+  <span class="cm">&lt;!-- Refusing payment is an adjuster's decision; the reason is journaled with it. --&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"adjuster_review"</span> <span class="na">vt:decide=</span><span class="s">"adjuster"</span> <span class="na">vt:candidates=</span><span class="s">"pay refuse investigate"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"pay"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"refuse"</span> <span class="na">target=</span><span class="s">"refused"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"investigate"</span> <span class="na">target=</span><span class="s">"investigation"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"investigation"</span> <span class="na">vt:decide=</span><span class="s">"adjuster"</span> <span class="na">vt:candidates=</span><span class="s">"pay refuse"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"pay"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"refuse"</span> <span class="na">target=</span><span class="s">"refused"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span></code></pre>
+
+  <p>The same structure again: <code>refuse</code> exists only in states decided by <code>adjuster</code>. The model's <code>fast_track</code> is enabled only for an amount of 5&nbsp;000 or less with no fraud flags. <code>vt:maxDecisions="3"</code> bounds the number of times the model can be asked in this state, and when the budget is spent the chart sends the claim to a person, so a model that vacillates cannot run for ever or be re-asked until it says yes.</p>
+
+  <h2>What the three have in common</h2>
+
+  <ul>
+    <li><strong>The rule is structural.</strong> "Only a person denies" is not a policy document a model might read. It is the absence of a transition.</li>
+    <li><strong>The model is useful where it is allowed to be.</strong> It handles the routine cases, which is most of them, and the chart gives it nothing it could misuse at the edges.</li>
+    <li><strong>People are in the loop by design, not by exception.</strong> A person's decision is a journal entry of the same kind as a model's, with the same record of what was offered.</li>
+    <li><strong>Changing the rule is changing a version.</strong> A new threshold is a new chart with a new hash, replayable against last year's cases before it goes live.</li>
+  </ul>
+
+  <h2>What you still have to do</h2>
+
+  <p>Write the right rules. Review them for fairness and legality. Validate your model. Secure access to the journals, and decide what personal data may go in them: today, keep it out of events and refer to it, because a journal is append-only and the redaction scheme is only specified, not built. Vertep makes the rules explicit, enforced and recorded. It does not make them correct.</p>
+
+  <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+  <nav class="pager" aria-label="Articles">
+    <a href="explainable-by-construction.html">← Explainable by construction</a>
+    <a href="../regulated.html">Vertep for regulated work →</a>
+  </nav>
+
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

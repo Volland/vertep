@@ -5,10 +5,13 @@
 <h1 align="center">Vertep</h1>
 
 <p align="center">
-  Statecharts that run as durable actors, write down every step they take, let a language model choose only among the moves the chart allows, and agree step for step with a model proven in Lean.
+  <b>Let a language model choose, but only among the moves your policy allows.</b><br>
+  Every step is written down before it happens, so any decision can be replayed and explained later, without the model.
 </p>
 
 <p align="center">
+  <a href="https://volland.github.io/vertep/why.html"><b>Why Vertep</b></a> ·
+  <a href="https://volland.github.io/vertep/regulated.html">For regulated work</a> ·
   <a href="https://volland.github.io/vertep/"><b>Website</b></a> ·
   <a href="https://volland.github.io/vertep/docs/index.html">Getting started</a> ·
   <a href="https://volland.github.io/vertep/examples/">Examples</a> ·
@@ -22,6 +25,32 @@
   <a href="https://docs.rs/vertep"><img src="https://img.shields.io/docsrs/vertep" alt="docs.rs"></a>
   <a href="#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg" alt="license"></a>
 </p>
+
+---
+
+## Why
+
+An AI agent is usually a loop around a prompt. Its state is a transcript, it cannot be replayed, and its explanation is written afterwards by the same kind of system that gave the answer. That is a poor basis for a loan, a claim or a treatment request, where someone will later ask *why*.
+
+Vertep puts the model at a **choice point** inside a statechart it does not control:
+
+- **Bounded.** At a decide state the chart offers only the moves enabled right now. A model cannot pick one the chart does not offer, and that is a theorem in the Lean model, not a prompt instruction.
+- **Recorded.** Inputs, decisions and model results are journaled before they take effect.
+- **Replayable.** Replay the journal with no model bound and reach the same states. The thing under examination is not needed to examine it.
+- **Explainable.** The record answers: what state, what was offered, who chose, under which version of the rules, and what followed. See [Explainable by construction](https://volland.github.io/vertep/articles/explainable-by-construction.html).
+
+### See it in ten minutes
+
+```sh
+git clone https://github.com/Volland/vertep && cd vertep
+cargo run -p vertep-examples --bin credit-decision
+```
+
+Three loan applications are decided by a scripted stand-in for a model. On the second, the model answers *approve* for an amount over the policy ceiling; the chart never offered it, refuses the answer, and an officer decides. Then an auditor opens the same journal with **no decider bound** and reads what happened, entry by entry. Walkthrough: [examples/credit-decision](https://volland.github.io/vertep/examples/credit-decision.html). The same pattern for [healthcare prior authorisation and insurance claims](https://volland.github.io/vertep/articles/regulated-decisions.html) is shown as charts.
+
+### Where it stands
+
+Version **0.1.x**, built in the open and quickly. The SCXML core, the journal, deciders and the Lean model are the strong parts; clusters, federation, durable objects, wallets and agent protocols are built and specified but younger, with open items on the [roadmap](tg.md/roadmap.md). It is not a compliance product: it gives you an honest record and structural limits, and [what it contributes to the rules you answer to](https://volland.github.io/vertep/regulated.html) is stated next to what it does not. Planned work on explanation export, personal-data redaction in journals and production readiness is drafted in [`openspec/changes/m12-decision-records`](openspec/changes/m12-decision-records) and [`m13-production-readiness`](openspec/changes/m13-production-readiness). Feedback and issues are the most useful contribution right now.
 
 ---
 

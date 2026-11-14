@@ -172,13 +172,39 @@ EXAMPLES = [
                 "The replay reaches the same states with zero decider calls.",
             ]),
             ("nb", "For a language-model agent with tools and a fork from the journal, see <code>crates/vertep-agent/examples/react_support_agent.rs</code> and <code>fork_from_journal.rs</code>, and the article <a href=\"../articles/deterministic-agents.html\">The goat does not choose the play</a>."),
-            ("warn", "The agent host keeps its own journal, and only the in-memory <code>MemoryJournal</code> implements it today. A durable agent journal on tiramemsu is not there yet."),
+            ("warn", "This example uses the in-memory <code>MemoryJournal</code>, the default for tests. For a durable agent journal, give the host a <code>StoreAgentJournal</code> over any <code>JournalStore</code>, such as a tiramemsu file."),
+        ],
+    },
+    {
+        "slug": "credit-decision",
+        "title": "Credit decision",
+        "num": "VI",
+        "summary": "A regulated loan decision: a hard policy limit, a model that cannot approve what policy forbids, a human officer, and an audit from the journal alone.",
+        "lede": "A lender lets a model underwrite consumer loans inside a chart that holds the policy. Three applications are decided, then an auditor opens the same journal with no decider bound and reads what was offered, who chose and why. A scripted decider stands in for the model, so the example needs no network.",
+        "files": ["credit-decision/loan.scxml", "credit-decision/main.rs", "credit-decision/expected-output.txt"],
+        "body": lambda: [
+            ("h2", "The chart"),
+            ("p", "Three rules hold however the underwriter behaves. A debt-to-income ratio over 50% is declined by rule, before any decider is asked. <code>approve</code> is offered only while it is enabled: ratio at most 43% and amount at most 50,000. An answer that was not offered is refused and the case goes to a person."),
+            ("code", (read("credit-decision/loan.scxml"), "SCXML")),
+            ("h2", "The program"),
+            ("p", "The first <code>AgentHost</code> decides three applications. The second, the auditor's, opens the same journal with no decider bound and replays it."),
+            ("code", (read("credit-decision/main.rs"), "Rust")),
+            ("h2", "Run it"),
+            ("raw", run("cargo run -p vertep-examples --bin credit-decision")),
+            ("out", (read("credit-decision/expected-output.txt"), "Output")),
+            ("ul", [
+                "Loan 1001 was approved by the underwriter, who was offered all three moves.",
+                "On loan 1002 the amount is over the ceiling, so <code>approve</code> was never offered: the underwriter answered it anyway, the chart refused the answer, and an officer decided. The journal keeps the refused answer with its rationale.",
+                "Loan 1003 was declined by rule. The journal has no decision entry because nobody was asked.",
+                "The audit replays nine entries with zero decider calls, and <code>state_at</code> shows the process as of every entry.",
+            ]),
+            ("nb", "This example shows how a record can explain a decision. It is not a compliance product: what a regulator requires of a lender is a legal question, and the articles <a href=\"../articles/explainable-by-construction.html\">Explainable by construction</a> and <a href=\"../articles/regulated-decisions.html\">Three regulated decisions</a> say what the record does and does not cover."),
         ],
     },
     {
         "slug": "browser-js",
         "title": "Browser and Node.js",
-        "num": "VI",
+        "num": "VII",
         "summary": "@vertep/web from Node.js: spawn from SCXML text, send, subscribe, read the journal, travel back.",
         "lede": "An ES module that uses <code>@vertep/web</code>, the package a browser loads. The actor system runs in a worker, a worker thread in Node.js, with the core compiled to WebAssembly.",
         "files": ["browser-js/main.mjs", "browser-js/package.json", "browser-js/expected-output.txt"],
@@ -231,9 +257,12 @@ def page(title: str, desc: str, current: str, sidebar: str, main: str) -> str:
   <div class="masthead-inner">
     <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
     <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
       <a href="../docs/index.html">Docs</a>
       <a href="index.html" aria-current="page">Examples</a>
       <a href="../articles/index.html">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
       <a href="../about.html">About</a>
     </nav>
   </div>
@@ -250,7 +279,7 @@ def page(title: str, desc: str, current: str, sidebar: str, main: str) -> str:
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
   </div>
 </footer>
 </body>

@@ -1,0 +1,31 @@
+deciding three applications:
+https://example.org/loans/1001  amount 20000, ratio 31%
+  underwriter asked in `underwriting`: offered ["approve", "decline", "refer"] -> approve
+  -> ["approved"]
+https://example.org/loans/1002  amount 80000, ratio 38%
+  underwriter asked in `underwriting`: offered ["decline", "refer"] -> approve
+  officer     asked in `officer_review`: offered ["approve", "decline"] -> approve
+  -> ["approved"]
+https://example.org/loans/1003  amount 15000, ratio 62%
+  -> ["declined"]
+
+an auditor opens the same journal; no decider is bound:
+https://example.org/loans/1001  final ["approved"]
+  1 start
+  2 event     apply
+  3 decision  approve, rationale "stable income, low ratio, small amount"
+  as of entry 2: ["underwriting"]
+  as of entry 3: ["approved"]
+https://example.org/loans/1002  final ["approved"]
+  1 start
+  2 event     apply
+  3 decision  approve, rationale "strong credit history"
+  4 decision  approve, rationale "verified employment by phone; collateral accepted"
+  as of entry 2: ["underwriting"]
+  as of entry 3: ["officer_review"]
+  as of entry 4: ["approved"]
+https://example.org/loans/1003  final ["declined"]
+  1 start
+  2 event     apply
+  as of entry 2: ["declined"]
+entries replayed: 9, decider calls: 0

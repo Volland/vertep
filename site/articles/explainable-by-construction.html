@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explainable by construction — Vertep</title>
+<meta name="description" content="Why the record of an automated decision should be the process itself: five questions a record must answer, read from a real journal, and what it still cannot do.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html" aria-current="page">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+
+  <header class="article-head">
+    <p class="kicker">Article the fifth</p>
+    <h1>Explainable by construction</h1>
+    <p class="byline">Why the record of a decision should be the process itself, and not a story told about it</p>
+  </header>
+
+  <p class="opening">Some months after a loan was refused, the applicant asks why. A regulator asks the same thing about a thousand loans at once. The bank has a model, a log, a ticket and a team who remember something. What it needs is a way to say, for this loan, what the system knew, what it was allowed to do, who chose, and under which rules, and to say it in a way someone else can check.</p>
+
+  <h2>Two kinds of explanation</h2>
+
+  <p>There are, roughly, two ways to explain an automated decision.</p>
+
+  <p>The first is <strong>post hoc</strong>. After the decision, a second process estimates which inputs mattered, or asks the model to say why. Tools like feature-attribution methods and "explain your answer" prompts are of this kind. They can be useful, and they have a well-known weakness: they are a model of the model. A fluent paragraph of reasons may have nothing to do with how the answer was actually produced, and it was written after the fact by something that wanted to sound reasonable.</p>
+
+  <p>The second is <strong>by construction</strong>. The system is built so that, at every consequential step, what happened is a matter of record: the state it was in, the choices open to it, who or what took one, and the rules in force. An explanation then is not generated. It is read back.</p>
+
+  <p>Vertep is built for the second kind. It does not replace the first: if you want attribution scores for a credit model, you still need them. But it gives you something they cannot, which is a faithful account of the <em>process</em> around the model.</p>
+
+  <h2>Five questions a record must answer</h2>
+
+  <ol>
+    <li><strong>What state was the process in?</strong> Not "what did the transcript say", but which state of which chart, with which data.</li>
+    <li><strong>What was it allowed to do?</strong> Which moves were enabled at that moment, and which were not.</li>
+    <li><strong>Who or what chose, and what did they say?</strong> A model, a rule or a person, and their stated reason.</li>
+    <li><strong>Under which version of the rules?</strong> Exactly which chart, identified in a way that cannot be quietly changed.</li>
+    <li><strong>What happened next?</strong> The transition taken, and every effect it caused.</li>
+  </ol>
+
+  <p>In Vertep each one is a property of how the system runs, not a feature added to it. A chart's version is the hash of its canonical form, so it names the rules and cannot be edited without being a different version. At a decide state the core computes the enabled events and offers only those. The answer comes back as an event, is written to the journal and is then applied. And the journal is read before anything is done, so the order of the record is the order of causes.</p>
+
+  <h2>Reading a record</h2>
+
+  <p>The <a href="../examples/credit-decision.html">credit-decision example</a> decides three loan applications, then opens the journal with no model bound. This is the second application, a loan of 80&nbsp;000 at a debt-to-income ratio of 38%, above the 50&nbsp;000 ceiling in the chart:</p>
+
+<pre class="output" data-lang="Output"><code>https://example.org/loans/1002  amount 80000, ratio 38%
+  underwriter asked in `underwriting`: offered [&quot;decline&quot;, &quot;refer&quot;] -&gt; approve
+  officer     asked in `officer_review`: offered [&quot;approve&quot;, &quot;decline&quot;] -&gt; approve
+
+https://example.org/loans/1002  final [&quot;approved&quot;]
+  1 start
+  2 event     apply
+  3 decision  approve, rationale &quot;strong credit history&quot;
+  4 decision  approve, rationale &quot;verified employment by phone; collateral accepted&quot;
+  as of entry 2: [&quot;underwriting&quot;]
+  as of entry 3: [&quot;officer_review&quot;]
+  as of entry 4: [&quot;approved&quot;]
+https://example.org/loans/1003  final [&quot;declined&quot;]
+  1 start
+  2 event     apply</code></pre>
+
+  <p>Read it as an auditor would. The process was in <code>underwriting</code> after entry 2. The underwriter was offered <code>decline</code> and <code>refer</code>: the chart never offered <code>approve</code>, because the amount exceeds the ceiling. The underwriter answered <code>approve</code> anyway, with a rationale. That answer was refused, because it was not on the offer, and the chart sent the case to an officer, who approved it with their own recorded reason.</p>
+
+  <p>Three things in this record would be hard to get from a log. First, the refused answer is there: the model's attempt to approve is part of the history and not erased by the rule that stopped it. Second, <em>approve</em> in entry 3 did not approve anything. The state as of entry 3 is <code>officer_review</code>, and the record says so. Third, the third application, at 62%, has no decision at all, because the chart declined it by rule and never asked anyone. An empty space where a decision would be is itself an answer.</p>
+
+  <h2>Replay is the audit</h2>
+
+  <p>The auditor in the example opens the same journal in a second host with no decider bound, and the process replays: nine entries, zero decider calls, the same states. This matters in a way that is easy to miss. The thing being examined, the model, is not needed to examine its decision. The record is complete enough to stand without it, so it can be checked years later after the model has been retired, retrained or switched off.</p>
+
+  <p>Replay also gives time travel: <code>state_at</code> shows the process as of any entry. And because a chart is versioned by its hash, one can ask a question that logs cannot answer: <em>what would this applicant's journey have been under next quarter's policy?</em> Fork from the journal at the application, run it under a new chart version and compare. The original record is untouched. For a regulated lender changing a threshold, that is the difference between hoping the change is safe and having run it on last year's cases.</p>
+
+  <h2>The model's reason is a claim</h2>
+
+  <p>A rationale a language model writes is stored in the journal as the decider's annotation, next to its decision. That is deliberate. The record says "the underwriter said this was because of stable income", and not "this was because of stable income". The first is a fact about what was recorded. The second would be a claim about the model that Vertep cannot verify and does not make.</p>
+
+  <p>This is a useful discipline for the people reading the record too. What can be checked, whether a move was legal, whether a person decided, which rules applied, is kept apart from what can only be reported. An examiner can trust the first without trusting the second, and can ask for the second to be sampled and reviewed.</p>
+
+  <h2>What this does not give you</h2>
+
+  <ul>
+    <li><strong>It does not explain the model.</strong> If a regulator asks why a model scored an applicant at 0.72, the journal records the score and the move that followed, not what is in the weights.</li>
+    <li><strong>It cannot make a bad policy good.</strong> A chart can encode an unfair threshold exactly and then record every use of it faithfully. What it adds is that the threshold is explicit, versioned, testable and replayable on past cases, which is where a fairness review can begin.</li>
+    <li><strong>A plain journal is not tamper-evident today.</strong> Durable objects in Vertep have hash-chained, signed journals. Extending that to every agent journal, with an exportable explanation bundle a third party can verify, is specified as a draft, <code>m12-decision-records</code>, and is not built.</li>
+    <li><strong>Personal data and an append-only record pull against each other.</strong> Under rules like the GDPR's right to erasure, you cannot simply rewrite history. Until the specified per-subject encryption lands, the safe practice is to keep personal data out of events and journal references to it.</li>
+    <li><strong>It is 0.1.x software.</strong> The example above is a scripted decider on an in-memory journal. It shows the shape of the record, not a production deployment.</li>
+  </ul>
+
+  <h2>Why bother</h2>
+
+  <p>Most explainability effort goes into making the model's answer more understandable. That matters. But a decision is also a process with a time, an authority and a rule, and in a regulated setting those are what someone is held to. A system that records the process as it runs turns "we think it was because" into "here is the entry". The model remains a model, as opaque as it was. It simply no longer has to be the only witness.</p>
+
+  <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+  <nav class="pager" aria-label="Articles">
+    <a href="kolyada.html">← A protocol a stranger can check</a>
+    <a href="regulated-decisions.html">Three regulated decisions →</a>
+  </nav>
+
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

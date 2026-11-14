@@ -11,6 +11,7 @@ they print with the `expected-output.txt` next to them, so the outputs below are
 | [rust-macro](#rust-macro) | A chart written with `statechart!`, guards and actions as Rust functions | rust-dsl |
 | [durable-actor](#durable-actor) | A virtual actor on a tiramemsu journal: replay after restart, a durable timer | actor-model, event-journal, durable-timers |
 | [decider-agent](#decider-agent) | `vt:decide` choice points, a scripted decider, replay with no decider | deciders |
+| [credit-decision](#credit-decision) | A regulated loan decision: a policy ceiling the model cannot talk past, a human officer, an audit from the journal alone | deciders |
 | [browser-js](#browser-js) | `@vertep/web` from Node.js: spawn, send, subscribe, journal, time travel | wasm-bindings |
 
 All commands run from the repository root.
@@ -292,6 +293,23 @@ run 2, same journal, no decider bound:
 
 For an LLM-driven agent with tools and a fork from the journal, see
 `crates/vertep-agent/examples/react_support_agent.rs` and `fork_from_journal.rs`.
+
+## credit-decision
+
+`credit-decision/loan.scxml` is a consumer-loan chart with a model underwriter, a hard
+debt-to-income limit (declined by rule, no decider asked), an approval ceiling (`approve` is
+offered only while it is enabled) and a human officer for referrals. An answer that was not
+offered is refused and the case goes to the officer. `credit-decision/main.rs` decides three
+applications with scripted deciders, then opens the same journal with no decider bound and prints
+what an auditor reads: entries, rationales, the state as of each entry, and zero decider calls.
+`prior-auth.scxml` and `claims.scxml` are two more regulated charts, validated with
+`vt validate` but not run, shown in the article *Three regulated decisions*.
+
+```sh
+cargo run -p vertep-examples --bin credit-decision
+```
+
+This example shows how a record can explain a decision. It is not a compliance product.
 
 ## browser-js
 

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vertep for regulated work</title>
+<meta name="description" content="Explainable AI decisions for lending, insurance and healthcare: bounded by a chart, recorded in a journal, replayable without the model. What it contributes to the rules you answer to, and what it does not.">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/fonts.css">
+<link rel="stylesheet" href="assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="index.html"><img src="assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="why.html">Why</a>
+      <a href="regulated.html" aria-current="page">Regulated</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="examples/index.html">Examples</a>
+      <a href="articles/index.html">Articles</a>
+      <a href="vertepnyk.html">Vertepnyk</a>
+      <a href="about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero hatched">
+  <div class="hero-inner">
+    <div>
+      <p class="kicker">For regulated work</p>
+      <h1>An answer for the day someone asks why.</h1>
+      <p class="lede">In lending, insurance and healthcare, an AI decision is not finished when it is made. It is finished when it can be explained to an applicant, an examiner or a court, months later. Vertep records the process as it happens, so the explanation is a replay and not a reconstruction.</p>
+      <div class="actions">
+        <a class="btn primary" href="articles/explainable-by-construction.html">Explainable by construction</a>
+        <a class="btn" href="articles/regulated-decisions.html">Three regulated decisions</a>
+      </div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="rays"></div>
+      <div class="disc"></div>
+      <div class="goat"><img src="assets/img/goat.svg" alt=""></div>
+    </div>
+  </div>
+</section>
+<section class="band "><div class="band-inner">
+
+    <h2>Three places it fits</h2>
+    <p class="sub">The pattern is the same: the model takes the routine cases, the chart refuses what policy forbids, and a person owns the consequential ones.</p>
+    <div class="cards">
+<a class="card" href="examples/credit-decision.html"><div class="card-head"><span class="num">I</span><h3>Lending</h3></div><div class="card-body"><p>A model underwrites; a hard ratio limit declines without asking it; approval is not offered above the ceiling; an officer decides the referrals. <strong>Runnable:</strong> three real applications with their audit.</p><span class="more">Run the example →</span></div></a><a class="card" href="articles/regulated-decisions.html#prior-auth"><div class="card-head"><span class="num">II</span><h3>Healthcare prior authorisation</h3></div><div class="card-body"><p>A model may approve routine requests or refer. Denial exists in exactly one state, and a clinician decides it. Statutory deadlines are durable timers that escalate to a named role.</p><span class="more">The chart →</span></div></a><a class="card" href="articles/regulated-decisions.html#claims"><div class="card-head"><span class="num">III</span><h3>Insurance claims</h3></div><div class="card-body"><p>A model fast-tracks small, clean claims and flags the rest. Only an adjuster can refuse payment, and the reason is journaled with the decision.</p><span class="more">The chart →</span></div></a>
+    </div>
+
+</div></section><section class="band hatched"><div class="band-inner">
+
+    <h2>The questions an examiner asks</h2>
+    <p class="sub">And where each answer lives. None of these needs a separate logging system, because the record is what ran.</p>
+    <div class="split" style="display:block">
+      <table style="width:100%;border-collapse:collapse;font-size:.98rem">
+        <thead><tr><th style="text-align:left;padding:.5rem .6rem;border-bottom:2px solid var(--ink)">Question</th><th style="text-align:left;padding:.5rem .6rem;border-bottom:2px solid var(--ink)">Where the answer is</th></tr></thead>
+        <tbody>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>What was the process in when it decided?</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">The state configuration as of the decision's journal entry (<code>state_at</code>).</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>What was it allowed to do?</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">The enabled events the chart offered at that decide state. Anything else was not on the table.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>Who or what chose, and what did they say?</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">The decision entry: the chosen event, the decider's identity and its rationale, kept as the decider's claim.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>Under which version of the rules?</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">The chart's version is the hash of its canonical form, recorded with the entries.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>Was a person involved, and when?</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">The chart names which states are decided by people. A person's decision is a journal entry like any other.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>Can you reproduce it?</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">Replay the journal with no decider bound: same states, no model calls.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>What would the new rules have done?</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">Fork from the journal under another chart version and compare, without touching the original record.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+</div></section><section class="band "><div class="band-inner">
+
+    <h2>What it contributes to the rules you answer to</h2>
+    <p class="sub">A record is evidence. It is not compliance. This table says which part of each requirement the record helps with, and which stays yours.</p>
+    <div class="split" style="display:block">
+      <table style="width:100%;border-collapse:collapse;font-size:.95rem">
+        <thead><tr><th style="text-align:left;padding:.5rem .6rem;border-bottom:2px solid var(--ink)">Regime</th><th style="text-align:left;padding:.5rem .6rem;border-bottom:2px solid var(--ink)">What it asks, in short</th><th style="text-align:left;padding:.5rem .6rem;border-bottom:2px solid var(--ink)">What Vertep contributes, and what it does not</th></tr></thead>
+        <tbody>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>EU AI Act, Articles 12, 13 and 14</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">Automatic recording of events, transparency to deployers, and human oversight, for high-risk systems such as credit scoring and life or health insurance risk assessment.</td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">The journal is an automatic, ordered event record; human-decided states make oversight structural. Classification, risk management and conformity assessment stay with you.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>GDPR, Articles 15(1)(h) and 22</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">Meaningful information about the logic of automated decisions, and limits on decisions based solely on automated processing.</td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">The chart and journal show the logic and the human steps. Whether a given decision needs a human in the loop is a legal call; the chart lets you build one in.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>GDPR, Article 17</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">Erasure of personal data.</td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">An append-only journal is in tension with this. Today, keep personal data out of events and journal references instead. Payload encryption with per-subject keys is specified in the draft <code>m12-decision-records</code>, and not built.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>US ECOA and Regulation B</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">Specific reasons when credit is denied.</td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">The journal records the decline and its rationale, and the chart can require a reason on the event. Choosing lawful reason codes is yours.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>SR 11-7 model risk management</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">Inventory, controls and ongoing monitoring of models used in decisions.</td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">A model's role is bounded and logged at named decide states, which gives a clear inventory of where models act. Validation of the model itself stays with you.</td></tr>
+<tr><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top"><strong>FDA 21 CFR Part 11</strong></td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">Secure, time-stamped audit trails for electronic records in regulated life-science work.</td><td style="padding:.55rem .6rem;border-bottom:1px solid var(--ink-2);vertical-align:top">Journals are append-only and time-stamped. Signed, hash-chained journals exist in durable objects. Validation, access control and signatures are your system's work.</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:1.2rem"><small>This is a technical summary, not legal advice, and Vertep is a tool, not a certification. Obligations depend on your jurisdiction, product and risk classification; check them with counsel.</small></p>
+    </div>
+
+</div></section><section class="band "><div class="band-inner">
+
+    <h2>Said plainly: what it does not do</h2>
+    <div class="split">
+      <div>
+        <ul>
+          <li><strong>It does not open the model.</strong> A model's stated rationale is recorded as its claim, labelled as such. It is not a faithful account of the weights, and Vertep does not pretend otherwise. What is verifiable is the process around the model.</li>
+          <li><strong>It does not make a policy fair.</strong> A chart can encode a biased threshold exactly. It makes the threshold visible, versioned and testable, which is where fairness review has to start.</li>
+          <li><strong>It does not erase from a journal yet.</strong> See the Article 17 row above, and the draft specification for the fix.</li>
+        </ul>
+      </div>
+      <div>
+        <ul>
+          <li><strong>It is 0.1.x software.</strong> It has not run a lender's production load. Use it first where a failure is cheap, and where its record is worth more than its maturity.</li>
+          <li><strong>A plain journal is not signed.</strong> Hash-chained, signed journals come with durable objects; extending that to every agent journal, and an exportable explanation bundle, are in the draft <code>m12-decision-records</code>.</li>
+          <li><strong>It is not a compliance product.</strong> It gives you an honest record and structural limits. The programme around them is yours.</li>
+        </ul>
+      </div>
+    </div>
+
+</div></section><section class="band ink"><div class="band-inner">
+
+    <h2>Start with one decision</h2>
+    <p class="sub">Pick one consequential decision a model currently makes or drafts. Write its legal moves as a chart. Bind the model at the one state where it has to choose.</p>
+    <div class="actions" style="justify-content:center">
+      <a class="btn primary" href="examples/credit-decision.html">Run the lending example</a>
+      <a class="btn" href="docs/agents.html">Agents in the docs</a>
+      <a class="btn" href="https://github.com/Volland/vertep/issues">Tell us what you need</a>
+    </div>
+
+</div></section>
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="why.html" style="color:inherit">Why</a><a href="regulated.html" style="color:inherit">Regulated</a><a href="docs/index.html" style="color:inherit">Docs</a><a href="examples/index.html" style="color:inherit">Examples</a><a href="articles/index.html" style="color:inherit">Articles</a><a href="vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="impressum.html" style="color:inherit">Impressum</a><a href="datenschutz.html" style="color:inherit">Datenschutz</a><a href="agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>
