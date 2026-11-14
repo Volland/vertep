@@ -375,7 +375,7 @@ impl Wallet {
         if v.nonce != request.nonce {
             return Err(WalletError::Nonce("presentation answers another nonce".into()));
         }
-        if !self.config.trusted_issuers.iter().any(|i| *i == v.credential.issuer) {
+        if !self.config.trusted_issuers.contains(&v.credential.issuer) {
             return Err(WalletError::UntrustedIssuer(v.credential.issuer.clone()));
         }
         if !v.credential.valid_at(self.now()) {

@@ -156,9 +156,9 @@ The custody model landed 2026-11-12 (M7).
 - **Oracle:** `vertep-custody --history` replays fault histories in strict mode, with the joint model for histories that carry configuration records.
 - **Axioms:** pinned to `propext`, `Classical.choice` and `Quot.sound`.
 
-The wallet exchange model is planned for M9 (`Wallet`, `WalletTheorems`, `WalletUnsafe`, `WalletCheck`, executable `vertep-wallet`): credential exchange over a network adversary, six safety theorems, and strict replay of exchange histories from every protocol plugin.
+The wallet exchange model landed 2026-11-14 (M9: `Wallet`, `WalletTheorems`, `WalletUnsafe`, `WalletCheck`, executable `vertep-wallet`): credential exchange among issuers, holders and verifiers under a network adversary with symbolic signatures; six safety theorems proven over every reachable state (possession before issuance, one issuance per offer, consent before presentation, disclosure within consent, sound acceptance, one acceptance per nonce), a Lean-checked counterexample showing the audience check is necessary, and a checker proven sound (`replay_sound`). Axioms: `propext` and `Quot.sound`.
 
-- realizes:: [[decisions#The exchange model is symbolic over a network adversary]] {confidence: partial, note: "planned in M9"}
+- realizes:: [[decisions#The exchange model is symbolic over a network adversary]] {confidence: full}
 - scheduled_in:: [[roadmap#M9 Agent wallet]] {note: "the wallet exchange model"}
 
 - realizes:: [[decisions#Custody epochs are won by quorum promises]] {confidence: partial, note: "proven for a fixed custodian set; safety under custodian-set changes is a checked conjecture"}

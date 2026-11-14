@@ -24,8 +24,8 @@ if grep -rnE '^\s*(private |protected |noncomputable )*(axiom|unsafe)\b|@\[(impl
   exit 1
 fi
 
-echo "== lake build vertep-oracle vt-certify vertep-shapes vertep-journal vertep-lease vertep-custody vertep-decide vertep-types"
-lake build vertep-oracle vt-certify vertep-shapes vertep-journal vertep-lease vertep-custody vertep-decide vertep-types
+echo "== lake build vertep-oracle vt-certify vertep-shapes vertep-journal vertep-lease vertep-custody vertep-wallet vertep-decide vertep-types"
+lake build vertep-oracle vt-certify vertep-shapes vertep-journal vertep-lease vertep-custody vertep-wallet vertep-decide vertep-types
 
 echo "== lake build VertepTests (axioms pinned)"
 lake build VertepTests

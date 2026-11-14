@@ -43,6 +43,10 @@ import VertepLean.CustodyCheck
 import VertepLean.CustodyReconfigUnsafe
 import VertepLean.CustodyJoint
 import VertepLean.CustodyJointCheck
+import VertepLean.Wallet
+import VertepLean.WalletTheorems
+import VertepLean.WalletUnsafe
+import VertepLean.WalletCheck
 import VertepLean.DecideCheck
 import VertepLean.Types.Basic
 import VertepLean.Types.Check

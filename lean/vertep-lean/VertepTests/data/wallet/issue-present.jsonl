@@ -1,0 +1,21 @@
+{"kind":"setup","agents":[{"id":"did:example:issuer","keys":["k-issuer"]},{"id":"did:example:holder","keys":["k-holder"]},{"id":"did:example:verifier","keys":["k-verifier"]},{"id":"did:example:verifier2","keys":["k-verifier2"]}],"trust":[{"verifier":"did:example:verifier","issuer":"did:example:issuer"},{"verifier":"did:example:verifier2","issuer":"did:example:issuer"}],"compromised":[]}
+{"kind":"offer","issuer":"did:example:issuer","to":"did:example:holder","nonce":"o1","msg":"m1"}
+{"kind":"deliver","msg":"m1","to":"did:example:holder"}
+{"kind":"prove-possession","holder":"did:example:holder","key":"k-holder","issuer":"did:example:issuer","nonce":"o1","msg":"m2"}
+{"kind":"duplicate","msg":"m2"}
+{"kind":"deliver","msg":"m2","to":"did:example:issuer"}
+{"kind":"deliver","msg":"m2","to":"did:example:issuer"}
+{"kind":"issue","issuer":"did:example:issuer","ikey":"k-issuer","credential":"sha256:c1","key":"k-holder","nonce":"o1","claims":["age","name"],"msg":"m3"}
+{"kind":"deliver","msg":"m3","to":"did:example:holder"}
+{"kind":"store","holder":"did:example:holder","credential":"sha256:c1"}
+{"kind":"request-presentation","verifier":"did:example:verifier","to":"did:example:holder","nonce":"p1","claims":["age"],"msg":"m4"}
+{"kind":"deliver","msg":"m4","to":"did:example:holder"}
+{"kind":"consent","holder":"did:example:holder","verifier":"did:example:verifier","nonce":"p1","claims":["age"]}
+{"kind":"present","holder":"did:example:holder","verifier":"did:example:verifier","nonce":"p1","credential":"sha256:c1","claims":["age"],"msg":"m5"}
+{"kind":"duplicate","msg":"m5"}
+{"kind":"deliver","msg":"m5","to":"did:example:verifier"}
+{"kind":"deliver","msg":"m5","to":"did:example:verifier"}
+{"kind":"verify","verifier":"did:example:verifier","msg":"m5","result":"accept"}
+{"kind":"verify","verifier":"did:example:verifier","msg":"m5","result":"refuse","reason":"nonce already used"}
+{"kind":"send","from":"did:example:verifier","msg":"m6"}
+{"kind":"deliver","msg":"m6","to":"did:example:holder"}

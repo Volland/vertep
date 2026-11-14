@@ -23,7 +23,7 @@
 
 ## 2. Lean exchange model
 
-- [ ] 2.1 Write `VertepLean/Wallet.lean` (D5):
+- [x] 2.1 Write `VertepLean/Wallet.lean` (D5):
   - agents, keys and compromised keys;
   - symbolic messages and signatures;
   - fresh nonces;
@@ -31,13 +31,13 @@
   - issuer, holder and verifier steps;
   - ghost state;
   - `Reachable`
-- [ ] 2.2 Write `VertepLean/WalletTheorems.lean`, proving the six theorems as invariants of `Reachable`: `issue_needs_possession`, `issue_once_per_offer`, `present_needs_consent`, `disclosure_within_consent`, `accept_sound` and `accept_once_per_nonce`. Add axiom checks to `VertepTests`
-- [ ] 2.3 Write `VertepLean/WalletUnsafe.lean`: a verifier without the audience check, and a reachable state where it accepts a presentation made for another verifier
-- [ ] 2.4 Write `VertepLean/WalletCheck.lean` and `VertepWalletMain.lean`, and add `lean_exe «vertep-wallet»`:
+- [x] 2.2 Write `VertepLean/WalletTheorems.lean`, proving the six theorems as invariants of `Reachable`: `issue_needs_possession`, `issue_once_per_offer`, `present_needs_consent`, `disclosure_within_consent`, `accept_sound` and `accept_once_per_nonce`. Add axiom checks to `VertepTests`
+- [x] 2.3 Write `VertepLean/WalletUnsafe.lean`: a verifier without the audience check, and a reachable state where it accepts a presentation made for another verifier
+- [x] 2.4 Write `VertepLean/WalletCheck.lean` and `VertepWalletMain.lean`, and add `lean_exe «vertep-wallet»`:
   - strict replay of a JSONL exchange history;
   - the first failing step reported with its position and reason
-- [ ] 2.5 Add the wallet model to the Verification View's Protocol models table and diagram
-- [ ] 2.6 Tests for `Theorems proven` and `Unsafe variant rejected`, each with `@tg: verifies::` in a Rust test that runs the Lean build, as the other models do
+- [x] 2.5 Add the wallet model to the Verification View's Protocol models table and diagram
+- [x] 2.6 Tests for `Theorems proven` and `Unsafe variant rejected`, each with `@tg: verifies::` in a Rust test that runs the Lean build, as the other models do
 
 ## 3. Crate, interfaces and vocabulary
 

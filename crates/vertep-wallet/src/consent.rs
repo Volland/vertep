@@ -111,7 +111,7 @@ pub fn offered_options(request: &DecisionRequest) -> Vec<DisclosureOption> {
     request
         .context
         .get("options")
-        .map(|v| vertep_agent::json::to_json(v))
+        .map(vertep_agent::json::to_json)
         .and_then(|j| serde_json::from_value(j).ok())
         .unwrap_or_default()
 }

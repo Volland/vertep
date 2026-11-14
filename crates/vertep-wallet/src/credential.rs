@@ -230,7 +230,7 @@ impl KeyLookup for ResolverKeys {
         doc.verification_method
             .iter()
             .find(|m| m.id == method)
-            .map(|m| m.public_key.clone())
+            .map(|m| m.public_key)
             .ok_or_else(|| WalletError::BadSignature(format!("{method} is not a key of {did}")))
     }
 }

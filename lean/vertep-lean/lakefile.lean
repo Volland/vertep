@@ -55,6 +55,11 @@ lean_exe «vertep-lease» where
 lean_exe «vertep-custody» where
   root := `VertepCustodyMain
 
+/-- The exchange model as the judge of exchange histories (m9-agent-wallet 2.4, design D6):
+`lake exe vertep-wallet --history HISTORY.jsonl [HISTORY.jsonl …]`. -/
+lean_exe «vertep-wallet» where
+  root := `VertepWalletMain
+
 /-- Decision validation as a differential oracle for agent runs (m3-agents 8.5):
 `lake exe vertep-decide --obs DECISIONS.jsonl`. -/
 lean_exe «vertep-decide» where

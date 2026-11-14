@@ -190,12 +190,14 @@ The journal protocol, decide states with grants, and shard leases are modelled a
 - describes:: [[components#vertep-agent]] {note: "decider model and decide-state differential tests"}
 - describes:: [[components#vertep-cluster]] {note: "lease model and history replay"}
 - describes:: [[decisions#Fencing epochs on journal appends]]
+- describes:: [[decisions#The exchange model is symbolic over a network adversary]] {note: "M9 wallet model"}
 
 | Model (`VertepLean/`) | Proven, in every reachable state | Oracle and Rust test |
 |---|---|---|
 | `Journal`, `JournalTheorems` | `replay_determinism`, `replay_no_divergence`, `replay_equals_live`; `turn_idempotent`, `accepted_once`; `outbox_safe`, `outbox_complete`, `no_message_lost`; `cas_single`, `turn_cas_exclusive` | `vertep-journal` judges runs of `tests/journal_protocol.rs`: two nodes, crashes before and after append, redeliveries, concurrent activations |
 | `Agent`, `AgentTheorems` | `decider_safety`, `stale_not_taken`, `unknown_not_taken`, `decision_dedup`, `decision_once`, `replay_live`; `chainGrant_mem`, `grants_do_not_escalate`, `grant_enforced`, `ungranted_not_delivered` | `vertep-decide` replays decision outcomes of `tests/decide_differential.rs`: generated charts with a decide state, adversarial decisions |
 | `Lease`, `LeaseTheorems` | `grant_unique`, `one_writer_per_epoch`, `journal_epochs_ordered`, `shard_epochs_ordered`, `message_once`, `stale_append_fenced`, `frames_ordered`, `stale_frame_dropped` | `vertep-lease` replays `History::to_jsonl` of the cluster fault-injection test |
+| `Wallet`, `WalletTheorems`, `WalletUnsafe` | `issue_needs_possession`, `issue_once_per_offer`, `present_needs_consent`, `disclosure_within_consent`, `accept_sound`, `accept_once_per_nonce`; `presentation_within_request`; the audience check is necessary (`audience_check_needed`, `no_foreign_acceptance`) | `vertep-wallet` replays exchange histories of the conformance kit (`vertep_wallet::testkit`): every protocol plugin under seeded adversarial schedules (M9) |
 
 ```mermaid
 flowchart LR
@@ -203,11 +205,13 @@ flowchart LR
         J["Journal: CAS append, dedup, outbox, replay"]
         A["Agent: offers, decide, grants"]
         L["Lease: authorities, fenced store, receivers"]
+        W["Wallet: credential exchange, network adversary"]
     end
     subgraph rust["Rust under test"]
         RT["vertep-runtime Node"]
         AG["vertep-agent AgentMachine"]
         CL["vertep-cluster fault injection"]
+        WK["vertep-wallet conformance kit"]
     end
     RT -- "observation JSON" --> OJ["vertep-journal"]
     AG -- "decision outcomes JSONL" --> OD["vertep-decide"]
@@ -215,6 +219,8 @@ flowchart LR
     J --> OJ
     A --> OD
     L --> OL
+    WK -- "exchange history JSONL" --> OW["vertep-wallet"]
+    W --> OW
 ```
 
 What the models abstract, and what the oracles found:
