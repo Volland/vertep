@@ -118,16 +118,16 @@
 <span class="sd">/// 2026-11-11T00:00:00Z, the virtual clock's start.
 </span><span class="k">const</span> T0: <span class="kt">i64</span> <span class="o">=</span> <span class="mi">1_794_355_200_000</span>;
 
-<span class="k">type</span> <span class="nc">Error</span> <span class="o">=</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;</span>;
+<span class="k">type</span> <span class="nc">Error</span> <span class="o">=</span> <span class="callout">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;</span>;
 
-<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="callout">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
     <span class="kd">let</span> dir <span class="o">=</span> std::env::temp_dir().join(<span class="fm">format!</span>(<span class="s">"vertep-durable-actor-{}"</span>, std::process::id()));
     <span class="kd">let</span> result <span class="o">=</span> run(<span class="o">&amp;</span>dir);
     <span class="kd">let</span> _ <span class="o">=</span> std::fs::remove_dir_all(<span class="o">&amp;</span>dir);
     result
 }
 
-<span class="k">fn</span> <span class="nf">run</span>(dir: <span class="kp">&amp;</span><span class="nc">std</span>::path::Path) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
+<span class="k">fn</span> <span class="nf">run</span>(dir: <span class="kp">&amp;</span><span class="nc">std</span>::path::Path) -&gt; <span class="callout">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
     <span class="kd">let</span> (shell, clock) <span class="o">=</span> Shell::virtual_time(T0);
     <span class="kd">let</span> order <span class="o">=</span> Address::virtual_actor(ORDER_TYPE, <span class="s">"42"</span>)<span class="o">?</span>;
     <span class="fm">println!</span>(<span class="s">"actor {}"</span>, order.as_str());
@@ -192,11 +192,11 @@
         then.configuration,
         context(<span class="o">&amp;</span>then)
     );
-    <span class="nb">Ok</span>(())
+    <span class="callout">Ok</span>(())
 }
 
 <span class="sd">/// A node on `backend` that runs CEL charts, with the order chart registered.
-</span><span class="k">fn</span> <span class="nf">node</span>(backend: <span class="nc">Arc</span><span class="o">&lt;</span>TiramemsuBackend<span class="o">&gt;</span>, shell: <span class="nc">Shell</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Node, Error<span class="o">&gt;</span> {
+</span><span class="k">fn</span> <span class="nf">node</span>(backend: <span class="nc">Arc</span><span class="o">&lt;</span>TiramemsuBackend<span class="o">&gt;</span>, shell: <span class="nc">Shell</span>) -&gt; <span class="callout">Result</span><span class="o">&lt;</span>Node, Error<span class="o">&gt;</span> {
     <span class="kd">let</span> <span class="k">mut</span> node <span class="o">=</span> Node::builder(backend, shell)
         .datamodels(Arc::new(vertep_dm_cel::CelRegistry))
         .build();
@@ -205,13 +205,13 @@
     <span class="kd">let</span> chart <span class="o">=</span> vertep::scxml::read(ORDER, <span class="o">&amp;</span>opts)<span class="o">?</span>.chart;
     <span class="c1">// Registering is idempotent: the same chart gets the same content-addressed version.
 </span>    node.register_type(ORDER_TYPE, chart)<span class="o">?</span>;
-    <span class="nb">Ok</span>(node)
+    <span class="callout">Ok</span>(node)
 }
 
-<span class="k">fn</span> <span class="nf">print_journal</span>(node: <span class="kp">&amp;</span><span class="nc">Node</span>, order: <span class="kp">&amp;</span><span class="nc">Address</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
+<span class="k">fn</span> <span class="nf">print_journal</span>(node: <span class="kp">&amp;</span><span class="nc">Node</span>, order: <span class="kp">&amp;</span><span class="nc">Address</span>) -&gt; <span class="callout">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
     <span class="k">for</span> entry <span class="k">in</span> node.journal(order)<span class="o">?</span> {
         <span class="k">if</span> <span class="kd">let</span> EntryBody::Input { input, effects } <span class="o">=</span> <span class="o">&amp;</span>entry.body {
-            <span class="kd">let</span> timers: <span class="nb">Vec</span><span class="o">&lt;&amp;</span><span class="kt">str</span><span class="o">&gt;</span> <span class="o">=</span> effects
+            <span class="kd">let</span> timers: <span class="callout">Vec</span><span class="o">&lt;&amp;</span><span class="kt">str</span><span class="o">&gt;</span> <span class="o">=</span> effects
                 .timers
                 .iter()
                 .map(<span class="o">|</span>t<span class="o">|</span> t.event.name.as_str())
@@ -225,13 +225,13 @@
             );
         }
     }
-    <span class="nb">Ok</span>(())
+    <span class="callout">Ok</span>(())
 }
 
 <span class="sd">/// The context of an actor state as JSON. `ActorState::datamodel` is the datamodel's own
 /// snapshot encoding (for CEL, typed values like `{"$int": "2"}` plus system variables);
 /// `ContextView` decodes the data items into plain values.
-</span><span class="k">fn</span> <span class="nf">context</span>(state: <span class="kp">&amp;</span><span class="nc">ActorState</span>) -&gt; <span class="nb">String</span> {
+</span><span class="k">fn</span> <span class="nf">context</span>(state: <span class="kp">&amp;</span><span class="nc">ActorState</span>) -&gt; <span class="callout">String</span> {
     <span class="kd">let</span> view <span class="o">=</span> vertep::agent::ContextView::new(state.datamodel.clone());
     vertep::agent::json::to_json(view.data()).to_string()
 }</code></pre>

@@ -290,9 +290,9 @@ def render_block(kind: str, value) -> str:
     if kind == "ul":
         return "    <ul>\n" + "\n".join(f"      <li>{li}</li>" for li in value) + "\n    </ul>"
     if kind == "nb":
-        return f'    <div class="nb"><p>{value}</p></div>'
+        return f'    <div class="callout"><p>{value}</p></div>'
     if kind == "warn":
-        return f'    <div class="nb warn"><p>{value}</p></div>'
+        return f'    <div class="callout warn"><p>{value}</p></div>'
     raise ValueError(kind)
 
 

@@ -71,7 +71,7 @@
     </table>
     <p>Both packages are ES modules, both are at version <code>0.1.0</code>, and both need Node.js 22 or later. A release script, <code>bindings/js/scripts/check-version.mjs</code>, fails when a package version differs from the Rust workspace version.</p>
 
-    <div class="nb"><p>Install both from npm: <code>npm install @vertep/web</code>, plus <code>@vertep/dm-ecma</code> for charts on the ECMAScript datamodel. Build them from source, as below, only to work on the bindings themselves.</p></div>
+    <div class="callout"><p>Install both from npm: <code>npm install @vertep/web</code>, plus <code>@vertep/dm-ecma</code> for charts on the ECMAScript datamodel. Build them from source, as below, only to work on the bindings themselves.</p></div>
 
     <h2 id="build">Building from source</h2>
     <p>You need the Rust toolchain pinned in <code>rust-toolchain.toml</code> (it already lists the <code>wasm32-unknown-unknown</code> target), Node.js 22 or later, and the <code>wasm-bindgen</code> CLI at exactly the version <code>crates/vertep-wasm/Cargo.toml</code> pins, which is <code>0.2.128</code> today. The build script stops if the two versions differ.</p>
@@ -387,7 +387,7 @@ const system = await createActorSystem({
     </table>
     <p>The frames are JSON text: <code>hello</code>, then <code>welcome</code> or <code>refused</code>, then <code>message</code> (an envelope with message id, target, origin, event name and payload) and <code>ack</code>. Delivery is at least once: an actor's send stays owed in its outbox until the peer's <code>ack</code>, is sent again after a reconnect, and is dropped as a duplicate by message id at the receiver. The end-to-end test forces dropped acknowledgements and duplicated frames, and checks that each ping and pong is journaled once.</p>
     <p>A JavaScript <code>send</code> to a server actor resolves when the server acknowledges it, and rejects with <code>TransportRefused</code> when the credential is refused.</p>
-    <div class="nb warn"><p><code>request</code> to a server actor is not supported yet, according to the implementation notes in <code>tg.md/views/browser.md</code>; use <code>send</code> and a reply event. DID-authenticated envelopes from the <a href="distribution.html">federation layer</a> are planned to wrap the same frames later; today the credential provider is the only authentication.</p></div>
+    <div class="callout warn"><p><code>request</code> to a server actor is not supported yet, according to the implementation notes in <code>tg.md/views/browser.md</code>; use <code>send</code> and a reply event. DID-authenticated envelopes from the <a href="distribution.html">federation layer</a> are planned to wrap the same frames later; today the credential provider is the only authentication.</p></div>
 
     <h2 id="types">Generated TypeScript types</h2>
     <p><code>vt gen ts &lt;chart&gt; [--name N]</code> prints a TypeScript module from the chart's IR types: the event union with typed payloads, the context type, the state-id union, the chart as a typed <code>ChartSpec</code>, and a typed <code>create&lt;Name&gt;Actor</code>. It is one more projection of the same type language that gives JSON Schema, SHACL and Rust (see <a href="types.html">Datamodels and types</a>). Run on the YAML fixture <code>bindings/js/packages/web/test/fixtures/order.yaml</code>:</p>

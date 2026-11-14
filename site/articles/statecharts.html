@@ -148,7 +148,7 @@ order.scxml: ok: urn:vertep:chart:sha256:23ede432a69736bd8c523baf5547828af92211b
   <p>Inside Vertep, the algorithm is two functions in <code>vertep-core</code>: <code>start</code> opens a session, and <code>step</code> takes the session and one input and returns what happened.</p>
 
 <pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">fn</span> <span class="nf">step</span>(chart: <span class="kp">&amp;</span><span class="nc">CompiledChart</span>, session: <span class="nc">Session</span>, input: <span class="nc">Input</span>, dm: <span class="kp">&amp;</span><span class="nc">mut</span> <span class="k">dyn</span> Datamodel)
-    -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Outcome, StepError<span class="o">&gt;</span>;   <span class="o">//</span> Outcome { session, effects, trace }</code></pre>
+    -&gt; <span class="callout">Result</span><span class="o">&lt;</span>Outcome, StepError<span class="o">&gt;</span>;   <span class="o">//</span> Outcome { session, effects, trace }</code></pre>
 
   <p>It does no I/O. It has no clock, no randomness and no network. When a chart wants to send a message, start a timer or ask a model, <code>step</code> does not do it. It returns an <em>effect</em> that says so, and the runtime shell around it carries the effect out. The result comes back later as another event.</p>
 

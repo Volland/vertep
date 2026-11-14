@@ -106,7 +106,7 @@ statechart<span class="o">!</span> {
     ctx.passes <span class="o">+=</span> <span class="mi">1</span>;
 }
 
-<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), MachineError<span class="o">&gt;</span> {
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="callout">Result</span><span class="o">&lt;</span>(), MachineError<span class="o">&gt;</span> {
     <span class="fm">println!</span>(<span class="s">"chart version {}"</span>, <span class="o">*</span>VERSION);
 
     <span class="c1">// `Machine::start` runs the start macrostep; the effects (none here) are returned.
@@ -127,7 +127,7 @@ statechart<span class="o">!</span> {
         show(<span class="o">&amp;</span>label, <span class="o">&amp;</span>m);
     }
     <span class="fm">assert!</span>(m.is_terminated(), <span class="s">"`off` is a top-level final state"</span>);
-    <span class="nb">Ok</span>(())
+    <span class="callout">Ok</span>(())
 }
 
 <span class="k">fn</span> <span class="nf">show</span>(label: <span class="kp">&amp;</span><span class="kt">str</span>, m: <span class="kp">&amp;</span><span class="nc">Machine</span>) {

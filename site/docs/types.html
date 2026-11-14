@@ -225,7 +225,7 @@ guard-int.yaml: 1 type error
 $ vt typecheck no-field.yaml
 no-field.yaml: state `counting` › transition 1 › cond: no field `amount` in Add in `ev.data.amount &gt; 0`
 no-field.yaml: 1 type error</code></pre>
-    <div class="nb warn"><p>In <code>vt typecheck</code> the CEL expression check runs only after the declarations and assignments pass, so a chart with both kinds of error shows the second kind after you fix the first. CEL diagnostics name the state and transition but carry no line and column, and they count transitions from 1 where the other diagnostics count from 0.</p></div>
+    <div class="callout warn"><p>In <code>vt typecheck</code> the CEL expression check runs only after the declarations and assignments pass, so a chart with both kinds of error shows the second kind after you fix the first. CEL diagnostics name the state and transition but carry no line and column, and they count transitions from 1 where the other diagnostics count from 0.</p></div>
     <p>An unknown type name gets a suggestion:</p>
 <pre class="output" data-lang="Output"><code>$ vt typecheck counter-typo.scxml
 counter-typo.scxml:9:5: vt:type on &lt;data id="count"&gt;: unknown type `Add2`; did you mean `Add`?</code></pre>
@@ -413,7 +413,7 @@ counter.yaml: the Rust projection is generated at compile time by the statechart
     state open { on place <span class="o">=&gt;</span> open; }
 }
 
-<span class="k">fn</span> <span class="nf">label</span>(p: <span class="kp">&amp;</span><span class="nc">Payment</span>) -&gt; <span class="nb">String</span> {
+<span class="k">fn</span> <span class="nf">label</span>(p: <span class="kp">&amp;</span><span class="nc">Payment</span>) -&gt; <span class="callout">String</span> {
     <span class="c1">// Exhaustive: the enum has exactly these two variants.
 </span>    <span class="k">match</span> p {
         Payment::Card { last4 } <span class="o">=&gt;</span> <span class="fm">format!</span>(<span class="s">"card {last4}"</span>),

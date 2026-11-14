@@ -116,14 +116,14 @@
     <h2 id="step">step, a pure function</h2>
     <p>The interpreter is two functions in <code>vertep_core::session</code>. <code>start</code> runs the first macrostep; <code>step</code> runs every later one.</p>
 <pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">fn</span> <span class="nf">start</span>(chart: <span class="kp">&amp;</span><span class="nc">CompiledChart</span>, input: <span class="nc">StartInput</span>, dm: <span class="kp">&amp;</span><span class="nc">mut</span> <span class="k">dyn</span> Datamodel)
-    -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Outcome, StartError<span class="o">&gt;</span>;
+    -&gt; <span class="callout">Result</span><span class="o">&lt;</span>Outcome, StartError<span class="o">&gt;</span>;
 
 <span class="k">pub</span> <span class="k">fn</span> <span class="nf">step</span>(chart: <span class="kp">&amp;</span><span class="nc">CompiledChart</span>, session: <span class="nc">Session</span>, input: <span class="nc">Input</span>, dm: <span class="kp">&amp;</span><span class="nc">mut</span> <span class="k">dyn</span> Datamodel)
-    -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Outcome, StepError<span class="o">&gt;</span>;
+    -&gt; <span class="callout">Result</span><span class="o">&lt;</span>Outcome, StepError<span class="o">&gt;</span>;
 
 <span class="k">pub</span> <span class="k">struct</span> <span class="nc">Outcome</span> {
     <span class="k">pub</span> session: <span class="nc">Session</span>,        <span class="c1">// the session after the macrostep
-</span>    <span class="k">pub</span> effects: <span class="nb">Vec</span><span class="o">&lt;</span>Effect<span class="o">&gt;</span>,    <span class="c1">// in the order they were produced
+</span>    <span class="k">pub</span> effects: <span class="callout">Vec</span><span class="o">&lt;</span>Effect<span class="o">&gt;</span>,    <span class="c1">// in the order they were produced
 </span>    <span class="k">pub</span> trace: <span class="nc">MacrostepTrace</span>,   <span class="c1">// the macrostep record
 </span>}
 

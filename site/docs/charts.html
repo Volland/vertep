@@ -166,14 +166,14 @@ urn:vertep:chart:sha256:1dc511b5d015deca8f320c136c262267c95b7e2cba6f76173318ded0
 
     <h3 id="scxml-rust">Reading SCXML from Rust</h3>
     <p>The <code>vertep</code> facade re-exports the reader as <code>vertep::scxml</code>. <code>CompiledChart::new</code> runs the well-formedness validator and builds the tables <code>step</code> needs. From <code>examples/traffic-light/main.rs</code>:</p>
-<pre data-lang="Rust"><code><span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), <span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;&gt;</span> {
+<pre data-lang="Rust"><code><span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="callout">Result</span><span class="o">&lt;</span>(), <span class="callout">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;&gt;</span> {
     <span class="c1">// 1. Read the SCXML document into the chart IR, then validate and compile it.
 </span>    <span class="kd">let</span> parsed <span class="o">=</span> vertep::scxml::read_str(CHART)<span class="o">?</span>;
     <span class="kd">let</span> chart <span class="o">=</span> CompiledChart::new(parsed.chart).map_err(<span class="o">|</span>v<span class="o">|</span> <span class="fm">format!</span>(<span class="s">"invalid chart: {v:?}"</span>))<span class="o">?</span>;
 
     <span class="c1">// 2. Start a session. The chart names the `null` datamodel (no data, only `In()` guards).
 </span>    <span class="kd">let</span> <span class="k">mut</span> dm <span class="o">=</span> NullDatamodel::new();
-    <span class="kd">let</span> <span class="k">mut</span> timers: <span class="nb">Vec</span><span class="o">&lt;</span>Timer<span class="o">&gt;</span> <span class="o">=</span> <span class="nb">Vec</span>::new();
+    <span class="kd">let</span> <span class="k">mut</span> timers: <span class="callout">Vec</span><span class="o">&lt;</span>Timer<span class="o">&gt;</span> <span class="o">=</span> <span class="callout">Vec</span>::new();
     <span class="kd">let</span> <span class="k">mut</span> now_ms <span class="o">=</span> <span class="mi">0</span>;
     <span class="kd">let</span> start <span class="o">=</span> StartInput {
         info: <span class="nc">SessionInfo</span> {
@@ -280,7 +280,7 @@ lossy.scxml: refusing to convert scxml to yaml: it would lose:
       </tbody>
     </table>
     <p>Executable content is a list of mappings, each with exactly one key: <code>assign</code>, <code>raise</code>, <code>send</code>, <code>log</code>, <code>if</code>, <code>foreach</code>, <code>cancel</code>, <code>script</code>, <code>call</code> (a <code>vt:call</code> element) or <code>extension</code> (any other extension element). At the top level, <code>types</code>, <code>events</code> and <code>context</code> carry the types; <a href="types.html">Datamodels and types</a> covers them.</p>
-    <div class="nb"><p>Quote <code>"null"</code> when you mean the null datamodel. Unquoted, YAML reads it as a null value:</p>
+    <div class="callout"><p>Quote <code>"null"</code> when you mean the null datamodel. Unquoted, YAML reads it as a null value:</p>
 <pre class="output" data-lang="Output"><code>$ vt validate dn.yaml
 dn.yaml:3:12: datamodel: expected a string, found null</code></pre></div>
     <p>The writer is canonical and byte-stable. Spellings such as <code>implicit: true</code>, <code>generated: true</code> on generated state ids, a <code>transitions</code> list that keeps an order <code>on</code> grouping would change, and <code>extensions</code> lists on every node exist so that no IR distinction is lost.</p>
@@ -330,7 +330,7 @@ statechart<span class="o">!</span> {
     ctx.passes <span class="o">+=</span> <span class="mi">1</span>;
 }
 
-<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), MachineError<span class="o">&gt;</span> {
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="callout">Result</span><span class="o">&lt;</span>(), MachineError<span class="o">&gt;</span> {
     <span class="fm">println!</span>(<span class="s">"chart version {}"</span>, <span class="o">*</span>VERSION);
 
     <span class="c1">// `Machine::start` runs the start macrostep; the effects (none here) are returned.
@@ -351,7 +351,7 @@ statechart<span class="o">!</span> {
         show(<span class="o">&amp;</span>label, <span class="o">&amp;</span>m);
     }
     <span class="fm">assert!</span>(m.is_terminated(), <span class="s">"`off` is a top-level final state"</span>);
-    <span class="nb">Ok</span>(())
+    <span class="callout">Ok</span>(())
 }</code></pre>
 <pre class="output" data-lang="Output"><code>$ cargo run -p vertep-examples --bin rust-macro
 chart version urn:vertep:chart:sha256:0b1614ef361262f9f6fec5189fa5834756f37808a3a466f81a9f83d6ed20e868
@@ -531,7 +531,7 @@ urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1b
 $ vt hash order.yaml
 urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f</code></pre>
     <p>The macro's <code>VERSION</code> constant is the same IRI; the test checks it.</p>
-    <div class="nb"><p>The datamodel is part of the chart, so it is part of the version. The same states written once with CEL expressions and once with Rust functions are two charts with two versions.</p></div>
+    <div class="callout"><p>The datamodel is part of the chart, so it is part of the version. The same states written once with CEL expressions and once with Rust functions are two charts with two versions.</p></div>
 
     <h2 id="validation">Validation and well-formedness</h2>
     <p>A chart passes several checks before it can run. All of them report every error they find, with a location, instead of stopping at the first.</p>
@@ -570,7 +570,7 @@ door-shapes.scxml:9:3: DoneDataOutsideFinal at State { id: "x" }
 door-shapes.scxml: shapes: &lt;urn:vertep:chart:sha256:dcf27340493a3568d3813f8b980134e8e4475d58cbc59e85e9da0c3be3a3c807#s.opened&gt; (vt:child|vt:transition|vt:invoke|vt:data|vt:initial|vt:initialElement): a final state has only onentry, onexit and donedata (MaxCountConstraintComponent)
 door-shapes.scxml: shapes: &lt;urn:vertep:chart:sha256:dcf27340493a3568d3813f8b980134e8e4475d58cbc59e85e9da0c3be3a3c807#s.closed&gt; = &lt;urn:vertep:chart:sha256:dcf27340493a3568d3813f8b980134e8e4475d58cbc59e85e9da0c3be3a3c807#s.closed&gt;: a state's children cannot all be history states (OrConstraintComponent)
 door-shapes.scxml: shapes: &lt;urn:vertep:chart:sha256:dcf27340493a3568d3813f8b980134e8e4475d58cbc59e85e9da0c3be3a3c807#s.x&gt; vt:donedata: donedata belongs to final states (MaxCountConstraintComponent)</code></pre>
-    <div class="nb warn"><p><code>vt validate</code> prints core violations by their internal names (<code>StateHistoryOnly</code>, <code>FinalContent</code>), not as sentences. The table below says what each name means.</p></div>
+    <div class="callout warn"><p><code>vt validate</code> prints core violations by their internal names (<code>StateHistoryOnly</code>, <code>FinalContent</code>), not as sentences. The table below says what each name means.</p></div>
     <table>
       <thead><tr><th>Violation</th><th>Meaning</th></tr></thead>
       <tbody>

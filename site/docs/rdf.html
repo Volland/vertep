@@ -235,7 +235,7 @@ vt validate order-annotated.ttl</code></pre>
 <pre class="output" data-lang="Output"><code>urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f
 order-annotated.ttl: ok: urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f</code></pre>
     <p>So a store can attach comments, usage statistics or certificates to a chart without changing which chart it is. A certificate from <code>vt certify</code> hangs off the version IRI with <code>vt:certifiedBy</code>; because the IRI is a content hash, a certificate can never apply to a different chart.</p>
-    <div class="nb"><p>The runtime records the version IRI in every journal entry. An actor stays on the version it started with until it reaches a top-level final state or is migrated explicitly, and replay always uses the version recorded for each stretch of the journal. See <a href="runtime.html">The actor runtime</a> for chart versioning and migrations.</p></div>
+    <div class="callout"><p>The runtime records the version IRI in every journal entry. An actor stays on the version it started with until it reaches a top-level final state or is migrated explicitly, and replay always uses the version recorded for each stretch of the journal. See <a href="runtime.html">The actor runtime</a> for chart versioning and migrations.</p></div>
 
     <h2 id="formats">Serialization formats and vt convert</h2>
     <p><code>vertep-rdf</code> reads and writes Turtle, N-Triples, N-Quads and TriG, all RDF 1.2, with triples in sorted order so the output is stable. In the dataset formats (N-Quads, TriG) the chart sits in the named graph whose name is its version IRI:</p>
