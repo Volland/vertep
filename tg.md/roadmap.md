@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in eleven milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in twelve milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -24,6 +24,7 @@ flowchart LR
     M8 --> M9
     M5 --> M10["M10 Agent protocols<br/>m10-agent-protocols"]
     M2 --> M10
+    M6 --> M11["M11 Python bindings<br/>m11-python-bindings"]
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
@@ -104,6 +105,8 @@ Delivered by the OpenSpec change `m6-wasm-js`.
 
 DID-addressed durable objects with verifiable journals, decentralised custody over TSP with quorum-promised epochs, the durable agent journal, and a TSP mailbox mediator.
 
+- precedes:: [[roadmap#M11 Python bindings]] {note: "the Python binding wraps the command bridge M6 defined"}
+
 - precedes:: [[roadmap#M8 did:webvh hosting]] {note: "custodian-set changes publish witnessed DID log entries"}
 
 Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. Creating and hosting `did:webvh` logs followed in [[roadmap#M8 did:webvh hosting]].
@@ -133,3 +136,11 @@ Agents publish verifiable role-based protocols, hash-identified JSON-LD choreogr
 Delivered by the OpenSpec change `m10-agent-protocols` (capabilities `agent-protocols`, `protocol-conformance` and `protocol-spaces`), in [[components#vertep-kolyada]]. The design is in [[views/kolyada#Kolyada]]. Test vectors come first and the Lean model second.
 
 The layer is called Kolyada. The core crate was implemented 2026-11-14: documents, identity, projection, signed envelopes, the conformance check, causal delivery, instances and offers, with test vectors. Open: the join policy, sealed fan-out and the mailbox binding in `vertep-federation`, the `vt:plays` declaration, `vt kolyada` and the Lean model.
+
+## M11 Python bindings
+
+The actor system from Python as a PyO3 extension and a pure-Python API, installed with `pip install vertep`, on the JavaScript bindings' command bridge.
+
+Delivered by the OpenSpec change `m11-python-bindings` (capability `python-bindings`), in [[components#vertep-py]]. The design is in [[views/python#Python]].
+
+Implemented 2026-11-14: the crate and the package `vertep` in `bindings/python` with 27 tests that prove each scenario and run every example, examples in `examples/python`, the docs page, a CI job and the release workflow. Open: reserving the name on PyPI, the TestPyPI dry run of every platform's wheel and the first upload, which are the maintainer's (`bindings/python/RELEASING.md`).

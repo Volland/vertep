@@ -139,3 +139,4 @@ Code links to the requirements it implements with `// @tg: implements::` comment
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.
+- `bindings/python/`: the `vertep` Python package (PyO3 extension in `crates/vertep-py`; release steps in `RELEASING.md`)

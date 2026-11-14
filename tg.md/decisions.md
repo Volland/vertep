@@ -1644,3 +1644,42 @@ Identities, projections, envelope hashes and verdict sequences are published as 
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-13"}
 
 The model proves that accepted messages are enabled by the projection, that unbound roles are never accepted and that causally consistent orders converge.
+
+## Python bindings wrap the command bridge
+
+The Python package exposes `vertep_wasm::System`'s JSON command bridge through a PyO3 extension and builds its API in plain Python on top, instead of binding `vertep-runtime` directly (M11 design D1).
+
+- motivated_by:: [[decisions#One worker hosts the core, the shell and the journal]] {weight: primary, since: "2026-11-14", note: "the bridge is the seam both bindings and the native tests already share"}
+- motivated_by:: [[decisions#JavaScript ergonomics follow XState and semantics follow SCXML]] {weight: secondary, since: "2026-11-14"}
+
+Rejected: binding the native runtime (a second semantics layer to keep equal to the JavaScript one, and an async tokio runtime in every Python process) and generating the API from the type language (it describes charts, not actors). A journal written from Python opens in Rust and JavaScript because all three use the same store and the same entries.
+
+## The Python clock moves only inside calls
+
+A Python system runs on the system clock or a virtual clock with no background thread: the system clock is read at each call, `wait` sleeps in interruptible slices, and a virtual clock moves only on `advance` (M11 design D2).
+
+- motivated_by:: [[decisions#The browser shell implements the runtime shell trait]] {weight: primary, since: "2026-11-14"}
+
+Nothing runs while Python is outside a call, so a test never sleeps and a replay cannot depend on when it runs. Wall-clock time still enters an actor only as a journaled timestamp.
+
+## A Python system belongs to one thread
+
+The extension class is PyO3 `unsendable` and the API is synchronous: another thread gets an error instead of a data race, and `asyncio` can later be layered over the same core (M11 design D3).
+
+- motivated_by:: [[decisions#No-std core and tokio shell]] {weight: secondary, since: "2026-11-14", note: "datamodels need not be Send"}
+
+## Python callables are the implementations module
+
+A `{iri: callable}` mapping binds named guards and actions as the module the JavaScript worker imports does, with the same contract: the event as `{type, ...fields, _meta}`, a bool or an outcome back (M11 design D5).
+
+- motivated_by:: [[decisions#Implementations are a module imported by the worker]] {weight: primary, since: "2026-11-14"}
+
+`dev=True` replays every macrostep and reports a guard or action whose answer differs as an `ImpurityWarning`.
+
+## One abi3 wheel per platform, published with Trusted Publishing
+
+The extension is built against the stable ABI for CPython 3.9 and later, so a platform has one wheel for every supported Python; an sdist covers the rest, and uploads use OpenID Connect with a required reviewer (M11 design D4).
+
+- motivated_by:: [[constraints#PyPI releases are immutable]] {weight: primary, since: "2026-11-14"}
+
+A workflow smoke-tests every wheel in a clean environment before any upload, and a version gate ties the package to the Rust workspace and the release tag.

@@ -13,6 +13,7 @@ they print with the `expected-output.txt` next to them, so the outputs below are
 | [decider-agent](#decider-agent) | `vt:decide` choice points, a scripted decider, replay with no decider | deciders |
 | [browser-js](#browser-js) | `@vertep/web` from Node.js: spawn, send, subscribe, journal, time travel | wasm-bindings |
 
+| [python](#python) | The `vertep` package: virtual clock, subscriptions, a durable file, guards and actions in Python | python-bindings |
 All commands run from the repository root.
 
 ## Setup
@@ -334,3 +335,23 @@ In a browser, pass `storage: "opfs"` for a durable journal in the origin private
   compares them with the files under `traffic-light/vt/` and `typed-order/vt/`.
 - After an intended change, re-record with `VERTEP_BLESS=1 cargo test -p vertep-examples` and
   review the diff.
+
+## python
+
+Four programs in `python/` use the `vertep` package, each with its output recorded next to it
+(`<name>.expected-output.txt`); the Python tests run every one and compare.
+
+| Program | Shows |
+|---|---|
+| `quickstart.py` | An order actor, a durable delayed send on a virtual clock, `as_of` |
+| `cart.py` | A CEL cart: subscriptions, `can`, the journal, time travel (the same chart as `browser-js`) |
+| `durable_actor.py` | A journal in a file, a second system on another clock, an overdue timer firing at start, SPARQL |
+| `guards_actions.py` | Guards and actions as Python functions bound by IRI; `dev=True` reporting an impure guard |
+
+```sh
+cd bindings/python
+python -m venv .venv && . .venv/bin/activate
+pip install maturin && maturin develop          # or `pip install vertep` once it is published
+python ../../examples/python/quickstart.py
+pytest                                           # runs the bindings' tests and every example
+```

@@ -1,0 +1,40 @@
+[package]
+name = "vertep-py"
+description = "Vertep for Python: the actor system's command bridge as a PyO3 extension module (the native half of the `vertep` package on PyPI)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# Shipped as the `vertep` wheel and sdist built by maturin from `bindings/python`, not on crates.io.
+publish = false
+
+[lib]
+name = "_vertep"
+crate-type = ["cdylib", "rlib"]
+# The tests are Python's (`bindings/python/tests`). A Rust test binary would link libpython, which
+# `cargo test --workspace` should not need.
+test = false
+doctest = false
+
+[features]
+default = []
+# The ECMAScript datamodel (boa) for charts that name `datamodel="ecmascript"`. It adds several
+# megabytes to the wheel, so the default wheel leaves it out.
+ecmascript = ["vertep-wasm/ecmascript"]
+
+[dependencies]
+# abi3: one wheel per platform for every CPython from 3.9 on.
+pyo3 = { version = "0.30.1", features = ["abi3-py39"] }
+vertep-wasm = { path = "../vertep-wasm", features = ["journal"] }
+vertep-runtime = { workspace = true }
+serde_json = "1"
+
+# No `[lints] workspace = true`: the `#[pyclass]` and `#[pymodule]` macros emit `unsafe` glue and
+# the workspace forbids it (as for `vertep-wasm`).
+[lints.rust]
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

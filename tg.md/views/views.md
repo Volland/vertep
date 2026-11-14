@@ -11,6 +11,7 @@ Architecture views of Vertep, typed `View`: each explains a slice of the system 
 - [[agents]] — deciders, LLM and tool actors, grants and plan charts
 - [[distribution]] — cluster membership, shards, QUIC, worker pools and DID federation
 - [[browser]] — WebAssembly core, browser shell, OPFS journal and TypeScript API
+- [[python]] — the Python package: a PyO3 extension over the command bridge, an explicit clock and wheels per platform
 - [[durable-objects]] — DID-addressed durable objects, custody epochs over TSP, keepers and failover
 - [[kolyada]] — Kolyada, the agent protocol layer: hash-identified choreographies, role projection, signed messages and spaces over sealed mailboxes
 - [[wallet]] — the agent wallet, role charts, plugin interfaces, consent, the Lean exchange model and conformance

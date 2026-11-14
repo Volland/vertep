@@ -1,7 +1,7 @@
 ---
 type: Capability
 status: draft
-openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces]
+openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces, python-bindings]
 ---
 # Capabilities
 
@@ -179,6 +179,105 @@ Implemented in [[components#vertep-federation]] on the runtime's `Resolver`, `Ma
 The core and a browser shell in WebAssembly with a TypeScript API, generated typings and a tiramemsu journal in OPFS. OpenSpec: `wasm-bindings`.
 
 - scheduled_in:: [[roadmap#M6 WASM and JS]]
+
+## Python bindings
+
+Charts, actors, journals, time travel and SPARQL from Python, with Python guards and actions, installed with `pip install vertep`. OpenSpec: `python-bindings`.
+
+- scheduled_in:: [[roadmap#M11 Python bindings]]
+
+Specified by the change `m11-python-bindings`; built on the command bridge of [[capabilities#WASM bindings]], so the semantics, the journal format and the error codes are the JavaScript bindings'.
+
+## Durable objects
+
+DID-addressed, single-writer virtual actors whose hash-chained, signed journal outlives any host; durable alarms, activation from verified replicas, the durable agent journal and lineage. OpenSpec: `durable-objects`.
+
+- scheduled_in:: [[roadmap#M7 Durable objects]]
+
+## Object custody
+
+Custodian sets of hosts and keepers named in the DID document, epochs won by quorum promises, replication over TSP, encrypted keeper replicas, handoff, failover and equivocation evidence. OpenSpec: `object-custody`.
+
+- scheduled_in:: [[roadmap#M7 Durable objects]]
+
+## TSP mediator
+
+A TSP 1.0 routed-mode intermediary with durable store-and-forward mailboxes, a pickup protocol inside TSP, live WebSocket sessions, quotas and metadata minimisation. OpenSpec: `tsp-mediator`.
+
+- scheduled_in:: [[roadmap#M7 Durable objects]]
+
+Implemented in [[components#vertep-tsp-mediator]] (library and `vt-mediator` binary) with the client in [[components#vertep-federation]] (`tsp_mailbox`, `live`). Every requirement carries `@tg: implements::` and every scenario a `@tg: verifies::` test. The tests cover:
+
+- interop with the reference wallet in process;
+- a replicated deployment on M4 standby replication;
+- the binary over real HTTP and WebSocket sockets;
+- an opt-in Docker test of two mediators in a route.
+
+The architecture is in [[views/distribution#Distribution#TSP mediator]].
+
+## webvh identity
+
+Creating `did:webvh` DIDs from Vertep identities with key-manager keys, updates, pre-rotated key rotation, deactivation, custodians witnessing their object's log, and custody changes published as witnessed log entries. OpenSpec: `webvh-identity`.
+
+- scheduled_in:: [[roadmap#M8 did:webvh hosting]]
+
+Implemented in [[components#vertep-webvh]]; the custody side of witnessing is in [[components#vertep-objects]].
+
+## webvh hosting
+
+The `did:webvh` 1.0 file layout, directory, git and command publishers, serving logs over HTTP, the `vt webvh` commands, `vt-mediator` under `did:webvh`, and interop with third-party logs. OpenSpec: `webvh-hosting`.
+
+- scheduled_in:: [[roadmap#M8 did:webvh hosting]]
+
+Implemented in [[components#vertep-webvh]], [[components#vertep-cli]] and [[components#vertep-tsp-mediator]].
+
+## Agent wallet
+
+A wallet per identity: a sealed credential store, holder-binding keys, five plugin interfaces, credential formats, consent as a decide state, status lists, lifecycle and `vt wallet`. OpenSpec: `agent-wallet`.
+
+- scheduled_in:: [[roadmap#M9 Agent wallet]]
+
+Implemented in [[components#vertep-wallet]] and [[components#vertep-cli]].
+
+## Credential exchange
+
+One exchange vocabulary for every protocol, role charts, the native protocol over TSP, the Lean exchange model with its theorems and checker, and the plugin conformance kit. OpenSpec: `credential-exchange`.
+
+- scheduled_in:: [[roadmap#M9 Agent wallet]]
+
+Implemented in [[components#vertep-wallet]] and [[components#vertep-lean]].
+
+## OID4VC
+
+OpenID4VCI issuance with the pre-authorised code flow and OpenID4VP presentation with DCQL and `direct_post`, as exchange-protocol plugins for issuers, holders and verifiers. OpenSpec: `oid4vc`.
+
+- scheduled_in:: [[roadmap#M9 Agent wallet]]
+
+Implemented in [[components#vertep-wallet]] behind feature `oid4vc`.
+
+## Agent protocols
+
+Role-based protocols as restricted JSON-LD documents: hash identity, payload shapes, well-formedness, role projection, signed offers, DID-document discovery and the RDF bridge. OpenSpec: `agent-protocols`.
+
+- scheduled_in:: [[roadmap#M10 Agent protocols]]
+
+Implemented in [[components#vertep-kolyada]]: every requirement but the RDF agreement test of shapes carries `@tg: implements::` and every scenario a `@tg: verifies::` test. The design is in [[views/kolyada#Kolyada]].
+
+## Protocol conformance
+
+The signed message envelope, the pure `accept` check, causal delivery, violation and equivocation proofs, language-neutral test vectors and the Lean protocol model. OpenSpec: `protocol-conformance`.
+
+- scheduled_in:: [[roadmap#M10 Agent protocols]]
+
+Implemented in [[components#vertep-kolyada]] except the Lean protocol model, which is not yet written. The vectors are checked in Rust and, for envelopes, with Node alone.
+
+## Protocol spaces
+
+Protocol instances shared by agents: signed genesis, countersigned joins, join policy, role-derived authority, sealed fan-out, hash-linked history, sub-protocols and the chart and mailbox binding. OpenSpec: `protocol-spaces`.
+
+- scheduled_in:: [[roadmap#M10 Agent protocols]]
+
+Partly implemented in [[components#vertep-kolyada]]: instances, joins, role-derived authority, the hash-linked history and sub-protocol genesis. The join policy, sealed fan-out over mailboxes and the chart and mailbox binding are planned in [[components#vertep-federation]].
 
 ## Durable objects
 

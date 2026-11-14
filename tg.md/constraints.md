@@ -286,3 +286,9 @@ DIDComm authcrypt authenticates a sender only to the recipient, so a recipient c
 
 - constrains:: [[decisions#Protocol messages are signed, then sealed]] {strength: must, source: "DIDComm Messaging v2"}
 - constrains:: [[decisions#Out-of-order messages wait, and refusals come with proof]] {strength: must, source: "DIDComm Messaging v2"}
+
+## PyPI releases are immutable
+
+A file uploaded to PyPI or TestPyPI can never be replaced or re-uploaded under the same version; a bad release can only be yanked and superseded by a new version.
+
+- constrains:: [[decisions#One abi3 wheel per platform, published with Trusted Publishing]] {strength: must, source: "PyPI file-name reuse policy"}

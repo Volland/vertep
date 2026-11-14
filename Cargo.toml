@@ -21,6 +21,7 @@ members = [
     "crates/vertep-federation",
     "crates/vertep-agent",
     "crates/vertep-wasm",
+    "crates/vertep-py",
     "crates/vertep-objects",
     "crates/vertep-tsp-mediator",
     "crates/vertep-webvh",
