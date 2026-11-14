@@ -175,6 +175,12 @@ pub trait ExchangeProtocol: Send + Sync {
     /// [`WalletError::Protocol`] when it cannot be encoded.
     fn encode(&self, message: &ExchangeMessage) -> Result<Vec<u8>, WalletError>;
 
+    /// The audience a verifier with DID `verifier` is named by in presentations (the DID
+    /// itself unless the protocol uses another client identifier).
+    fn audience(&self, verifier: &str) -> String {
+        verifier.to_owned()
+    }
+
     /// Decodes wire bytes. A message the protocol does not map onto the exchange vocabulary
     /// is [`WalletError::Unmapped`].
     ///
@@ -241,6 +247,8 @@ impl WalletRegistry {
         #[cfg(feature = "sd-jwt")]
         r.register_format(Arc::new(crate::format::sdjwt::SdJwtVc));
         r.register_protocol(Arc::new(crate::protocol::native::VertepExchange));
+        r.register_protocol(Arc::new(crate::protocol::oid4vc::Oid4vci));
+        r.register_protocol(Arc::new(crate::protocol::oid4vc::Oid4vp));
         r.register_consent(
             crate::vocab::CONSENT_RULES,
             Arc::new(crate::consent::RulePolicy::refuse_all()),

@@ -59,6 +59,10 @@ ureq = { version = "2.12.1", default-features = false, features = ["json"], opti
 vertep-wallet = { path = ".", features = ["testkit", "sd-jwt", "oid4vc", "http-status", "tsp"] }
 vertep-federation = { workspace = true, features = ["testkit", "tsp"] }
 tempfile = "3"
+axum = { version = "0.7.9", default-features = false, features = ["http1", "tokio"] }
+ureq = { version = "2.12.1", default-features = false, features = ["json"] }
+percent-encoding = "2"
+serde = { version = "1", features = ["derive"] }
 tokio = { workspace = true, features = ["rt-multi-thread", "net", "macros", "time"] }
 
 [lints]

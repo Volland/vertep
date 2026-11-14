@@ -1,0 +1,838 @@
+{
+ "source": "OpenID for Verifiable Credential Issuance 1.0 (openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html), examples",
+ "credential_offers": [
+  {
+   "credential_issuer": "https://credential-issuer.example.com",
+   "credential_configuration_ids": [
+    "UniversityDegreeCredential",
+    "org.iso.18013.5.1.mDL"
+   ],
+   "grants": {
+    "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+     "pre-authorized_code": "oaKazRN8I0IbtZ0C7JuMn5",
+     "tx_code": {
+      "length": 4,
+      "input_mode": "numeric",
+      "description": "Please provide the one-time code that was sent via e-mail"
+     }
+    }
+   }
+  },
+  {
+   "credential_issuer": "https://credential-issuer.example.com",
+   "credential_configuration_ids": [
+    "UniversityDegreeCredential"
+   ],
+   "grants": {
+    "authorization_code": {
+     "issuer_state": "eyJhbGciOiJSU0Et...FYUaBy"
+    }
+   }
+  },
+  {
+   "credential_issuer": "https://credential-issuer.example.com",
+   "credential_configuration_ids": [
+    "UniversityDegree_LDP_VC"
+   ],
+   "grants": {
+    "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+     "pre-authorized_code": "adhjhdjajkdkhjhdj",
+     "tx_code": {}
+    }
+   }
+  }
+ ],
+ "token_responses": [
+  {
+   "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6Ikp..sHQ",
+   "token_type": "Bearer",
+   "expires_in": 86400,
+   "authorization_details": [
+    {
+     "type": "openid_credential",
+     "credential_configuration_id": "UniversityDegreeCredential",
+     "credential_identifiers": [
+      "CivilEngineeringDegree-2023",
+      "ElectricalEngineeringDegree-2023"
+     ]
+    }
+   ]
+  }
+ ],
+ "nonce_responses": [
+  {
+   "c_nonce": "wKI4LT17ac15ES9bw8ac4"
+  }
+ ],
+ "credential_responses": [
+  {
+   "credentials": [
+    {
+     "credential": "LUpixVCWJk0eOt4CXQe1NXK....WZwmhmn9OQp6YxX0a2L"
+    }
+   ]
+  },
+  {
+   "credentials": [
+    {
+     "credential": "omppc3N1ZXJBdXRohEOhASahG...ArQwggKwMIICVqADAgEC"
+    }
+   ]
+  }
+ ],
+ "error_responses": [
+  {
+   "error": "invalid_request"
+  },
+  {
+   "error": "unknown_credential_configuration"
+  }
+ ],
+ "issuer_metadata": [
+  {
+   "credential_issuer": "https://credential-issuer.example.com",
+   "authorization_servers": [
+    "https://server.example.com"
+   ],
+   "credential_endpoint": "https://credential-issuer.example.com/credential",
+   "nonce_endpoint": "https://credential-issuer.example.com/nonce",
+   "deferred_credential_endpoint": "https://credential-issuer.example.com/deferred_credential",
+   "notification_endpoint": "https://credential-issuer.example.com/notification",
+   "credential_request_encryption": {
+    "jwks": [
+     {
+      "kty": "EC",
+      "kid": "ac",
+      "use": "enc",
+      "crv": "P-256",
+      "alg": "ECDH-ES",
+      "x": "YO4epjifD-KWeq1sL2tNmm36BhXnkJ0He-WqMYrp9Fk",
+      "y": "Hekpm0zfK7C-YccH5iBjcIXgf6YdUvNUac_0At55Okk"
+     }
+    ],
+    "enc_values_supported": [
+     "A128GCM"
+    ],
+    "zip_values_supported": [
+     "DEF"
+    ],
+    "encryption_required": true
+   },
+   "credential_response_encryption": {
+    "alg_values_supported": [
+     "ECDH-ES"
+    ],
+    "enc_values_supported": [
+     "A128GCM"
+    ],
+    "zip_values_supported": [
+     "DEF"
+    ],
+    "encryption_required": true
+   },
+   "batch_credential_issuance": {
+    "batch_size": 10
+   },
+   "display": [
+    {
+     "name": "Example University",
+     "locale": "en-US",
+     "logo": {
+      "uri": "https://university.example.edu/public/logo.png",
+      "alt_text": "a square logo of a university"
+     }
+    },
+    {
+     "name": "Example Universit\u00e9",
+     "locale": "fr-FR",
+     "logo": {
+      "uri": "https://university.example.edu/public/logo.png",
+      "alt_text": "Un logo universitaire carr\u00e9"
+     }
+    }
+   ],
+   "credential_configurations_supported": {
+    "SD_JWT_VC_example_in_OpenID4VCI": {
+     "format": "dc+sd-jwt",
+     "scope": "SD_JWT_VC_example_in_OpenID4VCI",
+     "credential_signing_alg_values_supported": [
+      "ES256"
+     ],
+     "cryptographic_binding_methods_supported": [
+      "jwk"
+     ],
+     "proof_types_supported": {
+      "jwt": {
+       "proof_signing_alg_values_supported": [
+        "ES256"
+       ],
+       "key_attestations_required": {
+        "key_storage": [
+         "iso_18045_moderate"
+        ],
+        "user_authentication": [
+         "iso_18045_moderate"
+        ]
+       }
+      }
+     },
+     "vct": "SD_JWT_VC_example_in_OpenID4VCI",
+     "credential_metadata": {
+      "display": [
+       {
+        "name": "IdentityCredential",
+        "locale": "en-US",
+        "logo": {
+         "uri": "https://university.example.edu/public/logo_credential.png",
+         "alt_text": "a square logo of a university credential"
+        },
+        "description": "A credential that signals the membership of a university",
+        "background_color": "#12107c",
+        "text_color": "#FFFFFF"
+       }
+      ],
+      "claims": [
+       {
+        "path": [
+         "given_name"
+        ],
+        "display": [
+         {
+          "name": "Given Name",
+          "locale": "en-US"
+         },
+         {
+          "name": "Vorname",
+          "locale": "de-DE"
+         }
+        ]
+       },
+       {
+        "path": [
+         "family_name"
+        ],
+        "display": [
+         {
+          "name": "Surname",
+          "locale": "en-US"
+         },
+         {
+          "name": "Nachname",
+          "locale": "de-DE"
+         }
+        ]
+       },
+       {
+        "path": [
+         "email"
+        ]
+       },
+       {
+        "path": [
+         "phone_number"
+        ]
+       },
+       {
+        "path": [
+         "address"
+        ],
+        "display": [
+         {
+          "name": "Place of residence",
+          "locale": "en-US"
+         },
+         {
+          "name": "Wohnsitz",
+          "locale": "de-DE"
+         }
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "street_address"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "locality"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "region"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "country"
+        ]
+       },
+       {
+        "path": [
+         "birthdate"
+        ]
+       },
+       {
+        "path": [
+         "is_over_18"
+        ]
+       },
+       {
+        "path": [
+         "is_over_21"
+        ]
+       },
+       {
+        "path": [
+         "is_over_65"
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "credential_configurations_supported": {
+    "SD_JWT_VC_example_in_OpenID4VCI": {
+     "format": "dc+sd-jwt",
+     "scope": "SD_JWT_VC_example_in_OpenID4VCI",
+     "cryptographic_binding_methods_supported": [
+      "jwk"
+     ],
+     "credential_signing_alg_values_supported": [
+      "ES256"
+     ],
+     "proof_types_supported": {
+      "jwt": {
+       "proof_signing_alg_values_supported": [
+        "ES256"
+       ],
+       "key_attestations_required": {
+        "key_storage": [
+         "iso_18045_moderate"
+        ],
+        "user_authentication": [
+         "iso_18045_moderate"
+        ]
+       }
+      }
+     },
+     "vct": "SD_JWT_VC_example_in_OpenID4VCI",
+     "credential_metadata": {
+      "display": [
+       {
+        "name": "IdentityCredential",
+        "logo": {
+         "uri": "https://university.example.edu/public/logo.png",
+         "alt_text": "a square logo of a university"
+        },
+        "locale": "en-US",
+        "background_color": "#12107c",
+        "text_color": "#FFFFFF"
+       }
+      ],
+      "claims": [
+       {
+        "path": [
+         "given_name"
+        ],
+        "display": [
+         {
+          "name": "Given Name",
+          "locale": "en-US"
+         },
+         {
+          "name": "Vorname",
+          "locale": "de-DE"
+         }
+        ]
+       },
+       {
+        "path": [
+         "family_name"
+        ],
+        "display": [
+         {
+          "name": "Surname",
+          "locale": "en-US"
+         },
+         {
+          "name": "Nachname",
+          "locale": "de-DE"
+         }
+        ]
+       },
+       {
+        "path": [
+         "email"
+        ]
+       },
+       {
+        "path": [
+         "phone_number"
+        ]
+       },
+       {
+        "path": [
+         "address"
+        ],
+        "display": [
+         {
+          "name": "Place of residence",
+          "locale": "en-US"
+         },
+         {
+          "name": "Wohnsitz",
+          "locale": "de-DE"
+         }
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "street_address"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "locality"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "region"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "country"
+        ]
+       },
+       {
+        "path": [
+         "birthdate"
+        ]
+       },
+       {
+        "path": [
+         "is_over_18"
+        ]
+       },
+       {
+        "path": [
+         "is_over_21"
+        ]
+       },
+       {
+        "path": [
+         "is_over_65"
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "credential_configurations_supported": {
+    "UniversityDegreeCredential": {
+     "format": "jwt_vc_json",
+     "scope": "UniversityDegree",
+     "cryptographic_binding_methods_supported": [
+      "did:example"
+     ],
+     "credential_signing_alg_values_supported": [
+      "ES256"
+     ],
+     "credential_definition": {
+      "type": [
+       "VerifiableCredential",
+       "UniversityDegreeCredential"
+      ]
+     },
+     "proof_types_supported": {
+      "jwt": {
+       "proof_signing_alg_values_supported": [
+        "ES256"
+       ]
+      }
+     },
+     "credential_metadata": {
+      "claims": [
+       {
+        "path": [
+         "credentialSubject",
+         "given_name"
+        ],
+        "display": [
+         {
+          "name": "Given Name",
+          "locale": "en-US"
+         }
+        ]
+       },
+       {
+        "path": [
+         "credentialSubject",
+         "family_name"
+        ],
+        "display": [
+         {
+          "name": "Surname",
+          "locale": "en-US"
+         }
+        ]
+       },
+       {
+        "path": [
+         "credentialSubject",
+         "degree"
+        ]
+       },
+       {
+        "path": [
+         "credentialSubject",
+         "gpa"
+        ],
+        "mandatory": true,
+        "display": [
+         {
+          "name": "GPA"
+         }
+        ]
+       }
+      ],
+      "display": [
+       {
+        "name": "University Credential",
+        "locale": "en-US",
+        "logo": {
+         "uri": "https://university.example.edu/public/logo.png",
+         "alt_text": "a square logo of a university"
+        },
+        "background_color": "#12107c",
+        "text_color": "#FFFFFF"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "credential_configurations_supported": {
+    "UniversityDegree_LDP_VC": {
+     "format": "ldp_vc",
+     "cryptographic_binding_methods_supported": [
+      "did:example"
+     ],
+     "credential_signing_alg_values_supported": [
+      "Ed25519Signature2018"
+     ],
+     "credential_definition": {
+      "@context": [
+       "https://www.w3.org/2018/credentials/v1",
+       "https://www.w3.org/2018/credentials/examples/v1"
+      ],
+      "type": [
+       "VerifiableCredential",
+       "UniversityDegreeCredential"
+      ]
+     },
+     "credential_metadata": {
+      "claims": [
+       {
+        "path": [
+         "credentialSubject",
+         "given_name"
+        ],
+        "display": [
+         {
+          "name": "Given Name",
+          "locale": "en-US"
+         }
+        ]
+       },
+       {
+        "path": [
+         "credentialSubject",
+         "family_name"
+        ],
+        "display": [
+         {
+          "name": "Surname",
+          "locale": "en-US"
+         }
+        ]
+       },
+       {
+        "path": [
+         "credentialSubject",
+         "degree"
+        ]
+       },
+       {
+        "path": [
+         "credentialSubject",
+         "gpa"
+        ],
+        "mandatory": true,
+        "display": [
+         {
+          "name": "GPA"
+         }
+        ]
+       }
+      ],
+      "display": [
+       {
+        "name": "University Credential",
+        "locale": "en-US",
+        "logo": {
+         "uri": "https://university.example.edu/public/logo.png",
+         "alt_text": "a square logo of a university"
+        },
+        "background_color": "#12107c",
+        "text_color": "#FFFFFF"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "credential_configurations_supported": {
+    "org.iso.18013.5.1.mDL": {
+     "format": "mso_mdoc",
+     "doctype": "org.iso.18013.5.1.mDL",
+     "cryptographic_binding_methods_supported": [
+      "cose_key"
+     ],
+     "credential_signing_alg_values_supported": [
+      -7,
+      -9
+     ],
+     "credential_metadata": {
+      "display": [
+       {
+        "name": "Mobile Driving License",
+        "locale": "en-US",
+        "logo": {
+         "uri": "https://state.example.org/public/mdl.png",
+         "alt_text": "state mobile driving license"
+        },
+        "background_color": "#12107c",
+        "text_color": "#FFFFFF"
+       },
+       {
+        "name": "\u30e2\u30d0\u30a4\u30eb\u904b\u8ee2\u514d\u8a31\u8a3c",
+        "locale": "ja-JP",
+        "logo": {
+         "uri": "https://state.example.org/public/mdl.png",
+         "alt_text": "\u7c73\u56fd\u5dde\u767a\u884c\u306e\u30e2\u30d0\u30a4\u30eb\u904b\u8ee2\u514d\u8a31\u8a3c"
+        },
+        "background_color": "#12107c",
+        "text_color": "#FFFFFF"
+       }
+      ],
+      "claims": [
+       {
+        "path": [
+         "org.iso.18013.5.1",
+         "given_name"
+        ],
+        "display": [
+         {
+          "name": "Given Name",
+          "locale": "en-US"
+         },
+         {
+          "name": "\u540d\u524d",
+          "locale": "ja-JP"
+         }
+        ]
+       },
+       {
+        "path": [
+         "org.iso.18013.5.1",
+         "family_name"
+        ],
+        "display": [
+         {
+          "name": "Surname",
+          "locale": "en-US"
+         }
+        ]
+       },
+       {
+        "path": [
+         "org.iso.18013.5.1",
+         "birth_date"
+        ],
+        "mandatory": true
+       },
+       {
+        "path": [
+         "org.iso.18013.5.1.aamva",
+         "organ_donor"
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "credential_configurations_supported": {
+    "SD_JWT_VC_example_in_OpenID4VCI": {
+     "format": "dc+sd-jwt",
+     "scope": "SD_JWT_VC_example_in_OpenID4VCI",
+     "cryptographic_binding_methods_supported": [
+      "jwk"
+     ],
+     "credential_signing_alg_values_supported": [
+      "ES256"
+     ],
+     "proof_types_supported": {
+      "jwt": {
+       "proof_signing_alg_values_supported": [
+        "ES256"
+       ],
+       "key_attestations_required": {
+        "key_storage": [
+         "iso_18045_moderate"
+        ],
+        "user_authentication": [
+         "iso_18045_moderate"
+        ]
+       }
+      }
+     },
+     "vct": "SD_JWT_VC_example_in_OpenID4VCI",
+     "credential_metadata": {
+      "display": [
+       {
+        "name": "IdentityCredential",
+        "logo": {
+         "uri": "https://university.example.edu/public/logo.png",
+         "alt_text": "a square logo of a university"
+        },
+        "locale": "en-US",
+        "background_color": "#12107c",
+        "text_color": "#FFFFFF"
+       }
+      ],
+      "claims": [
+       {
+        "path": [
+         "given_name"
+        ],
+        "display": [
+         {
+          "name": "Given Name",
+          "locale": "en-US"
+         },
+         {
+          "name": "Vorname",
+          "locale": "de-DE"
+         }
+        ]
+       },
+       {
+        "path": [
+         "family_name"
+        ],
+        "display": [
+         {
+          "name": "Surname",
+          "locale": "en-US"
+         },
+         {
+          "name": "Nachname",
+          "locale": "de-DE"
+         }
+        ]
+       },
+       {
+        "path": [
+         "email"
+        ]
+       },
+       {
+        "path": [
+         "phone_number"
+        ]
+       },
+       {
+        "path": [
+         "address"
+        ],
+        "display": [
+         {
+          "name": "Place of residence",
+          "locale": "en-US"
+         },
+         {
+          "name": "Wohnsitz",
+          "locale": "de-DE"
+         }
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "street_address"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "locality"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "region"
+        ]
+       },
+       {
+        "path": [
+         "address",
+         "country"
+        ]
+       },
+       {
+        "path": [
+         "birthdate"
+        ]
+       },
+       {
+        "path": [
+         "is_over_18"
+        ]
+       },
+       {
+        "path": [
+         "is_over_21"
+        ]
+       },
+       {
+        "path": [
+         "is_over_65"
+        ]
+       }
+      ]
+     }
+    }
+   }
+  }
+ ]
+}

@@ -36,6 +36,9 @@ pub struct WalletConfig {
     pub status: Option<String>,
     /// Whether verification accepts a credential whose status cannot be determined.
     pub accept_unknown_status: bool,
+    /// Other identifiers of this wallet as an issuer (an OpenID4VCI `credential_issuer` URL),
+    /// accepted as the audience of possession proofs.
+    pub aliases: Vec<String>,
 }
 
 impl WalletConfig {
@@ -51,6 +54,7 @@ impl WalletConfig {
             consent: vocab::CONSENT_RULES.to_owned(),
             status: Some(vocab::STATUS_BITSTRING.to_owned()),
             accept_unknown_status: false,
+            aliases: Vec::new(),
         }
     }
 
@@ -71,6 +75,7 @@ impl WalletConfig {
             consent: vocab::CONSENT_RULES.to_owned(),
             status: Some(vocab::STATUS_BITSTRING.to_owned()),
             accept_unknown_status: false,
+            aliases: Vec::new(),
         })
     }
 }
@@ -201,7 +206,9 @@ impl Wallet {
     pub fn accept(&self, credential: &Credential, issuer: &str) -> Result<CredentialMeta, WalletError> {
         let format = self.registry.format(&credential.format)?;
         let meta = format.verify(credential, self.keys.as_ref())?;
-        if meta.issuer != issuer {
+        // an issuer named by DID must be the credential's issuer; an OpenID4VCI issuer is named
+        // by its URL, and the credential's signature names its DID
+        if issuer.starts_with("did:") && meta.issuer != issuer {
             return Err(WalletError::UntrustedIssuer(format!(
                 "credential from {} offered by {issuer}",
                 meta.issuer
@@ -278,7 +285,7 @@ impl Wallet {
     /// [`WalletError::Storage`].
     pub fn consent_request(&self, request: &PresentationRequest) -> Result<ConsentRequest, WalletError> {
         Ok(ConsentRequest {
-            verifier: request.verifier.clone(),
+            verifier: crate::exchange::agent_of(&request.verifier),
             nonce: request.nonce.clone(),
             requested: request.claims.clone(),
             types: request.types.clone(),
@@ -356,7 +363,7 @@ impl Wallet {
             .and_then(|j| PublicKey::from_jwk(j).map_err(WalletError::Key))?;
         jws.verify(&key)?;
         let aud = jws.payload.get("aud").and_then(Value::as_str).unwrap_or_default();
-        if aud != self.config.did {
+        if aud != self.config.did && !self.config.aliases.iter().any(|a| a == aud) {
             return Err(WalletError::WrongAudience(format!("possession proof for {aud}")));
         }
         if jws.payload.get("nonce").and_then(Value::as_str) != Some(nonce) {

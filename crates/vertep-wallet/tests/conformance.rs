@@ -11,12 +11,17 @@ use vertep_wallet::message::ExchangeMessage;
 use vertep_wallet::plugin::ExchangeProtocol;
 use vertep_wallet::protocol::native::VertepExchange;
 use vertep_wallet::testkit::{Schedule, check_history};
-use vertep_wallet::vocab::{PROTOCOL_VCE, Role};
+use vertep_wallet::vocab::{self, PROTOCOL_VCE, Role};
 use vertep_wallet::{Line, WalletError};
 
 /// One issuance and two presentation requests (to two verifiers) over `protocol`, under
 /// `schedule`; returns the world.
 fn scenario(protocol: &str, schedule: Schedule, tweak: impl Fn(&vertep_wallet::WalletRegistry) + Clone) -> World {
+    scenario2(protocol, protocol, schedule, tweak)
+}
+
+/// The same with one protocol for issuance and another for presentation.
+fn scenario2(issuing: &str, presenting: &str, schedule: Schedule, tweak: impl Fn(&vertep_wallet::WalletRegistry) + Clone) -> World {
     let mut w = World::new();
     let issuer = w.agent_with(None, tweak.clone());
     let holder = w.agent_with(None, tweak.clone());
@@ -26,10 +31,10 @@ fn scenario(protocol: &str, schedule: Schedule, tweak: impl Fn(&vertep_wallet::W
         w.party(v).wallet_mut().trust(&issuer);
     }
     allow(&w, &holder, RulePolicy::refuse_all().allow("*", &["nationality", "birthDate"]));
-    w.party(&issuer).offer(protocol, &holder, id_offer()).unwrap();
+    w.party(&issuer).offer(issuing, &holder, id_offer()).unwrap();
     w.kit.run(schedule);
-    w.party(&v1).request(protocol, &holder, &["nationality"], &[], None).unwrap();
-    w.party(&v2).request(protocol, &holder, &["birthDate", "name"], &[], None).unwrap();
+    w.party(&v1).request(presenting, &holder, &["nationality"], &[], None).unwrap();
+    w.party(&v2).request(presenting, &holder, &["birthDate", "name"], &[], None).unwrap();
     w.kit.run(schedule);
     w
 }
@@ -45,8 +50,11 @@ fn built_in_plugins_conformant() {
     let mut checked = 0;
     let mut accepted = 0;
     for seed in 0..seeds {
-        for schedule in [Schedule::adversarial(seed), Schedule::lossy(seed)] {
-            let w = scenario(PROTOCOL_VCE, schedule, |_| {});
+        for (schedule, (issuing, presenting)) in [Schedule::adversarial(seed), Schedule::lossy(seed)]
+            .into_iter()
+            .flat_map(|s| [(s, (PROTOCOL_VCE, PROTOCOL_VCE)), (s, (vocab::PROTOCOL_OID4VCI, vocab::PROTOCOL_OID4VP))])
+        {
+            let w = scenario2(issuing, presenting, schedule, |_| {});
             match w.kit.check() {
                 Some(Ok(_)) => checked += 1,
                 Some(Err(report)) => panic!("seed {seed}: rejected\n{report}\n{}", w.kit.jsonl()),
@@ -112,4 +120,23 @@ fn faulty_plugin_caught() {
         None if lean_required() => panic!("the Lean checker is not built"),
         None => eprintln!("skipped: the Lean checker vertep-wallet is not built"),
     }
+}
+
+// @tg: verifies:: [[openspec:oid4vc#OpenID4VC Conformance#OpenID4VC histories accepted]] {level: integration}
+#[test]
+fn openid4vc_histories_accepted() {
+    for seed in 0..8 {
+        for schedule in [Schedule::honest(), Schedule::adversarial(seed), Schedule::lossy(seed)] {
+            let w = scenario2(vocab::PROTOCOL_OID4VCI, vocab::PROTOCOL_OID4VP, schedule, |_| {});
+            match w.kit.check() {
+                Some(Ok(_)) => {}
+                Some(Err(report)) => panic!("seed {seed}: rejected\n{report}\n{}", w.kit.jsonl()),
+                None if lean_required() => panic!("the Lean checker is not built"),
+                None => {}
+            }
+        }
+    }
+    let w = scenario2(vocab::PROTOCOL_OID4VCI, vocab::PROTOCOL_OID4VP, Schedule::honest(), |_| {});
+    let accepted = w.history().lines().iter().filter(|l| matches!(l, Line::Verify { result, .. } if result == "accept")).count();
+    assert_eq!(accepted, 2, "{}", w.kit.jsonl());
 }

@@ -110,19 +110,19 @@
 
 ## 10. OpenID4VC
 
-- [ ] 10.1 Implement OpenID4VCI issuer endpoints with axum (D11):
+- [x] 10.1 Implement OpenID4VCI issuer endpoints with axum (D11):
   - issuer metadata;
   - the pre-authorised code token endpoint with transaction codes;
   - the nonce endpoint;
   - the credential endpoint with `openid4vci-proof+jwt`
 
   This is `OpenID4VCI Pre-Authorised Issuance` and `Credential Issuer Metadata`
-- [ ] 10.2 Implement the OpenID4VCI holder over `ureq`: offer URI, token, nonce, proof and credential
-- [ ] 10.3 Implement the OpenID4VP verifier: DCQL query, nonce, `redirect_uri` and `decentralized_identifier` client identifiers with EdDSA request objects, and `direct_post` handling
-- [ ] 10.4 Implement the OpenID4VP holder: request parsing, DCQL matching, consent, the presentation through the format, and `access_denied`
-- [ ] 10.5 Write the role charts and codecs that map onto the exchange vocabulary, and run the conformance kit (`OpenID4VC Conformance`)
-- [ ] 10.6 Add the specification example fixtures for offers, metadata, requests and DCQL (`OpenID4VC Interoperability`)
-- [ ] 10.7 Tests for every scenario of the five `oid4vc` requirements, each with `@tg: verifies::`
+- [x] 10.2 Implement the OpenID4VCI holder over `ureq`: offer URI, token, nonce, proof and credential
+- [x] 10.3 Implement the OpenID4VP verifier: DCQL query, nonce, `redirect_uri` and `decentralized_identifier` client identifiers with EdDSA request objects, and `direct_post` handling
+- [x] 10.4 Implement the OpenID4VP holder: request parsing, DCQL matching, consent, the presentation through the format, and `access_denied`
+- [x] 10.5 Write the role charts and codecs that map onto the exchange vocabulary, and run the conformance kit (`OpenID4VC Conformance`)
+- [x] 10.6 Add the specification example fixtures for offers, metadata, requests and DCQL (`OpenID4VC Interoperability`)
+- [x] 10.7 Tests for every scenario of the five `oid4vc` requirements, each with `@tg: verifies::`
 
 ## 11. Grant credentials from a wallet
 

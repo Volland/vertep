@@ -105,6 +105,15 @@ fn nonce() -> Result<String, WalletError> {
     Ok(b64(&b))
 }
 
+/// The agent (DID) an audience names: OpenID4VP `decentralized_identifier:` client ids map to
+/// their DID, as histories name agents by DID.
+pub fn agent_of(audience: &str) -> String {
+    audience
+        .strip_prefix(crate::protocol::oid4vc::DID_CLIENT_PREFIX)
+        .unwrap_or(audience)
+        .to_owned()
+}
+
 fn claims_of(v: &Value) -> Claims {
     v.as_array()
         .map(|a| a.iter().filter_map(Value::as_str).map(str::to_owned).collect())
@@ -426,13 +435,35 @@ impl Exchanges {
         types: &[&str],
         purpose: Option<&str>,
     ) -> Result<String, WalletError> {
+        self.request_for(protocol, holder, claims, types, purpose, None)
+    }
+
+    /// As [`Exchanges::request`], naming the verifier by `audience` (an OpenID4VP client
+    /// identifier) instead of the protocol's default.
+    ///
+    /// # Errors
+    ///
+    /// [`WalletError`] when the protocol is unknown or the message cannot be sent.
+    pub fn request_for(
+        &mut self,
+        protocol: &str,
+        holder: &str,
+        claims: &[&str],
+        types: &[&str],
+        purpose: Option<&str>,
+        audience: Option<&str>,
+    ) -> Result<String, WalletError> {
         let id = format!("x-{}", nonce()?);
         let n = nonce()?;
         let claims: Claims = claims.iter().map(|c| (*c).to_owned()).collect();
+        let audience = match audience {
+            Some(a) => a.to_owned(),
+            None => self.wallet.registry().protocol(protocol)?.audience(self.wallet.did()),
+        };
         self.requests.insert(
             id.clone(),
             PresentationRequest {
-                verifier: self.wallet.did().to_owned(),
+                verifier: audience,
                 nonce: n.clone(),
                 claims: claims.clone(),
                 types: types.iter().map(|t| (*t).to_owned()).collect(),
@@ -653,9 +684,10 @@ impl Exchanges {
                 let n = s(&ctx, "nonce");
                 let digest = s(data, "credential");
                 let claims = claims_of(data.get("claims").unwrap_or(&Value::Null));
+                let agent = agent_of(&verifier);
                 self.record(Line::Consent {
                     holder: me.clone(),
-                    verifier: verifier.clone(),
+                    verifier: agent.clone(),
                     nonce: n.clone(),
                     claims: claims.clone(),
                 });
@@ -663,7 +695,7 @@ impl Exchanges {
                     Ok((meta, p)) => {
                         self.record(Line::Present {
                             holder: me,
-                            verifier,
+                            verifier: agent,
                             nonce: n,
                             credential: meta.digest,
                             claims,
@@ -776,7 +808,8 @@ impl Exchanges {
                 let Some(info) = self.live_actor(Role::Issuer, &m.exchange) else {
                     let msg = self.next_msg();
                     self.record(Line::Send { from: me, msg: msg.clone() });
-                    return self.reply_problem(protocol, &m.exchange, &m.from, &msg, "unknown or used offer");
+                    // an unknown or finished offer: its nonce is unknown or used
+                    return self.reply_problem(protocol, &m.exchange, &m.from, &msg, "nonce");
                 };
                 let ctx = self.ctx(&info.actor)?;
                 let n = ctx.get("nonce").and_then(Value::as_str).unwrap_or_default().to_owned();
@@ -840,11 +873,13 @@ impl Exchanges {
                     purpose: purpose.clone(),
                 };
                 let options = self.wallet.options(&req)?;
+                // messages go to the verifier's DID; the chart keeps the audience (client id)
+                let peer = agent_of(&verifier);
                 self.start(
                     protocol,
                     Role::Holder,
                     &m.exchange,
-                    &verifier,
+                    &peer,
                     event(
                         "exchange.request",
                         json!({"exchange": m.exchange, "verifier": verifier, "nonce": nonce,
