@@ -10,7 +10,7 @@ authors.workspace = true
 readme = "README.md"
 homepage = "https://volland.github.io/vertep/"
 documentation = "https://docs.rs/vertep-wallet"
-keywords = ["wallet", "verifiable-credentials", "sd-jwt", "openid4vc", "did"]
+keywords = ["wallet", "credentials", "sd-jwt", "openid4vc", "did"]
 categories = ["cryptography", "authentication"]
 
 [features]

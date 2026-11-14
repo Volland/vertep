@@ -100,6 +100,8 @@ The core and a browser shell compiled to WebAssembly, with a TypeScript API and 
 
 Delivered by the OpenSpec change `m6-wasm-js`.
 
+Archived 2026-11-14 as `openspec/changes/archive/2026-11-14-m6-wasm-js` with 15 requirements in `openspec/specs/wasm-bindings`. The npm packages are published (`next` 0.1.3, `latest` 0.1.2).
+
 ## M7 Durable objects
 
 DID-addressed durable objects with verifiable journals, decentralised custody over TSP with quorum-promised epochs, the durable agent journal, and a TSP mailbox mediator.
