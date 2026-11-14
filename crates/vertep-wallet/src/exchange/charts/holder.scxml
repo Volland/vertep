@@ -30,6 +30,16 @@
         <param name="exchange" expr="ev.data.exchange"/>
       </send>
     </transition>
+    <transition event="exchange.request" cond="size(ev.data.options) == 0" target="refused">
+      <assign location="exchange" expr="ev.data.exchange"/>
+      <assign location="peer" expr="ev.data.verifier"/>
+      <assign location="nonce" expr="ev.data.nonce"/>
+      <assign location="reason" expr="'no-match'"/>
+      <send event="wire.refuse" target="wire:out">
+        <param name="exchange" expr="ev.data.exchange"/>
+        <param name="reason" expr="'no-match'"/>
+      </send>
+    </transition>
     <transition event="exchange.request" target="consent">
       <assign location="exchange" expr="ev.data.exchange"/>
       <assign location="peer" expr="ev.data.verifier"/>

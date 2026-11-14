@@ -184,3 +184,8 @@ pub fn lean_accepts(w: &World) {
         None => eprintln!("skipped: the Lean checker vertep-wallet is not built"),
     }
 }
+
+/// The datamodel data of an agent state as JSON.
+pub fn data(dm: vertep_core::datamodel::Value) -> serde_json::Value {
+    vertep_agent::json::to_json(vertep_agent::decider::ContextView::new(dm).data())
+}
