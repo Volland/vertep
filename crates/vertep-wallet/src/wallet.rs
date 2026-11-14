@@ -39,6 +39,21 @@ pub struct WalletConfig {
 }
 
 impl WalletConfig {
+    /// A configuration for `identity` (any DID method): its signing key signs as issuer and
+    /// binds credentials as holder; built-in store, consent policy and status resolver.
+    pub fn from_identity(identity: &vertep_federation::ActorIdentity) -> Self {
+        WalletConfig {
+            did: identity.did.clone(),
+            kid: identity.signing.kid.clone(),
+            signing_key: identity.signing.key_name.clone(),
+            trusted_issuers: Vec::new(),
+            store: vocab::STORE_SEALED.to_owned(),
+            consent: vocab::CONSENT_RULES.to_owned(),
+            status: Some(vocab::STATUS_BITSTRING.to_owned()),
+            accept_unknown_status: false,
+        }
+    }
+
     /// A configuration for a `did:key` identity of the key `signing_key`, with the built-in
     /// sealed store, rule consent policy and Bitstring Status List resolver.
     ///

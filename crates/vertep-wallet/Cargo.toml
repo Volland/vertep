@@ -56,8 +56,8 @@ tokio = { workspace = true, optional = true, features = ["rt-multi-thread", "net
 ureq = { version = "2.12.1", default-features = false, features = ["json"], optional = true }
 
 [dev-dependencies]
-vertep-wallet = { path = ".", features = ["testkit", "sd-jwt", "oid4vc", "http-status"] }
-vertep-federation = { workspace = true, features = ["testkit"] }
+vertep-wallet = { path = ".", features = ["testkit", "sd-jwt", "oid4vc", "http-status", "tsp"] }
+vertep-federation = { workspace = true, features = ["testkit", "tsp"] }
 tempfile = "3"
 tokio = { workspace = true, features = ["rt-multi-thread", "net", "macros", "time"] }
 
