@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in eleven milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in thirteen milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -24,6 +24,9 @@ flowchart LR
     M8 --> M9
     M5 --> M10["M10 Agent protocols<br/>m10-agent-protocols"]
     M2 --> M10
+    M3 --> M12["M12 Decision records<br/>m12-decision-records"]
+    M7 --> M12
+    M12 --> M13["M13 Production readiness<br/>m13-production-readiness"]
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
@@ -65,6 +68,7 @@ Deciders at choice points, LLM actors with journaled results and tool actors, an
 
 - precedes:: [[roadmap#M7 Durable objects]] {note: "the durable agent journal"}
 - precedes:: [[roadmap#M9 Agent wallet]] {note: "consent is a decide state"}
+- precedes:: [[roadmap#M12 Decision records]] {note: "decision entries gain a disposition and an offer"}
 
 Delivered by the OpenSpec change `m3-agents`.
 
@@ -105,6 +109,7 @@ Delivered by the OpenSpec change `m6-wasm-js`.
 DID-addressed durable objects with verifiable journals, decentralised custody over TSP with quorum-promised epochs, the durable agent journal, and a TSP mailbox mediator.
 
 - precedes:: [[roadmap#M8 did:webvh hosting]] {note: "custodian-set changes publish witnessed DID log entries"}
+- precedes:: [[roadmap#M12 Decision records]] {note: "the hash-chained journal envelope is reused for agent journals"}
 
 Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. Creating and hosting `did:webvh` logs followed in [[roadmap#M8 did:webvh hosting]].
 
@@ -133,3 +138,17 @@ Agents publish verifiable role-based protocols, hash-identified JSON-LD choreogr
 Delivered by the OpenSpec change `m10-agent-protocols` (capabilities `agent-protocols`, `protocol-conformance` and `protocol-spaces`), in [[components#vertep-kolyada]]. The design is in [[views/kolyada#Kolyada]]. Test vectors come first and the Lean model second.
 
 The layer is called Kolyada. The core crate was implemented 2026-11-14: documents, identity, projection, signed envelopes, the conformance check, causal delivery, instances and offers, with test vectors. Open: the join policy, sealed fan-out and the mailbox binding in `vertep-federation`, the `vt:plays` declaration, `vt kolyada` and the Lean model.
+
+## M12 Decision records
+
+Drafted, not started: a journal that alone explains each decision, exports as a bundle verified offline, can be chained and signed, replays counterfactually, and lets personal data be erased by key destruction.
+
+- precedes:: [[roadmap#M13 Production readiness]] {note: "benchmarks track the cost of offers and sealing"}
+
+Specified by the OpenSpec change `m12-decision-records` (capabilities `decision-records` and `journal-redaction`), motivated by the credit-decision example, in which a refused answer reads as an accepted one. The positioning it serves is [[decisions#Explanation is the process record, not a story about it]].
+
+## M13 Production readiness
+
+Drafted, not started: stability tiers, a reproducible toolchain, a benchmark suite with a regression gate, a supply-chain gate, a docs-versus-behaviour audit, a tested ten-minute path, journal shipping between nodes and WebSocket live delivery.
+
+Specified by the OpenSpec change `m13-production-readiness` (capabilities `production-readiness` and `journal-shipping`, and an addition to `relay-mailboxes`). It also tracks the open Lean custody proof (M7 task 10.4) and the open M10 items. New milestones wait for it, see [[decisions#New milestones wait for production readiness]].

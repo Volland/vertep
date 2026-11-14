@@ -160,3 +160,16 @@ fn typed_order_runs() {
         session = outcome.session;
     }
 }
+
+// @tg: verifies:: [[openspec:deciders#Enabled Event Offer#Only enabled transitions are offered]] {level: e2e}
+// @tg: verifies:: [[openspec:deciders#Decisions Are Journaled Inputs#Replay does not call the decider]] {level: e2e}
+#[test]
+fn credit_decision() {
+    let out = run(env!("CARGO_BIN_EXE_credit-decision"));
+    // approve is never offered above the ceiling, and a refused answer sends the case to a person
+    assert!(out.contains(r#"offered ["decline", "refer"] -> approve"#));
+    // the hard rule declines without asking any decider
+    assert!(out.contains("amount 15000, ratio 62%\n  -> [\"declined\"]"));
+    assert!(out.contains("entries replayed: 9, decider calls: 0"));
+    check_recorded("credit-decision/expected-output.txt", &out);
+}

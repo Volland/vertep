@@ -1644,3 +1644,21 @@ Identities, projections, envelope hashes and verdict sequences are published as 
 - motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-13"}
 
 The model proves that accepted messages are enabled by the projection, that unbound roles are never accepted and that causally consistent orders converge.
+
+## Explanation is the process record, not a story about it
+
+Vertep explains a decision by recording the process as it runs (state, offer, chooser, chart version, outcome) and replaying it, not by generating reasons afterwards.
+
+A decider's rationale is kept as its unverified claim. Proposed 2026-11-14 from the independent review and the credit-decision example.
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-14"}
+
+Rejected: post hoc attribution or generated reasons as the product's explanation, because they model the model and can be fluent and wrong. They remain usable beside the record. Realized in part by the examples and the site pages for regulated work, and in full by the draft change `m12-decision-records`.
+
+## New milestones wait for production readiness
+
+After M10 and M11 are finished, no new milestone starts until `m13-production-readiness` is archived. Proposed 2026-11-14: twelve milestones in four days left the evidence (benchmarks, tiers, clean builds, outside users) behind the specification.
+
+- motivated_by:: [[decisions#Full SCXML first]] {weight: secondary, since: "2026-11-14", note: "depth in the strongest layers before breadth"}
+
+Rejected: continuing at the same pace, because adoption comes from depth in the layers people use first.

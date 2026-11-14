@@ -17,6 +17,8 @@
   <div class="masthead-inner">
     <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
     <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
       <a href="../docs/index.html">Docs</a>
       <a href="index.html" aria-current="page">Examples</a>
       <a href="../articles/index.html">Articles</a>
@@ -36,7 +38,8 @@
       <li><a href="rust-macro.html">III. Rust macro</a></li>
       <li><a href="durable-actor.html">IV. Durable actor</a></li>
       <li><a href="decider-agent.html" aria-current="page">V. Decider agent</a></li>
-      <li><a href="browser-js.html">VI. Browser and Node.js</a></li>
+      <li><a href="credit-decision.html">VI. Credit decision</a></li>
+      <li><a href="browser-js.html">VII. Browser and Node.js</a></li>
     </ul>
     <h4>Elsewhere</h4>
     <ul>
@@ -127,11 +130,11 @@
 <span class="sd">/// 2026-11-11T00:00:00Z, the virtual clock's start.
 </span><span class="k">const</span> T0: <span class="kt">i64</span> <span class="o">=</span> <span class="mi">1_794_355_200_000</span>;
 
-<span class="k">type</span> <span class="nc">Error</span> <span class="o">=</span> <span class="callout">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;</span>;
+<span class="k">type</span> <span class="nc">Error</span> <span class="o">=</span> <span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;</span>;
 
 <span class="sd">/// A deterministic stand-in for an LLM: answers from a script, in order, and prints each offer.
 </span><span class="k">struct</span> <span class="nc">ScriptedDecider</span> {
-    answers: <span class="nc">Mutex</span><span class="o">&lt;</span>VecDeque<span class="o">&lt;</span>(<span class="o">&amp;'</span><span class="callout">static</span> <span class="kt">str</span>, <span class="o">&amp;'</span><span class="callout">static</span> <span class="kt">str</span>)<span class="o">&gt;&gt;</span>,
+    answers: <span class="nc">Mutex</span><span class="o">&lt;</span>VecDeque<span class="o">&lt;</span>(<span class="o">&amp;'</span><span class="nb">static</span> <span class="kt">str</span>, <span class="o">&amp;'</span><span class="nb">static</span> <span class="kt">str</span>)<span class="o">&gt;&gt;</span>,
 }
 
 <span class="k">impl</span> Decider <span class="k">for</span> ScriptedDecider {
@@ -144,33 +147,33 @@
 </span>    <span class="k">fn</span> <span class="nf">decide</span>(
         <span class="o">&amp;</span><span class="bp">self</span>,
         request: <span class="nc">DecisionRequest</span>,
-    ) -&gt; <span class="nc">Pin</span><span class="o">&lt;</span><span class="callout">Box</span><span class="o">&lt;</span><span class="k">dyn</span> Future<span class="o">&lt;</span>Output <span class="o">=</span> DecisionOutcome<span class="o">&gt;</span> <span class="o">+</span> <span class="callout">Send</span><span class="o">&gt;&gt;</span> {
-        <span class="kd">let</span> offered: <span class="callout">Vec</span><span class="o">&lt;&amp;</span><span class="kt">str</span><span class="o">&gt;</span> <span class="o">=</span> request
+    ) -&gt; <span class="nc">Pin</span><span class="o">&lt;</span><span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> Future<span class="o">&lt;</span>Output <span class="o">=</span> DecisionOutcome<span class="o">&gt;</span> <span class="o">+</span> <span class="nb">Send</span><span class="o">&gt;&gt;</span> {
+        <span class="kd">let</span> offered: <span class="nb">Vec</span><span class="o">&lt;&amp;</span><span class="kt">str</span><span class="o">&gt;</span> <span class="o">=</span> request
             .candidates
             .iter()
             .map(<span class="o">|</span>c<span class="o">|</span> c.event.as_str())
             .collect();
         <span class="kd">let</span> answer <span class="o">=</span> <span class="bp">self</span>.answers.lock().expect(<span class="s">"lock"</span>).pop_front();
         <span class="kd">let</span> outcome <span class="o">=</span> <span class="k">match</span> answer {
-            <span class="callout">Some</span>((event, why)) <span class="o">=&gt;</span> {
+            <span class="nb">Some</span>((event, why)) <span class="o">=&gt;</span> {
                 <span class="fm">println!</span>(
                     <span class="s">"  decider asked in `{}`: offered {offered:?} -&gt; {event}"</span>,
                     request.state
                 );
                 <span class="kd">let</span> <span class="k">mut</span> decision <span class="o">=</span> Decision::new(event, vertep::prelude::Value::Undefined);
                 decision.annotations <span class="o">=</span> Annotations {
-                    rationale: <span class="callout">Some</span>(why.to_owned()),
+                    rationale: <span class="nb">Some</span>(why.to_owned()),
                     <span class="o">..</span>Annotations::default()
                 };
                 DecisionOutcome::Decision(decision)
             }
-            <span class="callout">None</span> <span class="o">=&gt;</span> DecisionOutcome::refuse(<span class="s">"the script is exhausted"</span>),
+            <span class="nb">None</span> <span class="o">=&gt;</span> DecisionOutcome::refuse(<span class="s">"the script is exhausted"</span>),
         };
-        <span class="callout">Box</span>::pin(<span class="k">async</span> <span class="k">move</span> { outcome })
+        <span class="nb">Box</span>::pin(<span class="k">async</span> <span class="k">move</span> { outcome })
     }
 }
 
-<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="callout">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), Error<span class="o">&gt;</span> {
     <span class="kd">let</span> journal <span class="o">=</span> Arc::new(MemoryJournal::new());
 
     <span class="c1">// ---- run 1: with the decider ------------------------------------------------------------
@@ -199,7 +202,7 @@
     <span class="fm">println!</span>(<span class="s">"journal:"</span>);
     <span class="k">for</span> entry <span class="k">in</span> host.journal(AGENT) {
         <span class="kd">let</span> detail <span class="o">=</span> <span class="k">match</span> <span class="o">&amp;</span>entry.input {
-            AgentInput::Start { <span class="o">..</span> } <span class="o">=&gt;</span> <span class="callout">String</span>::new(),
+            AgentInput::Start { <span class="o">..</span> } <span class="o">=&gt;</span> <span class="nb">String</span>::new(),
             AgentInput::Event { event, <span class="o">..</span> } <span class="o">=&gt;</span> event.name.clone(),
             AgentInput::Decision {
                 correlation,
@@ -240,13 +243,13 @@
     );
     <span class="fm">assert_eq!</span>(after.configuration, before.configuration);
     <span class="fm">assert_eq!</span>(after.datamodel, before.datamodel);
-    <span class="callout">Ok</span>(())
+    <span class="nb">Ok</span>(())
 }
 
 <span class="sd">/// Reads the chart. Charts naming a datamodel other than `null` need `AnyDatamodel`.
-</span><span class="k">fn</span> <span class="nf">chart</span>() -&gt; <span class="callout">Result</span><span class="o">&lt;</span>vertep::prelude::Chart, Error<span class="o">&gt;</span> {
+</span><span class="k">fn</span> <span class="nf">chart</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>vertep::prelude::Chart, Error<span class="o">&gt;</span> {
     <span class="kd">let</span> opts <span class="o">=</span> vertep::scxml::ReadOptions::new().with_datamodels(<span class="o">&amp;</span>vertep::scxml::AnyDatamodel);
-    <span class="callout">Ok</span>(vertep::scxml::read(REFUND, <span class="o">&amp;</span>opts)<span class="o">?</span>.chart)
+    <span class="nb">Ok</span>(vertep::scxml::read(REFUND, <span class="o">&amp;</span>opts)<span class="o">?</span>.chart)
 }
 
 <span class="sd">/// A `request` event with an `amount` payload.
@@ -259,7 +262,7 @@
 }
 
 <span class="sd">/// The context as JSON.
-</span><span class="k">fn</span> <span class="nf">context</span>(state: <span class="kp">&amp;</span><span class="nc">vertep</span>::agent::AgentState) -&gt; <span class="callout">String</span> {
+</span><span class="k">fn</span> <span class="nf">context</span>(state: <span class="kp">&amp;</span><span class="nc">vertep</span>::agent::AgentState) -&gt; <span class="nb">String</span> {
     <span class="kd">let</span> view <span class="o">=</span> vertep::agent::ContextView::new(state.datamodel.clone());
     vertep::agent::json::to_json(view.data()).to_string()
 }</code></pre>
@@ -286,11 +289,11 @@ run 2, same journal, no decider bound:
       <li>The replay reaches the same states with zero decider calls.</li>
     </ul>
     <div class="callout"><p>For a language-model agent with tools and a fork from the journal, see <code>crates/vertep-agent/examples/react_support_agent.rs</code> and <code>fork_from_journal.rs</code>, and the article <a href="../articles/deterministic-agents.html">The goat does not choose the play</a>.</p></div>
-    <div class="callout warn"><p>The agent host keeps its own journal, and only the in-memory <code>MemoryJournal</code> implements it today. A durable agent journal on tiramemsu is not there yet.</p></div>
+    <div class="callout warn"><p>This example uses the in-memory <code>MemoryJournal</code>, the default for tests. For a durable agent journal, give the host a <code>StoreAgentJournal</code> over any <code>JournalStore</code>, such as a tiramemsu file.</p></div>
     <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
     <nav class="pager" aria-label="Examples">
       <a href="durable-actor.html">← Durable actor</a>
-      <a href="browser-js.html">Browser and Node.js →</a>
+      <a href="credit-decision.html">Credit decision →</a>
     </nav>
   </main>
 </div>
@@ -299,7 +302,7 @@ run 2, same journal, no decider bound:
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
   </div>
 </footer>
 </body>

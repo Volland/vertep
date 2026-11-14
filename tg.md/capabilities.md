@@ -1,7 +1,7 @@
 ---
 type: Capability
 status: draft
-openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces]
+openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces, decision-records, journal-redaction, production-readiness, journal-shipping]
 ---
 # Capabilities
 
@@ -270,3 +270,35 @@ Protocol instances shared by agents: signed genesis, countersigned joins, join p
 - scheduled_in:: [[roadmap#M10 Agent protocols]]
 
 Partly implemented in [[components#vertep-kolyada]]: instances, joins, role-derived authority, the hash-linked history and sub-protocol genesis. The join policy, sealed fan-out over mailboxes and the chart and mailbox binding are planned in [[components#vertep-federation]].
+
+## Decision records
+
+The journal alone explains every decision: disposition and offer on each decision entry, a derived explanation view, a bundle verified offline, chained agent journals and counterfactual replay. OpenSpec: `decision-records`.
+
+- scheduled_in:: [[roadmap#M12 Decision records]]
+
+Not implemented: the change is a draft. The behaviour it fixes is visible in `examples/credit-decision`.
+
+## Journal redaction
+
+Sensitive fields sealed under per-subject keys, erasure by key destruction that keeps the journal valid, replay marked `recorded` after erasure, and retention policy. OpenSpec: `journal-redaction`.
+
+- scheduled_in:: [[roadmap#M12 Decision records]]
+
+Not implemented: the change is a draft. Until it lands, personal data stays out of events. See [[constraints#Erasure rules]].
+
+## Production readiness
+
+Stability tiers, a reproducible toolchain, a benchmark suite and gate, a supply-chain gate, a docs-versus-behaviour audit and a tested ten-minute path. OpenSpec: `production-readiness`.
+
+- scheduled_in:: [[roadmap#M13 Production readiness]]
+
+Not implemented: the change is a draft.
+
+## Journal shipping
+
+A pull protocol that replicates a journal between cluster nodes in order with digests, resumes after interruption and bounds memory under a slow follower. OpenSpec: `journal-shipping`.
+
+- scheduled_in:: [[roadmap#M13 Production readiness]]
+
+Not implemented: the change is a draft; it closes the gap noted in [[roadmap#M4 Cluster]].

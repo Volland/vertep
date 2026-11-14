@@ -286,3 +286,9 @@ DIDComm authcrypt authenticates a sender only to the recipient, so a recipient c
 
 - constrains:: [[decisions#Protocol messages are signed, then sealed]] {strength: must, source: "DIDComm Messaging v2"}
 - constrains:: [[decisions#Out-of-order messages wait, and refusals come with proof]] {strength: must, source: "DIDComm Messaging v2"}
+
+## Erasure rules
+
+GDPR Article 17 and similar rules require personal data to be erasable on request, which an append-only, hash-chained journal does not allow by rewriting.
+
+- constrains:: [[decisions#Explanation is the process record, not a story about it]] {strength: must, source: "GDPR Article 17"}

@@ -29,6 +29,10 @@ path = "durable-actor/main.rs"
 name = "decider-agent"
 path = "decider-agent/main.rs"
 
+[[bin]]
+name = "credit-decision"
+path = "credit-decision/main.rs"
+
 [dependencies]
 # The facade: core, SCXML, the actor runtime and tiramemsu by default; agents on request.
 vertep = { path = "../crates/vertep", features = ["agent"] }

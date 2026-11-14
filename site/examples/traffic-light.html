@@ -17,6 +17,8 @@
   <div class="masthead-inner">
     <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
     <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
       <a href="../docs/index.html">Docs</a>
       <a href="index.html" aria-current="page">Examples</a>
       <a href="../articles/index.html">Articles</a>
@@ -36,7 +38,8 @@
       <li><a href="rust-macro.html">III. Rust macro</a></li>
       <li><a href="durable-actor.html">IV. Durable actor</a></li>
       <li><a href="decider-agent.html">V. Decider agent</a></li>
-      <li><a href="browser-js.html">VI. Browser and Node.js</a></li>
+      <li><a href="credit-decision.html">VI. Credit decision</a></li>
+      <li><a href="browser-js.html">VII. Browser and Node.js</a></li>
     </ul>
     <h4>Elsewhere</h4>
     <ul>
@@ -138,18 +141,18 @@
 <span class="sd">/// A delayed `&lt;send&gt;` the host must deliver later.
 </span><span class="k">struct</span> <span class="nc">Timer</span> {
     due_ms: <span class="kt">u64</span>,
-    sendid: <span class="callout">String</span>,
+    sendid: <span class="nb">String</span>,
     event: <span class="nc">Event</span>,
 }
 
-<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="callout">Result</span><span class="o">&lt;</span>(), <span class="callout">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;&gt;</span> {
+<span class="k">fn</span> <span class="nf">main</span>() -&gt; <span class="nb">Result</span><span class="o">&lt;</span>(), <span class="nb">Box</span><span class="o">&lt;</span><span class="k">dyn</span> std::error::Error<span class="o">&gt;&gt;</span> {
     <span class="c1">// 1. Read the SCXML document into the chart IR, then validate and compile it.
 </span>    <span class="kd">let</span> parsed <span class="o">=</span> vertep::scxml::read_str(CHART)<span class="o">?</span>;
     <span class="kd">let</span> chart <span class="o">=</span> CompiledChart::new(parsed.chart).map_err(<span class="o">|</span>v<span class="o">|</span> <span class="fm">format!</span>(<span class="s">"invalid chart: {v:?}"</span>))<span class="o">?</span>;
 
     <span class="c1">// 2. Start a session. The chart names the `null` datamodel (no data, only `In()` guards).
 </span>    <span class="kd">let</span> <span class="k">mut</span> dm <span class="o">=</span> NullDatamodel::new();
-    <span class="kd">let</span> <span class="k">mut</span> timers: <span class="callout">Vec</span><span class="o">&lt;</span>Timer<span class="o">&gt;</span> <span class="o">=</span> <span class="callout">Vec</span>::new();
+    <span class="kd">let</span> <span class="k">mut</span> timers: <span class="nb">Vec</span><span class="o">&lt;</span>Timer<span class="o">&gt;</span> <span class="o">=</span> <span class="nb">Vec</span>::new();
     <span class="kd">let</span> <span class="k">mut</span> now_ms <span class="o">=</span> <span class="mi">0</span>;
     <span class="kd">let</span> start <span class="o">=</span> StartInput {
         info: <span class="nc">SessionInfo</span> {
@@ -167,10 +170,10 @@
         <span class="kd">let</span> next_timer <span class="o">=</span> timers.iter().map(<span class="o">|</span>t<span class="o">|</span> t.due_ms).min();
         <span class="kd">let</span> next_script <span class="o">=</span> script.peek().map(<span class="o">|</span>(at, _)<span class="o">|</span> at <span class="o">*</span> <span class="mi">1000</span>);
         <span class="kd">let</span> timer_first <span class="o">=</span> <span class="k">match</span> (next_timer, next_script) {
-            (<span class="callout">Some</span>(t), <span class="callout">Some</span>(s)) <span class="o">=&gt;</span> t <span class="o">&lt;=</span> s,
-            (<span class="callout">Some</span>(_), <span class="callout">None</span>) <span class="o">=&gt;</span> <span class="kc">true</span>,
-            (<span class="callout">None</span>, <span class="callout">Some</span>(_)) <span class="o">=&gt;</span> <span class="kc">false</span>,
-            (<span class="callout">None</span>, <span class="callout">None</span>) <span class="o">=&gt;</span> <span class="k">break</span>,
+            (<span class="nb">Some</span>(t), <span class="nb">Some</span>(s)) <span class="o">=&gt;</span> t <span class="o">&lt;=</span> s,
+            (<span class="nb">Some</span>(_), <span class="nb">None</span>) <span class="o">=&gt;</span> <span class="kc">true</span>,
+            (<span class="nb">None</span>, <span class="nb">Some</span>(_)) <span class="o">=&gt;</span> <span class="kc">false</span>,
+            (<span class="nb">None</span>, <span class="nb">None</span>) <span class="o">=&gt;</span> <span class="k">break</span>,
         };
         <span class="kd">let</span> at <span class="o">=</span> <span class="k">if</span> timer_first { next_timer } <span class="k">else</span> { next_script }.expect(<span class="s">"a next input"</span>);
         <span class="k">if</span> at <span class="o">&gt;</span> END_S <span class="o">*</span> <span class="mi">1000</span> {
@@ -205,11 +208,11 @@
             t.due_ms <span class="o">/</span> <span class="mi">1000</span>
         );
     }
-    <span class="callout">Ok</span>(())
+    <span class="nb">Ok</span>(())
 }
 
 <span class="sd">/// Prints one macrostep and applies its effects to the timer list; returns the new session.
-</span><span class="k">fn</span> <span class="nf">report</span>(now_ms: <span class="kt">u64</span>, input: <span class="kp">&amp;</span><span class="kt">str</span>, outcome: <span class="nc">Outcome</span>, timers: <span class="kp">&amp;</span><span class="nc">mut</span> <span class="callout">Vec</span><span class="o">&lt;</span>Timer<span class="o">&gt;</span>) -&gt; <span class="nc">session</span>::Session {
+</span><span class="k">fn</span> <span class="nf">report</span>(now_ms: <span class="kt">u64</span>, input: <span class="kp">&amp;</span><span class="kt">str</span>, outcome: <span class="nc">Outcome</span>, timers: <span class="kp">&amp;</span><span class="nc">mut</span> <span class="nb">Vec</span><span class="o">&lt;</span>Timer<span class="o">&gt;</span>) -&gt; <span class="nc">session</span>::Session {
     <span class="fm">println!</span>(
         <span class="s">"[{:&gt;4}s] {:&lt;8} -&gt; {}"</span>,
         now_ms <span class="o">/</span> <span class="mi">1000</span>,
@@ -219,7 +222,7 @@
     <span class="k">for</span> effect <span class="k">in</span> outcome.effects {
         <span class="k">match</span> effect {
             <span class="c1">// No target: the event goes back to this session's external queue after the delay.
-</span>            Effect::<span class="callout">Send</span>(send) <span class="k">if</span> send.target.is_none() <span class="o">=&gt;</span> {
+</span>            Effect::<span class="nb">Send</span>(send) <span class="k">if</span> send.target.is_none() <span class="o">=&gt;</span> {
                 <span class="fm">println!</span>(
                     <span class="s">"          schedule {} in {}s"</span>,
                     send.event.name,
@@ -341,7 +344,7 @@ c:s.crossing:ia:sel:chart vt:choice c:s.operating .</code></pre>
   <div class="colophon-inner">
     <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
     <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
-    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
   </div>
 </footer>
 </body>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A prior-authorisation request: a model may approve routine requests or refer; only a clinician
+  can deny. `deny` exists in exactly one state, and that state names a person's decider, so no
+  configuration of the model, the prompt or the tools can reach it.
+
+  A chart shown in the article "Three regulated decisions"; it is validated with `vt validate`
+  but, unlike `loan.scxml`, no example program runs it.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" name="prior-auth" initial="submitted">
+  <datamodel>
+    <data id="routine" expr="false"/>
+    <data id="urgent" expr="false"/>
+  </datamodel>
+
+  <state id="submitted">
+    <transition event="submit" target="triage">
+      <assign location="routine" expr="ev.data.routine"/>
+      <assign location="urgent" expr="ev.data.urgent"/>
+    </transition>
+  </state>
+
+  <!-- The model sees only what is enabled: `approve` needs a routine request. -->
+  <state id="triage" vt:decide="triage-model" vt:candidates="approve refer"
+         vt:fallback="clinician/on-call" vt:deadline="4h">
+    <transition event="approve" cond="ctx.routine" target="approved"/>
+    <transition event="refer" target="clinician_review"/>
+    <transition event="error.decide.invalid" target="clinician_review"/>
+  </state>
+
+  <!-- The only state in which `deny` exists, and its decider is a person. -->
+  <state id="clinician_review" vt:decide="clinician/on-call" vt:candidates="approve deny request_info"
+         vt:fallback="clinician/medical-director" vt:deadline="72h">
+    <transition event="approve" target="approved"/>
+    <transition event="deny" target="denied"/>
+    <transition event="request_info" target="awaiting_info"/>
+  </state>
+
+  <state id="awaiting_info">
+    <transition event="info.received" target="clinician_review"/>
+  </state>
+
+  <state id="approved"/>
+  <state id="denied"/>
+</scxml>

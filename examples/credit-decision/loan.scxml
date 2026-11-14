@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A consumer-loan decision with a model underwriter, a hard policy limit and a human officer, on
+  the CEL datamodel.
+
+  Three things are true however the underwriter behaves:
+
+  - An application whose debt-to-income ratio is over 50 % is declined by rule, before any
+    decider is asked (`screening`).
+  - `approve` is offered only while it is enabled: the ratio must be at most 43 % and the amount
+    at most 50 000. A model cannot approve what policy forbids, because the chart never offers it.
+  - A decider that answers with an event it was not offered is refused, and the case goes to a
+    person (`error.decide.invalid`).
+
+  Illustrates the deciders capability and the decision-record story in site/articles.
+-->
+<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#"
+       version="1.0" datamodel="cel" name="loan-decision" initial="received">
+  <datamodel>
+    <data id="amount" expr="0"/>
+    <data id="dti" expr="0"/>
+  </datamodel>
+
+  <state id="received">
+    <transition event="apply" target="screening">
+      <assign location="amount" expr="ev.data.amount"/>
+      <assign location="dti" expr="ev.data.dti"/>
+    </transition>
+  </state>
+
+  <!-- Hard rule: no decider is consulted. -->
+  <state id="screening">
+    <transition cond="ctx.dti > 50" target="declined"/>
+    <transition target="underwriting"/>
+  </state>
+
+  <state id="underwriting" vt:decide="underwriter" vt:candidates="approve decline refer">
+    <transition event="approve" cond="ctx.dti &lt;= 43 &amp;&amp; ctx.amount &lt;= 50000" target="approved"/>
+    <transition event="decline" target="declined"/>
+    <transition event="refer" target="officer_review"/>
+    <transition event="error.decide.invalid" target="officer_review"/>
+  </state>
+
+  <state id="officer_review" vt:decide="officer" vt:candidates="approve decline">
+    <transition event="approve" target="approved"/>
+    <transition event="decline" target="declined"/>
+  </state>
+
+  <state id="approved"/>
+  <state id="declined"/>
+</scxml>
