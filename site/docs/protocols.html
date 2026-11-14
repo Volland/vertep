@@ -60,7 +60,7 @@
     <h1>Agent protocols (Kolyada)</h1>
     <p class="lede">Kolyada lets an agent say, in a form a stranger can verify, how to talk to it: who sends which message, in which order, to whom. A protocol is one JSON-LD document; its identity is the hash of its graph; every role runs a projection of it; and every message is signed before any transport carries it, so a peer that trusts nobody can still check each step.</p>
 
-    <div class="nb warn">
+    <div class="callout warn">
       <p>Kolyada is milestone M10, in progress. The core crate <code>vertep-kolyada</code> is built and tested: documents, identity, shapes, projection, signed envelopes, the conformance check, causal delivery, history, sub-protocols, offers and the RDF bridge. Not built yet: the join policy, sealed fan-out and the inbound and outbound checks in the mailbox and send path (in <code>vertep-federation</code>), the <code>vt:plays</code> chart declaration, <code>vt kolyada</code>, and the Lean model. Until then you drive an <code>Instance</code> yourself, as below.</p>
     </div>
 

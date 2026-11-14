@@ -110,7 +110,7 @@ pnpm --filter vertepnyk-electron run dist       # the desktop app for this OS</c
         <p>Building needs Node.js 22 and pnpm. Until <code>@vertep/web</code> is on npm, the workspace links Vertep's JavaScript packages from a sibling checkout; the repository's README explains how.</p>
       </div>
     </div>
-    <div class="nb warn">
+    <div class="callout warn">
       <p>What "preview" means:</p>
       <ul>
         <li><strong>Layout and the chart hash.</strong> Vertepnyk writes layout as <code>vl:</code> attributes in SCXML and a <code>layout</code> key in YAML. Vertep treats both as formatting from 0.1.4, so moving a box keeps the chart's version; with <code>vt</code> 0.1.3 or older, <code>vt hash</code> reports a new version when layout changes. Update with <code>cargo install vertep-cli</code>.</li>

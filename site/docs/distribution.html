@@ -222,7 +222,7 @@ cluster.attach(node.handle());</code></pre>
     <p>To move a shard, the rebalancer drains the old owner, ships the journal suffix the new owner lacks, verifies the end position, and transfers the lease at a higher epoch. Late messages at the old owner are forwarded with a redirect. With a shared journal store a move is a lease transfer only.</p>
     <p>Resharding is offline. <code>vt cluster reshard &lt;dir&gt; &lt;out&gt;</code> doubles the shard count of a stopped cluster: it reads the data directory (<code>cluster.meta</code>, the shard files and the <code>leases</code> dump), refuses if the cluster is running, re-hashes every actor IRI into shard <code>s</code> or <code>s + N</code>, and writes the new files and metadata to <code>&lt;out&gt;</code>.</p>
 
-    <div class="nb warn">
+    <div class="callout warn">
       <p>Known gaps in the cluster, as of this release:</p>
       <ul>
         <li><strong>Journal shipping between nodes has no wire protocol yet.</strong> The shipping hook accepts any copy of a journal, and the tests ship between stores in one process. Moving a shard between machines needs a way to copy its file that you supply.</li>
@@ -342,7 +342,7 @@ vt webvh serve --root ./site --addr 127.0.0.1:8080        # behind a TLS proxy</
     </ul>
     <p>For a durable object, the custodians are the witnesses, at the custody quorum. A custodian witnesses an entry only if it is the valid next entry, signed by a current update key, and declares a custodian set that custodian accepted. So the published document can never name custodians who did not agree. <a href="durable-objects.html#webvh">Durable objects</a> shows how a custody change publishes itself; <a href="cli.html#webvh">the vt command</a> has every subcommand with its output.</p>
 
-    <div class="nb warn">
+    <div class="callout warn">
       <p>Known gaps in federation:</p>
       <ul>
         <li><strong>Third-party mediators are tested over HTTP only.</strong> Interop with Hyperledger Identus runs in Docker when <code>VERTEP_MEDIATOR_INTEROP=1</code> is set, and is skipped otherwise. The <code>vt-mediator</code> WebSocket client speaks <code>ws://</code> only, so TLS needs a proxy in front.</li>

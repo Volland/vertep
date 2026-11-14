@@ -164,7 +164,7 @@
 theorem configuration_wellformedness : ConfigurationWellFormedness :=
   configuration_wellformedness_of compile_cwf entry_legal</code></pre>
     <p>Proving it was not a formality. The attempt found three bugs in the W3C Appendix D entry algorithm as both cores implemented it, each producing an illegal configuration from a valid chart with history states. All three are fixed in Rust and Lean, with regression tests on both sides. The Rust property test <code>crates/vertep-conformance/tests/config_legality.rs</code> never generated those shapes, which is why the proof, not the test, found them. The protocol models found two more bugs in the Rust runtime (an outbox mark that passed refused sends, and colliding mailbox row IRIs when two nodes share a store), also fixed.</p>
-    <div class="nb"><p>Some limits are deliberate. The type theorems read a <code>pattern</code> as the lexical rule its regular expression encodes; the regular expressions themselves are not proven equal to those rules. Lean decides <code>int</code> on the exact decimal while Rust decides it on an <code>f64</code>, so differential cases stay away from the edges of the signed 64-bit range.</p></div>
+    <div class="callout"><p>Some limits are deliberate. The type theorems read a <code>pattern</code> as the lexical rule its regular expression encodes; the regular expressions themselves are not proven equal to those rules. Lean decides <code>int</code> on the exact decimal while Rust decides it on an <code>f64</code>, so differential cases stay away from the edges of the signed 64-bit range.</p></div>
 
     <h2 id="open">The verification backlog</h2>
     <p>Every item below is done: the backlog change was archived on 2026-11-12 with all formal-model requirements implemented and verified.</p>
@@ -276,7 +276,7 @@ vt certify crates/vertep-scxml/tests/corpus/irp_style.scxml</code></pre>
 Build it from the Lean model and put it on PATH, or point VT_CERTIFY at it:
   cd lean/vertep-lean &amp;&amp; lake build &amp;&amp; export VT_CERTIFY=$PWD/.lake/build/bin/vt-certify
 No certificate was produced.</code></pre>
-    <div class="nb"><p>Typed charts certify as well (backlog 4.5, done 2026-11-12):</p>
+    <div class="callout"><p>Typed charts certify as well (backlog 4.5, done 2026-11-12):</p>
 <pre class="output" data-lang="Output"><code>$ vt certify crates/vertep-dm-rust/tests/charts/order.scxml
 &lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f&gt; &lt;https://w3id.org/vertep/vt#certifiedBy&gt; &lt;urn:vertep:cert:sha256:b9adf42734b3ce2e71ac4d6a6cd87569d41aee090031360b377534e298d9665e&gt; .
 &lt;urn:vertep:cert:sha256:b9adf427…&gt; &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;https://w3id.org/vertep/vt#Certificate&gt; .

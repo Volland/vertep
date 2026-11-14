@@ -190,11 +190,11 @@
 
     <h2 id="deciders">Deciders</h2>
     <p>The contract, from <code>crates/vertep-agent/src/decider.rs</code>:</p>
-<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">trait</span> Decider: <span class="nb">Send</span> <span class="o">+</span> <span class="nb">Sync</span> {
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">trait</span> Decider: <span class="callout">Send</span> <span class="o">+</span> <span class="callout">Sync</span> {
     <span class="sd">/// The decider's kind.
 </span>    <span class="k">fn</span> <span class="nf">kind</span>(<span class="o">&amp;</span><span class="bp">self</span>) -&gt; <span class="nc">DeciderKind</span>;
     <span class="sd">/// Decides; the future may take arbitrarily long (the actor keeps running).
-</span>    <span class="k">fn</span> <span class="nf">decide</span>(<span class="o">&amp;</span><span class="bp">self</span>, request: <span class="nc">DecisionRequest</span>) -&gt; <span class="nc">BoxFuture</span><span class="o">&lt;'</span><span class="nb">static</span>, DecisionOutcome<span class="o">&gt;</span>;
+</span>    <span class="k">fn</span> <span class="nf">decide</span>(<span class="o">&amp;</span><span class="bp">self</span>, request: <span class="nc">DecisionRequest</span>) -&gt; <span class="nc">BoxFuture</span><span class="o">&lt;'</span><span class="callout">static</span>, DecisionOutcome<span class="o">&gt;</span>;
     <span class="sd">/// The request `correlation` was cancelled or superseded; a later answer is stale.
 </span>    <span class="k">fn</span> <span class="nf">cancel</span>(<span class="o">&amp;</span><span class="bp">self</span>, _correlation: <span class="kp">&amp;</span><span class="kt">str</span>) {}
 }
@@ -233,8 +233,8 @@
         Arc::new(GuardDecider::with_rules(<span class="fm">vec!</span>[
             vertep_agent::decider::GuardRule {
                 event: <span class="s">"finish"</span>.into(),
-                guard: <span class="nb">None</span>,
-                payload: <span class="nb">Some</span>(<span class="s">"{'text': 'A person will get back to you.'}"</span>.into()),
+                guard: <span class="callout">None</span>,
+                payload: <span class="callout">Some</span>(<span class="s">"{'text': 'A person will get back to you.'}"</span>.into()),
             },
         ])),
     );
@@ -270,18 +270,18 @@
     <p>Every call records prompt and completion tokens, the model, the provider binding, latency and an optional cost. The running totals of an actor are visible to its guards as the read-only data item <code>vt_usage</code>, with the fields <code>prompt_tokens</code>, <code>completion_tokens</code>, <code>total_tokens</code>, <code>calls</code> and <code>cost</code>. A budget guard such as <code>cond="vt_usage.total_tokens &amp;lt; 50000"</code> reads it like any other data. Calls made by an LLM decider count too.</p>
 
     <h3 id="providers">Providers</h3>
-<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">trait</span> Provider: <span class="nb">Send</span> <span class="o">+</span> <span class="nb">Sync</span> {
+<pre data-lang="Rust"><code><span class="k">pub</span> <span class="k">trait</span> Provider: <span class="callout">Send</span> <span class="o">+</span> <span class="callout">Sync</span> {
     <span class="sd">/// Completes `request`.
 </span>    <span class="k">fn</span> <span class="nf">complete</span>(
         <span class="o">&amp;</span><span class="bp">self</span>,
         request: <span class="nc">ProviderRequest</span>,
-    ) -&gt; <span class="nc">BoxFuture</span><span class="o">&lt;'</span><span class="nb">static</span>, <span class="nb">Result</span><span class="o">&lt;</span>ProviderResult, ProviderError<span class="o">&gt;&gt;</span>;
+    ) -&gt; <span class="nc">BoxFuture</span><span class="o">&lt;'</span><span class="callout">static</span>, <span class="callout">Result</span><span class="o">&lt;</span>ProviderResult, ProviderError<span class="o">&gt;&gt;</span>;
     <span class="sd">/// Streams `request` as chunks followed by the final result, when the provider can.
 </span>    <span class="k">fn</span> <span class="nf">stream</span>(
         <span class="o">&amp;</span><span class="bp">self</span>,
         _request: <span class="nc">ProviderRequest</span>,
-    ) -&gt; <span class="nb">Option</span><span class="o">&lt;</span>BoxStream<span class="o">&lt;'</span><span class="nb">static</span>, <span class="nb">Result</span><span class="o">&lt;</span>StreamItem, ProviderError<span class="o">&gt;&gt;&gt;</span> {
-        <span class="nb">None</span>
+    ) -&gt; <span class="callout">Option</span><span class="o">&lt;</span>BoxStream<span class="o">&lt;'</span><span class="callout">static</span>, <span class="callout">Result</span><span class="o">&lt;</span>StreamItem, ProviderError<span class="o">&gt;&gt;&gt;</span> {
+        <span class="callout">None</span>
     }
 }</code></pre>
     <p>A <code>ProviderRequest</code> carries the rendered prompt, the model, the generation parameters, an optional output schema and the tools the model may call (exactly the granted ones). A <code>ProviderResult</code> carries the content, usage, the model id the provider reports, an optional cost and any tool calls.</p>
@@ -296,10 +296,10 @@
 </span>    <span class="s">"Order"</span>,                                        <span class="c1">// result type
 </span>    <span class="o">|</span>args: <span class="nc">Value</span><span class="o">|</span> <span class="k">async</span> <span class="k">move</span> {
         <span class="kd">let</span> id <span class="o">=</span> <span class="k">match</span> vertep_agent::json::field(<span class="o">&amp;</span>args, <span class="s">"id"</span>) {
-            <span class="nb">Some</span>(Value::<span class="nb">String</span>(id)) <span class="o">=&gt;</span> id.clone(),
-            _ <span class="o">=&gt;</span> <span class="k">return</span> <span class="nb">Err</span>(<span class="s">"no id"</span>.to_owned()),
+            <span class="callout">Some</span>(Value::<span class="callout">String</span>(id)) <span class="o">=&gt;</span> id.clone(),
+            _ <span class="o">=&gt;</span> <span class="k">return</span> <span class="callout">Err</span>(<span class="s">"no id"</span>.to_owned()),
         };
-        <span class="nb">Ok</span>(json(serde_json::json<span class="o">!</span>({ <span class="s">"id"</span>: <span class="nc">id</span>, <span class="s">"status"</span>: <span class="s">"returned"</span> })))
+        <span class="callout">Ok</span>(json(serde_json::json<span class="o">!</span>({ <span class="s">"id"</span>: <span class="nc">id</span>, <span class="s">"status"</span>: <span class="s">"returned"</span> })))
     },
 )
 .expect(<span class="s">"the order tool is well-typed"</span>)
@@ -315,7 +315,7 @@
           <span class="na">deciders=</span><span class="s">"human/inbox"</span> <span class="na">functions=</span><span class="s">"vt:action/notify"</span><span class="nt">/&gt;</span></code></pre>
     <p>The attribute forms are <code>vt:grantTargets</code>, <code>vt:grantTools</code>, <code>vt:grantDeciders</code> and <code>vt:grantFunctions</code>; several <code>vt:grant</code> elements add up. A child's effective grant is its parent's effective grant intersected with its own declaration, recursively, so authority never widens down the invoke tree. An LLM call is offered exactly the granted tools.</p>
     <p>Enforcement sits in the send path, not in the LLM adapter, so it covers plans and nested invokes the same way. An ungranted send is not delivered. The sender gets <code>error.communication</code> with the reason <code>not-granted</code>, and the parent gets <code>vt.grant.denied</code>, which it journals. Runtime actors invoked from ordinary charts are wrapped in <code>GrantedActor</code>, which filters their sends the same way.</p>
-    <div class="nb warn"><p>Grants restrict invoked children. They do not restrict the agent chart's own <code>&lt;send&gt;</code> elements: those go wherever the chart says. In <code>support-agent.scxml</code> the <code>call_tool</code> transition sends to <code>targetexpr="ev.data.tool"</code>, a target the model chose, and the chart declares no payload type, so the decision is checked by event name only. If that matters, give <code>call_tool</code> a payload type or a guard on <code>ev.data.tool</code>.</p></div>
+    <div class="callout warn"><p>Grants restrict invoked children. They do not restrict the agent chart's own <code>&lt;send&gt;</code> elements: those go wherever the chart says. In <code>support-agent.scxml</code> the <code>call_tool</code> transition sends to <code>targetexpr="ev.data.tool"</code>, a target the model chose, and the chart declares no payload type, so the decision is checked by event name only. If that matters, give <code>call_tool</code> a payload type or a guard on <code>ev.data.tool</code>.</p></div>
 
     <h2 id="react">A ReAct loop is a chart</h2>
     <p>The model as the main driver needs no feature of its own. It is a decide loop whose candidates are tool calls, a finish event and an escalation, bounded by <code>vt:maxDecisions</code> or by a guard on a counter or on <code>vt_usage</code>. The whole support agent, <code>crates/vertep-agent/examples/support-agent.scxml</code>:</p>
@@ -424,7 +424,7 @@ open offer https://example.org/agents/support/42/fork-1/decision/5.0 with ["call
 fork: Some(Object([("answer", Object([("text", String("Escalated by a supervisor."))])), ("steps", Number(1.0))]))
 triage calls after the fork: 0</code></pre>
     <p>The fork reproduces the offer that was open at position 5, under its own IRI. The triage model is not called again.</p>
-    <div class="nb warn"><p>The agent journal is the trait <code>AgentJournal</code>, and the crate implements it only with <code>MemoryJournal</code>, an in-memory store that keeps entries as JSON text. A durable agent journal on tiramemsu or another store is not in the tree yet; implement <code>AgentJournal</code> (append with a position check, read, list actors) to provide one.</p></div>
+    <div class="callout warn"><p>The agent journal is the trait <code>AgentJournal</code>, and the crate implements it only with <code>MemoryJournal</code>, an in-memory store that keeps entries as JSON text. A durable agent journal on tiramemsu or another store is not in the tree yet; implement <code>AgentJournal</code> (append with a position check, read, list actors) to provide one.</p></div>
 
     <h2 id="ontology">The agent graph</h2>
     <p><code>AgentHost::graph(actor)</code> returns the provenance graph of a run in the <code>vt-agent:</code> module (<code>https://w3id.org/vertep/agent#</code>), which ships with <code>vertep-rdf</code> together with its SHACL shapes. It names deciders, decisions, LLM calls, tools, tool calls, grants, plans and plan executions, aligned to PROV-O by subclassing. The alignment axioms are included as plain triples, so PROV-O queries work without a reasoner. A decision's annotations sit on the RDF 1.2 triple term of the statement <code>decision vt-agent:chose event</code>. See <a href="rdf.html">RDF and versions</a> for querying.</p>

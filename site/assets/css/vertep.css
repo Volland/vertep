@@ -250,17 +250,17 @@ a.card .more { font-family: var(--font-head); color: var(--orange-text); }
 .plate svg { display: block; margin: 0 auto; }
 
 /* nota bene */
-.nb {
+.callout {
   border: 2px solid var(--ink); background: var(--paper-2); padding: .9rem 1.1rem .9rem 1.1rem;
   margin: 1.5rem 0; position: relative;
 }
-.nb::before {
+.callout::before {
   content: "Nota bene"; font-family: var(--font-head); font-size: .95rem; letter-spacing: .06em;
   display: inline-block; background: var(--orange); color: var(--on-orange);
   border: 2px solid var(--ink); padding: 0 .55rem .1rem; margin: -1.6rem 0 .35rem -.2rem; position: relative;
 }
-.nb.warn::before { content: "Caveat"; background: var(--ink); color: var(--paper); }
-.nb > :last-child { margin-bottom: 0; }
+.callout.warn::before { content: "Caveat"; background: var(--ink); color: var(--paper); }
+.callout > :last-child { margin-bottom: 0; }
 
 /* ---------- docs layout ---------- */
 
@@ -351,20 +351,36 @@ a.card .more { font-family: var(--font-head); color: var(--orange-text); }
 }
 
 /* ---------- code highlighting ----------
-   Written into the pages by tools/highlight.py for Rust, XML and YAML. Two inks only: ink and the
-   rubric orange, told apart by weight and slant too, so meaning never rests on colour alone. */
+   Written into the pages by tools/highlight.py (Pygments classes) for Rust, XML and YAML.
+   Real syntax colours, tuned to the paper palette and to AA contrast on --paper-2; keywords stay
+   bold and comments italic, so meaning never rests on colour alone. */
+:root {
+  --syn-keyword: #a3226b;  --syn-type: #0b6e8a;    --syn-func: #2554b5;   --syn-string: #2e7d32;
+  --syn-number: #b2440c;   --syn-comment: #7a6c60; --syn-const: #7b3fb0;  --syn-attr: #8a5a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --syn-keyword: #f07eb8; --syn-type: #5cc8e0;    --syn-func: #7aa5ff;  --syn-string: #8fd38f;
+    --syn-number: #f48a4c;  --syn-comment: #a79783; --syn-const: #c4a0f0; --syn-attr: #e6b655;
+  }
+}
+:root[data-theme="dark"] {
+  --syn-keyword: #f07eb8; --syn-type: #5cc8e0;    --syn-func: #7aa5ff;  --syn-string: #8fd38f;
+  --syn-number: #f48a4c;  --syn-comment: #a79783; --syn-const: #c4a0f0; --syn-attr: #e6b655;
+}
 pre:not(.output) .k, pre:not(.output) .kd, pre:not(.output) .kn, pre:not(.output) .kr,
-pre:not(.output) .kp, pre:not(.output) .ow { color: var(--ink); font-weight: 600; }
-pre:not(.output) .kt, pre:not(.output) .nc, pre:not(.output) .nt, pre:not(.output) .nn,
-pre:not(.output) .no { color: var(--orange-text); font-weight: 600; }
-pre:not(.output) .na, pre:not(.output) .nl, pre:not(.output) .nf, pre:not(.output) .fm,
-pre:not(.output) .nb, pre:not(.output) .bp { color: var(--orange-text); }
+pre:not(.output) .kp, pre:not(.output) .ow { color: var(--syn-keyword); font-weight: 600; }
+pre:not(.output) .kt, pre:not(.output) .nc, pre:not(.output) .nn,
+pre:not(.output) .nb, pre:not(.output) .bp { color: var(--syn-type); }
+pre:not(.output) .nt { color: var(--syn-keyword); }
+pre:not(.output) .nf, pre:not(.output) .fm, pre:not(.output) .nl { color: var(--syn-func); }
+pre:not(.output) .na, pre:not(.output) .nd, pre:not(.output) .cp { color: var(--syn-attr); }
+pre:not(.output) .no, pre:not(.output) .kc, pre:not(.output) .ni { color: var(--syn-const); }
+pre:not(.output) .nv, pre:not(.output) .vi, pre:not(.output) .py { color: var(--ink); }
 pre:not(.output) .s, pre:not(.output) .s1, pre:not(.output) .s2, pre:not(.output) .sa,
 pre:not(.output) .sb, pre:not(.output) .sc, pre:not(.output) .se, pre:not(.output) .si,
-pre:not(.output) .sx { color: var(--orange-text); font-style: italic; }
+pre:not(.output) .sx { color: var(--syn-string); }
 pre:not(.output) .m, pre:not(.output) .mi, pre:not(.output) .mf, pre:not(.output) .mh,
-pre:not(.output) .l, pre:not(.output) .kc { color: var(--ink); font-style: italic; }
+pre:not(.output) .l { color: var(--syn-number); }
 pre:not(.output) .c, pre:not(.output) .c1, pre:not(.output) .cm, pre:not(.output) .cs,
-pre:not(.output) .sd { color: var(--ink-2); font-style: italic; }
-pre:not(.output) .nd, pre:not(.output) .cp, pre:not(.output) .ni, pre:not(.output) .nv,
-pre:not(.output) .vi, pre:not(.output) .py { color: var(--ink-2); }
+pre:not(.output) .sd { color: var(--syn-comment); font-style: italic; }

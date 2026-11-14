@@ -1170,7 +1170,7 @@ Rust, XML (SCXML) and YAML blocks on the site are highlighted by `site/tools/hig
 
 - motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: primary, since: "2026-11-12"}
 
-Pygments does the lexing and is needed only when the tool runs, never to view the site; the tool is idempotent and leaves the text of every block unchanged. `site/tools/sync-examples.py` calls the same function, so regenerated example pages keep their colours. The theme is in the "code highlighting" section of `site/assets/css/vertep.css`: ink and the rubric orange only, separated by weight and slant too, and it follows the dark-mode tokens. Blocks of other languages and the recorded outputs stay plain.
+Pygments does the lexing and is needed only when the tool runs, never to view the site; the tool is idempotent and leaves the text of every block unchanged. `site/tools/sync-examples.py` calls the same function, so regenerated example pages keep their colours. The theme is in the "code highlighting" section of `site/assets/css/vertep.css`: a full multi-colour palette (keywords, types, functions, strings, numbers, comments), with keywords bold and comments italic, defined as `--syn-*` tokens that follow the dark-mode switch. Blocks of other languages and the recorded outputs stay plain.
 
 ## Editor lint and spell-check are configured in the repository
 

@@ -400,7 +400,7 @@ exit 1</code></pre>
 dup.scxml:3:3: state id `a` is already declared at 2:3
 exit 1</code></pre>
 
-    <div class="nb"><p><code>validate</code> passes <code>examples/typed-order/order-ill-typed.yaml</code>: the chart is well-formed, it is only ill-typed. Run <code>vt typecheck</code> as well when a chart declares types.</p></div>
+    <div class="callout"><p><code>validate</code> passes <code>examples/typed-order/order-ill-typed.yaml</code>: the chart is well-formed, it is only ill-typed. Run <code>vt typecheck</code> as well when a chart declares types.</p></div>
 
     <h2 id="hash">vt hash</h2>
 
@@ -686,7 +686,7 @@ vt certify examples/traffic-light/traffic-light.scxml</code></pre>
 <pre class="output" data-lang="Output"><code>&lt;urn:vertep:chart:sha256:949a45ea97433907f548d026509517254b3a25aab6edf582ff3e3e725d7b6504&gt; is not well-formed; violated rules: state rules (r2)
 exit 1</code></pre>
 
-    <div class="nb"><p>Typed charts certify too. The checker reads the chart's <code>vt:types</code> block as Rust does, derives the type triples (<code>vt:declaresType</code>, the type definitions and their shapes), requires them in the graph and hashes them into the version, so it arrives at the version Rust computed:</p>
+    <div class="callout"><p>Typed charts certify too. The checker reads the chart's <code>vt:types</code> block as Rust does, derives the type triples (<code>vt:declaresType</code>, the type definitions and their shapes), requires them in the graph and hashes them into the version, so it arrives at the version Rust computed:</p>
 <pre class="output" data-lang="Output"><code>$ vt certify crates/vertep-dm-rust/tests/charts/order.scxml
 &lt;urn:vertep:chart:sha256:05bdae901f2ef328f81ad649674bac2beab559eac46bae2dbc34db1bdcd2e38f&gt; &lt;https://w3id.org/vertep/vt#certifiedBy&gt; &lt;urn:vertep:cert:sha256:b9adf42734b3ce2e71ac4d6a6cd87569d41aee090031360b377534e298d9665e&gt; .
 &lt;urn:vertep:cert:sha256:b9adf427…&gt; &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;https://w3id.org/vertep/vt#Certificate&gt; .
@@ -765,7 +765,7 @@ replication_factor = 1</code></pre>
 
     <p>The end-to-end test <code>crates/vertep-cli/tests/reshard.rs</code> runs the same command on a cluster of 40 actors and checks that each one's journal is in the shard it hashes to after doubling.</p>
 
-    <div class="nb warn"><p>The shard files are opened before they are copied. If <code>DIR</code> is missing some of them, <code>reshard</code> creates them empty in <code>DIR</code>, as it did in the run above. The existing files are not modified.</p></div>
+    <div class="callout warn"><p>The shard files are opened before they are copied. If <code>DIR</code> is missing some of them, <code>reshard</code> creates them empty in <code>DIR</code>, as it did in the run above. The existing files are not modified.</p></div>
 
     <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
 
