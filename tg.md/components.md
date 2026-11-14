@@ -11,6 +11,7 @@ flowchart TD
     facade["vertep (facade)"]
     cli["vertep-cli"]
     wasm["vertep-wasm"]
+    py["vertep-py"]
     agent["vertep-agent"]
     objects["vertep-objects"]
     mediator["vertep-tsp-mediator"]
@@ -38,6 +39,7 @@ flowchart TD
     facade --> agent & cluster & fed & objects & runtime & macros & tira & wallet
     cli --> scxml & yaml & rdf & lean & webvh & wallet
     wasm --> runtime & tira
+    py --> wasm
     agent --> runtime & cel & rdf
     objects --> runtime & store & fed & cluster
     mediator --> fed & store & tira & webvh
@@ -592,6 +594,23 @@ Implemented 2026-11-11: the crate (`System` and its JSON command bridge, the bro
 Typed CEL since 2026-11-12: the worker's `Datamodels` registry forwards `create_for` and `check` for `cel` to `CelRegistry`, so typed charts run typed and a chart with CEL type errors is rejected at `register`/`spawn` with `ChartInvalid`, one violation per type error.
 
 Open: publishing. A smaller storage-free build (the original 600 KB target) needs a non-SPARQL `GraphStore` read path and is follow-up work.
+
+## vertep-py
+
+The PyO3 extension module of the Python package `vertep`: the actor system's command bridge, a system or virtual clock and Python guards and actions.
+
+- provides:: [[capabilities#Python bindings]] {confidence: full}
+- uses:: [[components#vertep-wasm]] {kind: required, note: "System and its command bridge, with the journal feature and tiramemsu's native host"}
+- uses:: [[components#vertep-runtime]] {kind: required, note: "Shell::virtual_time and the clock trait"}
+- realizes:: [[decisions#Python bindings wrap the command bridge]]
+- realizes:: [[decisions#The Python clock moves only inside calls]]
+- realizes:: [[decisions#A Python system belongs to one thread]]
+- realizes:: [[decisions#Python callables are the implementations module]]
+- realizes:: [[decisions#One abi3 wheel per platform, published with Trusted Publishing]]
+- realizes:: [[decisions#Event-sourced actors]] {confidence: partial, note: "journals written from Python replay in Rust and JavaScript"}
+- scheduled_in:: [[roadmap#M11 Python bindings]]
+
+Implemented 2026-11-14: `Core` (`command`, `pump`, `wait`, `now`, `next_deadline`, `export`, `close`) in `crates/vertep-py`, and the package in `bindings/python` (`ActorSystem`, `Actor`, `Snapshot`, `Subscription`, typed errors). Built by maturin; the crate is a workspace member with `publish = false`, its own lints (the PyO3 macros emit `unsafe`) and `test = false`, because its tests are Python's and a Rust test binary would link libpython. Open: the first PyPI release.
 
 ## vertep-cli
 

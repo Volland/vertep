@@ -1,0 +1,3 @@
+pay 0 : ('idle',) (the guard refused)
+pay 25: () terminated: True total: 25.0
+dev mode: a guard or action is impure

@@ -1,7 +1,7 @@
 ---
 type: Capability
 status: draft
-openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces, decision-records, journal-redaction, production-readiness, journal-shipping]
+openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces, python-bindings, decision-records, journal-redaction, production-readiness, journal-shipping]
 ---
 # Capabilities
 
@@ -179,6 +179,14 @@ Implemented in [[components#vertep-federation]] on the runtime's `Resolver`, `Ma
 The core and a browser shell in WebAssembly with a TypeScript API, generated typings and a tiramemsu journal in OPFS. OpenSpec: `wasm-bindings`.
 
 - scheduled_in:: [[roadmap#M6 WASM and JS]]
+
+## Python bindings
+
+Charts, actors, journals, time travel and SPARQL from Python, with Python guards and actions, installed with `pip install vertep`. OpenSpec: `python-bindings`.
+
+- scheduled_in:: [[roadmap#M11 Python bindings]]
+
+Specified by the change `m11-python-bindings`; built on the command bridge of [[capabilities#WASM bindings]], so the semantics, the journal format and the error codes are the JavaScript bindings'.
 
 ## Durable objects
 

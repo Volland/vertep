@@ -5,3 +5,14 @@
 lean/**/.lake/
 *.swp
 .claude/worktrees/
+
+# Python bindings (bindings/python)
+__pycache__/
+*.pyc
+*.so
+*.pyd
+.pytest_cache/
+.venv/
+bindings/python/dist/
+bindings/python/python/vertep/*.dylib
+.gstack/

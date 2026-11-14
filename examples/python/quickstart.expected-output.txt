@@ -1,0 +1,10 @@
+actor https://example.org/charts/order/42
+start: ('open',)
+after pay: ('paid',)
+pending timers: [('ship', 200)]
+after 100 ms: ('paid',)
+after 200 ms: ('shipped',)
+journal:
+  1 pay   -> ['s.open:t0']
+  2 ship  -> ['s.paid:t0']
+as of entry 1: ('paid',)
