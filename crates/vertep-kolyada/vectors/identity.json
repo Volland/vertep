@@ -1,0 +1,371 @@
+{
+  "about": "Protocol identities: the SHA-256 of the RDFC-1.0 canonical N-Quads of the expanded graph.",
+  "cases": [
+    {
+      "document": {
+        "@context": "https://w3id.org/vertep/kolyada/1.0",
+        "final": [
+          "Cancelled",
+          "Done"
+        ],
+        "initial": "Idle",
+        "limits": {
+          "bufferSize": 4,
+          "timeoutMs": 1000
+        },
+        "messages": [
+          {
+            "id": "quote.request",
+            "payload": {
+              "fields": [
+                {
+                  "datatype": "string",
+                  "max": 1,
+                  "min": 1,
+                  "name": "item"
+                },
+                {
+                  "datatype": "integer",
+                  "max": 1,
+                  "min": 1,
+                  "name": "qty"
+                }
+              ]
+            }
+          },
+          {
+            "id": "quote",
+            "payload": {
+              "fields": [
+                {
+                  "datatype": "number",
+                  "max": 1,
+                  "min": 1,
+                  "name": "price"
+                },
+                {
+                  "datatype": "string",
+                  "in": [
+                    "EUR",
+                    "USD"
+                  ],
+                  "name": "currency"
+                }
+              ]
+            }
+          },
+          {
+            "id": "order"
+          },
+          {
+            "id": "cancel"
+          },
+          {
+            "id": "receipt"
+          }
+        ],
+        "roles": [
+          "buyer",
+          "seller",
+          "auditor"
+        ],
+        "transitions": [
+          {
+            "from": "Idle",
+            "message": "quote.request",
+            "receivers": [
+              "seller"
+            ],
+            "sender": "buyer",
+            "to": "Quoting"
+          },
+          {
+            "from": "Quoting",
+            "message": "quote",
+            "receivers": [
+              "buyer",
+              "auditor"
+            ],
+            "sender": "seller",
+            "to": "Decided"
+          },
+          {
+            "from": "Decided",
+            "message": "order",
+            "receivers": [
+              "seller"
+            ],
+            "sender": "buyer",
+            "to": "Ordered"
+          },
+          {
+            "from": "Decided",
+            "message": "cancel",
+            "receivers": [
+              "seller"
+            ],
+            "sender": "buyer",
+            "to": "Cancelled"
+          },
+          {
+            "from": "Ordered",
+            "message": "receipt",
+            "receivers": [
+              "buyer"
+            ],
+            "sender": "seller",
+            "to": "Done"
+          }
+        ],
+        "type": "Protocol",
+        "version": "1.0"
+      },
+      "id": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+      "name": "quote"
+    },
+    {
+      "document": {
+        "@context": "https://w3id.org/vertep/kolyada/1.0",
+        "final": [
+          "Cancelled",
+          "Done"
+        ],
+        "initial": "Idle",
+        "limits": {
+          "bufferSize": 4,
+          "timeoutMs": 1000
+        },
+        "messages": [
+          {
+            "id": "quote.request",
+            "payload": {
+              "fields": [
+                {
+                  "datatype": "string",
+                  "max": 1,
+                  "min": 1,
+                  "name": "item"
+                },
+                {
+                  "datatype": "integer",
+                  "max": 1,
+                  "min": 1,
+                  "name": "qty"
+                }
+              ]
+            }
+          },
+          {
+            "id": "quote",
+            "payload": {
+              "fields": [
+                {
+                  "datatype": "number",
+                  "max": 1,
+                  "min": 1,
+                  "name": "price"
+                },
+                {
+                  "datatype": "string",
+                  "in": [
+                    "EUR",
+                    "USD"
+                  ],
+                  "name": "currency"
+                }
+              ]
+            }
+          },
+          {
+            "id": "order"
+          },
+          {
+            "id": "cancel"
+          },
+          {
+            "id": "receipt"
+          }
+        ],
+        "roles": [
+          "auditor",
+          "seller",
+          "buyer"
+        ],
+        "transitions": [
+          {
+            "from": "Ordered",
+            "message": "receipt",
+            "receivers": [
+              "buyer"
+            ],
+            "sender": "seller",
+            "to": "Done"
+          },
+          {
+            "from": "Decided",
+            "message": "cancel",
+            "receivers": [
+              "seller"
+            ],
+            "sender": "buyer",
+            "to": "Cancelled"
+          },
+          {
+            "from": "Decided",
+            "message": "order",
+            "receivers": [
+              "seller"
+            ],
+            "sender": "buyer",
+            "to": "Ordered"
+          },
+          {
+            "from": "Quoting",
+            "message": "quote",
+            "receivers": [
+              "buyer",
+              "auditor"
+            ],
+            "sender": "seller",
+            "to": "Decided"
+          },
+          {
+            "from": "Idle",
+            "message": "quote.request",
+            "receivers": [
+              "seller"
+            ],
+            "sender": "buyer",
+            "to": "Quoting"
+          }
+        ],
+        "type": "Protocol",
+        "version": "1.0"
+      },
+      "id": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+      "name": "quote, members reordered"
+    },
+    {
+      "document": {
+        "@context": "https://w3id.org/vertep/kolyada/1.0",
+        "final": [
+          "Cancelled",
+          "Done"
+        ],
+        "initial": "Idle",
+        "limits": {
+          "bufferSize": 4,
+          "timeoutMs": 1000
+        },
+        "messages": [
+          {
+            "id": "quote.request",
+            "payload": {
+              "fields": [
+                {
+                  "datatype": "string",
+                  "max": 1,
+                  "min": 1,
+                  "name": "item"
+                },
+                {
+                  "datatype": "integer",
+                  "max": 1,
+                  "min": 1,
+                  "name": "qty"
+                }
+              ]
+            }
+          },
+          {
+            "id": "quote",
+            "payload": {
+              "fields": [
+                {
+                  "datatype": "number",
+                  "max": 1,
+                  "min": 1,
+                  "name": "price"
+                },
+                {
+                  "datatype": "string",
+                  "in": [
+                    "EUR",
+                    "USD"
+                  ],
+                  "name": "currency"
+                }
+              ]
+            }
+          },
+          {
+            "id": "order"
+          },
+          {
+            "id": "cancel"
+          },
+          {
+            "id": "receipt"
+          }
+        ],
+        "roles": [
+          "buyer",
+          "seller",
+          "auditor"
+        ],
+        "transitions": [
+          {
+            "from": "Idle",
+            "message": "quote.request",
+            "receivers": [
+              "seller"
+            ],
+            "sender": "buyer",
+            "to": "Quoting"
+          },
+          {
+            "from": "Quoting",
+            "message": "quote",
+            "receivers": [
+              "buyer",
+              "auditor"
+            ],
+            "sender": "seller",
+            "to": "Decided"
+          },
+          {
+            "from": "Decided",
+            "message": "order",
+            "receivers": [
+              "seller"
+            ],
+            "sender": "buyer",
+            "to": "Ordered"
+          },
+          {
+            "from": "Decided",
+            "message": "cancel",
+            "receivers": [
+              "seller"
+            ],
+            "sender": "buyer",
+            "to": "Cancelled"
+          },
+          {
+            "from": "Ordered",
+            "message": "receipt",
+            "receivers": [
+              "buyer"
+            ],
+            "sender": "seller",
+            "to": "Cancelled"
+          }
+        ],
+        "type": "Protocol",
+        "version": "1.0"
+      },
+      "id": "urn:vertep:protocol:sha256:b78a656ce9ee9b77bd37087d960ff32120cf2f568c5d842016b71b170b2dbe65",
+      "name": "quote, one target changed"
+    }
+  ]
+}

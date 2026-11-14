@@ -1,0 +1,43 @@
+[package]
+name = "vertep-kolyada"
+description = "Kolyada: verifiable role-based agent protocols for Vertep, with signed messages, projection and conformance checks"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+homepage = "https://volland.github.io/vertep/"
+documentation = "https://docs.rs/vertep-kolyada"
+keywords = ["protocol", "choreography", "agents", "json-ld", "did"]
+categories = ["network-programming", "cryptography", "data-structures"]
+
+[features]
+default = []
+# An Ed25519 `Signer` and `Verifier` over in-memory keys, for tests, vectors and examples.
+testkit = ["dep:ed25519-dalek"]
+
+[dependencies]
+vertep-rdf = { workspace = true }
+oxrdf = { workspace = true }
+# The JSON-LD form of protocol documents, read into RDF with the bundled context only.
+oxjsonld = { version = "0.2.7", features = ["rdf-12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# JCS (RFC 8785): the bytes that are signed and hashed.
+serde_json_canonicalizer = "0.3"
+sha2 = "0.10"
+base64 = "0.22"
+ed25519-dalek = { version = "3", optional = true }
+
+[dev-dependencies]
+vertep-kolyada = { path = ".", features = ["testkit"] }
+oxigraph = { workspace = true }
+
+[[example]]
+name = "quote"
+required-features = ["testkit"]
+
+[lints]
+workspace = true

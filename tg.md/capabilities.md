@@ -1,7 +1,7 @@
 ---
 type: Capability
 status: draft
-openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc]
+openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces]
 ---
 # Capabilities
 
@@ -246,3 +246,27 @@ OpenID4VCI issuance with the pre-authorised code flow and OpenID4VP presentation
 - scheduled_in:: [[roadmap#M9 Agent wallet]]
 
 Implemented in [[components#vertep-wallet]] behind feature `oid4vc`.
+
+## Agent protocols
+
+Role-based protocols as restricted JSON-LD documents: hash identity, payload shapes, well-formedness, role projection, signed offers, DID-document discovery and the RDF bridge. OpenSpec: `agent-protocols`.
+
+- scheduled_in:: [[roadmap#M10 Agent protocols]]
+
+Implemented in [[components#vertep-kolyada]]: every requirement but the RDF agreement test of shapes carries `@tg: implements::` and every scenario a `@tg: verifies::` test. The design is in [[views/kolyada#Kolyada]].
+
+## Protocol conformance
+
+The signed message envelope, the pure `accept` check, causal delivery, violation and equivocation proofs, language-neutral test vectors and the Lean protocol model. OpenSpec: `protocol-conformance`.
+
+- scheduled_in:: [[roadmap#M10 Agent protocols]]
+
+Implemented in [[components#vertep-kolyada]] except the Lean protocol model, which is not yet written. The vectors are checked in Rust and, for envelopes, with Node alone.
+
+## Protocol spaces
+
+Protocol instances shared by agents: signed genesis, countersigned joins, join policy, role-derived authority, sealed fan-out, hash-linked history, sub-protocols and the chart and mailbox binding. OpenSpec: `protocol-spaces`.
+
+- scheduled_in:: [[roadmap#M10 Agent protocols]]
+
+Partly implemented in [[components#vertep-kolyada]]: instances, joins, role-derived authority, the hash-linked history and sub-protocol genesis. The join policy, sealed fan-out over mailboxes and the chart and mailbox binding are planned in [[components#vertep-federation]].

@@ -1,0 +1,32 @@
+{
+  "about": "Ed25519 over the JCS (RFC 8785) bytes of the body; the hash is SHA-256 over the JCS bytes of the whole message.",
+  "did": "did:example:buyer",
+  "hash": "b14c147ba4f764c4d862ec3d6f762a3d1b8c85be8f5f59be4700c3a8049b3b49",
+  "message": {
+    "body": {
+      "deps": [
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "1111111111111111111111111111111111111111111111111111111111111111"
+      ],
+      "instance": "0000000000000000000000000000000000000000000000000000000000000000",
+      "payload": {
+        "item": "widget",
+        "note": "é",
+        "qty": 3
+      },
+      "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+      "recipients": [
+        "seller"
+      ],
+      "role": "buyer",
+      "sender": "did:example:buyer",
+      "seq": 2,
+      "type": "quote.request"
+    },
+    "key": "did:example:buyer#key-1",
+    "signature": "JsItry15HlutgdJNDhJ7ipZEnNB9lq8re3h8-q4zzFFvmvBvDfa5R9nwxHR3JzWw2SX6WQV9ETKyx6tf0fpxDw"
+  },
+  "publicKey": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w",
+  "seed": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+  "signingBytes": "{\"deps\":[\"0000000000000000000000000000000000000000000000000000000000000000\",\"1111111111111111111111111111111111111111111111111111111111111111\"],\"instance\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"payload\":{\"item\":\"widget\",\"note\":\"é\",\"qty\":3},\"protocol\":\"urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6\",\"recipients\":[\"seller\"],\"role\":\"buyer\",\"sender\":\"did:example:buyer\",\"seq\":2,\"type\":\"quote.request\"}"
+}

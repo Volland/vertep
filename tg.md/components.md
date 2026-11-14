@@ -16,6 +16,7 @@ flowchart TD
     mediator["vertep-tsp-mediator"]
     webvh["vertep-webvh"]
     wallet["vertep-wallet"]
+    protocol["vertep-kolyada"]
     cluster["vertep-cluster"]
     fed["vertep-federation"]
     runtime["vertep-runtime"]
@@ -45,6 +46,9 @@ flowchart TD
     wallet -. conformance oracle .-> lean
     cluster --> runtime & store
     fed --> runtime
+    fed --> protocol
+    protocol --> rdf
+    cli --> protocol
     runtime --> core & store & rdf
     tira --> store & rdf
     oxi --> store
@@ -382,6 +386,7 @@ Trust-boundary actors: DID identities and resolution, authenticated senders, gra
 - provides:: [[capabilities#Relay mailboxes]] {confidence: full}
 - uses:: [[components#vertep-runtime]] {kind: required}
 - uses:: [[components#vertep-core]] {kind: required}
+- uses:: [[components#vertep-kolyada]] {kind: required, note: "spaces, join policy and the inbound and outbound conformance checks"}
 - uses:: [[components#vertep-rdf]] {kind: required}
 - uses:: [[components#vertep-tiramemsu]] {kind: dev, note: "identity history test"}
 - realizes:: [[decisions#Identity, mailbox and transport layers]] {confidence: full, note: "the cross-trust layers on the runtime's Resolver, Mailbox and Transport traits"}
@@ -643,3 +648,41 @@ Added 2026-11-12 under `examples/` (package `vertep-examples`, not published), i
 - `browser-js`: `@vertep/web` from Node.js: spawn from SCXML text, send, subscribe, read the journal, time travel.
 
 `tests/run_examples.rs` runs every binary and compares its standard output with `expected-output.txt`; `tests/vt_commands.rs` does the same for the `vt` outputs under each example's `vt/` directory (`VERTEP_BLESS=1` re-records). The Node.js example is checked when its `node_modules` link to the built package exists.
+
+## vertep-kolyada
+
+The agent protocol core: restricted JSON-LD protocol documents, hash identity, role projection, the signed envelope, the pure conformance check, causal delivery and the test vectors; no interpreter, runtime or transport.
+
+- provides:: [[capabilities#Agent protocols]] {confidence: full}
+- provides:: [[capabilities#Protocol conformance]] {confidence: full}
+- provides:: [[capabilities#Protocol spaces]] {confidence: partial, note: "the instance state machine; mailboxes and policy live in vertep-federation"}
+- uses:: [[components#vertep-rdf]] {kind: required, note: "RDFC-1.0 canonical hashing of the expanded graph"}
+- uses:: [[components#vertep-lean]] {kind: optional, note: "planned: the protocol model and the history checker"}
+- realizes:: [[decisions#A protocol is a role-based choreography and the interface is its projection]]
+- realizes:: [[decisions#Choreographies are one global chart projected in a restricted subset]]
+- realizes:: [[decisions#Protocols are identified by the hash of their graph]]
+- realizes:: [[decisions#Protocol documents are JSON-LD in a restricted profile]]
+- realizes:: [[decisions#Protocol messages are signed, then sealed]]
+- realizes:: [[decisions#Out-of-order messages wait, and refusals come with proof]]
+- realizes:: [[decisions#The protocol core is a crate with one-way dependencies]]
+- realizes:: [[decisions#Test vectors are the protocol contract and Lean proves the core after them]]
+- realizes:: [[decisions#A protocol space is logical, sealed pairwise and hash-linked]] {confidence: partial, note: "the instance and its hash-linked history; sealing and mailboxes are in vertep-federation"}
+- realizes:: [[decisions#Role gives authority and the agent's policy decides at join]] {confidence: partial, note: "authority and joins; the agent's policy is in vertep-federation"}
+- realizes:: [[decisions#Sub-protocols make a space a tree of instances]] {confidence: partial, note: "the child genesis and completion; the parent chart's wait is a chart concern"}
+- scheduled_in:: [[roadmap#M10 Agent protocols]]
+
+Implemented 2026-11-14 for the core, with 45 tests and a language-neutral vector check. The modules are:
+
+- `document`: the `vk:` profile, the bundled context, identity and well-formedness;
+- `shape`: the SHACL subset;
+- `projection`: role projection and the interface view;
+- `envelope`: the signed message, with the `Signer` and `Verifier` traits;
+- `instance`: genesis, joins, the conformance check, causal delivery, history and sub-protocol genesis;
+- `violation`: refusal and equivocation proofs;
+- `offer`: signed offers and the `VertepProtocol` service entry;
+- `bridge`: protocols and offers as RDF;
+- `testkit` (feature): an Ed25519 signer and verifier over in-memory keys.
+
+`vectors/` holds the published test vectors and `vectors/check.mjs` checks the envelope ones with Node alone. A participant tracks the states it may be in, not one state: a transition it takes no part in is silent and a message hidden from it counts as one unknown step. Signing and DID resolution enter through the traits, so the crate has no transport or key code.
+
+Not built yet: the Lean model, the join policy, sealed fan-out over mailboxes, the inbound and outbound checks at the mailbox and send path, the `vt:plays` declaration and `vt kolyada`. These are the federation, runtime and CLI tasks of `m10-agent-protocols`, and they will realize [[decisions#Charts declare roles and the mailbox checks before the journal]].

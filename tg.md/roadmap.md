@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in ten milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in eleven milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -22,6 +22,8 @@ flowchart LR
     M3 --> M9["M9 Agent wallet<br/>m9-agent-wallet"]
     M5 --> M9
     M8 --> M9
+    M5 --> M10["M10 Agent protocols<br/>m10-agent-protocols"]
+    M2 --> M10
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
@@ -86,6 +88,7 @@ Actors across trust boundaries: DID identities, authenticated senders, capabilit
 - precedes:: [[roadmap#M7 Durable objects]] {note: "TSP, DID identities and relay mailboxes"}
 - precedes:: [[roadmap#M8 did:webvh hosting]] {note: "the did:webvh resolver"}
 - precedes:: [[roadmap#M9 Agent wallet]] {note: "keys, DIDs, TSP and grant credentials"}
+- precedes:: [[roadmap#M10 Agent protocols]] {note: "DIDs, sealed mailboxes, relays and grants"}
 
 Delivered by the OpenSpec change `m5-federation`.
 
@@ -122,3 +125,11 @@ A wallet for every Vertep identity: credentials received, sealed, presented with
 Delivered by the OpenSpec change `m9-agent-wallet` (capabilities `agent-wallet`, `credential-exchange` and `oid4vc`, and one addition to `did-identity`), in [[components#vertep-wallet]]. The design is in [[views/wallet#Wallet]].
 
 Implemented 2026-11-14: the crate with its formats, sealed store, consent, status lists, role charts and exchange engine; the Vertep Credential Exchange over TSP; OpenID4VCI and OpenID4VP with their HTTP bindings; grant credentials from a wallet; `vt wallet`. The Lean exchange model proves its six theorems, and the conformance kit's histories of every built-in protocol are accepted by its checker. Archived 2026-11-14 as `openspec/changes/archive/2026-11-14-m9-agent-wallet` and released in 0.1.5 the same day.
+
+## M10 Agent protocols
+
+Agents publish verifiable role-based protocols, hash-identified JSON-LD choreographies that any peer can project, check and run over any transport, and cooperate in shared spaces of sealed, hash-linked messages.
+
+Delivered by the OpenSpec change `m10-agent-protocols` (capabilities `agent-protocols`, `protocol-conformance` and `protocol-spaces`), in [[components#vertep-kolyada]]. The design is in [[views/kolyada#Kolyada]]. Test vectors come first and the Lean model second.
+
+The layer is called Kolyada. The core crate was implemented 2026-11-14: documents, identity, projection, signed envelopes, the conformance check, causal delivery, instances and offers, with test vectors. Open: the join policy, sealed fan-out and the mailbox binding in `vertep-federation`, the `vt:plays` declaration, `vt kolyada` and the Lean model.
