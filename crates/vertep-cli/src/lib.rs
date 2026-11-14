@@ -22,6 +22,7 @@
 pub mod cel;
 pub mod commands;
 pub mod surface;
+pub mod wallet;
 pub mod webvh;
 
 pub use commands::{Outcome, SchemaFormat};

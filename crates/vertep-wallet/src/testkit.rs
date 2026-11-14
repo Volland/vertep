@@ -384,3 +384,132 @@ pub fn check_history(jsonl: &str) -> Option<Result<String, String>> {
     );
     Some(if out.status.success() { Ok(report) } else { Err(report) })
 }
+
+/// A ready-made party for conformance runs: a `did:key` wallet with a sealed in-memory store,
+/// the built-in plugins, and `consent` as its policy.
+///
+/// # Errors
+///
+/// [`WalletError`] when the wallet cannot be created.
+pub fn party(
+    kit: &Kit,
+    clock: &vertep_runtime::VirtualClock,
+    consent: crate::consent::RulePolicy,
+) -> Result<Exchanges, WalletError> {
+    use vertep_federation::{InMemoryKeyManager, KeyManager, KeyType, RuntimeClock};
+    let km = Arc::new(InMemoryKeyManager::new());
+    let key = km.generate(KeyType::Ed25519)?;
+    let registry = Arc::new(crate::plugin::WalletRegistry::with_builtins());
+    let store = crate::store::SealedStore::open(km.as_ref(), &key, Arc::new(crate::store::MemoryRecords::new()))?;
+    registry.register_store(crate::vocab::STORE_SEALED, Arc::new(store));
+    registry.register_consent(crate::vocab::CONSENT_RULES, Arc::new(consent));
+    let mut config = crate::wallet::WalletConfig::did_key(km.as_ref(), &key)?;
+    config.status = None;
+    let km: Arc<dyn KeyManager> = km;
+    let wallet = crate::wallet::Wallet::new(
+        config,
+        km,
+        registry,
+        Arc::new(crate::credential::DidKeyOnly),
+        Arc::new(RuntimeClock(Arc::new(clock.clone()))),
+    );
+    Exchanges::builder(Arc::new(clock.clone()))
+        .history(kit.history())
+        .create(wallet, kit.wire())
+}
+
+/// The standard conformance scenario: an issuer issues an identity credential (SD-JWT VC) to a
+/// holder over `issuing`, and two verifiers request presentations over `presenting`, all under
+/// `schedule`.
+///
+/// # Errors
+///
+/// [`WalletError`] when a party cannot be created or an exchange cannot start.
+pub fn scenario(issuing: &str, presenting: &str, schedule: Schedule) -> Result<Kit, WalletError> {
+    use crate::consent::RulePolicy;
+    let clock = vertep_runtime::VirtualClock::new(1_794_355_200_000);
+    let mut kit = Kit::new();
+    let issuer = party(&kit, &clock, RulePolicy::refuse_all())?;
+    let holder = party(&kit, &clock, RulePolicy::refuse_all().allow("*", &["nationality", "birthDate"]))?;
+    let mut v1 = party(&kit, &clock, RulePolicy::refuse_all())?;
+    let mut v2 = party(&kit, &clock, RulePolicy::refuse_all())?;
+    let (i, h, a, b) = (
+        issuer.wallet().did().to_owned(),
+        holder.wallet().did().to_owned(),
+        v1.wallet().did().to_owned(),
+        v2.wallet().did().to_owned(),
+    );
+    v1.wallet_mut().trust(&i);
+    v2.wallet_mut().trust(&i);
+    for p in [issuer, holder, v1, v2] {
+        kit.add(p);
+    }
+    let offer = crate::exchange::Offer {
+        format: crate::vocab::FORMAT_SD_JWT.to_owned(),
+        types: vec!["https://example.org/IdentityCredential".to_owned()],
+        claims: serde_json::json!({"name": "Olena", "birthDate": "1990-05-01", "nationality": "UA"})
+            .as_object()
+            .cloned()
+            .unwrap_or_default(),
+        valid_until: None,
+        status: None,
+    };
+    kit.party(&i).offer(issuing, &h, offer)?;
+    kit.run(schedule);
+    kit.party(&a).request(presenting, &h, &["nationality"], &[], None)?;
+    kit.party(&b).request(presenting, &h, &["birthDate", "name"], &[], None)?;
+    kit.run(schedule);
+    Ok(kit)
+}
+
+/// The outcome of a conformance run.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Report {
+    /// Histories recorded.
+    pub histories: usize,
+    /// Histories the Lean checker accepted (0 when it is not built).
+    pub accepted: usize,
+    /// Whether the Lean checker ran.
+    pub checked: bool,
+    /// Presentations verifiers accepted, over all histories.
+    pub presentations: usize,
+    /// The reports of rejected histories.
+    pub rejected: Vec<String>,
+}
+
+/// Runs [`scenario`] over `seeds` adversarial and lossy schedules (and one honest one) and
+/// checks every history with the Lean checker when it is built.
+///
+/// # Errors
+///
+/// [`WalletError`] when a scenario cannot run.
+pub fn conformance(issuing: &str, presenting: &str, seeds: u64) -> Result<Report, WalletError> {
+    let mut r = Report::default();
+    let mut schedules = vec![Schedule::honest()];
+    for s in 0..seeds {
+        schedules.push(Schedule::adversarial(s));
+        schedules.push(Schedule::lossy(s));
+    }
+    for s in schedules {
+        let kit = scenario(issuing, presenting, s)?;
+        r.histories += 1;
+        r.presentations += kit
+            .history()
+            .lines()
+            .iter()
+            .filter(|l| matches!(l, Line::Verify { result, .. } if result == "accept"))
+            .count();
+        match kit.check() {
+            Some(Ok(_)) => {
+                r.checked = true;
+                r.accepted += 1;
+            }
+            Some(Err(report)) => {
+                r.checked = true;
+                r.rejected.push(report);
+            }
+            None => {}
+        }
+    }
+    Ok(r)
+}

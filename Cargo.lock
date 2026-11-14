@@ -5295,20 +5295,25 @@ dependencies = [
 name = "vertep-cli"
 version = "0.1.4"
 dependencies = [
+ "axum",
  "clap",
+ "getrandom 0.3.4",
  "oxrdf",
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
  "vertep-cluster",
  "vertep-core",
  "vertep-dm-cel",
  "vertep-federation",
  "vertep-objects",
  "vertep-rdf",
+ "vertep-runtime",
  "vertep-scxml",
  "vertep-store",
  "vertep-tiramemsu",
+ "vertep-wallet",
  "vertep-webvh",
  "vertep-yaml",
 ]

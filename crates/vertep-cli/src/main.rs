@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use vertep_cli::{Outcome, SchemaFormat, Surface, commands, webvh};
+use vertep_cli::{Outcome, SchemaFormat, Surface, commands, wallet, webvh};
 
 /// Tools for Vertep charts in SCXML, YAML and RDF.
 #[derive(Parser)]
@@ -69,6 +69,171 @@ enum Cmd {
     Webvh {
         #[command(subcommand)]
         command: WebvhCmd,
+    },
+    /// Agent wallets: issue, accept, present and verify credentials.
+    Wallet {
+        #[command(subcommand)]
+        command: WalletCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum WalletCmd {
+    /// Create a did:key wallet in a directory; prints its DID.
+    Create {
+        /// The wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+    },
+    /// Trust an issuer when verifying.
+    Trust {
+        /// The wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// The issuer DID.
+        issuer: String,
+    },
+    /// Let a verifier (or `*`) receive claims (the consent policy).
+    Allow {
+        /// The wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// The verifier DID, or `*`.
+        verifier: String,
+        /// Claim names, comma-separated.
+        claims: String,
+    },
+    /// List the stored credentials.
+    List {
+        /// The wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+    },
+    /// Show a credential's metadata and claims.
+    Show {
+        /// The wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// The credential digest.
+        digest: String,
+    },
+    /// Issue a credential to a holder key and write it to a file.
+    Issue {
+        /// The issuer's wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// The holder (a did:key).
+        #[arg(long)]
+        to: String,
+        /// The credential type.
+        #[arg(long = "type")]
+        type_: String,
+        /// The claims, a JSON object.
+        #[arg(long)]
+        claims: String,
+        /// sd-jwt, di-jcs or di-rdfc.
+        #[arg(long, default_value = "sd-jwt")]
+        format: String,
+        /// Validity in days.
+        #[arg(long)]
+        valid_days: Option<i64>,
+        /// A status list URL to give the credential an entry in.
+        #[arg(long)]
+        status_list: Option<String>,
+        /// The output file.
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Serve an OpenID4VCI issuer and print the credential offer URI.
+    Offer {
+        /// The issuer's wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// Where to listen.
+        #[arg(long, default_value = "127.0.0.1:8080")]
+        listen: String,
+        /// The public base URL.
+        #[arg(long)]
+        base: Option<String>,
+        /// The credential type.
+        #[arg(long = "type")]
+        type_: String,
+        /// The claims, a JSON object.
+        #[arg(long)]
+        claims: String,
+        /// A transaction code the holder must enter.
+        #[arg(long)]
+        tx_code: Option<String>,
+        /// Seconds to wait for the holder.
+        #[arg(long, default_value_t = 300)]
+        timeout: u64,
+    },
+    /// Store a credential file, or redeem an openid-credential-offer:// URI.
+    Accept {
+        /// The holder's wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// A credential file or an offer URI.
+        input: String,
+        /// The transaction code of an offer.
+        #[arg(long)]
+        tx_code: Option<String>,
+    },
+    /// Write a presentation request.
+    Request {
+        /// The verifier's wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// Claim names, comma-separated.
+        #[arg(long)]
+        claims: String,
+        /// Acceptable credential types, comma-separated.
+        #[arg(long)]
+        types: Option<String>,
+        /// Why the verifier asks.
+        #[arg(long)]
+        purpose: Option<String>,
+        /// The output file.
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Answer a request file or an openid4vp:// request through the consent policy.
+    Present {
+        /// The holder's wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// A request file or URI.
+        input: String,
+        /// The output file (for request files).
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Verify a presentation against its request.
+    Verify {
+        /// The verifier's wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// The request file.
+        request: PathBuf,
+        /// The presentation file.
+        presentation: PathBuf,
+        /// A directory of published status list credentials.
+        #[arg(long)]
+        status_dir: Option<PathBuf>,
+    },
+    /// Revoke an issued credential (its status entry).
+    Revoke {
+        /// The issuer's wallet directory.
+        #[arg(long)]
+        dir: PathBuf,
+        /// The credential digest.
+        digest: String,
+    },
+    /// Run the conformance kit for the built-in protocols.
+    Conformance {
+        /// Seeds per schedule kind.
+        #[arg(long, default_value_t = 8)]
+        seeds: u64,
     },
 }
 
@@ -329,10 +494,45 @@ fn main() -> ExitCode {
             command: ClusterCmd::Reshard { dir, out },
         } => commands::cluster_reshard(&dir, &out),
         Cmd::Webvh { command } => run_webvh(command),
+        Cmd::Wallet { command } => run_wallet(command),
     };
     print!("{}", out.stdout);
     eprint!("{}", out.stderr);
     ExitCode::from(u8::try_from(out.code).unwrap_or(1))
+}
+
+fn split(list: &str) -> Vec<String> {
+    list.split(',').map(str::trim).filter(|s| !s.is_empty()).map(str::to_owned).collect()
+}
+
+fn run_wallet(command: WalletCmd) -> Outcome {
+    match command {
+        WalletCmd::Create { dir } => wallet::create(&dir),
+        WalletCmd::Trust { dir, issuer } => wallet::trust(&dir, &issuer),
+        WalletCmd::Allow { dir, verifier, claims } => wallet::allow(&dir, &verifier, &split(&claims)),
+        WalletCmd::List { dir } => wallet::list(&dir),
+        WalletCmd::Show { dir, digest } => wallet::show(&dir, &digest),
+        WalletCmd::Issue { dir, to, type_, claims, format, valid_days, status_list, out } => {
+            wallet::issue(&wallet::IssueArgs { dir, to, type_, claims, format, valid_days, status_list, out })
+        }
+        WalletCmd::Offer { dir, listen, base, type_, claims, tx_code, timeout } => {
+            wallet::offer(&wallet::OfferArgs { dir, listen, base, type_, claims, tx_code, timeout })
+        }
+        WalletCmd::Accept { dir, input, tx_code } => wallet::accept(&dir, &input, tx_code.as_deref()),
+        WalletCmd::Request { dir, claims, types, purpose, out } => wallet::request(
+            &dir,
+            &split(&claims),
+            &types.map(|t| split(&t)).unwrap_or_default(),
+            purpose.as_deref(),
+            &out,
+        ),
+        WalletCmd::Present { dir, input, out } => wallet::present(&dir, &input, out.as_deref()),
+        WalletCmd::Verify { dir, request, presentation, status_dir } => {
+            wallet::verify(&dir, &request, &presentation, status_dir.as_deref())
+        }
+        WalletCmd::Revoke { dir, digest } => wallet::revoke(&dir, &digest),
+        WalletCmd::Conformance { seeds } => wallet::conformance(seeds),
+    }
 }
 
 fn run_webvh(command: WebvhCmd) -> Outcome {
