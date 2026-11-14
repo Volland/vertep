@@ -1,0 +1,337 @@
+{
+  "about": "The verdicts of the conformance check for the seller of an open instance.",
+  "bindings": {
+    "auditor": "did:example:auditor",
+    "buyer": "did:example:buyer",
+    "seller": "did:example:seller"
+  },
+  "genesis": {
+    "body": {
+      "deps": [],
+      "payload": {
+        "bindings": {
+          "auditor": "did:example:auditor",
+          "buyer": "did:example:buyer",
+          "seller": "did:example:seller"
+        }
+      },
+      "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+      "recipients": [
+        "auditor",
+        "seller"
+      ],
+      "role": "buyer",
+      "sender": "did:example:buyer",
+      "seq": 1,
+      "type": "kolyada:genesis"
+    },
+    "key": "did:example:buyer#key-1",
+    "signature": "laSQSH2Dh8owWkyKkgvgwUJButRIS19tXUAWFUCw1YyhnSfBOr_SPCzkUz_U_Q3CqDth8dx3DMl14yMqmpjXDw"
+  },
+  "participants": {
+    "auditor": "did:example:auditor",
+    "buyer": "did:example:buyer",
+    "seller": "did:example:seller"
+  },
+  "protocol": {
+    "@context": "https://w3id.org/vertep/kolyada/1.0",
+    "final": [
+      "Cancelled",
+      "Done"
+    ],
+    "initial": "Idle",
+    "limits": {
+      "bufferSize": 4,
+      "timeoutMs": 1000
+    },
+    "messages": [
+      {
+        "id": "quote.request",
+        "payload": {
+          "fields": [
+            {
+              "datatype": "string",
+              "max": 1,
+              "min": 1,
+              "name": "item"
+            },
+            {
+              "datatype": "integer",
+              "max": 1,
+              "min": 1,
+              "name": "qty"
+            }
+          ]
+        }
+      },
+      {
+        "id": "quote",
+        "payload": {
+          "fields": [
+            {
+              "datatype": "number",
+              "max": 1,
+              "min": 1,
+              "name": "price"
+            },
+            {
+              "datatype": "string",
+              "in": [
+                "EUR",
+                "USD"
+              ],
+              "name": "currency"
+            }
+          ]
+        }
+      },
+      {
+        "id": "order"
+      },
+      {
+        "id": "cancel"
+      },
+      {
+        "id": "receipt"
+      }
+    ],
+    "roles": [
+      "buyer",
+      "seller",
+      "auditor"
+    ],
+    "transitions": [
+      {
+        "from": "Idle",
+        "message": "quote.request",
+        "receivers": [
+          "seller"
+        ],
+        "sender": "buyer",
+        "to": "Quoting"
+      },
+      {
+        "from": "Quoting",
+        "message": "quote",
+        "receivers": [
+          "buyer",
+          "auditor"
+        ],
+        "sender": "seller",
+        "to": "Decided"
+      },
+      {
+        "from": "Decided",
+        "message": "order",
+        "receivers": [
+          "seller"
+        ],
+        "sender": "buyer",
+        "to": "Ordered"
+      },
+      {
+        "from": "Decided",
+        "message": "cancel",
+        "receivers": [
+          "seller"
+        ],
+        "sender": "buyer",
+        "to": "Cancelled"
+      },
+      {
+        "from": "Ordered",
+        "message": "receipt",
+        "receivers": [
+          "buyer"
+        ],
+        "sender": "seller",
+        "to": "Done"
+      }
+    ],
+    "type": "Protocol",
+    "version": "1.0"
+  },
+  "receiver": "seller",
+  "seeds": {
+    "auditor": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM",
+    "buyer": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+    "seller": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI"
+  },
+  "setup": [
+    {
+      "body": {
+        "deps": [],
+        "payload": {
+          "bindings": {
+            "auditor": "did:example:auditor",
+            "buyer": "did:example:buyer",
+            "seller": "did:example:seller"
+          }
+        },
+        "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+        "recipients": [
+          "auditor",
+          "seller"
+        ],
+        "role": "buyer",
+        "sender": "did:example:buyer",
+        "seq": 1,
+        "type": "kolyada:genesis"
+      },
+      "key": "did:example:buyer#key-1",
+      "signature": "laSQSH2Dh8owWkyKkgvgwUJButRIS19tXUAWFUCw1YyhnSfBOr_SPCzkUz_U_Q3CqDth8dx3DMl14yMqmpjXDw"
+    },
+    {
+      "body": {
+        "deps": [
+          "60e4e1b6f1223ab14efa47917db7b8460943a1bb4355506e19f125177d3ac01a"
+        ],
+        "instance": "60e4e1b6f1223ab14efa47917db7b8460943a1bb4355506e19f125177d3ac01a",
+        "payload": {},
+        "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+        "recipients": [
+          "auditor",
+          "buyer"
+        ],
+        "role": "seller",
+        "sender": "did:example:seller",
+        "seq": 1,
+        "type": "kolyada:join"
+      },
+      "key": "did:example:seller#key-1",
+      "signature": "hlwvOUVVPYKswIrpKfDRHvvUPXpuRGBnN75LrSo5Ddq5A8nRxdqftiKFWgNOEkuk2dcEdHvyPcpywvWEYAu3CQ"
+    },
+    {
+      "body": {
+        "deps": [
+          "60e4e1b6f1223ab14efa47917db7b8460943a1bb4355506e19f125177d3ac01a"
+        ],
+        "instance": "60e4e1b6f1223ab14efa47917db7b8460943a1bb4355506e19f125177d3ac01a",
+        "payload": {},
+        "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+        "recipients": [
+          "buyer",
+          "seller"
+        ],
+        "role": "auditor",
+        "sender": "did:example:auditor",
+        "seq": 1,
+        "type": "kolyada:join"
+      },
+      "key": "did:example:auditor#key-1",
+      "signature": "14BOz8CvfL8ylr1t9SjejVWkhvmBFRFVwhWncZdN3MLC-fxx4QtE72-RXOG1-qg4JnvQqSr3BOCz-c4LRoKMBg"
+    }
+  ],
+  "steps": [
+    {
+      "message": {
+        "body": {
+          "deps": [
+            "33c093280a4c9f74e1f4aad5595c1fa7997601c94ba94818fa2350b72fcc245e",
+            "bc3be9bda266903aef743c41424e54d8e5406b2c611b79b864ab1dcb27d939e8"
+          ],
+          "instance": "60e4e1b6f1223ab14efa47917db7b8460943a1bb4355506e19f125177d3ac01a",
+          "payload": {
+            "item": "a",
+            "qty": 1
+          },
+          "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+          "recipients": [
+            "seller"
+          ],
+          "role": "buyer",
+          "sender": "did:example:buyer",
+          "seq": 2,
+          "type": "quote.request"
+        },
+        "key": "did:example:buyer#key-1",
+        "signature": "p4Dw2RadkzqILLaIi0JFKr2au7HGIJPvEyK05KkBScWFUZHJHWS_YIqcuZxh0DbQjh-ZKJUTCIs4H-VW0boABg"
+      },
+      "name": "valid request",
+      "verdict": "accepted"
+    },
+    {
+      "message": {
+        "body": {
+          "deps": [
+            "33c093280a4c9f74e1f4aad5595c1fa7997601c94ba94818fa2350b72fcc245e",
+            "bc3be9bda266903aef743c41424e54d8e5406b2c611b79b864ab1dcb27d939e8"
+          ],
+          "instance": "60e4e1b6f1223ab14efa47917db7b8460943a1bb4355506e19f125177d3ac01a",
+          "payload": {
+            "item": "a",
+            "qty": 9
+          },
+          "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+          "recipients": [
+            "seller"
+          ],
+          "role": "buyer",
+          "sender": "did:example:buyer",
+          "seq": 2,
+          "type": "quote.request"
+        },
+        "key": "did:example:buyer#key-1",
+        "signature": "p4Dw2RadkzqILLaIi0JFKr2au7HGIJPvEyK05KkBScWFUZHJHWS_YIqcuZxh0DbQjh-ZKJUTCIs4H-VW0boABg"
+      },
+      "name": "body changed after signing",
+      "verdict": {
+        "refused": "signature"
+      }
+    },
+    {
+      "message": {
+        "body": {
+          "deps": [
+            "33c093280a4c9f74e1f4aad5595c1fa7997601c94ba94818fa2350b72fcc245e",
+            "bc3be9bda266903aef743c41424e54d8e5406b2c611b79b864ab1dcb27d939e8"
+          ],
+          "instance": "60e4e1b6f1223ab14efa47917db7b8460943a1bb4355506e19f125177d3ac01a",
+          "payload": {
+            "item": "a"
+          },
+          "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+          "recipients": [
+            "seller"
+          ],
+          "role": "buyer",
+          "sender": "did:example:buyer",
+          "seq": 21,
+          "type": "quote.request"
+        },
+        "key": "did:example:buyer#key-1",
+        "signature": "0ZHtnY2fHq-KEM49JVNUc_dVEB8qk3SwwqNLKrNuSjGSWls_vy2LXZL4GBax38WEArmRTk_Vh5vovSzxOqNCDA"
+      },
+      "name": "payload misses a required field",
+      "verdict": {
+        "refused": "payload shape"
+      }
+    },
+    {
+      "message": {
+        "body": {
+          "deps": [
+            "33c093280a4c9f74e1f4aad5595c1fa7997601c94ba94818fa2350b72fcc245e",
+            "bc3be9bda266903aef743c41424e54d8e5406b2c611b79b864ab1dcb27d939e8"
+          ],
+          "instance": "60e4e1b6f1223ab14efa47917db7b8460943a1bb4355506e19f125177d3ac01a",
+          "payload": {},
+          "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6",
+          "recipients": [
+            "seller"
+          ],
+          "role": "buyer",
+          "sender": "did:example:buyer",
+          "seq": 20,
+          "type": "order"
+        },
+        "key": "did:example:buyer#key-1",
+        "signature": "UmOAGYgMT_rVubAAHA65jTbLH4VDoC9CN9oxyOoI6QppzeFPpesZuZJPZwnA3o9qXmC21YDROgCwlS7z90q-DA"
+      },
+      "name": "message not enabled in the state",
+      "verdict": {
+        "refused": "not enabled in state"
+      }
+    }
+  ]
+}

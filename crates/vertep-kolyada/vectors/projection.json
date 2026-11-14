@@ -1,0 +1,154 @@
+{
+  "projections": [
+    {
+      "final": [
+        "Cancelled",
+        "Done"
+      ],
+      "initial": "Idle",
+      "role": "buyer",
+      "steps": [
+        {
+          "action": {
+            "send": "cancel",
+            "to": [
+              "seller"
+            ]
+          },
+          "from": "Decided",
+          "to": "Cancelled"
+        },
+        {
+          "action": {
+            "send": "order",
+            "to": [
+              "seller"
+            ]
+          },
+          "from": "Decided",
+          "to": "Ordered"
+        },
+        {
+          "action": {
+            "send": "quote.request",
+            "to": [
+              "seller"
+            ]
+          },
+          "from": "Idle",
+          "to": "Quoting"
+        },
+        {
+          "action": {
+            "from": "seller",
+            "receive": "receipt"
+          },
+          "from": "Ordered",
+          "to": "Done"
+        },
+        {
+          "action": {
+            "from": "seller",
+            "receive": "quote"
+          },
+          "from": "Quoting",
+          "to": "Decided"
+        }
+      ]
+    },
+    {
+      "final": [
+        "Cancelled",
+        "Done"
+      ],
+      "initial": "Idle",
+      "role": "seller",
+      "steps": [
+        {
+          "action": {
+            "from": "buyer",
+            "receive": "cancel"
+          },
+          "from": "Decided",
+          "to": "Cancelled"
+        },
+        {
+          "action": {
+            "from": "buyer",
+            "receive": "order"
+          },
+          "from": "Decided",
+          "to": "Ordered"
+        },
+        {
+          "action": {
+            "from": "buyer",
+            "receive": "quote.request"
+          },
+          "from": "Idle",
+          "to": "Quoting"
+        },
+        {
+          "action": {
+            "send": "receipt",
+            "to": [
+              "buyer"
+            ]
+          },
+          "from": "Ordered",
+          "to": "Done"
+        },
+        {
+          "action": {
+            "send": "quote",
+            "to": [
+              "auditor",
+              "buyer"
+            ]
+          },
+          "from": "Quoting",
+          "to": "Decided"
+        }
+      ]
+    },
+    {
+      "final": [
+        "Cancelled",
+        "Done"
+      ],
+      "initial": "Idle",
+      "role": "auditor",
+      "steps": [
+        {
+          "action": "silent",
+          "from": "Decided",
+          "to": "Cancelled"
+        },
+        {
+          "action": "silent",
+          "from": "Decided",
+          "to": "Ordered"
+        },
+        {
+          "action": "silent",
+          "from": "Idle",
+          "to": "Quoting"
+        },
+        {
+          "action": "silent",
+          "from": "Ordered",
+          "to": "Done"
+        },
+        {
+          "action": {
+            "from": "seller",
+            "receive": "quote"
+          },
+          "from": "Quoting",
+          "to": "Decided"
+        }
+      ]
+    }
+  ],
+  "protocol": "urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6"
+}

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A protocol a stranger can check — Vertep</title>
+<meta name="description" content="Kolyada, Vertep's layer of role-based agent protocols: one document says who sends what to whom, its hash names it, every message is signed, and any party can check every step without trusting anyone.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="index.html" aria-current="page">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+  <header class="article-head">
+    <p class="kicker">Article the fourth</p>
+    <h1>A protocol a stranger can check</h1>
+    <p class="byline">Kolyada: role-based agent protocols, verifiable without trust</p>
+  </header>
+
+  <p class="opening">In the Ukrainian Christmas season, carolers go from house to house. They carry a star, sometimes a vertep, the puppet box this project is named after, and they sing carols in a known order. The household answers in a known way. Nobody hands out a script at the door: every party already knows its part, and everyone can tell at once when someone sings out of turn. That custom is called <em>kolyada</em>, and it is the name of the layer that gives Vertep agents the same thing: a shared, checkable account of who says what, in which order, to whom.</p>
+
+  <h2>Permission is not a conversation</h2>
+  <p>Vertep agents already talk across organisations. They have DIDs, their messages are sealed end to end over TSP or DIDComm, and a <em>grant</em> decides who may send what: "this DID may send <code>order.*</code> to this actor". Grants answer the question a service asks of a client. They do not answer the question two agents ask each other before working together: <em>what is the conversation?</em></p>
+  <p>Take a purchase. The buyer asks for a quote; the seller answers, and an auditor must see the quote but nothing else; the buyer then orders or cancels; the seller sends a receipt. Written as grants, this becomes a pile of permissions that says nothing about order, nothing about who may see what, and nothing a third party can check afterwards. Written as a protocol, it is one document.</p>
+
+  <h2>One document, many roles</h2>
+  <p>A Kolyada protocol names roles, message types with the shape of their payloads, and a choreography: a chart whose transitions read "the buyer sends <code>quote.request</code> to the seller". It is a global view of the conversation, the way a sequence diagram is, but precise enough to run.</p>
+  <p>Each role then gets its <em>projection</em>: the same chart seen from where that role stands, keeping its own sends and receives and making everything else silent. The seller's projection waits for <code>quote.request</code>, sends <code>quote</code>, and then waits for <code>order</code> or <code>cancel</code>. That projection is the agent's public interface: the honest answer to "which messages and handshakes does this agent accept".</p>
+  <p>One rule keeps this sound, and it comes from the research on multiparty session types and choreographic programming: at every branching point, <strong>one role decides</strong>. The buyer chooses between <code>order</code> and <code>cancel</code>; the seller does not get a vote at the same moment. Without the rule, two parties could take different branches and both believe they followed the protocol. Kolyada rejects such documents when they are read, and names the state.</p>
+  <p>The projection constrains only what is visible on the wire. Behind it, an agent may be a statechart, an LLM with tools bounded by a decide state, or ordinary code.</p>
+
+  <h2>Names you can check</h2>
+  <p>A protocol's name is the hash of its meaning: the SHA-256 of the canonical form of its RDF graph, the same scheme Vertep uses for chart versions. Two spellings of the same protocol share one name, a changed protocol has a new one, and nobody has to run a registry. An agent lists the protocols it speaks in its DID document, signs offers for the roles it plays, and a peer fetches the document from anywhere and checks that its hash matches.</p>
+  <p>Messages are <strong>signed, then sealed</strong>. The body, with the protocol name, the instance, the sender's role and sequence number, the hashes of the messages it depends on, the roles it is sealed to, the type and the payload, is signed with the sender's DID key before any transport encrypts it. This matters more than it looks. DIDComm's authenticated encryption convinces the recipient of who sent a message, but nobody else; a signature convinces everyone, later, without the sender's help.</p>
+
+  <h2>A space without a server</h2>
+  <p>Agents that cooperate under a protocol form a <em>space</em>, and a space is deliberately not a store. Vertep's mailboxes only ever hold ciphertext sealed to their owner, so a space is a logical thing: an instance id, the DIDs bound to each role, and a history.</p>
+  <p>The initiator signs a <em>genesis</em> binding a DID to every role, and its hash becomes the instance id. Each participant reads it, applies its own policy, and countersigns with a join. Until then nobody may speak. Once the space is open, the role is the authority: the seller may send exactly what the seller's projection allows, without any grant, and no grant could widen it.</p>
+  <p>Every copy of a message is sealed separately to each recipient. The auditor receives the seller's quote; it never receives the buyer's request. But the quote depends on the request, so the auditor is told the request's <em>hash</em> and nothing else. The chain of hashes stays whole, the auditor can verify everything it was shown, and it still cannot read what was not meant for it. Messages that arrive before their dependencies wait in a small buffer whose size and timeout the protocol itself declares.</p>
+
+  <h2>When someone cheats</h2>
+  <p>Every incoming message goes through one pure function: is the signature valid, is the sender bound to the role it claims, has everything it depends on arrived, does some state the participant may be in allow it, does the payload fit its shape. The verdict is accepted, held or refused, and a refusal carries a reason from a fixed list.</p>
+  <p>A refused message is not thrown away. The signed message is kept as a <em>violation</em>, and because the check is pure, anyone holding the protocol and the history can run it again and reach the same verdict. If a seller signs a receipt before any order exists, the buyer refuses it and can show the signed receipt to an arbiter. Two different signed messages from one role with the same sequence number are proof of equivocation. Cheating stops being a matter of whose story you believe.</p>
+  <p>The same check guards the other direction: <code>Instance::send</code> runs it on the sender's own projection before signing, so an agent cannot emit a message its role may not send. In the tour, the auditor's attempt to place an order is refused before anything leaves.</p>
+
+  <h2>Why not just use a Decentralised Web Node?</h2>
+  <p>Kolyada borrows the best idea of the Decentralised Web Node: protocols published as documents, with permissions derived from them. It differs in three ways that follow from what Vertep is. Its agents are statecharts, so a protocol is a chart over roles rather than a tree of records. Its storage is a journal and its relays hold only ciphertext, so a space is a logical grouping instead of a shared node. And it is designed for checking without trust: documents by hash, messages by signature, verdicts by a pure function, with test vectors so an implementation in another language can prove it agrees, and a Lean model to come.</p>
+
+  <h2>Where it stands</h2>
+  <p>The core crate, <code>vertep-kolyada</code>, is built: documents and their identity, payload shapes, projection, signed envelopes, the conformance check, causal delivery, history, sub-protocols, offers and the RDF bridge, with test vectors that Node can check on its own. A runnable tour walks the purchase above from document to receipt:</p>
+<pre data-lang="Shell"><code>cargo run -p vertep-kolyada --example quote --features testkit</code></pre>
+  <p>Next comes the part that makes it disappear into ordinary agents: a chart declares the roles it plays, its mailbox runs the check where grants run today, before anything is journaled, and the verdict is journaled with the message so that replay never verifies again. After that, the <code>vt kolyada</code> command, and the Lean model that proves accepted messages are always allowed by the projection, that unbound roles are never accepted, and that participants who see messages in different but causally consistent orders end in the same place.</p>
+  <p>The <a href="../docs/protocols.html">Agent protocols page</a> in the docs has the document format, the API and the full run of the tour.</p>
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

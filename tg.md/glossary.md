@@ -74,3 +74,30 @@ The travelling puppet theatre of Ukrainian Christmas, whose puppets move only al
 
 - defines:: [[decisions#Deciders at choice points]] {note: "the puppeteer chooses among the slots the stage offers"}
 - defines:: [[decisions#Documentation site is plain static HTML]] {note: "the site's marks are the vertep star and goat"}
+
+## Agent protocol
+
+A hash-identified choreography of roles, messages and states that agents publish and follow; an agent's interface is its role's projection of it.
+
+- defines:: [[decisions#A protocol is a role-based choreography and the interface is its projection]]
+- defines:: [[decisions#Protocols are identified by the hash of their graph]]
+
+## Protocol space
+
+The tree of protocol instances under one root genesis, sharing one hash-linked history of messages that are each sealed per recipient.
+
+- defines:: [[decisions#A protocol space is logical, sealed pairwise and hash-linked]]
+- defines:: [[decisions#Sub-protocols make a space a tree of instances]]
+
+## Role projection
+
+A protocol restricted to what one role sends and receives, with every other step silent; it is what a role's checker runs.
+
+- defines:: [[decisions#Choreographies are one global chart projected in a restricted subset]]
+
+## Kolyada
+
+The name of Vertep's agent protocol layer, after the Ukrainian carol that singers perform door to door from a known script: agents that follow a published script, each in its role.
+
+- defines:: [[decisions#A protocol is a role-based choreography and the interface is its projection]]
+- defines:: [[decisions#The protocol core is a crate with one-way dependencies]] {note: "the crate is vertep-kolyada"}

@@ -272,3 +272,17 @@ A status list is a GZIP-compressed, base64url-encoded bitstring of at least 16KB
 Loading `@context` URLs at verification time lets a context server change a credential's meaning and track verifiers, so only bundled contexts are used and a credential needing another is refused.
 
 - constrains:: [[decisions#Credential formats are implemented over the key manager]] {strength: must, source: "W3C VCDM 2.0 security considerations"}
+- constrains:: [[decisions#Protocol documents are JSON-LD in a restricted profile]] {strength: must, source: "W3C VCDM 2.0 security considerations", note: "the vk: context is bundled"}
+
+## Choreography projection needs one deciding role
+
+Projecting a global choreography onto its roles gives a correct local behavior only when one role decides at each branching point and parallel branches do not span roles; otherwise a role cannot tell which branch was taken.
+
+- constrains:: [[decisions#Choreographies are one global chart projected in a restricted subset]] {strength: must, source: "multiparty session types; choreography realizability"}
+
+## Authcrypt is not verifiable by a third party
+
+DIDComm authcrypt authenticates a sender only to the recipient, so a recipient cannot prove to anyone else who sent a message; a signature of the sender's own is needed for any proof other participants can check.
+
+- constrains:: [[decisions#Protocol messages are signed, then sealed]] {strength: must, source: "DIDComm Messaging v2"}
+- constrains:: [[decisions#Out-of-order messages wait, and refusals come with proof]] {strength: must, source: "DIDComm Messaging v2"}
