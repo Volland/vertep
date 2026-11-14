@@ -108,7 +108,7 @@ The wallet should be built the same way:
   - Facade `vertep`: feature `wallet`.
 - **Dependencies:**
   - existing: `ed25519-dalek`, `sha2`, `base64` and `bs58`; `ureq` (HTTP client) and `axum` (HTTP endpoints, feature `oid4vc`).
-  - new: none required. SD-JWT and the JWS compact form are small enough to implement over the `KeyManager`, as the Data Integrity code already is.
+  - new: `flate2`, for the GZIP-compressed Bitstring Status List. SD-JWT and the JWS compact form are implemented over the `KeyManager`, as the Data Integrity code already is.
 - **The graph (`tg.md`):**
   - **New:**
     - a `vertep-wallet` component scheduled in a new milestone `M9 Agent wallet`;

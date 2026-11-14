@@ -67,7 +67,10 @@ fn stored_credential_is_encrypted() {
     for n in records.names().unwrap() {
         let bytes = records.read(&n).unwrap().unwrap();
         let text = String::from_utf8_lossy(&bytes);
-        assert!(!text.contains("1990-05-01") && !text.contains("Olena"), "{n} holds a claim value");
+        assert!(
+            !text.contains("1990-05-01") && !text.contains("Olena"),
+            "{n} holds a claim value"
+        );
     }
 }
 
@@ -82,9 +85,15 @@ fn graph_holds_metadata_only() {
     let state = vertep_agent::json::to_json(&p.host().state(&actor).unwrap().datamodel).to_string();
     let journal = format!("{:?}", p.host().journal(&actor));
     for text in [&graph, &state, &journal] {
-        assert!(!text.contains("1990-05-01") && !text.contains("Olena"), "claim value in {text}");
+        assert!(
+            !text.contains("1990-05-01") && !text.contains("Olena"),
+            "claim value in {text}"
+        );
     }
-    assert!(state.contains(&digest) && state.contains(&issuer), "{state}");
+    assert!(
+        state.contains(&digest) && state.contains(&issuer),
+        "{state}"
+    );
 }
 
 // @tg: verifies:: [[openspec:agent-wallet#Sealed Credential Store#Tampered record refused]] {level: integration}
@@ -115,7 +124,10 @@ fn binding_key_from_the_key_manager() {
     let meta = w.party(&holder).wallet().list().unwrap()[0].clone();
     let a = w.agent_parts(&holder);
     let public = a.km.public_key(&a.key).unwrap();
-    assert_eq!(meta.holder_key, vertep_federation::resolver::key::did_key(&public));
+    assert_eq!(
+        meta.holder_key,
+        vertep_federation::resolver::key::did_key(&public)
+    );
     let pop_key = w
         .history()
         .lines()
@@ -140,16 +152,32 @@ fn expired_credential_not_presented() {
     offer.valid_until = Some(T0 + DAY);
     issue(&mut w, &issuer, &holder, offer);
     allow(&w, &holder, RulePolicy::refuse_all().allow("*", &["name"]));
-    w.clock.advance(std::time::Duration::from_millis(2 * DAY as u64));
-    let r = w.party(&verifier).request(PROTOCOL_VCE, &holder, &["name"], &[], None).unwrap();
+    w.clock
+        .advance(std::time::Duration::from_millis(2 * DAY as u64));
+    let r = w
+        .party(&verifier)
+        .request(PROTOCOL_VCE, &holder, &["name"], &[], None)
+        .unwrap();
     w.kit.run(Schedule::honest());
     assert!(w.party(&verifier).verified(&r).is_none());
-    assert_eq!(w.party(&holder).state(Role::Holder, &r).unwrap(), vec!["refused"]);
-    assert!(!w.history().lines().iter().any(|l| matches!(l, Line::Present { .. })));
+    assert_eq!(
+        w.party(&holder).state(Role::Holder, &r).unwrap(),
+        vec!["refused"]
+    );
+    assert!(
+        !w.history()
+            .lines()
+            .iter()
+            .any(|l| matches!(l, Line::Present { .. }))
+    );
     let digest = w.party(&holder).wallet().list().unwrap()[0].digest.clone();
     let names: vertep_wallet::history::Claims = ["name".to_owned()].into();
     assert_eq!(
-        w.party(&holder).wallet().present(&digest, &names, &verifier, "n").unwrap_err().check(),
+        w.party(&holder)
+            .wallet()
+            .present(&digest, &names, &verifier, "n")
+            .unwrap_err()
+            .check(),
         "validity"
     );
 }
@@ -162,7 +190,13 @@ fn deleted_credential_gone() {
     w.party(&holder).delete(&digest).unwrap();
     assert!(w.party(&holder).wallet().list().unwrap().is_empty());
     let records = &w.agent_parts(&holder).records;
-    assert!(!records.names().unwrap().iter().any(|n| n.contains(digest.trim_start_matches("sha256:"))));
+    assert!(
+        !records
+            .names()
+            .unwrap()
+            .iter()
+            .any(|n| n.contains(digest.trim_start_matches("sha256:")))
+    );
     let p = w.party(&holder);
     let actor = p.wallet_actor().to_owned();
     let journal = format!("{:?}", p.host().journal(&actor));

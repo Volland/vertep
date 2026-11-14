@@ -58,11 +58,20 @@ fn data_integrity_round_trip() {
             format: cred.format.clone(),
             raw: tamper(&cred.raw),
         };
-        assert!(f.verify(&bad, &DidKeyOnly).is_err(), "{} accepts a changed claim", f.cryptosuite());
+        assert!(
+            f.verify(&bad, &DidKeyOnly).is_err(),
+            "{} accepts a changed claim",
+            f.cryptosuite()
+        );
         let all = names(&["birthDate", "name", "nationality"]);
-        let p = f.present(km.as_ref(), &cred, &holder, "did:example:v", "n-1", &all).unwrap();
+        let p = f
+            .present(km.as_ref(), &cred, &holder, "did:example:v", "n-1", &all)
+            .unwrap();
         let v = f.verify_presentation(&p, &DidKeyOnly).unwrap();
-        assert_eq!((v.audience.as_str(), v.nonce.as_str()), ("did:example:v", "n-1"));
+        assert_eq!(
+            (v.audience.as_str(), v.nonce.as_str()),
+            ("did:example:v", "n-1")
+        );
         assert_eq!(v.signer, holder.did_key_id());
     }
 }
@@ -95,7 +104,8 @@ fn rdf_canonical_proof_survives_reserialisation() {
         format: cred.format.clone(),
         raw: text,
     };
-    f.verify(&again, &DidKeyOnly).expect("the reserialised credential verifies");
+    f.verify(&again, &DidKeyOnly)
+        .expect("the reserialised credential verifies");
 }
 
 // @tg: verifies:: [[openspec:agent-wallet#Credential Formats#Selective disclosure]] {level: unit}
@@ -105,7 +115,14 @@ fn selective_disclosure() {
     let f = SdJwtVc;
     let cred = f.issue(km.as_ref(), &issuer, &request(&holder)).unwrap();
     let p = f
-        .present(km.as_ref(), &cred, &holder, "did:example:v", "n-2", &names(&["nationality"]))
+        .present(
+            km.as_ref(),
+            &cred,
+            &holder,
+            "did:example:v",
+            "n-2",
+            &names(&["nationality"]),
+        )
         .unwrap();
     for hidden in ["Olena", "1990-05-01"] {
         // neither the values nor their disclosures are in the presentation
@@ -123,11 +140,24 @@ fn selective_disclosure() {
     assert_eq!(v.disclosed["nationality"], json!("UA"));
     // a changed disclosure no longer matches the issuer's digests
     let forged = p.raw.replacen('~', "~WyJzYWx0IiwibmFtZSIsIk9sZWgiXQ~", 1);
-    assert!(f.verify_presentation(&vertep_wallet::Presentation { format: p.format.clone(), raw: forged }, &DidKeyOnly).is_err());
+    assert!(
+        f.verify_presentation(
+            &vertep_wallet::Presentation {
+                format: p.format.clone(),
+                raw: forged
+            },
+            &DidKeyOnly
+        )
+        .is_err()
+    );
 }
 
 fn vector(name: &str) -> String {
-    std::fs::read_to_string(format!("{}/tests/vectors/di/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()
+    std::fs::read_to_string(format!(
+        "{}/tests/vectors/di/{name}",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap()
 }
 
 // @tg: verifies:: [[openspec:agent-wallet#Credential Formats#Interoperable examples]] {level: unit}
@@ -135,13 +165,20 @@ fn vector(name: &str) -> String {
 fn specification_examples() {
     // W3C vc-di-eddsa test vectors: the signed examples verify, a tampered one does not, and
     // our RDF canonical form of the unsigned example equals the published one
-    for (file, f) in [("signedJCS.json", DataIntegrity::jcs()), ("signedDataInt.json", DataIntegrity::rdfc())] {
+    for (file, f) in [
+        ("signedJCS.json", DataIntegrity::jcs()),
+        ("signedDataInt.json", DataIntegrity::rdfc()),
+    ] {
         let doc: Value = serde_json::from_str(&vector(file)).unwrap();
         f.verify_proof(&doc, "assertionMethod", &DidKeyOnly)
             .unwrap_or_else(|e| panic!("{file}: {e}"));
         let mut bad = doc.clone();
         bad["credentialSubject"]["alumniOf"] = json!("Another School");
-        assert!(f.verify_proof(&bad, "assertionMethod", &DidKeyOnly).is_err(), "{file}");
+        assert!(
+            f.verify_proof(&bad, "assertionMethod", &DidKeyOnly)
+                .is_err(),
+            "{file}"
+        );
     }
     let unsigned: Value = serde_json::from_str(&vector("unsigned.json")).unwrap();
     let canon = String::from_utf8(rdfc(&unsigned).unwrap()).unwrap();
@@ -151,6 +188,7 @@ fn specification_examples() {
     assert!(rdfc(&remote).is_err());
 }
 
+// @tg: verifies:: [[openspec:agent-wallet#Holder Binding Keys#Presentation signed by the bound key]] {level: unit}
 #[test]
 fn sd_jwt_is_bound_to_the_holder() {
     let (km, issuer, holder) = keys();
@@ -158,7 +196,14 @@ fn sd_jwt_is_bound_to_the_holder() {
     let f = SdJwtVc;
     let cred = f.issue(km.as_ref(), &issuer, &request(&holder)).unwrap();
     let p = f
-        .present(km.as_ref(), &cred, &other, "did:example:v", "n", &names(&["name"]))
+        .present(
+            km.as_ref(),
+            &cred,
+            &other,
+            "did:example:v",
+            "n",
+            &names(&["name"]),
+        )
         .unwrap();
     assert_eq!(
         f.verify_presentation(&p, &DidKeyOnly).unwrap_err().check(),

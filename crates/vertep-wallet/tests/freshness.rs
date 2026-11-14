@@ -15,7 +15,11 @@ fn msg_of(w: &World, f: impl Fn(&Line) -> Option<String>) -> String {
 }
 
 fn issues(w: &World) -> usize {
-    w.history().lines().iter().filter(|l| matches!(l, Line::Issue { .. })).count()
+    w.history()
+        .lines()
+        .iter()
+        .filter(|l| matches!(l, Line::Issue { .. }))
+        .count()
 }
 
 // @tg: verifies:: [[openspec:credential-exchange#Possession Before Issuance#Valid possession proof]] {level: integration}
@@ -39,8 +43,13 @@ fn another_issuers_nonce_refused() {
     let issuer_b = w.agent();
     let holder = w.agent();
     // B offers too, but its offer is lost; A's possession proof is then replayed to B
-    w.party(&issuer_b).offer(PROTOCOL_VCE, &holder, id_offer()).unwrap();
-    w.kit.run(Schedule { drop: 100, ..Schedule::honest() });
+    w.party(&issuer_b)
+        .offer(PROTOCOL_VCE, &holder, id_offer())
+        .unwrap();
+    w.kit.run(Schedule {
+        drop: 100,
+        ..Schedule::honest()
+    });
     issue(&mut w, &issuer_a, &holder, id_offer());
     let pop = msg_of(&w, |l| match l {
         Line::ProvePossession { msg, .. } => Some(msg.clone()),
@@ -73,7 +82,10 @@ fn reused_nonce_refused() {
     w.kit.replay(&pop, &issuer);
     w.kit.run(Schedule::honest());
     assert_eq!(issues(&w), 1);
-    assert_eq!(w.party(&issuer).state(Role::Issuer, &x).unwrap(), vec!["issued"]);
+    assert_eq!(
+        w.party(&issuer).state(Role::Issuer, &x).unwrap(),
+        vec!["issued"]
+    );
     lean_accepts(&w);
 }
 
@@ -83,9 +95,14 @@ fn redelivered_request_issues_once() {
     let mut w = World::new();
     let issuer = w.agent();
     let holder = w.agent();
-    w.party(&issuer).offer(PROTOCOL_VCE, &holder, id_offer()).unwrap();
+    w.party(&issuer)
+        .offer(PROTOCOL_VCE, &holder, id_offer())
+        .unwrap();
     // deliver the offer, then the possession proof three times
-    w.kit.run(Schedule { duplicate: 100, ..Schedule::honest() });
+    w.kit.run(Schedule {
+        duplicate: 100,
+        ..Schedule::honest()
+    });
     let pop = msg_of(&w, |l| match l {
         Line::ProvePossession { msg, .. } => Some(msg.clone()),
         _ => None,
@@ -104,8 +121,15 @@ fn presented(w: &mut World) -> (String, String, String, String) {
     let verifier = w.agent();
     w.party(&verifier).wallet_mut().trust(&issuer);
     issue(w, &issuer, &holder, id_offer());
-    allow(w, &holder, RulePolicy::refuse_all().allow("*", &["nationality"]));
-    let r = w.party(&verifier).request(PROTOCOL_VCE, &holder, &["nationality"], &[], None).unwrap();
+    allow(
+        w,
+        &holder,
+        RulePolicy::refuse_all().allow("*", &["nationality"]),
+    );
+    let r = w
+        .party(&verifier)
+        .request(PROTOCOL_VCE, &holder, &["nationality"], &[], None)
+        .unwrap();
     w.kit.run(Schedule::honest());
     assert!(w.party(&verifier).verified(&r).is_some());
     (issuer, holder, verifier, r)
@@ -133,13 +157,23 @@ fn replay_to_another_verifier_refused() {
     let (issuer, holder, _, _) = presented(&mut w);
     let other = w.agent();
     w.party(&other).wallet_mut().trust(&issuer);
-    w.party(&other).request(PROTOCOL_VCE, &holder, &["nationality"], &[], None).unwrap();
+    w.party(&other)
+        .request(PROTOCOL_VCE, &holder, &["nationality"], &[], None)
+        .unwrap();
     // hold the holder back: only the replay reaches the other verifier
-    w.kit.run(Schedule { drop: 100, ..Schedule::honest() });
+    w.kit.run(Schedule {
+        drop: 100,
+        ..Schedule::honest()
+    });
     let m = present_msg(&w);
     w.kit.replay(&m, &other);
     assert_eq!(refusals(&w, &other), 1);
-    assert!(w.party(&other).exchanges().iter().all(|x| w.party(&other).verified(&x.id).is_none()));
+    assert!(
+        w.party(&other)
+            .exchanges()
+            .iter()
+            .all(|x| w.party(&other).verified(&x.id).is_none())
+    );
     lean_accepts(&w);
 }
 
@@ -178,15 +212,31 @@ fn wrong_holder_key_refused() {
     let mut w = World::new();
     let (_, holder, verifier, _) = presented(&mut w);
     let thief = w.agent();
-    let (_, cred) = w.agent_parts(&holder).registry.store(vertep_wallet::vocab::STORE_SEALED).unwrap()
-        .get(&w.party(&holder).wallet().list().unwrap()[0].digest).unwrap();
+    let (_, cred) = w
+        .agent_parts(&holder)
+        .registry
+        .store(vertep_wallet::vocab::STORE_SEALED)
+        .unwrap()
+        .get(&w.party(&holder).wallet().list().unwrap()[0].digest)
+        .unwrap();
     // the thief has the credential bytes but presents with its own key
     let t = w.party(&thief).wallet();
     let names: Claims = ["nationality".to_owned()].into();
     let p = vertep_wallet::format::sdjwt::SdJwtVc
-        .present(t.key_manager().as_ref(), &cred, &t.holder().unwrap(), &verifier, "n-9", &names)
+        .present(
+            t.key_manager().as_ref(),
+            &cred,
+            &t.holder().unwrap(),
+            &verifier,
+            "n-9",
+            &names,
+        )
         .unwrap();
-    let err = w.party(&verifier).wallet().verify_presentation(&p, &request(&verifier, &["nationality"])).unwrap_err();
+    let err = w
+        .party(&verifier)
+        .wallet()
+        .verify_presentation(&p, &request(&verifier, &["nationality"]))
+        .unwrap_err();
     assert_eq!(err.check(), "holder-binding");
 }
 
@@ -200,8 +250,16 @@ fn untrusted_issuer_refused() {
     issue(&mut w, &issuer, &holder, id_offer());
     let digest = w.party(&holder).wallet().list().unwrap()[0].digest.clone();
     let names: Claims = ["nationality".to_owned()].into();
-    let (_, p) = w.party(&holder).wallet().present(&digest, &names, &verifier, "n-9").unwrap();
-    let err = w.party(&verifier).wallet().verify_presentation(&p, &request(&verifier, &["nationality"])).unwrap_err();
+    let (_, p) = w
+        .party(&holder)
+        .wallet()
+        .present(&digest, &names, &verifier, "n-9")
+        .unwrap();
+    let err = w
+        .party(&verifier)
+        .wallet()
+        .verify_presentation(&p, &request(&verifier, &["nationality"]))
+        .unwrap_err();
     assert_eq!(err.check(), "untrusted-issuer");
     assert!(err.to_string().contains(&issuer));
 }
@@ -213,8 +271,16 @@ fn unrequested_claim_refused() {
     let (_, holder, verifier, _) = presented(&mut w);
     let digest = w.party(&holder).wallet().list().unwrap()[0].digest.clone();
     let names: Claims = ["nationality".to_owned(), "name".to_owned()].into();
-    let (_, p) = w.party(&holder).wallet().present(&digest, &names, &verifier, "n-9").unwrap();
-    let err = w.party(&verifier).wallet().verify_presentation(&p, &request(&verifier, &["nationality"])).unwrap_err();
+    let (_, p) = w
+        .party(&holder)
+        .wallet()
+        .present(&digest, &names, &verifier, "n-9")
+        .unwrap();
+    let err = w
+        .party(&verifier)
+        .wallet()
+        .verify_presentation(&p, &request(&verifier, &["nationality"]))
+        .unwrap_err();
     assert_eq!(err.check(), "unrequested-claim");
 }
 
@@ -230,7 +296,10 @@ fn exchange_replays_from_the_journal() {
     p.host().deactivate(&actor);
     let replayed = p.host().state(&actor).unwrap();
     assert_eq!(replayed.terminated, live.terminated);
-    assert_eq!(data(replayed.datamodel.clone()), data(live.datamodel.clone()));
+    assert_eq!(
+        data(replayed.datamodel.clone()),
+        data(live.datamodel.clone())
+    );
     assert_eq!(p.state(Role::Holder, &r).unwrap(), vec!["presented"]);
     assert_eq!(w.kit.sent().len(), sent, "replay sent a message");
 }

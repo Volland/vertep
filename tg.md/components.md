@@ -548,7 +548,7 @@ The agent wallet: a wallet actor per identity with a sealed credential store, ro
 - realizes:: [[decisions#Grant credentials are wallet credentials]]
 - scheduled_in:: [[roadmap#M9 Agent wallet]]
 
-Planned 2026-11-13 by the OpenSpec change `m9-agent-wallet`; the design is in [[views/wallet#Wallet]].
+Implemented 2026-11-14 by the OpenSpec change `m9-agent-wallet`; the design is in [[views/wallet#Wallet]]. Modules: `wallet` (the three roles' operations), `store` (sealed records), `consent`, `status`, `format` (`di`, `sdjwt`), `exchange` (the engine and the role charts), `protocol` (`native`, `tsp`, `oid4vc`, `oid4vc_http`), `grants`, `testkit` (the conformance kit). 38 of 38 requirements implemented and verified; every history the kit records is replayed by the Lean checker `vertep-wallet`.
 
 ## vertep-wasm
 

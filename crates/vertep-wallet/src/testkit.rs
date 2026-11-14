@@ -272,7 +272,8 @@ impl Kit {
                 };
                 if n.queue.is_empty() {
                     None
-                } else if schedule.reorder > 0 && n.queue.len() > 1 && rng.chance(schedule.reorder) {
+                } else if schedule.reorder > 0 && n.queue.len() > 1 && rng.chance(schedule.reorder)
+                {
                     let i = rng.below(n.queue.len());
                     n.queue.remove(i)
                 } else {
@@ -339,7 +340,11 @@ impl Kit {
 
     /// Every message sent so far.
     pub fn sent(&self) -> Vec<Packet> {
-        self.wire.0.lock().map(|n| n.seen.clone()).unwrap_or_default()
+        self.wire
+            .0
+            .lock()
+            .map(|n| n.seen.clone())
+            .unwrap_or_default()
     }
 
     /// Replays the history through the Lean checker, if it is built.
@@ -382,7 +387,11 @@ pub fn check_history(jsonl: &str) -> Option<Result<String, String>> {
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
-    Some(if out.status.success() { Ok(report) } else { Err(report) })
+    Some(if out.status.success() {
+        Ok(report)
+    } else {
+        Err(report)
+    })
 }
 
 /// A ready-made party for conformance runs: a `did:key` wallet with a sealed in-memory store,
@@ -400,7 +409,11 @@ pub fn party(
     let km = Arc::new(InMemoryKeyManager::new());
     let key = km.generate(KeyType::Ed25519)?;
     let registry = Arc::new(crate::plugin::WalletRegistry::with_builtins());
-    let store = crate::store::SealedStore::open(km.as_ref(), &key, Arc::new(crate::store::MemoryRecords::new()))?;
+    let store = crate::store::SealedStore::open(
+        km.as_ref(),
+        &key,
+        Arc::new(crate::store::MemoryRecords::new()),
+    )?;
     registry.register_store(crate::vocab::STORE_SEALED, Arc::new(store));
     registry.register_consent(crate::vocab::CONSENT_RULES, Arc::new(consent));
     let mut config = crate::wallet::WalletConfig::did_key(km.as_ref(), &key)?;
@@ -430,7 +443,11 @@ pub fn scenario(issuing: &str, presenting: &str, schedule: Schedule) -> Result<K
     let clock = vertep_runtime::VirtualClock::new(1_794_355_200_000);
     let mut kit = Kit::new();
     let issuer = party(&kit, &clock, RulePolicy::refuse_all())?;
-    let holder = party(&kit, &clock, RulePolicy::refuse_all().allow("*", &["nationality", "birthDate"]))?;
+    let holder = party(
+        &kit,
+        &clock,
+        RulePolicy::refuse_all().allow("*", &["nationality", "birthDate"]),
+    )?;
     let mut v1 = party(&kit, &clock, RulePolicy::refuse_all())?;
     let mut v2 = party(&kit, &clock, RulePolicy::refuse_all())?;
     let (i, h, a, b) = (
@@ -447,17 +464,20 @@ pub fn scenario(issuing: &str, presenting: &str, schedule: Schedule) -> Result<K
     let offer = crate::exchange::Offer {
         format: crate::vocab::FORMAT_SD_JWT.to_owned(),
         types: vec!["https://example.org/IdentityCredential".to_owned()],
-        claims: serde_json::json!({"name": "Olena", "birthDate": "1990-05-01", "nationality": "UA"})
-            .as_object()
-            .cloned()
-            .unwrap_or_default(),
+        claims:
+            serde_json::json!({"name": "Olena", "birthDate": "1990-05-01", "nationality": "UA"})
+                .as_object()
+                .cloned()
+                .unwrap_or_default(),
         valid_until: None,
         status: None,
     };
     kit.party(&i).offer(issuing, &h, offer)?;
     kit.run(schedule);
-    kit.party(&a).request(presenting, &h, &["nationality"], &[], None)?;
-    kit.party(&b).request(presenting, &h, &["birthDate", "name"], &[], None)?;
+    kit.party(&a)
+        .request(presenting, &h, &["nationality"], &[], None)?;
+    kit.party(&b)
+        .request(presenting, &h, &["birthDate", "name"], &[], None)?;
     kit.run(schedule);
     Ok(kit)
 }

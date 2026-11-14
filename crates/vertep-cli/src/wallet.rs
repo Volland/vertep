@@ -65,7 +65,11 @@ fn read_file(dir: &Path) -> Result<WalletFile, String> {
 }
 
 fn write_file(dir: &Path, f: &WalletFile) -> Result<(), String> {
-    std::fs::write(dir.join("wallet.json"), serde_json::to_string_pretty(f).map_err(s)? + "\n").map_err(s)
+    std::fs::write(
+        dir.join("wallet.json"),
+        serde_json::to_string_pretty(f).map_err(s)? + "\n",
+    )
+    .map_err(s)
 }
 
 fn now() -> i64 {
@@ -85,7 +89,13 @@ fn open(dir: &Path) -> Result<(Wallet, WalletFile), String> {
     config.trusted_issuers = f.trusted.clone();
     config.status = None;
     let km: Arc<dyn KeyManager> = km;
-    let w = Wallet::new(config, km, registry, Arc::new(DidKeyOnly), Arc::new(SystemClock));
+    let w = Wallet::new(
+        config,
+        km,
+        registry,
+        Arc::new(DidKeyOnly),
+        Arc::new(SystemClock),
+    );
     Ok((w, f))
 }
 
@@ -140,8 +150,17 @@ pub fn list(dir: &Path) -> Outcome {
         let (w, _) = open(dir)?;
         let mut out = String::new();
         for m in w.list().map_err(s)? {
-            let until = m.valid_until.map(|u| Timestamp(u).to_rfc3339()).unwrap_or_else(|| "-".into());
-            out.push_str(&format!("{}  {}  {}  {}\n", m.digest, m.types.join(","), m.issuer, until));
+            let until = m
+                .valid_until
+                .map(|u| Timestamp(u).to_rfc3339())
+                .unwrap_or_else(|| "-".into());
+            out.push_str(&format!(
+                "{}  {}  {}  {}\n",
+                m.digest,
+                m.types.join(","),
+                m.issuer,
+                until
+            ));
         }
         Ok(out)
     })
@@ -152,7 +171,11 @@ pub fn show(dir: &Path, digest: &str) -> Outcome {
     run(|| {
         let (w, _) = open(dir)?;
         let (meta, claims) = w.show(digest).map_err(s)?;
-        Ok(serde_json::to_string_pretty(&json!({"metadata": meta, "claims": claims})).map_err(s)? + "\n")
+        Ok(
+            serde_json::to_string_pretty(&json!({"metadata": meta, "claims": claims}))
+                .map_err(s)?
+                + "\n",
+        )
     })
 }
 
@@ -232,18 +255,35 @@ fn save_list(dir: &Path, w: &Wallet, l: &StatusList, next: u64) -> Result<PathBu
         next,
         encoded: bits.encode().map_err(s)?,
     };
-    std::fs::write(list_path(dir, &l.url), serde_json::to_string(&f).map_err(s)?).map_err(s)?;
+    std::fs::write(
+        list_path(dir, &l.url),
+        serde_json::to_string(&f).map_err(s)?,
+    )
+    .map_err(s)?;
     // the published list credential, ready for any static host
-    let cred = l.publish(w.key_manager().as_ref(), &w.signing().map_err(s)?, now(), 86_400_000).map_err(s)?;
-    vertep_wallet::status::DirectoryStatusPublisher(dir.join("public")).publish(&l.url, &cred).map_err(s)
+    let cred = l
+        .publish(
+            w.key_manager().as_ref(),
+            &w.signing().map_err(s)?,
+            now(),
+            86_400_000,
+        )
+        .map_err(s)?;
+    vertep_wallet::status::DirectoryStatusPublisher(dir.join("public"))
+        .publish(&l.url, &cred)
+        .map_err(s)
 }
 
 /// `vt wallet issue`: issues a credential to a holder key and writes it to a file.
 pub fn issue(a: &IssueArgs) -> Outcome {
     run(|| {
         let (w, mut f) = open(&a.dir)?;
-        let claims: Value = serde_json::from_str(&a.claims).map_err(|e| format!("--claims: {e}"))?;
-        let claims = claims.as_object().cloned().ok_or("--claims must be a JSON object")?;
+        let claims: Value =
+            serde_json::from_str(&a.claims).map_err(|e| format!("--claims: {e}"))?;
+        let claims = claims
+            .as_object()
+            .cloned()
+            .ok_or("--claims must be a JSON object")?;
         let holder_key = DidKeyOnly.key_of(&a.to).map_err(|e| format!("--to: {e}"))?;
         let status = match &a.status_list {
             Some(url) => {
@@ -268,7 +308,11 @@ pub fn issue(a: &IssueArgs) -> Outcome {
             write_file(&a.dir, &f)?;
         }
         let file = json!({"format": cred.format, "credential": cred.raw, "issuer": meta.issuer});
-        std::fs::write(&a.out, serde_json::to_string_pretty(&file).map_err(s)? + "\n").map_err(s)?;
+        std::fs::write(
+            &a.out,
+            serde_json::to_string_pretty(&file).map_err(s)? + "\n",
+        )
+        .map_err(s)?;
         Ok(format!("issued: {}\nto: {}\n", meta.digest, a.to))
     })
 }
@@ -288,11 +332,17 @@ pub fn accept(dir: &Path, input: &str, tx_code: Option<&str>) -> Outcome {
         };
         let issuer = v["issuer"].as_str().unwrap_or_default();
         let meta = w.accept(&cred, issuer).map_err(s)?;
-        Ok(format!("stored: {}\nissuer: {}\n", meta.digest, meta.issuer))
+        Ok(format!(
+            "stored: {}\nissuer: {}\n",
+            meta.digest, meta.issuer
+        ))
     })
 }
 
-fn engine(w: Wallet, wire: Arc<dyn vertep_wallet::Wire>) -> Result<vertep_wallet::Exchanges, String> {
+fn engine(
+    w: Wallet,
+    wire: Arc<dyn vertep_wallet::Wire>,
+) -> Result<vertep_wallet::Exchanges, String> {
     vertep_wallet::Exchanges::builder(Arc::new(vertep_runtime_clock()))
         .create(w, wire)
         .map_err(s)
@@ -317,12 +367,23 @@ fn accept_offer(dir: &Path, uri: &str, tx_code: Option<&str>) -> Result<String, 
     let (w, _) = open(dir)?;
     let capture = CaptureWire::default();
     let mut e = engine(w, Arc::new(capture.clone()))?;
-    let meta = Oid4vcHolder::new(capture).accept_offer(&mut e, uri, tx_code).map_err(s)?;
-    Ok(format!("stored: {}\nissuer: {}\n", meta.digest, meta.issuer))
+    let meta = Oid4vcHolder::new(capture)
+        .accept_offer(&mut e, uri, tx_code)
+        .map_err(s)?;
+    Ok(format!(
+        "stored: {}\nissuer: {}\n",
+        meta.digest, meta.issuer
+    ))
 }
 
 /// `vt wallet request`: writes a presentation request for `claims`.
-pub fn request(dir: &Path, claims: &[String], types: &[String], purpose: Option<&str>, out: &Path) -> Outcome {
+pub fn request(
+    dir: &Path,
+    claims: &[String],
+    types: &[String],
+    purpose: Option<&str>,
+    out: &Path,
+) -> Outcome {
     run(|| {
         let (w, _) = open(dir)?;
         let mut nonce = [0u8; 16];
@@ -335,7 +396,11 @@ pub fn request(dir: &Path, claims: &[String], types: &[String], purpose: Option<
             purpose: purpose.map(str::to_owned),
         };
         std::fs::write(out, serde_json::to_string_pretty(&req).map_err(s)? + "\n").map_err(s)?;
-        Ok(format!("request: {}\nnonce: {}\n", out.display(), req.nonce))
+        Ok(format!(
+            "request: {}\nnonce: {}\n",
+            out.display(),
+            req.nonce
+        ))
     })
 }
 
@@ -348,7 +413,9 @@ pub fn present(dir: &Path, input: &str, out: Option<&Path>) -> Outcome {
             let (w, _) = open(dir)?;
             let capture = CaptureWire::default();
             let mut e = engine(w, Arc::new(capture.clone()))?;
-            let answered = Oid4vcHolder::new(capture).respond(&mut e, input).map_err(s)?;
+            let answered = Oid4vcHolder::new(capture)
+                .respond(&mut e, input)
+                .map_err(s)?;
             return Ok(format!("{answered:?}\n"));
         }
         let (w, _) = open(dir)?;
@@ -356,27 +423,54 @@ pub fn present(dir: &Path, input: &str, out: Option<&Path>) -> Outcome {
         let req: PresentationRequest = serde_json::from_str(&text).map_err(s)?;
         let options = w.options(&req).map_err(s)?;
         let Some(choice) = options.first() else {
-            return Err(WalletError::ConsentRefused("no-match: no allowed disclosure satisfies the request".into()).to_string());
+            return Err(WalletError::ConsentRefused(
+                "no-match: no allowed disclosure satisfies the request".into(),
+            )
+            .to_string());
         };
-        let (meta, p) = w.present(&choice.credential, &choice.claims, &req.verifier, &req.nonce).map_err(s)?;
+        let (meta, p) = w
+            .present(
+                &choice.credential,
+                &choice.claims,
+                &req.verifier,
+                &req.nonce,
+            )
+            .map_err(s)?;
         let file = json!({"format": p.format, "presentation": p.raw});
         let out = out.ok_or("--out is required for a request file")?;
         std::fs::write(out, serde_json::to_string_pretty(&file).map_err(s)? + "\n").map_err(s)?;
         let names: Vec<&String> = choice.claims.iter().collect();
-        Ok(format!("presented: {}\ndisclosed: {}\n", meta.digest, names.iter().map(|n| n.as_str()).collect::<Vec<_>>().join(",")))
+        Ok(format!(
+            "presented: {}\ndisclosed: {}\n",
+            meta.digest,
+            names
+                .iter()
+                .map(|n| n.as_str())
+                .collect::<Vec<_>>()
+                .join(",")
+        ))
     })
 }
 
 /// `vt wallet verify`: checks a presentation against the request it answers.
-pub fn verify(dir: &Path, request: &Path, presentation: &Path, status_dir: Option<&Path>) -> Outcome {
+pub fn verify(
+    dir: &Path,
+    request: &Path,
+    presentation: &Path,
+    status_dir: Option<&Path>,
+) -> Outcome {
     run(|| {
         let (mut w, _) = open(dir)?;
         let req: PresentationRequest =
             serde_json::from_str(&std::fs::read_to_string(request).map_err(s)?).map_err(s)?;
-        let v: Value = serde_json::from_str(&std::fs::read_to_string(presentation).map_err(s)?).map_err(s)?;
+        let v: Value =
+            serde_json::from_str(&std::fs::read_to_string(presentation).map_err(s)?).map_err(s)?;
         let p = Presentation {
             format: v["format"].as_str().ok_or("no format")?.to_owned(),
-            raw: v["presentation"].as_str().ok_or("no presentation")?.to_owned(),
+            raw: v["presentation"]
+                .as_str()
+                .ok_or("no presentation")?
+                .to_owned(),
         };
         if let Some(sd) = status_dir {
             let local = vertep_wallet::status::LocalStatus::new(Arc::new(DidKeyOnly));
@@ -386,10 +480,17 @@ pub fn verify(dir: &Path, request: &Path, presentation: &Path, status_dir: Optio
                 if let Ok(doc) = serde_json::from_str::<Value>(&raw)
                     && let Some(id) = doc.get("id").and_then(Value::as_str)
                 {
-                    local.publish(id, Credential { format: vocab::FORMAT_DI_JCS.into(), raw });
+                    local.publish(
+                        id,
+                        Credential {
+                            format: vocab::FORMAT_DI_JCS.into(),
+                            raw,
+                        },
+                    );
                 }
             }
-            w.registry().register_status(vocab::STATUS_BITSTRING, Arc::new(local));
+            w.registry()
+                .register_status(vocab::STATUS_BITSTRING, Arc::new(local));
             let mut c = w.config().clone();
             c.status = Some(vocab::STATUS_BITSTRING.into());
             let km = w.key_manager().clone();
@@ -413,7 +514,10 @@ pub fn verify(dir: &Path, request: &Path, presentation: &Path, status_dir: Optio
 pub fn revoke(dir: &Path, digest: &str) -> Outcome {
     run(|| {
         let (w, f) = open(dir)?;
-        let entry = f.issued.get(digest).ok_or_else(|| format!("{digest} was not issued with a status entry"))?;
+        let entry = f
+            .issued
+            .get(digest)
+            .ok_or_else(|| format!("{digest} was not issued with a status entry"))?;
         let (mut l, next) = load_list(dir, &entry.list)?;
         l.revoke(entry.index);
         let path = save_list(dir, &w, &l, next)?;
@@ -443,36 +547,65 @@ pub struct OfferArgs {
 /// `vt wallet offer`: serves an OpenID4VCI issuer, prints the credential offer URI, and stops
 /// once the credential is issued (or at the timeout).
 pub fn offer(a: &OfferArgs) -> Outcome {
-    use vertep_wallet::protocol::oid4vc_http::{CaptureWire, ClientId, Configuration, EngineHandle, Oid4vcServer, ServerConfig};
+    use vertep_wallet::protocol::oid4vc_http::{
+        CaptureWire, ClientId, Configuration, EngineHandle, Oid4vcServer, ServerConfig,
+    };
     run(|| {
-        let base = a.base.clone().unwrap_or_else(|| format!("http://{}", a.listen));
-        let claims: Value = serde_json::from_str(&a.claims).map_err(|e| format!("--claims: {e}"))?;
-        let claims = claims.as_object().cloned().ok_or("--claims must be a JSON object")?;
+        let base = a
+            .base
+            .clone()
+            .unwrap_or_else(|| format!("http://{}", a.listen));
+        let claims: Value =
+            serde_json::from_str(&a.claims).map_err(|e| format!("--claims: {e}"))?;
+        let claims = claims
+            .as_object()
+            .cloned()
+            .ok_or("--claims must be a JSON object")?;
         let capture = CaptureWire::default();
         let (dir, cap, b) = (a.dir.clone(), capture.clone(), base.clone());
         let handle = EngineHandle::spawn(move || {
             let (w, _) = open(&dir).unwrap_or_else(|e| panic!("{e}"));
             let mut c = w.config().clone();
             c.aliases.push(b);
-            let w = Wallet::new(c, w.key_manager().clone(), w.registry().clone(), Arc::new(DidKeyOnly), Arc::new(SystemClock));
+            let w = Wallet::new(
+                c,
+                w.key_manager().clone(),
+                w.registry().clone(),
+                Arc::new(DidKeyOnly),
+                Arc::new(SystemClock),
+            );
             engine(w, Arc::new(cap)).unwrap_or_else(|e| panic!("{e}"))
         });
         let config = ServerConfig {
             base_url: base.clone(),
-            configurations: vec![Configuration { id: a.type_.clone(), format: vocab::FORMAT_SD_JWT.into(), vct: a.type_.clone() }],
+            configurations: vec![Configuration {
+                id: a.type_.clone(),
+                format: vocab::FORMAT_SD_JWT.into(),
+                vct: a.type_.clone(),
+            }],
             client_id: ClientId::Did,
         };
         let server = Oid4vcServer::new(handle.clone(), capture, config).map_err(s)?;
         let uri = server
             .offer(
-                vertep_wallet::Offer { format: vocab::FORMAT_SD_JWT.into(), types: vec![a.type_.clone()], claims, valid_until: None, status: None },
+                vertep_wallet::Offer {
+                    format: vocab::FORMAT_SD_JWT.into(),
+                    types: vec![a.type_.clone()],
+                    claims,
+                    valid_until: None,
+                    status: None,
+                },
                 a.tx_code.as_deref(),
             )
             .map_err(s)?;
         println!("{uri}");
         let listener = std::net::TcpListener::bind(&a.listen).map_err(s)?;
         let router = server.router();
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().build().map_err(s)?;
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .map_err(s)?;
         let timeout = a.timeout;
         rt.block_on(async move {
             listener.set_nonblocking(true).map_err(s)?;
@@ -508,11 +641,17 @@ pub fn conformance(seeds: u64) -> Outcome {
         ] {
             let r = vertep_wallet::testkit::conformance(issuing, presenting, seeds).map_err(s)?;
             let lean = if r.checked {
-                format!("{} of {} accepted by the Lean checker", r.accepted, r.histories)
+                format!(
+                    "{} of {} accepted by the Lean checker",
+                    r.accepted, r.histories
+                )
             } else {
                 "not checked: the Lean checker vertep-wallet is not built".to_owned()
             };
-            out.push_str(&format!("{name}: {} histories, {} presentations accepted, {lean}\n", r.histories, r.presentations));
+            out.push_str(&format!(
+                "{name}: {} histories, {} presentations accepted, {lean}\n",
+                r.histories, r.presentations
+            ));
             if !r.rejected.is_empty() {
                 failed = true;
                 for rej in &r.rejected {

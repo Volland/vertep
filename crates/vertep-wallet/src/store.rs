@@ -14,8 +14,8 @@ use std::sync::{Arc, Mutex};
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 use serde::{Deserialize, Serialize};
-use vertep_federation::keys::{SealedBox, seal_to};
 use vertep_federation::KeyManager;
+use vertep_federation::keys::{SealedBox, seal_to};
 use zeroize::Zeroizing;
 
 use crate::credential::{Credential, CredentialMeta};
@@ -117,7 +117,13 @@ impl DirRecords {
     fn path(&self, name: &str) -> PathBuf {
         let safe: String = name
             .chars()
-            .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         self.0.join(safe)
     }
@@ -232,7 +238,9 @@ impl SealedStore {
 
     fn open_record(&self, digest: &str, bytes: &[u8]) -> Result<Record, WalletError> {
         if bytes.len() < 24 {
-            return Err(WalletError::Integrity(format!("record {digest} is truncated")));
+            return Err(WalletError::Integrity(format!(
+                "record {digest} is truncated"
+            )));
         }
         let plain = self
             .cipher
@@ -243,11 +251,15 @@ impl SealedStore {
                     aad: digest.as_bytes(),
                 },
             )
-            .map_err(|_| WalletError::Integrity(format!("record {digest} does not match its digest")))?;
+            .map_err(|_| {
+                WalletError::Integrity(format!("record {digest} does not match its digest"))
+            })?;
         let rec: Record = serde_json::from_slice(&plain)
             .map_err(|e| WalletError::Integrity(format!("record {digest}: {e}")))?;
         if rec.meta.digest != digest {
-            return Err(WalletError::Integrity(format!("record {digest} holds another credential")));
+            return Err(WalletError::Integrity(format!(
+                "record {digest} holds another credential"
+            )));
         }
         Ok(rec)
     }

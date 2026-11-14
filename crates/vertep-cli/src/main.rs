@@ -502,24 +502,72 @@ fn main() -> ExitCode {
 }
 
 fn split(list: &str) -> Vec<String> {
-    list.split(',').map(str::trim).filter(|s| !s.is_empty()).map(str::to_owned).collect()
+    list.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 fn run_wallet(command: WalletCmd) -> Outcome {
     match command {
         WalletCmd::Create { dir } => wallet::create(&dir),
         WalletCmd::Trust { dir, issuer } => wallet::trust(&dir, &issuer),
-        WalletCmd::Allow { dir, verifier, claims } => wallet::allow(&dir, &verifier, &split(&claims)),
+        WalletCmd::Allow {
+            dir,
+            verifier,
+            claims,
+        } => wallet::allow(&dir, &verifier, &split(&claims)),
         WalletCmd::List { dir } => wallet::list(&dir),
         WalletCmd::Show { dir, digest } => wallet::show(&dir, &digest),
-        WalletCmd::Issue { dir, to, type_, claims, format, valid_days, status_list, out } => {
-            wallet::issue(&wallet::IssueArgs { dir, to, type_, claims, format, valid_days, status_list, out })
-        }
-        WalletCmd::Offer { dir, listen, base, type_, claims, tx_code, timeout } => {
-            wallet::offer(&wallet::OfferArgs { dir, listen, base, type_, claims, tx_code, timeout })
-        }
-        WalletCmd::Accept { dir, input, tx_code } => wallet::accept(&dir, &input, tx_code.as_deref()),
-        WalletCmd::Request { dir, claims, types, purpose, out } => wallet::request(
+        WalletCmd::Issue {
+            dir,
+            to,
+            type_,
+            claims,
+            format,
+            valid_days,
+            status_list,
+            out,
+        } => wallet::issue(&wallet::IssueArgs {
+            dir,
+            to,
+            type_,
+            claims,
+            format,
+            valid_days,
+            status_list,
+            out,
+        }),
+        WalletCmd::Offer {
+            dir,
+            listen,
+            base,
+            type_,
+            claims,
+            tx_code,
+            timeout,
+        } => wallet::offer(&wallet::OfferArgs {
+            dir,
+            listen,
+            base,
+            type_,
+            claims,
+            tx_code,
+            timeout,
+        }),
+        WalletCmd::Accept {
+            dir,
+            input,
+            tx_code,
+        } => wallet::accept(&dir, &input, tx_code.as_deref()),
+        WalletCmd::Request {
+            dir,
+            claims,
+            types,
+            purpose,
+            out,
+        } => wallet::request(
             &dir,
             &split(&claims),
             &types.map(|t| split(&t)).unwrap_or_default(),
@@ -527,9 +575,12 @@ fn run_wallet(command: WalletCmd) -> Outcome {
             &out,
         ),
         WalletCmd::Present { dir, input, out } => wallet::present(&dir, &input, out.as_deref()),
-        WalletCmd::Verify { dir, request, presentation, status_dir } => {
-            wallet::verify(&dir, &request, &presentation, status_dir.as_deref())
-        }
+        WalletCmd::Verify {
+            dir,
+            request,
+            presentation,
+            status_dir,
+        } => wallet::verify(&dir, &request, &presentation, status_dir.as_deref()),
         WalletCmd::Revoke { dir, digest } => wallet::revoke(&dir, &digest),
         WalletCmd::Conformance { seeds } => wallet::conformance(seeds),
     }

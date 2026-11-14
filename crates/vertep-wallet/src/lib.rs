@@ -50,6 +50,10 @@ pub mod testkit;
 pub mod vocab;
 pub mod wallet;
 
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 pub use credential::{Credential, CredentialMeta, Presentation, PresentationRequest};
 pub use error::WalletError;
 pub use exchange::{Exchanges, Offer, Wire};

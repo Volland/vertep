@@ -41,8 +41,14 @@ pub trait Wire: Send + Sync {
     /// # Errors
     ///
     /// [`WalletError::Protocol`] when the message cannot be handed over.
-    fn send(&self, protocol: &str, from: &str, to: &str, msg_id: &str, bytes: &[u8])
-    -> Result<(), WalletError>;
+    fn send(
+        &self,
+        protocol: &str,
+        from: &str,
+        to: &str,
+        msg_id: &str,
+        bytes: &[u8],
+    ) -> Result<(), WalletError>;
 }
 
 /// What an issuer will issue once possession is proven.
@@ -122,7 +128,12 @@ pub fn agent_of(audience: &str) -> String {
 
 fn claims_of(v: &Value) -> Claims {
     v.as_array()
-        .map(|a| a.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -232,8 +243,10 @@ impl ExchangesBuilder {
             Err(InstantiateError::Exists(a)) => return Err(WalletError::Exists(a)),
             Err(other) => return Err(WalletError::Protocol(other.to_string())),
         }
-        e.host
-            .send(&e.wallet_actor.clone(), event("wallet.created", json!({"did": did})));
+        e.host.send(
+            &e.wallet_actor.clone(),
+            event("wallet.created", json!({"did": did})),
+        );
         e.settle()?;
         Ok(e)
     }
@@ -245,9 +258,9 @@ impl ExchangesBuilder {
     /// [`WalletError::UnknownCredential`] when the identity has no wallet in the journal.
     pub fn open(self, wallet: Wallet, wire: Arc<dyn Wire>) -> Result<Exchanges, WalletError> {
         let mut e = self.engine(wallet, wire)?;
-        e.host
-            .activate(&e.wallet_actor.clone())
-            .map_err(|err| WalletError::Storage(format!("no wallet for {}: {err}", e.wallet.did())))?;
+        e.host.activate(&e.wallet_actor.clone()).map_err(|err| {
+            WalletError::Storage(format!("no wallet for {}: {err}", e.wallet.did()))
+        })?;
         Ok(e)
     }
 }
@@ -273,7 +286,11 @@ impl Exchanges {
         Ok(())
     }
 
-    fn version(&mut self, protocol: &dyn ExchangeProtocol, role: Role) -> Result<ChartVersion, WalletError> {
+    fn version(
+        &mut self,
+        protocol: &dyn ExchangeProtocol,
+        role: Role,
+    ) -> Result<ChartVersion, WalletError> {
         let key = (protocol.iri().to_owned(), role);
         if let Some(v) = self.versions.get(&key) {
             return Ok(v.clone());
@@ -401,7 +418,10 @@ impl Exchanges {
         );
         self.host.send(
             &self.wallet_actor.clone(),
-            event("exchange.started", json!({"exchange": id, "role": role.as_str()})),
+            event(
+                "exchange.started",
+                json!({"exchange": id, "role": role.as_str()}),
+            ),
         );
         self.host.send(&actor, first);
         self.settle()
@@ -412,7 +432,12 @@ impl Exchanges {
     /// # Errors
     ///
     /// [`WalletError`] when the protocol is unknown or the message cannot be sent.
-    pub fn offer(&mut self, protocol: &str, holder: &str, offer: Offer) -> Result<String, WalletError> {
+    pub fn offer(
+        &mut self,
+        protocol: &str,
+        holder: &str,
+        offer: Offer,
+    ) -> Result<String, WalletError> {
         self.wallet.registry().format(&offer.format)?;
         let id = format!("x-{}", nonce()?);
         let n = nonce()?;
@@ -422,7 +447,10 @@ impl Exchanges {
             Role::Issuer,
             &id,
             holder,
-            event("exchange.start", json!({"exchange": id, "peer": holder, "nonce": n})),
+            event(
+                "exchange.start",
+                json!({"exchange": id, "peer": holder, "nonce": n}),
+            ),
         )?;
         Ok(id)
     }
@@ -464,7 +492,11 @@ impl Exchanges {
         let claims: Claims = claims.iter().map(|c| (*c).to_owned()).collect();
         let audience = match audience {
             Some(a) => a.to_owned(),
-            None => self.wallet.registry().protocol(protocol)?.audience(self.wallet.did()),
+            None => self
+                .wallet
+                .registry()
+                .protocol(protocol)?
+                .audience(self.wallet.did()),
         };
         self.requests.insert(
             id.clone(),
@@ -573,15 +605,19 @@ impl Exchanges {
             body,
         };
         let bytes = p.encode(&m)?;
-        self.wire
-            .send(&info.protocol, &m.from, &m.to, msg, &bytes)
+        self.wire.send(&info.protocol, &m.from, &m.to, msg, &bytes)
     }
 
     fn outbound(&mut self, actor: &str, name: &str, data: &Value) -> Result<(), WalletError> {
         let info = self.info_by_actor(actor)?;
         let ctx = self.ctx(actor)?;
         let me = self.wallet.did().to_owned();
-        let s = |v: &Value, k: &str| v.get(k).and_then(Value::as_str).unwrap_or_default().to_owned();
+        let s = |v: &Value, k: &str| {
+            v.get(k)
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned()
+        };
         let msg = self.next_msg();
         match name {
             "wire.offer" => {
@@ -721,7 +757,13 @@ impl Exchanges {
                             from: me,
                             msg: msg.clone(),
                         });
-                        self.send(&info, &msg, Body::Problem { reason: e.check().into() })
+                        self.send(
+                            &info,
+                            &msg,
+                            Body::Problem {
+                                reason: e.check().into(),
+                            },
+                        )
                     }
                 }
             }
@@ -760,7 +802,9 @@ impl Exchanges {
                     },
                 )
             }
-            other => Err(WalletError::Protocol(format!("unknown wire command {other}"))),
+            other => Err(WalletError::Protocol(format!(
+                "unknown wire command {other}"
+            ))),
         }
     }
 
@@ -780,7 +824,12 @@ impl Exchanges {
     ///
     /// [`WalletError::Unmapped`] when the protocol does not map the message onto the exchange
     /// vocabulary (nothing is journaled), and other errors when the message cannot be handled.
-    pub fn receive(&mut self, protocol: &str, msg_id: &str, bytes: &[u8]) -> Result<(), WalletError> {
+    pub fn receive(
+        &mut self,
+        protocol: &str,
+        msg_id: &str,
+        bytes: &[u8],
+    ) -> Result<(), WalletError> {
         let p = self.wallet.registry().protocol(protocol)?;
         let m = p.decode(bytes)?;
         if m.to != self.wallet.did() {
@@ -813,12 +862,19 @@ impl Exchanges {
             Body::CredentialRequest { proof } => {
                 let Some(info) = self.live_actor(Role::Issuer, &m.exchange) else {
                     let msg = self.next_msg();
-                    self.record(Line::Send { from: me, msg: msg.clone() });
+                    self.record(Line::Send {
+                        from: me,
+                        msg: msg.clone(),
+                    });
                     // an unknown or finished offer: its nonce is unknown or used
                     return self.reply_problem(protocol, &m.exchange, &m.from, &msg, "nonce");
                 };
                 let ctx = self.ctx(&info.actor)?;
-                let n = ctx.get("nonce").and_then(Value::as_str).unwrap_or_default().to_owned();
+                let n = ctx
+                    .get("nonce")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned();
                 let ev = match self.wallet.check_possession(&proof, &n) {
                     // an offer is unsigned and can be replayed to anyone: a did:key holder must
                     // prove possession of its own key
@@ -826,13 +882,19 @@ impl Exchanges {
                         if info.peer.starts_with("did:key:")
                             && vertep_federation::resolver::key::did_key(&key) != info.peer =>
                     {
-                        event("possession.invalid", json!({"reason": "holder", "msg": msg_id}))
+                        event(
+                            "possession.invalid",
+                            json!({"reason": "holder", "msg": msg_id}),
+                        )
                     }
                     Ok(key) => event(
                         "possession.valid",
                         json!({"key": vertep_federation::resolver::key::did_key(&key), "msg": msg_id}),
                     ),
-                    Err(e) => event("possession.invalid", json!({"reason": e.check(), "msg": msg_id})),
+                    Err(e) => event(
+                        "possession.invalid",
+                        json!({"reason": e.check(), "msg": msg_id}),
+                    ),
                 };
                 self.host.send(&info.actor, ev);
                 self.settle()
@@ -842,8 +904,15 @@ impl Exchanges {
                     return Ok(());
                 };
                 let ctx = self.ctx(&info.actor)?;
-                let issuer = ctx.get("peer").and_then(Value::as_str).unwrap_or_default().to_owned();
-                let cred = Credential { format, raw: credential };
+                let issuer = ctx
+                    .get("peer")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned();
+                let cred = Credential {
+                    format,
+                    raw: credential,
+                };
                 let ev = match self.wallet.accept(&cred, &issuer) {
                     Ok(meta) => {
                         self.record(Line::Store {
@@ -854,9 +923,15 @@ impl Exchanges {
                             &self.wallet_actor.clone(),
                             event("credential.stored", meta_json(&meta)),
                         );
-                        event("credential.valid", json!({"credential": meta.digest, "msg": msg_id}))
+                        event(
+                            "credential.valid",
+                            json!({"credential": meta.digest, "msg": msg_id}),
+                        )
                     }
-                    Err(e) => event("credential.invalid", json!({"reason": e.check(), "msg": msg_id})),
+                    Err(e) => event(
+                        "credential.invalid",
+                        json!({"reason": e.check(), "msg": msg_id}),
+                    ),
                 };
                 self.host.send(&info.actor, ev);
                 self.settle()
@@ -935,7 +1010,10 @@ impl Exchanges {
                             json!({"msg": msg_id, "credential": v.credential.digest, "claims": names}),
                         )
                     }
-                    Err(e) => event("presentation.invalid", json!({"msg": msg_id, "reason": e.check()})),
+                    Err(e) => event(
+                        "presentation.invalid",
+                        json!({"msg": msg_id, "reason": e.check()}),
+                    ),
                 };
                 self.host.send(&info.actor, ev);
                 self.settle()
@@ -945,8 +1023,10 @@ impl Exchanges {
                     if let Some(info) = self.live_actor(role, &m.exchange)
                         && info.peer == m.from
                     {
-                        self.host
-                            .send(&info.actor, event("exchange.problem", json!({"reason": reason})));
+                        self.host.send(
+                            &info.actor,
+                            event("exchange.problem", json!({"reason": reason})),
+                        );
                     }
                 }
                 self.settle()

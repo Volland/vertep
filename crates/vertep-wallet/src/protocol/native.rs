@@ -59,7 +59,8 @@ impl ExchangeProtocol for VertepExchange {
     }
 
     fn encode(&self, m: &ExchangeMessage) -> Result<Vec<u8>, WalletError> {
-        let mut body = serde_json::to_value(&m.body).map_err(|e| WalletError::Protocol(e.to_string()))?;
+        let mut body =
+            serde_json::to_value(&m.body).map_err(|e| WalletError::Protocol(e.to_string()))?;
         if let Some(o) = body.as_object_mut() {
             o.remove("type");
         }

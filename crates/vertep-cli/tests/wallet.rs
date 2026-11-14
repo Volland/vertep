@@ -8,7 +8,8 @@ const VT: &str = env!("CARGO_BIN_EXE_vt");
 fn vt(args: &[&str]) -> Output {
     let mut c = Command::new(VT);
     c.args(args);
-    let lean = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lean/vertep-lean/.lake/build/bin/vt-certify");
+    let lean = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../lean/vertep-lean/.lake/build/bin/vt-certify");
     if std::env::var_os("VT_CERTIFY").is_none() && lean.is_file() {
         c.env("VT_CERTIFY", lean);
     }
@@ -17,7 +18,11 @@ fn vt(args: &[&str]) -> Output {
 
 fn ok(args: &[&str]) -> String {
     let out = vt(args);
-    assert!(out.status.success(), "vt {args:?} failed: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "vt {args:?} failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
@@ -46,19 +51,48 @@ fn three() -> Three {
     let issuer = field(&ok(&["wallet", "create", "--dir", &i]), "did").to_owned();
     let holder = field(&ok(&["wallet", "create", "--dir", &h]), "did").to_owned();
     let verifier = field(&ok(&["wallet", "create", "--dir", &v]), "did").to_owned();
-    Three { _tmp: tmp, issuer, holder, verifier, i, h, v, root }
+    Three {
+        _tmp: tmp,
+        issuer,
+        holder,
+        verifier,
+        i,
+        h,
+        v,
+        root,
+    }
 }
 
 fn presented(t: &Three, format: &str) -> (String, String) {
     let p = |n: &str| t.root.join(n).display().to_string();
     let (cred, req, pres) = (p("cred.json"), p("req.json"), p("pres.json"));
-    ok(&["wallet", "issue", "--dir", &t.i, "--to", &t.holder, "--type", "https://example.org/IdentityCredential",
-        "--claims", r#"{"name":"Olena","nationality":"UA"}"#, "--format", format, "--out", &cred]);
+    ok(&[
+        "wallet",
+        "issue",
+        "--dir",
+        &t.i,
+        "--to",
+        &t.holder,
+        "--type",
+        "https://example.org/IdentityCredential",
+        "--claims",
+        r#"{"name":"Olena","nationality":"UA"}"#,
+        "--format",
+        format,
+        "--out",
+        &cred,
+    ]);
     ok(&["wallet", "accept", "--dir", &t.h, &cred]);
     ok(&["wallet", "trust", "--dir", &t.v, &t.issuer]);
-    let claims = if format == "sd-jwt" { "nationality" } else { "name,nationality" };
+    let claims = if format == "sd-jwt" {
+        "nationality"
+    } else {
+        "name,nationality"
+    };
     ok(&["wallet", "allow", "--dir", &t.h, &t.verifier, claims]);
-    ok(&["wallet", "request", "--dir", &t.v, "--claims", claims, "--out", &req]);
+    ok(&[
+        "wallet", "request", "--dir", &t.v, "--claims", claims, "--out", &req,
+    ]);
     ok(&["wallet", "present", "--dir", &t.h, &req, "--out", &pres]);
     (req, pres)
 }
@@ -101,7 +135,9 @@ fn failing_check_named() {
 fn role_charts_validate_and_certify() {
     let tmp = tempfile::tempdir().unwrap();
     let certifiable = std::env::var_os("VT_CERTIFY").is_some()
-        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lean/vertep-lean/.lake/build/bin/vt-certify").is_file();
+        || Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../lean/vertep-lean/.lake/build/bin/vt-certify")
+            .is_file();
     for (name, xml) in vertep_wallet::exchange::charts::all() {
         let path = tmp.path().join(format!("{name}.scxml"));
         std::fs::write(&path, xml).unwrap();
@@ -120,5 +156,8 @@ fn role_charts_validate_and_certify() {
 #[test]
 fn conformance_command_reports_both_protocols() {
     let out = ok(&["wallet", "conformance", "--seeds", "1"]);
-    assert!(out.contains("vce: 3 histories") && out.contains("oid4vc: 3 histories"), "{out}");
+    assert!(
+        out.contains("vce: 3 histories") && out.contains("oid4vc: 3 histories"),
+        "{out}"
+    );
 }

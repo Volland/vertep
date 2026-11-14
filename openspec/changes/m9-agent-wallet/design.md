@@ -59,7 +59,7 @@ The crate depends on `vertep-federation` (keys, DIDs, resolver, TSP), `vertep-ag
 ### D2. The wallet is a virtual actor; each exchange is an invoked role chart
 
 - **The wallet.** A wallet is the virtual actor `wallet/<percent-encoded DID>` running the wallet chart, which handles listing, deletion, policy changes and exchange dispatch.
-- **Exchanges.** Each exchange is an invoked child actor running its protocol's role chart: issuer, holder or verifier.
+- **Exchanges.** Each exchange is an agent actor of the wallet's host running its protocol's role chart: issuer, holder or verifier. (Planned as an invoked child of the wallet actor; built as a sibling actor keyed by the wallet and the exchange id, which keeps each exchange's journal separate and replayable on its own.)
   - Wire messages become chart events, and chart sends become wire messages, through the protocol's codec.
   - The holder chart's disclosure step is a `vt:decide` state (D7).
 - **What this gives:**

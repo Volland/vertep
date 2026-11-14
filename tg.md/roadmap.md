@@ -120,3 +120,5 @@ Implemented 2026-11-13: the crate, custodian witnessing in `vertep-objects`, `vt
 A wallet for every Vertep identity: credentials received, sealed, presented with consent, issued and verified, over pluggable exchange protocols and formats, with the exchange protocol modelled and proven in Lean.
 
 Delivered by the OpenSpec change `m9-agent-wallet` (capabilities `agent-wallet`, `credential-exchange` and `oid4vc`, and one addition to `did-identity`), in [[components#vertep-wallet]]. The design is in [[views/wallet#Wallet]].
+
+Implemented 2026-11-14: the crate with its formats, sealed store, consent, status lists, role charts and exchange engine; the Vertep Credential Exchange over TSP; OpenID4VCI and OpenID4VP with their HTTP bindings; grant credentials from a wallet; `vt wallet`. The Lean exchange model proves its six theorems, and the conformance kit's histories of every built-in protocol are accepted by its checker.

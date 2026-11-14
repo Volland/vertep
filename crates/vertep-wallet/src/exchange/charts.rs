@@ -4,7 +4,8 @@
 
 use crate::vocab::{CHARTS, Role};
 
-/// The issuer role chart.
+/// The issuer role chart: one instance per offer, final after its one issuance.
+// @tg: implements:: [[openspec:credential-exchange#Issuance At Most Once Per Offer]]
 pub const ISSUER: &str = include_str!("charts/issuer.scxml");
 /// The holder role chart.
 pub const HOLDER: &str = include_str!("charts/holder.scxml");
@@ -14,6 +15,7 @@ pub const VERIFIER: &str = include_str!("charts/verifier.scxml");
 pub const WALLET: &str = include_str!("charts/wallet.scxml");
 
 /// The generic chart of `role`.
+// @tg: implements:: [[openspec:credential-exchange#Role Charts]]
 pub fn generic(role: Role) -> &'static str {
     match role {
         Role::Issuer => ISSUER,

@@ -83,8 +83,8 @@ fn hash_data(
     proof_config: &Value,
     canon: Canonicalize<'_>,
 ) -> Result<Vec<u8>, ProofError> {
-    let mut out = Sha256::digest(canon(proof_config).map_err(ProofError::Canonicalization)?)
-        .to_vec();
+    let mut out =
+        Sha256::digest(canon(proof_config).map_err(ProofError::Canonicalization)?).to_vec();
     out.extend_from_slice(&Sha256::digest(
         canon(unsecured).map_err(ProofError::Canonicalization)?,
     ));

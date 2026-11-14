@@ -76,7 +76,10 @@ impl TspWire {
     /// Routes messages to `peer` through the intermediaries `hops` (DIDs), in order.
     pub fn route(&self, peer: &str, hops: &[&str]) {
         if let Ok(mut r) = self.routes.lock() {
-            r.insert(peer.to_owned(), hops.iter().map(|h| (*h).to_owned()).collect());
+            r.insert(
+                peer.to_owned(),
+                hops.iter().map(|h| (*h).to_owned()).collect(),
+            );
         }
     }
 
@@ -118,7 +121,10 @@ impl TspWire {
             }
             TspReceived::RelationshipRequested { sender, thread_id } => {
                 let peer = (self.resolve)(&sender).map_err(tsp)?;
-                let reply = self.session.accept_relationship(&peer, thread_id).map_err(tsp)?;
+                let reply = self
+                    .session
+                    .accept_relationship(&peer, thread_id)
+                    .map_err(tsp)?;
                 (self.deliver)(&sender, reply)?;
                 Ok(None)
             }
@@ -156,7 +162,9 @@ impl Wire for TspWire {
         let event = Event {
             name: EXCHANGE_EVENT.to_owned(),
             type_: EventType::External,
-            data: vertep_agent::json::from_json(&json!({"protocol": protocol, "message": b64(bytes)})),
+            data: vertep_agent::json::from_json(
+                &json!({"protocol": protocol, "message": b64(bytes)}),
+            ),
             ..Event::default()
         };
         let env = RelayEnvelope::from_event(msg_id, &event);

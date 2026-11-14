@@ -133,7 +133,7 @@
 
 - [x] 12.1 Implement `vt wallet`: `create`, `list`, `show`, `issue`, `offer`, `accept`, `request`, `present`, `verify`, `revoke` and `conformance`, with keys in the configured key store (`Wallet Command`)
 - [x] 12.2 Tests for `Issue and present between two wallets` and `Failing check named`, each with `@tg: verifies::`
-- [ ] 12.3 Annotate the entry points of every requirement with `@tg: implements::`, using `{confidence: partial}` where a requirement is partly met. Annotate the crate's `lib.rs` with `//! @tg: implements::` for D1–D13
-- [ ] 12.4 Write the crate README with a doctest. Add a site page `site/docs/wallet.html` covering the wallet, plugins, consent, the exchange model and theorems, and the conformance kit, and link it from the docs index
-- [ ] 12.5 Run `cargo fmt`, `cargo clippy -D warnings` and the workspace tests. The Lean build passes with `differential`
-- [ ] 12.6 `tg check`, `tg ontology check` and `tg trace agent-wallet credential-exchange oid4vc did-identity --gaps` show no new gaps
+- [x] 12.3 Annotate the entry points of every requirement with `@tg: implements::`, using `{confidence: partial}` where a requirement is partly met. Annotate the crate's `lib.rs` with `//! @tg: implements::` for D1–D13
+- [x] 12.4 Write the crate README with a doctest. Add a site page `site/docs/wallet.html` covering the wallet, plugins, consent, the exchange model and theorems, and the conformance kit, and link it from the docs index
+- [x] 12.5 Run `cargo fmt`, `cargo clippy -D warnings` and the workspace tests. The Lean build passes with `differential`
+- [x] 12.6 `tg check`, `tg ontology check` and `tg trace agent-wallet credential-exchange oid4vc did-identity --gaps` show no new gaps

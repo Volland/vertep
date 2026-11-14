@@ -27,7 +27,12 @@ impl CredentialFormat for MyFormat {
     fn iri(&self) -> &str {
         MY_FORMAT
     }
-    fn issue(&self, km: &dyn KeyManager, i: &SigningKey, r: &IssueRequest) -> Result<Credential, WalletError> {
+    fn issue(
+        &self,
+        km: &dyn KeyManager,
+        i: &SigningKey,
+        r: &IssueRequest,
+    ) -> Result<Credential, WalletError> {
         let mut c = SdJwtVc.issue(km, i, r)?;
         c.format = MY_FORMAT.into();
         Ok(c)
@@ -40,12 +45,24 @@ impl CredentialFormat for MyFormat {
     fn claims(&self, c: &Credential) -> Result<Map<String, Value>, WalletError> {
         SdJwtVc.claims(c)
     }
-    fn present(&self, km: &dyn KeyManager, c: &Credential, h: &SigningKey, a: &str, n: &str, d: &Claims) -> Result<Presentation, WalletError> {
+    fn present(
+        &self,
+        km: &dyn KeyManager,
+        c: &Credential,
+        h: &SigningKey,
+        a: &str,
+        n: &str,
+        d: &Claims,
+    ) -> Result<Presentation, WalletError> {
         let mut p = SdJwtVc.present(km, c, h, a, n, d)?;
         p.format = MY_FORMAT.into();
         Ok(p)
     }
-    fn verify_presentation(&self, p: &Presentation, k: &dyn KeyLookup) -> Result<VerifiedPresentation, WalletError> {
+    fn verify_presentation(
+        &self,
+        p: &Presentation,
+        k: &dyn KeyLookup,
+    ) -> Result<VerifiedPresentation, WalletError> {
         let mut v = SdJwtVc.verify_presentation(p, k)?;
         v.credential.format = MY_FORMAT.into();
         Ok(v)
@@ -118,7 +135,11 @@ fn unknown_protocol_refused() {
         .party(&issuer)
         .offer("https://example.org/protocols/none", &holder, id_offer())
         .unwrap_err();
-    assert!(err.to_string().contains("https://example.org/protocols/none"), "{err}");
+    assert!(
+        err.to_string()
+            .contains("https://example.org/protocols/none"),
+        "{err}"
+    );
     assert!(w.party(&issuer).exchanges().is_empty());
     assert!(w.history().lines().is_empty());
 }
@@ -132,8 +153,14 @@ fn history_in_the_vocabulary() {
     let verifier = w.agent();
     w.party(&verifier).wallet_mut().trust(&issuer);
     issue(&mut w, &issuer, &holder, id_offer());
-    allow(&w, &holder, vertep_wallet::consent::RulePolicy::refuse_all().allow(&verifier, &["name"]));
-    w.party(&verifier).request(PROTOCOL_VCE, &holder, &["name"], &[], None).unwrap();
+    allow(
+        &w,
+        &holder,
+        vertep_wallet::consent::RulePolicy::refuse_all().allow(&verifier, &["name"]),
+    );
+    w.party(&verifier)
+        .request(PROTOCOL_VCE, &holder, &["name"], &[], None)
+        .unwrap();
     w.kit.run(Schedule::honest());
     let steps: Vec<&'static str> = w
         .history()
@@ -144,9 +171,21 @@ fn history_in_the_vocabulary() {
         .collect();
     assert_eq!(
         steps,
-        ["offer", "prove-possession", "issue", "store", "request-presentation", "consent", "present", "verify"]
+        [
+            "offer",
+            "prove-possession",
+            "issue",
+            "store",
+            "request-presentation",
+            "consent",
+            "present",
+            "verify"
+        ]
     );
-    let vocab: Vec<&str> = vertep_wallet::Step::ALL.iter().map(|s| s.as_str()).collect();
+    let vocab: Vec<&str> = vertep_wallet::Step::ALL
+        .iter()
+        .map(|s| s.as_str())
+        .collect();
     assert!(steps.iter().all(|s| vocab.contains(s)));
     lean_accepts(&w);
 }
@@ -162,7 +201,10 @@ fn unmapped_message_refused() {
         "exchange": "x-1", "from": issuer, "to": holder, "body": {}
     }))
     .unwrap();
-    let err = w.party(&holder).receive(PROTOCOL_VCE, "m-1", &bytes).unwrap_err();
+    let err = w
+        .party(&holder)
+        .receive(PROTOCOL_VCE, "m-1", &bytes)
+        .unwrap_err();
     assert_eq!(err.check(), "unmapped");
     assert!(err.to_string().contains("Gossip"));
     assert!(w.party(&holder).exchanges().is_empty());

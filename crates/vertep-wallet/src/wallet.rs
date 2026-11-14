@@ -92,7 +92,9 @@ pub struct Wallet {
 
 impl std::fmt::Debug for Wallet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Wallet").field("did", &self.config.did).finish_non_exhaustive()
+        f.debug_struct("Wallet")
+            .field("did", &self.config.did)
+            .finish_non_exhaustive()
     }
 }
 
@@ -203,7 +205,11 @@ impl Wallet {
     /// # Errors
     ///
     /// [`WalletError`] naming the failed check.
-    pub fn accept(&self, credential: &Credential, issuer: &str) -> Result<CredentialMeta, WalletError> {
+    pub fn accept(
+        &self,
+        credential: &Credential,
+        issuer: &str,
+    ) -> Result<CredentialMeta, WalletError> {
         let format = self.registry.format(&credential.format)?;
         let meta = format.verify(credential, self.keys.as_ref())?;
         // an issuer named by DID must be the credential's issuer; an OpenID4VCI issuer is named
@@ -258,7 +264,10 @@ impl Wallet {
 
     fn revoked(&self, meta: &CredentialMeta) -> Result<bool, WalletError> {
         match (&meta.status, &self.config.status) {
-            (Some(s), Some(iri)) => self.registry.status(iri)?.is_set(s, &meta.issuer, self.now()),
+            (Some(s), Some(iri)) => self
+                .registry
+                .status(iri)?
+                .is_set(s, &meta.issuer, self.now()),
             _ => Ok(false),
         }
     }
@@ -283,7 +292,10 @@ impl Wallet {
     /// # Errors
     ///
     /// [`WalletError::Storage`].
-    pub fn consent_request(&self, request: &PresentationRequest) -> Result<ConsentRequest, WalletError> {
+    pub fn consent_request(
+        &self,
+        request: &PresentationRequest,
+    ) -> Result<ConsentRequest, WalletError> {
         Ok(ConsentRequest {
             verifier: crate::exchange::agent_of(&request.verifier),
             nonce: request.nonce.clone(),
@@ -299,7 +311,10 @@ impl Wallet {
     /// # Errors
     ///
     /// [`WalletError::UnknownPlugin`] or [`WalletError::Storage`].
-    pub fn options(&self, request: &PresentationRequest) -> Result<Vec<DisclosureOption>, WalletError> {
+    pub fn options(
+        &self,
+        request: &PresentationRequest,
+    ) -> Result<Vec<DisclosureOption>, WalletError> {
         let policy = self.registry.consent(&self.config.consent)?;
         Ok(policy.options(&self.consent_request(request)?))
     }
@@ -325,7 +340,14 @@ impl Wallet {
             return Err(WalletError::Revoked(digest.to_owned()));
         }
         let format = self.registry.format(&cred.format)?;
-        let p = format.present(self.km.as_ref(), &cred, &self.holder()?, audience, nonce, claims)?;
+        let p = format.present(
+            self.km.as_ref(),
+            &cred,
+            &self.holder()?,
+            audience,
+            nonce,
+            claims,
+        )?;
         Ok((meta, p))
     }
 
@@ -336,7 +358,11 @@ impl Wallet {
     /// # Errors
     ///
     /// [`WalletError`] when the format is unknown or signing fails.
-    pub fn issue(&self, format: &str, request: &IssueRequest) -> Result<(CredentialMeta, Credential), WalletError> {
+    pub fn issue(
+        &self,
+        format: &str,
+        request: &IssueRequest,
+    ) -> Result<(CredentialMeta, Credential), WalletError> {
         let f = self.registry.format(format)?;
         let cred = f.issue(self.km.as_ref(), &self.signing()?, request)?;
         let meta = f.verify(&cred, self.keys.as_ref())?;
@@ -362,12 +388,20 @@ impl Wallet {
             .ok_or_else(|| WalletError::Malformed("possession proof has no jwk".into()))
             .and_then(|j| PublicKey::from_jwk(j).map_err(WalletError::Key))?;
         jws.verify(&key)?;
-        let aud = jws.payload.get("aud").and_then(Value::as_str).unwrap_or_default();
+        let aud = jws
+            .payload
+            .get("aud")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         if aud != self.config.did && !self.config.aliases.iter().any(|a| a == aud) {
-            return Err(WalletError::WrongAudience(format!("possession proof for {aud}")));
+            return Err(WalletError::WrongAudience(format!(
+                "possession proof for {aud}"
+            )));
         }
         if jws.payload.get("nonce").and_then(Value::as_str) != Some(nonce) {
-            return Err(WalletError::Nonce("possession proof is over another nonce".into()));
+            return Err(WalletError::Nonce(
+                "possession proof is over another nonce".into(),
+            ));
         }
         Ok(key)
     }
@@ -395,7 +429,9 @@ impl Wallet {
             )));
         }
         if v.nonce != request.nonce {
-            return Err(WalletError::Nonce("presentation answers another nonce".into()));
+            return Err(WalletError::Nonce(
+                "presentation answers another nonce".into(),
+            ));
         }
         if !self.config.trusted_issuers.contains(&v.credential.issuer) {
             return Err(WalletError::UntrustedIssuer(v.credential.issuer.clone()));
@@ -412,7 +448,9 @@ impl Wallet {
         if !request.types.is_empty()
             && !v.credential.types.iter().any(|t| request.types.contains(t))
         {
-            return Err(WalletError::NoMatchingCredential("credential type not requested".into()));
+            return Err(WalletError::NoMatchingCredential(
+                "credential type not requested".into(),
+            ));
         }
         if let Some(extra) = v.disclosed.keys().find(|k| !request.claims.contains(*k)) {
             return Err(WalletError::UnrequestedClaim(extra.clone()));

@@ -78,7 +78,9 @@ fn unwrap(bytes: &[u8]) -> Result<(String, ExchangeMessage, Value), WalletError>
         exchange: s("exchange")?,
         from: s("from")?,
         to: s("to")?,
-        body: Body::Problem { reason: String::new() },
+        body: Body::Problem {
+            reason: String::new(),
+        },
     };
     Ok((kind, m, v.get("message").cloned().unwrap_or(Value::Null)))
 }
@@ -106,6 +108,7 @@ fn reason_of(message: &Value) -> String {
 
 /// OpenID4VCI 1.0, pre-authorised code flow.
 // @tg: implements:: [[openspec:oid4vc#OpenID4VCI Pre-Authorised Issuance]] {confidence: partial, note: "the message mapping; the endpoints are in oid4vc_http"}
+// @tg: implements:: [[openspec:oid4vc#OpenID4VC Conformance]] {note: "OpenID4VCI and OpenID4VP map onto the exchange vocabulary and pass the conformance kit"}
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Oid4vci;
 
@@ -158,7 +161,11 @@ impl ExchangeProtocol for Oid4vci {
             Body::Result { accepted, reason } => wrap(
                 m,
                 "error",
-                if *accepted { json!({}) } else { error_message(reason.as_deref().unwrap_or("")) },
+                if *accepted {
+                    json!({})
+                } else {
+                    error_message(reason.as_deref().unwrap_or(""))
+                },
             ),
             other => Err(WalletError::Protocol(format!(
                 "OpenID4VCI does not carry {:?}",
@@ -171,7 +178,11 @@ impl ExchangeProtocol for Oid4vci {
         let (kind, mut m, msg) = unwrap(bytes)?;
         m.body = match kind.as_str() {
             "nonce-response" => Body::Offer {
-                issuer: msg.get("credential_issuer").and_then(Value::as_str).unwrap_or(&m.from).to_owned(),
+                issuer: msg
+                    .get("credential_issuer")
+                    .and_then(Value::as_str)
+                    .unwrap_or(&m.from)
+                    .to_owned(),
                 nonce: msg
                     .get("c_nonce")
                     .and_then(Value::as_str)
@@ -180,22 +191,39 @@ impl ExchangeProtocol for Oid4vci {
                 types: msg
                     .get("credential_configuration_ids")
                     .and_then(Value::as_array)
-                    .map(|a| a.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(Value::as_str)
+                            .map(str::to_owned)
+                            .collect()
+                    })
                     .unwrap_or_default(),
-                format: format_iri(msg.get("format").and_then(Value::as_str).unwrap_or("dc+sd-jwt")).to_owned(),
+                format: format_iri(
+                    msg.get("format")
+                        .and_then(Value::as_str)
+                        .unwrap_or("dc+sd-jwt"),
+                )
+                .to_owned(),
             },
             "credential-request" => Body::CredentialRequest {
                 proof: proof_of_request(&msg)?,
             },
             "credential-response" => Body::Credential {
-                format: format_iri(msg.get("format").and_then(Value::as_str).unwrap_or("dc+sd-jwt")).to_owned(),
+                format: format_iri(
+                    msg.get("format")
+                        .and_then(Value::as_str)
+                        .unwrap_or("dc+sd-jwt"),
+                )
+                .to_owned(),
                 credential: msg
                     .pointer("/credentials/0/credential")
                     .and_then(Value::as_str)
                     .ok_or_else(|| WalletError::Malformed("no credentials[0].credential".into()))?
                     .to_owned(),
             },
-            "error" => Body::Problem { reason: reason_of(&msg) },
+            "error" => Body::Problem {
+                reason: reason_of(&msg),
+            },
             other => return Err(WalletError::Unmapped(format!("OpenID4VCI {other}"))),
         };
         Ok(m)
@@ -234,14 +262,28 @@ pub fn read_dcql(query: &Value) -> Result<Vec<(String, Vec<String>, Claims)>, Wa
         .ok_or_else(|| WalletError::Malformed("dcql_query without credentials".into()))?;
     let mut out = Vec::new();
     for c in creds {
-        let id = c.get("id").and_then(Value::as_str).unwrap_or("cred").to_owned();
+        let id = c
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("cred")
+            .to_owned();
         let types = c
             .pointer("/meta/vct_values")
             .and_then(Value::as_array)
-            .map(|a| a.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect()
+            })
             .unwrap_or_default();
         let mut claims = Claims::new();
-        for cl in c.get("claims").and_then(Value::as_array).cloned().unwrap_or_default() {
+        for cl in c
+            .get("claims")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+        {
             // a claim path is a list of names, array indices or null (any element); nested
             // paths name a dotted claim, which flat credentials do not hold
             let path = cl
@@ -298,13 +340,17 @@ impl ExchangeProtocol for Oid4vp {
                 types,
                 purpose,
             } => {
-                let mut req = authorization_request(verifier, nonce, types, claims, "", &m.exchange);
+                let mut req =
+                    authorization_request(verifier, nonce, types, claims, "", &m.exchange);
                 if let Some(p) = purpose {
                     req["purpose"] = json!(p);
                 }
                 wrap(m, "authorization-request", req)
             }
-            Body::Presentation { format, presentation } => wrap(
+            Body::Presentation {
+                format,
+                presentation,
+            } => wrap(
                 m,
                 "authorization-response",
                 json!({"vp_token": {"cred1": [presentation]}, "state": m.exchange, "format": format_id(format)}),
@@ -312,7 +358,11 @@ impl ExchangeProtocol for Oid4vp {
             Body::Result { accepted, reason } => wrap(
                 m,
                 "response-result",
-                if *accepted { json!({}) } else { error_message(reason.as_deref().unwrap_or("")) },
+                if *accepted {
+                    json!({})
+                } else {
+                    error_message(reason.as_deref().unwrap_or(""))
+                },
             ),
             Body::Problem { reason } => wrap(m, "error", error_message(reason)),
             other => Err(WalletError::Protocol(format!(
@@ -344,11 +394,19 @@ impl ExchangeProtocol for Oid4vp {
                         .to_owned(),
                     claims,
                     types,
-                    purpose: msg.get("purpose").and_then(Value::as_str).map(str::to_owned),
+                    purpose: msg
+                        .get("purpose")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
                 }
             }
             "authorization-response" => Body::Presentation {
-                format: format_iri(msg.get("format").and_then(Value::as_str).unwrap_or("dc+sd-jwt")).to_owned(),
+                format: format_iri(
+                    msg.get("format")
+                        .and_then(Value::as_str)
+                        .unwrap_or("dc+sd-jwt"),
+                )
+                .to_owned(),
                 presentation: msg
                     .get("vp_token")
                     .and_then(Value::as_object)
@@ -362,7 +420,9 @@ impl ExchangeProtocol for Oid4vp {
                 accepted: true,
                 reason: None,
             },
-            "response-result" | "error" => Body::Problem { reason: reason_of(&msg) },
+            "response-result" | "error" => Body::Problem {
+                reason: reason_of(&msg),
+            },
             other => return Err(WalletError::Unmapped(format!("OpenID4VP {other}"))),
         };
         Ok(m)

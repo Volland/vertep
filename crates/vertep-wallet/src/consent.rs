@@ -9,9 +9,7 @@
 
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use vertep_agent::decider::{
-    Decider, DeciderKind, Decision, DecisionOutcome, DecisionRequest,
-};
+use vertep_agent::decider::{Decider, DeciderKind, Decision, DecisionOutcome, DecisionRequest};
 use vertep_core::datamodel::Value;
 
 use crate::history::Claims;

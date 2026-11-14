@@ -19,11 +19,19 @@ use crate::exchange::{Offer, Verified};
 use crate::plugin::StatusResolver;
 
 /// The offer of a grant credential: the holder may send `events` to `target`.
-pub fn grant_offer(target: &str, events: &[&str], valid_until: Option<i64>, status: Option<StatusRef>) -> Offer {
+pub fn grant_offer(
+    target: &str,
+    events: &[&str],
+    valid_until: Option<i64>,
+    status: Option<StatusRef>,
+) -> Offer {
     Offer {
         format: crate::vocab::FORMAT_DI_JCS.to_owned(),
         types: vec![GRANT_CREDENTIAL_TYPE.to_owned()],
-        claims: json!({"target": target, "events": events}).as_object().cloned().unwrap_or_default(),
+        claims: json!({"target": target, "events": events})
+            .as_object()
+            .cloned()
+            .unwrap_or_default(),
         valid_until,
         status,
     }
@@ -46,13 +54,20 @@ pub fn grant_from(verified: &Verified, target: &str) -> Result<Grant, WalletErro
         .and_then(Value::as_str)
         .ok_or_else(|| WalletError::Malformed("grant without target".into()))?;
     if granted_target != target {
-        return Err(WalletError::Malformed(format!("the grant targets {granted_target}")));
+        return Err(WalletError::Malformed(format!(
+            "the grant targets {granted_target}"
+        )));
     }
     let events: Vec<String> = verified
         .disclosed
         .get("events")
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
         .unwrap_or_default();
     if events.is_empty() {
         return Err(WalletError::Malformed("grant without events".into()));

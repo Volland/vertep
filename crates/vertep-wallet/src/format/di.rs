@@ -84,11 +84,19 @@ impl DataIntegrity {
 
     /// The cryptosuite name.
     pub fn cryptosuite(&self) -> &'static str {
-        if self.rdfc { EDDSA_RDFC_2022 } else { EDDSA_JCS_2022 }
+        if self.rdfc {
+            EDDSA_RDFC_2022
+        } else {
+            EDDSA_JCS_2022
+        }
     }
 
     fn canon(&self) -> &'static dyn Fn(&Value) -> Result<Vec<u8>, String> {
-        if self.rdfc { &rdfc } else { &data_integrity::jcs }
+        if self.rdfc {
+            &rdfc
+        } else {
+            &data_integrity::jcs
+        }
     }
 
     /// Verifies only the proof of a secured document against the key its
@@ -115,7 +123,12 @@ impl DataIntegrity {
         Ok(vm)
     }
 
-    fn meta_of(&self, doc: &Value, issuer_key: String, raw: &str) -> Result<CredentialMeta, WalletError> {
+    fn meta_of(
+        &self,
+        doc: &Value,
+        issuer_key: String,
+        raw: &str,
+    ) -> Result<CredentialMeta, WalletError> {
         let issuer = match doc.get("issuer") {
             Some(Value::String(s)) => s.clone(),
             Some(Value::Object(o)) => o
@@ -167,7 +180,11 @@ impl DataIntegrity {
 
 impl CredentialFormat for DataIntegrity {
     fn iri(&self) -> &str {
-        if self.rdfc { FORMAT_DI_RDFC } else { FORMAT_DI_JCS }
+        if self.rdfc {
+            FORMAT_DI_RDFC
+        } else {
+            FORMAT_DI_JCS
+        }
     }
 
     fn issue(
@@ -181,7 +198,9 @@ impl CredentialFormat for DataIntegrity {
         let mut subject = request.claims.clone();
         subject.insert(
             "id".into(),
-            Value::from(vertep_federation::resolver::key::did_key(&request.holder_key)),
+            Value::from(vertep_federation::resolver::key::did_key(
+                &request.holder_key,
+            )),
         );
         let mut doc = Map::new();
         doc.insert("@context".into(), json!([VC_CONTEXT]));
@@ -213,7 +232,8 @@ impl CredentialFormat for DataIntegrity {
         .map_err(proof_err)?;
         Ok(Credential {
             format: self.iri().to_owned(),
-            raw: serde_json::to_string(&signed).map_err(|e| WalletError::Malformed(e.to_string()))?,
+            raw: serde_json::to_string(&signed)
+                .map_err(|e| WalletError::Malformed(e.to_string()))?,
         })
     }
 
@@ -275,7 +295,8 @@ impl CredentialFormat for DataIntegrity {
             .map_err(proof_err)?;
         Ok(Presentation {
             format: self.iri().to_owned(),
-            raw: serde_json::to_string(&signed).map_err(|e| WalletError::Malformed(e.to_string()))?,
+            raw: serde_json::to_string(&signed)
+                .map_err(|e| WalletError::Malformed(e.to_string()))?,
         })
     }
 

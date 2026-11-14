@@ -160,7 +160,10 @@ pub fn di_offer(format: &str) -> Offer {
 /// Issues `offer` from `issuer` to `holder` over the native protocol, delivered honestly;
 /// returns the issuer's exchange id.
 pub fn issue(w: &mut World, issuer: &str, holder: &str, offer: Offer) -> String {
-    let x = w.party(issuer).offer(PROTOCOL_VCE, holder, offer).expect("offer");
+    let x = w
+        .party(issuer)
+        .offer(PROTOCOL_VCE, holder, offer)
+        .expect("offer");
     w.kit.run(vertep_wallet::testkit::Schedule::honest());
     x
 }
@@ -177,7 +180,10 @@ pub fn allow(w: &World, holder: &str, policy: vertep_wallet::consent::RulePolicy
 pub fn lean_accepts(w: &World) {
     match w.kit.check() {
         Some(Ok(_)) => {}
-        Some(Err(report)) => panic!("the Lean checker rejects the history:\n{report}\n{}", w.kit.jsonl()),
+        Some(Err(report)) => panic!(
+            "the Lean checker rejects the history:\n{report}\n{}",
+            w.kit.jsonl()
+        ),
         None if std::env::var("VERTEP_WALLET_LEAN").as_deref() == Ok("1") => {
             panic!("the Lean checker vertep-wallet is not built")
         }

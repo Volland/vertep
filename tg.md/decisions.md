@@ -1437,7 +1437,7 @@ Rejected: growing `vertep-federation`, which every DID actor needs while most ne
 
 ## Wallets are virtual actors and exchanges are role charts
 
-A wallet is the virtual actor `wallet/<percent-encoded DID>`; each exchange is an invoked child running its protocol's issuer, holder or verifier chart, so every exchange is journaled, replayable and certifiable (M9 design D2).
+A wallet is the actor `…/charts/wallet/<percent-encoded DID>`; each exchange is an agent actor of the wallet's host running its protocol's issuer, holder or verifier chart, so every exchange is journaled, replayable and certifiable (M9 design D2).
 
 - motivated_by:: [[decisions#Virtual actor addresses append the key to the type]] {weight: primary, since: "2026-11-13"}
 - motivated_by:: [[decisions#Full SCXML first]] {weight: secondary, since: "2026-11-13"}
@@ -1528,6 +1528,8 @@ OpenID4VCI issuer endpoints and OpenID4VP verifier endpoints are axum handlers a
 - motivated_by:: [[decisions#Wallets are virtual actors and exchanges are role charts]] {weight: primary, since: "2026-11-13"}
 
 Rejected: the holder side only; agents could then neither issue to nor verify ecosystem wallets.
+
+As built: the nonce endpoint binds its nonce to the access token, and the token response also carries `c_nonce`, so wallets reading either work; the engine is not `Send`, so the endpoints reach it through an engine thread.
 
 ## Status lists are published credentials with a bounded cache
 

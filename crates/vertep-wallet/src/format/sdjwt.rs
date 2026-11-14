@@ -109,9 +109,15 @@ impl SdJwtVc {
             .ok_or_else(|| WalletError::Malformed("no iss".into()))?
             .to_owned();
         if iss.starts_with("did:") && controller_of(&kid) != iss {
-            return Err(WalletError::BadSignature(format!("{kid} is not a key of {iss}")));
+            return Err(WalletError::BadSignature(format!(
+                "{kid} is not a key of {iss}"
+            )));
         }
-        if p.get("_sd_alg").and_then(Value::as_str).unwrap_or("sha-256") != "sha-256" {
+        if p.get("_sd_alg")
+            .and_then(Value::as_str)
+            .unwrap_or("sha-256")
+            != "sha-256"
+        {
             return Err(WalletError::Malformed("_sd_alg is not sha-256".into()));
         }
         let sd: Vec<&str> = p
@@ -129,7 +135,10 @@ impl SdJwtVc {
                 )));
             }
             if disclosed.insert(dd.name.clone(), dd.value).is_some() {
-                return Err(WalletError::Malformed(format!("claim {} disclosed twice", dd.name)));
+                return Err(WalletError::Malformed(format!(
+                    "claim {} disclosed twice",
+                    dd.name
+                )));
             }
         }
         let holder = p
@@ -177,11 +186,9 @@ impl CredentialFormat for SdJwtVc {
         let mut disclosures = Vec::new();
         let mut sd = Vec::new();
         for (name, value) in &request.claims {
-            let enc = b64(
-                serde_json::to_string(&json!([salt()?, name, value]))
-                    .map_err(|e| WalletError::Malformed(e.to_string()))?
-                    .as_bytes(),
-            );
+            let enc = b64(serde_json::to_string(&json!([salt()?, name, value]))
+                .map_err(|e| WalletError::Malformed(e.to_string()))?
+                .as_bytes());
             sd.push(Value::from(sd_digest(&enc)));
             disclosures.push(enc);
         }
@@ -302,9 +309,9 @@ impl CredentialFormat for SdJwtVc {
         if kb_jws.header.get("typ").and_then(Value::as_str) != Some("kb+jwt") {
             return Err(WalletError::Malformed("typ is not kb+jwt".into()));
         }
-        kb_jws
-            .verify(&checked.holder)
-            .map_err(|_| WalletError::HolderBinding("key-binding JWT not signed by cnf key".into()))?;
+        kb_jws.verify(&checked.holder).map_err(|_| {
+            WalletError::HolderBinding("key-binding JWT not signed by cnf key".into())
+        })?;
         let presented = &presentation.raw[..presentation.raw.len() - kb.len()];
         if kb_jws.payload.get("sd_hash").and_then(Value::as_str) != Some(&sd_digest(presented)) {
             return Err(WalletError::HolderBinding("sd_hash does not match".into()));

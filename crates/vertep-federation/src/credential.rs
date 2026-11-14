@@ -146,12 +146,12 @@ pub fn verify_grant_credential(
     if !trusted_issuers.iter().any(|t| t == issuer) {
         return Err(CredentialError::UntrustedIssuer(issuer.to_owned()));
     }
-    let proof = data_integrity::proof_of(credential, CRYPTOSUITE, "assertionMethod").map_err(|e| {
-        match e {
+    let proof = data_integrity::proof_of(credential, CRYPTOSUITE, "assertionMethod").map_err(
+        |e| match e {
             ProofError::Malformed(m) if m == "no proof" => CredentialError::Malformed(m),
             _ => CredentialError::BadProof("unsupported proof".into()),
-        }
-    })?;
+        },
+    )?;
     let vm_id = proof
         .get("verificationMethod")
         .and_then(Value::as_str)

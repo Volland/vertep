@@ -42,8 +42,11 @@ pub trait CredentialFormat: Send + Sync {
     /// # Errors
     ///
     /// [`WalletError`] naming the failed check.
-    fn verify(&self, credential: &Credential, keys: &dyn KeyLookup)
-    -> Result<CredentialMeta, WalletError>;
+    fn verify(
+        &self,
+        credential: &Credential,
+        keys: &dyn KeyLookup,
+    ) -> Result<CredentialMeta, WalletError>;
 
     /// The credential's claims with values (the holder's own view).
     ///
@@ -211,11 +214,7 @@ impl std::fmt::Debug for WalletRegistry {
     }
 }
 
-fn get<T: ?Sized>(
-    m: &Map2<T>,
-    kind: &'static str,
-    iri: &str,
-) -> Result<Arc<T>, WalletError> {
+fn get<T: ?Sized>(m: &Map2<T>, kind: &'static str, iri: &str) -> Result<Arc<T>, WalletError> {
     m.read()
         .ok()
         .and_then(|m| m.get(iri).cloned())

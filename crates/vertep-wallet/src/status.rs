@@ -62,7 +62,9 @@ impl Bitstring {
         let mut gz = GzEncoder::new(Vec::new(), Compression::default());
         gz.write_all(&self.0)
             .map_err(|e| WalletError::Storage(e.to_string()))?;
-        let bytes = gz.finish().map_err(|e| WalletError::Storage(e.to_string()))?;
+        let bytes = gz
+            .finish()
+            .map_err(|e| WalletError::Storage(e.to_string()))?;
         Ok(format!("u{}", b64(&bytes)))
     }
 
@@ -72,16 +74,18 @@ impl Bitstring {
     ///
     /// [`WalletError::StatusUnavailable`] when it is not a valid list.
     pub fn decode(s: &str) -> Result<Self, WalletError> {
-        let body = s
-            .strip_prefix('u')
-            .ok_or_else(|| WalletError::StatusUnavailable("encodedList is not multibase base64url".into()))?;
+        let body = s.strip_prefix('u').ok_or_else(|| {
+            WalletError::StatusUnavailable("encodedList is not multibase base64url".into())
+        })?;
         let gz = unb64(body).map_err(|e| WalletError::StatusUnavailable(e.to_string()))?;
         let mut out = Vec::new();
         GzDecoder::new(&gz[..])
             .read_to_end(&mut out)
             .map_err(|e| WalletError::StatusUnavailable(format!("encodedList: {e}")))?;
         if out.len() * 8 < MIN_ENTRIES {
-            return Err(WalletError::StatusUnavailable("status list is shorter than 131,072 entries".into()));
+            return Err(WalletError::StatusUnavailable(
+                "status list is shorter than 131,072 entries".into(),
+            ));
         }
         Ok(Bitstring(out))
     }
@@ -205,7 +209,10 @@ pub fn read_entry(
         )));
     }
     if !meta.valid_at(now) {
-        return Err(WalletError::StatusUnavailable(format!("{} is expired", status.list)));
+        return Err(WalletError::StatusUnavailable(format!(
+            "{} is expired",
+            status.list
+        )));
     }
     let doc: Value = serde_json::from_str(&list.raw)
         .map_err(|e| WalletError::StatusUnavailable(e.to_string()))?;
@@ -269,7 +276,9 @@ impl StatusResolver for LocalStatus {
             .lock()
             .ok()
             .and_then(|m| m.get(&status.list).cloned())
-            .ok_or_else(|| WalletError::StatusUnavailable(format!("{} cannot be fetched", status.list)))?;
+            .ok_or_else(|| {
+                WalletError::StatusUnavailable(format!("{} cannot be fetched", status.list))
+            })?;
         read_entry(&list, status, issuer, self.keys.as_ref(), now)
     }
 }

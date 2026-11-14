@@ -16,12 +16,21 @@ use vertep_wallet::{Line, WalletError};
 
 /// One issuance and two presentation requests (to two verifiers) over `protocol`, under
 /// `schedule`; returns the world.
-fn scenario(protocol: &str, schedule: Schedule, tweak: impl Fn(&vertep_wallet::WalletRegistry) + Clone) -> World {
+fn scenario(
+    protocol: &str,
+    schedule: Schedule,
+    tweak: impl Fn(&vertep_wallet::WalletRegistry) + Clone,
+) -> World {
     scenario2(protocol, protocol, schedule, tweak)
 }
 
 /// The same with one protocol for issuance and another for presentation.
-fn scenario2(issuing: &str, presenting: &str, schedule: Schedule, tweak: impl Fn(&vertep_wallet::WalletRegistry) + Clone) -> World {
+fn scenario2(
+    issuing: &str,
+    presenting: &str,
+    schedule: Schedule,
+    tweak: impl Fn(&vertep_wallet::WalletRegistry) + Clone,
+) -> World {
     let mut w = World::new();
     let issuer = w.agent_with(None, tweak.clone());
     let holder = w.agent_with(None, tweak.clone());
@@ -30,11 +39,21 @@ fn scenario2(issuing: &str, presenting: &str, schedule: Schedule, tweak: impl Fn
     for v in [&v1, &v2] {
         w.party(v).wallet_mut().trust(&issuer);
     }
-    allow(&w, &holder, RulePolicy::refuse_all().allow("*", &["nationality", "birthDate"]));
-    w.party(&issuer).offer(issuing, &holder, id_offer()).unwrap();
+    allow(
+        &w,
+        &holder,
+        RulePolicy::refuse_all().allow("*", &["nationality", "birthDate"]),
+    );
+    w.party(&issuer)
+        .offer(issuing, &holder, id_offer())
+        .unwrap();
     w.kit.run(schedule);
-    w.party(&v1).request(presenting, &holder, &["nationality"], &[], None).unwrap();
-    w.party(&v2).request(presenting, &holder, &["birthDate", "name"], &[], None).unwrap();
+    w.party(&v1)
+        .request(presenting, &holder, &["nationality"], &[], None)
+        .unwrap();
+    w.party(&v2)
+        .request(presenting, &holder, &["birthDate", "name"], &[], None)
+        .unwrap();
     w.kit.run(schedule);
     w
 }
@@ -46,13 +65,22 @@ fn lean_required() -> bool {
 // @tg: verifies:: [[openspec:credential-exchange#Plugin Conformance#Built-in plugins conformant]] {level: integration}
 #[test]
 fn built_in_plugins_conformant() {
-    let seeds: u64 = std::env::var("VERTEP_WALLET_SEEDS").ok().and_then(|s| s.parse().ok()).unwrap_or(24);
+    let seeds: u64 = std::env::var("VERTEP_WALLET_SEEDS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(24);
     let mut checked = 0;
     let mut accepted = 0;
     for seed in 0..seeds {
-        for (schedule, (issuing, presenting)) in [Schedule::adversarial(seed), Schedule::lossy(seed)]
-            .into_iter()
-            .flat_map(|s| [(s, (PROTOCOL_VCE, PROTOCOL_VCE)), (s, (vocab::PROTOCOL_OID4VCI, vocab::PROTOCOL_OID4VP))])
+        for (schedule, (issuing, presenting)) in
+            [Schedule::adversarial(seed), Schedule::lossy(seed)]
+                .into_iter()
+                .flat_map(|s| {
+                    [
+                        (s, (PROTOCOL_VCE, PROTOCOL_VCE)),
+                        (s, (vocab::PROTOCOL_OID4VCI, vocab::PROTOCOL_OID4VP)),
+                    ]
+                })
         {
             let w = scenario2(issuing, presenting, schedule, |_| {});
             match w.kit.check() {
@@ -61,14 +89,22 @@ fn built_in_plugins_conformant() {
                 None if lean_required() => panic!("the Lean checker is not built"),
                 None => {}
             }
-            let accepts = w.history().lines().iter().filter(|l| matches!(l, Line::Verify { result, .. } if result == "accept")).count();
+            let accepts = w
+                .history()
+                .lines()
+                .iter()
+                .filter(|l| matches!(l, Line::Verify { result, .. } if result == "accept"))
+                .count();
             accepted += accepts;
         }
     }
     if checked == 0 {
         eprintln!("skipped: the Lean checker vertep-wallet is not built");
     }
-    assert!(accepted > 0, "no presentation was ever accepted: the schedules starve the exchanges");
+    assert!(
+        accepted > 0,
+        "no presentation was ever accepted: the schedules starve the exchanges"
+    );
 }
 
 #[test]
@@ -91,7 +127,10 @@ impl ExchangeProtocol for FaultyVerifier {
         match role {
             Role::Verifier => Box::leak(
                 vertep_wallet::exchange::charts::VERIFIER
-                    .replace(r#"<transition event="presentation.valid" target="accepted">"#, r#"<transition event="presentation.valid">"#)
+                    .replace(
+                        r#"<transition event="presentation.valid" target="accepted">"#,
+                        r#"<transition event="presentation.valid">"#,
+                    )
                     .into_boxed_str(),
             ),
             other => vertep_wallet::exchange::charts::generic(other),
@@ -108,12 +147,25 @@ impl ExchangeProtocol for FaultyVerifier {
 // @tg: verifies:: [[openspec:credential-exchange#Plugin Conformance#Faulty plugin caught]] {level: integration}
 #[test]
 fn faulty_plugin_caught() {
-    let register = |r: &vertep_wallet::WalletRegistry| r.register_protocol(Arc::new(FaultyVerifier));
+    let register =
+        |r: &vertep_wallet::WalletRegistry| r.register_protocol(Arc::new(FaultyVerifier));
     // duplicates make the faulty verifier accept the same presentation twice
-    let schedule = Schedule { duplicate: 100, ..Schedule::honest() };
+    let schedule = Schedule {
+        duplicate: 100,
+        ..Schedule::honest()
+    };
     let w = scenario(FAULTY, schedule, register);
-    let accepts = w.history().lines().iter().filter(|l| matches!(l, Line::Verify { result, .. } if result == "accept")).count();
-    assert!(accepts >= 2, "the faulty verifier should accept a duplicate: {}", w.kit.jsonl());
+    let accepts = w
+        .history()
+        .lines()
+        .iter()
+        .filter(|l| matches!(l, Line::Verify { result, .. } if result == "accept"))
+        .count();
+    assert!(
+        accepts >= 2,
+        "the faulty verifier should accept a duplicate: {}",
+        w.kit.jsonl()
+    );
     match check_history(&w.kit.jsonl()) {
         Some(Err(report)) => assert!(report.contains("verify"), "{report}"),
         Some(Ok(report)) => panic!("the checker accepts a faulty plugin's history: {report}"),
@@ -126,8 +178,17 @@ fn faulty_plugin_caught() {
 #[test]
 fn openid4vc_histories_accepted() {
     for seed in 0..8 {
-        for schedule in [Schedule::honest(), Schedule::adversarial(seed), Schedule::lossy(seed)] {
-            let w = scenario2(vocab::PROTOCOL_OID4VCI, vocab::PROTOCOL_OID4VP, schedule, |_| {});
+        for schedule in [
+            Schedule::honest(),
+            Schedule::adversarial(seed),
+            Schedule::lossy(seed),
+        ] {
+            let w = scenario2(
+                vocab::PROTOCOL_OID4VCI,
+                vocab::PROTOCOL_OID4VP,
+                schedule,
+                |_| {},
+            );
             match w.kit.check() {
                 Some(Ok(_)) => {}
                 Some(Err(report)) => panic!("seed {seed}: rejected\n{report}\n{}", w.kit.jsonl()),
@@ -136,7 +197,17 @@ fn openid4vc_histories_accepted() {
             }
         }
     }
-    let w = scenario2(vocab::PROTOCOL_OID4VCI, vocab::PROTOCOL_OID4VP, Schedule::honest(), |_| {});
-    let accepted = w.history().lines().iter().filter(|l| matches!(l, Line::Verify { result, .. } if result == "accept")).count();
+    let w = scenario2(
+        vocab::PROTOCOL_OID4VCI,
+        vocab::PROTOCOL_OID4VP,
+        Schedule::honest(),
+        |_| {},
+    );
+    let accepted = w
+        .history()
+        .lines()
+        .iter()
+        .filter(|l| matches!(l, Line::Verify { result, .. } if result == "accept"))
+        .count();
     assert_eq!(accepted, 2, "{}", w.kit.jsonl());
 }

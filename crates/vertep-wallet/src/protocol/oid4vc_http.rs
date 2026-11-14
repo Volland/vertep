@@ -42,7 +42,11 @@ use crate::vocab::{PROTOCOL_OID4VCI, PROTOCOL_OID4VP, Role};
 pub const ANY_HOLDER: &str = "urn:vertep:oid4vc:holder";
 
 /// Everything but RFC 3986 unreserved characters.
-const QUERY: &AsciiSet = &NON_ALPHANUMERIC.remove(b'-').remove(b'.').remove(b'_').remove(b'~');
+const QUERY: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
 
 fn enc(s: &str) -> String {
     utf8_percent_encode(s, QUERY).to_string()
@@ -113,7 +117,14 @@ impl CaptureWire {
 }
 
 impl Wire for CaptureWire {
-    fn send(&self, protocol: &str, _from: &str, _to: &str, _msg: &str, bytes: &[u8]) -> Result<(), WalletError> {
+    fn send(
+        &self,
+        protocol: &str,
+        _from: &str,
+        _to: &str,
+        _msg: &str,
+        bytes: &[u8],
+    ) -> Result<(), WalletError> {
         let m = match protocol {
             PROTOCOL_OID4VCI => Oid4vci.decode(bytes)?,
             PROTOCOL_OID4VP => Oid4vp.decode(bytes)?,
@@ -189,7 +200,10 @@ struct ServerState {
 
 impl ServerState {
     fn msg_id(&self) -> String {
-        let mut t = self.tables.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut t = self
+            .tables
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         t.counter += 1;
         format!("http-{}", t.counter)
     }
@@ -203,7 +217,9 @@ pub struct Oid4vcServer {
 
 impl std::fmt::Debug for Oid4vcServer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Oid4vcServer").field("base_url", &self.state.config.base_url).finish()
+        f.debug_struct("Oid4vcServer")
+            .field("base_url", &self.state.config.base_url)
+            .finish()
     }
 }
 
@@ -224,7 +240,10 @@ fn bearer(headers: &HeaderMap) -> Option<String> {
     headers
         .get("authorization")
         .and_then(|h| h.to_str().ok())
-        .and_then(|h| h.strip_prefix("Bearer ").or_else(|| h.strip_prefix("DPoP ")))
+        .and_then(|h| {
+            h.strip_prefix("Bearer ")
+                .or_else(|| h.strip_prefix("DPoP "))
+        })
         .map(str::to_owned)
 }
 
@@ -243,7 +262,11 @@ impl Oid4vcServer {
     /// # Errors
     ///
     /// [`WalletError::Protocol`] when the engine thread is gone.
-    pub fn new(engine: EngineHandle, capture: CaptureWire, config: ServerConfig) -> Result<Self, WalletError> {
+    pub fn new(
+        engine: EngineHandle,
+        capture: CaptureWire,
+        config: ServerConfig,
+    ) -> Result<Self, WalletError> {
         let did = engine.call(|e| e.wallet().did().to_owned())?;
         Ok(Oid4vcServer {
             state: Arc::new(ServerState {
@@ -288,7 +311,10 @@ impl Oid4vcServer {
     pub fn router(&self) -> Router {
         Router::new()
             .route("/.well-known/openid-credential-issuer", get(metadata_h))
-            .route("/.well-known/oauth-authorization-server", get(as_metadata_h))
+            .route(
+                "/.well-known/oauth-authorization-server",
+                get(as_metadata_h),
+            )
             .route("/token", post(token_h))
             .route("/nonce", post(nonce_h))
             .route("/credential", post(credential_h))
@@ -312,7 +338,10 @@ impl Oid4vcServer {
             .find(|c| c.format == offer.format && offer.types.first() == Some(&c.vct))
             .map(|c| c.id.clone())
             .ok_or_else(|| WalletError::Protocol("no configuration matches the offer".into()))?;
-        let x = self.state.engine.call(move |e| e.offer(PROTOCOL_OID4VCI, ANY_HOLDER, offer))??;
+        let x = self
+            .state
+            .engine
+            .call(move |e| e.offer(PROTOCOL_OID4VCI, ANY_HOLDER, offer))??;
         let nonce = self
             .state
             .capture
@@ -325,8 +354,13 @@ impl Oid4vcServer {
             .ok_or_else(|| WalletError::Protocol("the issuer chart sent no offer".into()))?;
         let code = random()?;
         {
-            let mut t = self.state.tables.lock().map_err(|_| WalletError::Protocol("poisoned".into()))?;
-            t.codes.insert(code.clone(), (x.clone(), tx_code.map(str::to_owned)));
+            let mut t = self
+                .state
+                .tables
+                .lock()
+                .map_err(|_| WalletError::Protocol("poisoned".into()))?;
+            t.codes
+                .insert(code.clone(), (x.clone(), tx_code.map(str::to_owned)));
             t.nonces.insert(x, nonce);
         }
         let mut grant = json!({"pre-authorized_code": code});
@@ -338,7 +372,10 @@ impl Oid4vcServer {
             "credential_configuration_ids": [config_id],
             "grants": {PRE_AUTHORIZED_GRANT: grant},
         });
-        Ok(format!("openid-credential-offer://?credential_offer={}", enc(&offer.to_string())))
+        Ok(format!(
+            "openid-credential-offer://?credential_offer={}",
+            enc(&offer.to_string())
+        ))
     }
 
     /// As verifier: starts an OpenID4VP exchange asking for `claims` of credentials of `types`,
@@ -348,7 +385,12 @@ impl Oid4vcServer {
     ///
     /// [`WalletError`] when the request cannot be started or signed.
     // @tg: implements:: [[openspec:oid4vc#OpenID4VP Verifier And Holder]] {confidence: partial, note: "the verifier side; the holder is Oid4vcHolder"}
-    pub fn request(&self, claims: &[&str], types: &[&str], purpose: Option<&str>) -> Result<(String, String), WalletError> {
+    pub fn request(
+        &self,
+        claims: &[&str],
+        types: &[&str],
+        purpose: Option<&str>,
+    ) -> Result<(String, String), WalletError> {
         let base = self.state.config.base_url.clone();
         let response_uri = format!("{base}/response");
         let client_id = match self.state.config.client_id {
@@ -362,7 +404,14 @@ impl Oid4vcServer {
         let x = self.state.engine.call(move |e| {
             let c: Vec<&str> = claims.iter().map(String::as_str).collect();
             let t: Vec<&str> = types.iter().map(String::as_str).collect();
-            e.request_for(PROTOCOL_OID4VP, ANY_HOLDER, &c, &t, purpose.as_deref(), Some(&cid))
+            e.request_for(
+                PROTOCOL_OID4VP,
+                ANY_HOLDER,
+                &c,
+                &t,
+                purpose.as_deref(),
+                Some(&cid),
+            )
         })??;
         let req = self
             .state
@@ -370,12 +419,18 @@ impl Oid4vcServer {
             .take(&x)
             .into_iter()
             .find_map(|m| match m.body {
-                Body::PresentationRequest { nonce, claims, types, .. } => Some((nonce, claims, types)),
+                Body::PresentationRequest {
+                    nonce,
+                    claims,
+                    types,
+                    ..
+                } => Some((nonce, claims, types)),
                 _ => None,
             })
             .ok_or_else(|| WalletError::Protocol("the verifier chart sent no request".into()))?;
         let (nonce, claims, types) = req;
-        let mut params = authorization_request(&client_id, &nonce, &types, &claims, &response_uri, &x);
+        let mut params =
+            authorization_request(&client_id, &nonce, &types, &claims, &response_uri, &x);
         let uri = match self.state.config.client_id {
             ClientId::Did => {
                 params["iss"] = json!(client_id);
@@ -383,14 +438,26 @@ impl Oid4vcServer {
                 let jwt = self.state.engine.call(move |e| {
                     let w = e.wallet();
                     let s = w.signing()?;
-                    jose::sign(w.key_manager().as_ref(), &s.key_name, &json!({"typ": "oauth-authz-req+jwt", "kid": s.kid}), &params)
+                    jose::sign(
+                        w.key_manager().as_ref(),
+                        &s.key_name,
+                        &json!({"typ": "oauth-authz-req+jwt", "kid": s.kid}),
+                        &params,
+                    )
                 })??;
-                format!("openid4vp://?client_id={}&request={}", enc(&client_id), enc(&jwt))
+                format!(
+                    "openid4vp://?client_id={}&request={}",
+                    enc(&client_id),
+                    enc(&jwt)
+                )
             }
             ClientId::RedirectUri => {
                 let mut q = String::from("openid4vp://?");
                 for (k, v) in params.as_object().into_iter().flatten() {
-                    let v = v.as_str().map(str::to_owned).unwrap_or_else(|| v.to_string());
+                    let v = v
+                        .as_str()
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| v.to_string());
                     q.push_str(&format!("{}={}&", enc(k), enc(&v)));
                 }
                 q.trim_end_matches('&').to_owned()
@@ -438,23 +505,43 @@ async fn as_metadata_h(State(s): S) -> Response {
 
 async fn token_h(State(s): S, Form(f): Form<BTreeMap<String, String>>) -> Response {
     if f.get("grant_type").map(String::as_str) != Some(PRE_AUTHORIZED_GRANT) {
-        return error(StatusCode::BAD_REQUEST, "unsupported_grant_type", "only the pre-authorized_code grant");
+        return error(
+            StatusCode::BAD_REQUEST,
+            "unsupported_grant_type",
+            "only the pre-authorized_code grant",
+        );
     }
     let Some(code) = f.get("pre-authorized_code") else {
-        return error(StatusCode::BAD_REQUEST, "invalid_request", "no pre-authorized_code");
+        return error(
+            StatusCode::BAD_REQUEST,
+            "invalid_request",
+            "no pre-authorized_code",
+        );
     };
     let Ok(mut t) = s.tables.lock() else {
-        return error(StatusCode::INTERNAL_SERVER_ERROR, "server_error", "poisoned");
+        return error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "server_error",
+            "poisoned",
+        );
     };
     let Some((x, tx)) = t.codes.get(code).cloned() else {
-        return error(StatusCode::BAD_REQUEST, "invalid_grant", "unknown or used pre-authorized_code");
+        return error(
+            StatusCode::BAD_REQUEST,
+            "invalid_grant",
+            "unknown or used pre-authorized_code",
+        );
     };
     if tx.as_deref() != f.get("tx_code").map(String::as_str) && tx.is_some() {
         return error(StatusCode::BAD_REQUEST, "invalid_grant", "wrong tx_code");
     }
     t.codes.remove(code);
     let Ok(token) = random() else {
-        return error(StatusCode::INTERNAL_SERVER_ERROR, "server_error", "no randomness");
+        return error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "server_error",
+            "no randomness",
+        );
     };
     t.tokens.insert(token.clone(), x.clone());
     let nonce = t.nonces.get(&x).cloned().unwrap_or_default();
@@ -463,18 +550,38 @@ async fn token_h(State(s): S, Form(f): Form<BTreeMap<String, String>>) -> Respon
 
 async fn nonce_h(State(s): S, headers: HeaderMap) -> Response {
     let Some(token) = bearer(&headers) else {
-        return error(StatusCode::BAD_REQUEST, "invalid_request", "this issuer binds nonces to the access token");
+        return error(
+            StatusCode::BAD_REQUEST,
+            "invalid_request",
+            "this issuer binds nonces to the access token",
+        );
     };
-    let t = s.tables.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let t = s
+        .tables
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     match t.tokens.get(&token).and_then(|x| t.nonces.get(x)) {
         Some(n) => ok(json!({"c_nonce": n})),
-        None => error(StatusCode::UNAUTHORIZED, "invalid_token", "unknown access token"),
+        None => error(
+            StatusCode::UNAUTHORIZED,
+            "invalid_token",
+            "unknown access token",
+        ),
     }
 }
 
 async fn credential_h(State(s): S, headers: HeaderMap, Json(body): Json<Value>) -> Response {
-    let Some(x) = bearer(&headers).and_then(|t| s.tables.lock().ok().and_then(|tb| tb.tokens.get(&t).cloned())) else {
-        return error(StatusCode::UNAUTHORIZED, "invalid_token", "unknown access token");
+    let Some(x) = bearer(&headers).and_then(|t| {
+        s.tables
+            .lock()
+            .ok()
+            .and_then(|tb| tb.tokens.get(&t).cloned())
+    }) else {
+        return error(
+            StatusCode::UNAUTHORIZED,
+            "invalid_token",
+            "unknown access token",
+        );
     };
     let proof = match proof_of_request(&body) {
         Ok(p) => p,
@@ -487,10 +594,18 @@ async fn credential_h(State(s): S, headers: HeaderMap, Json(body): Json<Value>) 
         body: Body::CredentialRequest { proof },
     };
     let Ok(bytes) = message(PROTOCOL_OID4VCI, &m) else {
-        return error(StatusCode::INTERNAL_SERVER_ERROR, "server_error", "encoding");
+        return error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "server_error",
+            "encoding",
+        );
     };
     let id = s.msg_id();
-    if let Err(e) = s.engine.call(move |e| e.receive(PROTOCOL_OID4VCI, &id, &bytes)).and_then(|r| r) {
+    if let Err(e) = s
+        .engine
+        .call(move |e| e.receive(PROTOCOL_OID4VCI, &id, &bytes))
+        .and_then(|r| r)
+    {
         return error(StatusCode::BAD_REQUEST, "invalid_request", &e.to_string());
     }
     for m in s.capture.take(&x).into_iter().rev() {
@@ -504,7 +619,11 @@ async fn credential_h(State(s): S, headers: HeaderMap, Json(body): Json<Value>) 
             _ => {}
         }
     }
-    error(StatusCode::BAD_REQUEST, "invalid_request", "no credential for this request")
+    error(
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "no credential for this request",
+    )
 }
 
 async fn response_h(State(s): S, Form(f): Form<BTreeMap<String, String>>) -> Response {
@@ -513,7 +632,10 @@ async fn response_h(State(s): S, Form(f): Form<BTreeMap<String, String>>) -> Res
     };
     let body = if let Some(e) = f.get("error") {
         Body::Problem {
-            reason: f.get("error_description").cloned().unwrap_or_else(|| e.clone()),
+            reason: f
+                .get("error_description")
+                .cloned()
+                .unwrap_or_else(|| e.clone()),
         }
     } else {
         let token: Value = match f.get("vp_token").map(|t| serde_json::from_str(t)) {
@@ -542,10 +664,18 @@ async fn response_h(State(s): S, Form(f): Form<BTreeMap<String, String>>) -> Res
         body,
     };
     let Ok(bytes) = message(PROTOCOL_OID4VP, &m) else {
-        return error(StatusCode::INTERNAL_SERVER_ERROR, "server_error", "encoding");
+        return error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "server_error",
+            "encoding",
+        );
     };
     let id = s.msg_id();
-    if let Err(e) = s.engine.call(move |e| e.receive(PROTOCOL_OID4VP, &id, &bytes)).and_then(|r| r) {
+    if let Err(e) = s
+        .engine
+        .call(move |e| e.receive(PROTOCOL_OID4VP, &id, &bytes))
+        .and_then(|r| r)
+    {
         return error(StatusCode::BAD_REQUEST, "invalid_request", &e.to_string());
     }
     if is_problem {
@@ -555,13 +685,23 @@ async fn response_h(State(s): S, Form(f): Form<BTreeMap<String, String>>) -> Res
         match m.body {
             Body::Result { accepted: true, .. } => return ok(json!({})),
             Body::Result { reason, .. } => {
-                return error(StatusCode::BAD_REQUEST, "invalid_request", reason.as_deref().unwrap_or("refused"));
+                return error(
+                    StatusCode::BAD_REQUEST,
+                    "invalid_request",
+                    reason.as_deref().unwrap_or("refused"),
+                );
             }
-            Body::Problem { reason } => return error(StatusCode::BAD_REQUEST, "invalid_request", &reason),
+            Body::Problem { reason } => {
+                return error(StatusCode::BAD_REQUEST, "invalid_request", &reason);
+            }
             _ => {}
         }
     }
-    error(StatusCode::BAD_REQUEST, "invalid_request", "the presentation was not judged")
+    error(
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "the presentation was not judged",
+    )
 }
 
 // ---- holder -------------------------------------------------------------------------------
@@ -588,8 +728,11 @@ fn query_param(uri: &str, name: &str) -> Option<String> {
     let q = uri.split_once('?')?.1;
     q.split('&').find_map(|kv| {
         let (k, v) = kv.split_once('=')?;
-        (percent_encoding::percent_decode_str(k).decode_utf8_lossy() == name)
-            .then(|| percent_encoding::percent_decode_str(v).decode_utf8_lossy().into_owned())
+        (percent_encoding::percent_decode_str(k).decode_utf8_lossy() == name).then(|| {
+            percent_encoding::percent_decode_str(v)
+                .decode_utf8_lossy()
+                .into_owned()
+        })
     })
 }
 
@@ -605,8 +748,17 @@ fn http_error(e: ureq::Error) -> WalletError {
     match e {
         ureq::Error::Status(code, r) => {
             let body: Value = r.into_json().unwrap_or_default();
-            let err = body.get("error").and_then(Value::as_str).unwrap_or("error").to_owned();
-            WalletError::Protocol(format!("{code} {err}: {}", body.get("error_description").and_then(Value::as_str).unwrap_or("")))
+            let err = body
+                .get("error")
+                .and_then(Value::as_str)
+                .unwrap_or("error")
+                .to_owned();
+            WalletError::Protocol(format!(
+                "{code} {err}: {}",
+                body.get("error_description")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+            ))
         }
         other => WalletError::Protocol(other.to_string()),
     }
@@ -624,13 +776,30 @@ impl Oid4vcHolder {
     /// # Errors
     ///
     /// [`WalletError::Protocol`] naming the endpoint and OAuth error that failed.
-    pub fn accept_offer(&self, e: &mut Exchanges, offer_uri: &str, tx_code: Option<&str>) -> Result<CredentialMeta, WalletError> {
+    pub fn accept_offer(
+        &self,
+        e: &mut Exchanges,
+        offer_uri: &str,
+        tx_code: Option<&str>,
+    ) -> Result<CredentialMeta, WalletError> {
         let offer: Value = match query_param(offer_uri, "credential_offer") {
-            Some(o) => serde_json::from_str(&o).map_err(|e| WalletError::Malformed(format!("credential_offer: {e}")))?,
-            None => get_json(&query_param(offer_uri, "credential_offer_uri").ok_or_else(|| WalletError::Malformed("not a credential offer".into()))?)?,
+            Some(o) => serde_json::from_str(&o)
+                .map_err(|e| WalletError::Malformed(format!("credential_offer: {e}")))?,
+            None => get_json(
+                &query_param(offer_uri, "credential_offer_uri")
+                    .ok_or_else(|| WalletError::Malformed("not a credential offer".into()))?,
+            )?,
         };
-        let issuer = offer.get("credential_issuer").and_then(Value::as_str).ok_or_else(|| WalletError::Malformed("no credential_issuer".into()))?.to_owned();
-        let config_id = offer.pointer("/credential_configuration_ids/0").and_then(Value::as_str).ok_or_else(|| WalletError::Malformed("no credential_configuration_ids".into()))?.to_owned();
+        let issuer = offer
+            .get("credential_issuer")
+            .and_then(Value::as_str)
+            .ok_or_else(|| WalletError::Malformed("no credential_issuer".into()))?
+            .to_owned();
+        let config_id = offer
+            .pointer("/credential_configuration_ids/0")
+            .and_then(Value::as_str)
+            .ok_or_else(|| WalletError::Malformed("no credential_configuration_ids".into()))?
+            .to_owned();
         let code = offer
             .get("grants")
             .and_then(|g| g.get(PRE_AUTHORIZED_GRANT))
@@ -639,25 +808,61 @@ impl Oid4vcHolder {
             .ok_or_else(|| WalletError::Malformed("not a pre-authorized_code offer".into()))?
             .to_owned();
         let meta = get_json(&format!("{issuer}/.well-known/openid-credential-issuer"))?;
-        let config = meta.pointer(&format!("/credential_configurations_supported/{config_id}")).cloned().unwrap_or_default();
-        let as_meta = get_json(&format!("{issuer}/.well-known/oauth-authorization-server")).unwrap_or_default();
-        let token_endpoint = as_meta.get("token_endpoint").and_then(Value::as_str).map(str::to_owned).unwrap_or_else(|| format!("{issuer}/token"));
-        let mut form = vec![("grant_type", PRE_AUTHORIZED_GRANT), ("pre-authorized_code", code.as_str())];
+        let config = meta
+            .pointer(&format!("/credential_configurations_supported/{config_id}"))
+            .cloned()
+            .unwrap_or_default();
+        let as_meta = get_json(&format!("{issuer}/.well-known/oauth-authorization-server"))
+            .unwrap_or_default();
+        let token_endpoint = as_meta
+            .get("token_endpoint")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .unwrap_or_else(|| format!("{issuer}/token"));
+        let mut form = vec![
+            ("grant_type", PRE_AUTHORIZED_GRANT),
+            ("pre-authorized_code", code.as_str()),
+        ];
         if let Some(t) = tx_code {
             form.push(("tx_code", t));
         }
-        let token: Value = ureq::post(&token_endpoint).send_form(&form).map_err(http_error)?.into_json().map_err(|e| WalletError::Protocol(e.to_string()))?;
-        let access = token.get("access_token").and_then(Value::as_str).ok_or_else(|| WalletError::Protocol("no access_token".into()))?.to_owned();
+        let token: Value = ureq::post(&token_endpoint)
+            .send_form(&form)
+            .map_err(http_error)?
+            .into_json()
+            .map_err(|e| WalletError::Protocol(e.to_string()))?;
+        let access = token
+            .get("access_token")
+            .and_then(Value::as_str)
+            .ok_or_else(|| WalletError::Protocol("no access_token".into()))?
+            .to_owned();
         let nonce = match token.get("c_nonce").and_then(Value::as_str) {
             Some(n) => n.to_owned(),
             None => {
-                let ne = meta.get("nonce_endpoint").and_then(Value::as_str).ok_or_else(|| WalletError::Protocol("no nonce".into()))?;
-                let r: Value = ureq::post(ne).set("Authorization", &format!("Bearer {access}")).call().map_err(http_error)?.into_json().map_err(|e| WalletError::Protocol(e.to_string()))?;
-                r.get("c_nonce").and_then(Value::as_str).ok_or_else(|| WalletError::Protocol("no c_nonce".into()))?.to_owned()
+                let ne = meta
+                    .get("nonce_endpoint")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| WalletError::Protocol("no nonce".into()))?;
+                let r: Value = ureq::post(ne)
+                    .set("Authorization", &format!("Bearer {access}"))
+                    .call()
+                    .map_err(http_error)?
+                    .into_json()
+                    .map_err(|e| WalletError::Protocol(e.to_string()))?;
+                r.get("c_nonce")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| WalletError::Protocol("no c_nonce".into()))?
+                    .to_owned()
             }
         };
         let x = format!("oid4vci:{code}");
-        let format = super::oid4vc::format_iri(config.get("format").and_then(Value::as_str).unwrap_or("dc+sd-jwt")).to_owned();
+        let format = super::oid4vc::format_iri(
+            config
+                .get("format")
+                .and_then(Value::as_str)
+                .unwrap_or("dc+sd-jwt"),
+        )
+        .to_owned();
         let me = e.wallet().did().to_owned();
         let offer_msg = ExchangeMessage {
             exchange: x.clone(),
@@ -670,7 +875,11 @@ impl Oid4vcHolder {
                 format: format.clone(),
             },
         };
-        e.receive(PROTOCOL_OID4VCI, &format!("{x}-offer"), &Oid4vci.encode(&offer_msg)?)?;
+        e.receive(
+            PROTOCOL_OID4VCI,
+            &format!("{x}-offer"),
+            &Oid4vci.encode(&offer_msg)?,
+        )?;
         let proof = self
             .capture
             .take(&x)
@@ -679,32 +888,68 @@ impl Oid4vcHolder {
                 Body::CredentialRequest { proof } => Some(proof),
                 _ => None,
             })
-            .ok_or_else(|| WalletError::Protocol("the holder chart sent no possession proof".into()))?;
-        let endpoint = meta.get("credential_endpoint").and_then(Value::as_str).map(str::to_owned).unwrap_or_else(|| format!("{issuer}/credential"));
+            .ok_or_else(|| {
+                WalletError::Protocol("the holder chart sent no possession proof".into())
+            })?;
+        let endpoint = meta
+            .get("credential_endpoint")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .unwrap_or_else(|| format!("{issuer}/credential"));
         let resp: Value = ureq::post(&endpoint)
             .set("Authorization", &format!("Bearer {access}"))
             .send_json(credential_request(&config_id, &proof))
             .map_err(http_error)?
             .into_json()
             .map_err(|e| WalletError::Protocol(e.to_string()))?;
-        let credential = resp.pointer("/credentials/0/credential").and_then(Value::as_str).ok_or_else(|| WalletError::Protocol("no credentials[0].credential".into()))?.to_owned();
+        let credential = resp
+            .pointer("/credentials/0/credential")
+            .and_then(Value::as_str)
+            .ok_or_else(|| WalletError::Protocol("no credentials[0].credential".into()))?
+            .to_owned();
         let cred_msg = ExchangeMessage {
             exchange: x.clone(),
             from: issuer,
             to: me,
             body: Body::Credential { format, credential },
         };
-        e.receive(PROTOCOL_OID4VCI, &format!("{x}-credential"), &Oid4vci.encode(&cred_msg)?)?;
+        e.receive(
+            PROTOCOL_OID4VCI,
+            &format!("{x}-credential"),
+            &Oid4vci.encode(&cred_msg)?,
+        )?;
         match e.state(Role::Holder, &x)?.first().map(String::as_str) {
             Some("stored") => {}
-            other => return Err(WalletError::Protocol(format!("the credential was not stored ({other:?})"))),
+            other => {
+                return Err(WalletError::Protocol(format!(
+                    "the credential was not stored ({other:?})"
+                )));
+            }
         }
-        let actor = e.exchange(Role::Holder, &x).map(|i| i.actor.clone()).unwrap_or_default();
-        let digest = e.host().state(&actor).ok()
-            .map(|s| vertep_agent::json::to_json(vertep_agent::decider::ContextView::new(s.datamodel).data()))
-            .and_then(|d| d.get("credential").and_then(Value::as_str).map(str::to_owned))
+        let actor = e
+            .exchange(Role::Holder, &x)
+            .map(|i| i.actor.clone())
             .unwrap_or_default();
-        e.wallet().list()?.into_iter().find(|m| m.digest == digest).ok_or_else(|| WalletError::UnknownCredential(digest))
+        let digest = e
+            .host()
+            .state(&actor)
+            .ok()
+            .map(|s| {
+                vertep_agent::json::to_json(
+                    vertep_agent::decider::ContextView::new(s.datamodel).data(),
+                )
+            })
+            .and_then(|d| {
+                d.get("credential")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+            .unwrap_or_default();
+        e.wallet()
+            .list()?
+            .into_iter()
+            .find(|m| m.digest == digest)
+            .ok_or(WalletError::UnknownCredential(digest.clone()))
     }
 
     /// Answers the authorisation request `request_uri` (`openid4vp://?…`, by value or with a
@@ -716,32 +961,66 @@ impl Oid4vcHolder {
     /// [`WalletError`] when the request is malformed, its request object does not verify, or
     /// the response cannot be posted.
     pub fn respond(&self, e: &mut Exchanges, request_uri: &str) -> Result<Answered, WalletError> {
-        let client_id = query_param(request_uri, "client_id").ok_or_else(|| WalletError::Malformed("no client_id".into()))?;
+        let client_id = query_param(request_uri, "client_id")
+            .ok_or_else(|| WalletError::Malformed("no client_id".into()))?;
         let params: Value = if let Some(jwt) = query_param(request_uri, "request") {
             let jws = Jws::parse(&jwt)?;
-            let kid = jws.header.get("kid").and_then(Value::as_str).ok_or_else(|| WalletError::Malformed("request object without kid".into()))?;
-            let did = client_did(&client_id).ok_or_else(|| WalletError::Malformed("a signed request needs a decentralized_identifier client id".into()))?;
+            let kid = jws
+                .header
+                .get("kid")
+                .and_then(Value::as_str)
+                .ok_or_else(|| WalletError::Malformed("request object without kid".into()))?;
+            let did = client_did(&client_id).ok_or_else(|| {
+                WalletError::Malformed(
+                    "a signed request needs a decentralized_identifier client id".into(),
+                )
+            })?;
             if controller_of(kid) != did {
-                return Err(WalletError::BadSignature(format!("{kid} is not a key of {did}")));
+                return Err(WalletError::BadSignature(format!(
+                    "{kid} is not a key of {did}"
+                )));
             }
             jws.verify(&e.wallet().keys().key(kid)?)?;
             if jws.payload.get("client_id").and_then(Value::as_str) != Some(client_id.as_str()) {
-                return Err(WalletError::Malformed("request object for another client".into()));
+                return Err(WalletError::Malformed(
+                    "request object for another client".into(),
+                ));
             }
             jws.payload
         } else {
             let mut p = serde_json::Map::new();
-            for k in ["response_type", "response_mode", "client_id", "response_uri", "nonce", "state", "purpose"] {
+            for k in [
+                "response_type",
+                "response_mode",
+                "client_id",
+                "response_uri",
+                "nonce",
+                "state",
+                "purpose",
+            ] {
                 if let Some(v) = query_param(request_uri, k) {
                     p.insert(k.into(), json!(v));
                 }
             }
-            let q = query_param(request_uri, "dcql_query").ok_or_else(|| WalletError::Malformed("no dcql_query".into()))?;
-            p.insert("dcql_query".into(), serde_json::from_str(&q).map_err(|e| WalletError::Malformed(format!("dcql_query: {e}")))?);
+            let q = query_param(request_uri, "dcql_query")
+                .ok_or_else(|| WalletError::Malformed("no dcql_query".into()))?;
+            p.insert(
+                "dcql_query".into(),
+                serde_json::from_str(&q)
+                    .map_err(|e| WalletError::Malformed(format!("dcql_query: {e}")))?,
+            );
             Value::Object(p)
         };
-        let state = params.get("state").and_then(Value::as_str).ok_or_else(|| WalletError::Malformed("no state".into()))?.to_owned();
-        let response_uri = params.get("response_uri").and_then(Value::as_str).ok_or_else(|| WalletError::Malformed("no response_uri".into()))?.to_owned();
+        let state = params
+            .get("state")
+            .and_then(Value::as_str)
+            .ok_or_else(|| WalletError::Malformed("no state".into()))?
+            .to_owned();
+        let response_uri = params
+            .get("response_uri")
+            .and_then(Value::as_str)
+            .ok_or_else(|| WalletError::Malformed("no response_uri".into()))?
+            .to_owned();
         let me = e.wallet().did().to_owned();
         let wrapped = serde_json::to_vec(&json!({
             "kind": "authorization-request", "exchange": state, "from": agent_of(&client_id), "to": me, "message": params,
@@ -752,16 +1031,25 @@ impl Oid4vcHolder {
             match m.body {
                 Body::Presentation { presentation, .. } => {
                     let token = json!({"cred1": [presentation]}).to_string();
-                    let r = ureq::post(&response_uri).send_form(&[("vp_token", token.as_str()), ("state", state.as_str())]);
-                    return Ok(Answered::Presented { accepted: r.is_ok() });
+                    let r = ureq::post(&response_uri)
+                        .send_form(&[("vp_token", token.as_str()), ("state", state.as_str())]);
+                    return Ok(Answered::Presented {
+                        accepted: r.is_ok(),
+                    });
                 }
                 Body::Problem { reason } => {
-                    let _ = ureq::post(&response_uri).send_form(&[("error", "access_denied"), ("error_description", reason.as_str()), ("state", state.as_str())]);
+                    let _ = ureq::post(&response_uri).send_form(&[
+                        ("error", "access_denied"),
+                        ("error_description", reason.as_str()),
+                        ("state", state.as_str()),
+                    ]);
                     return Ok(Answered::Refused(reason));
                 }
                 _ => {}
             }
         }
-        Err(WalletError::Protocol("the holder chart answered nothing".into()))
+        Err(WalletError::Protocol(
+            "the holder chart answered nothing".into(),
+        ))
     }
 }

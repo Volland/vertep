@@ -22,7 +22,9 @@ pub const VC_EXAMPLES_CONTEXT: &str = "https://www.w3.org/ns/credentials/example
 pub fn bundled_context(url: &str) -> Option<&'static str> {
     match url {
         VC_CONTEXT => Some(include_str!("../../contexts/credentials-v2.jsonld")),
-        VC_EXAMPLES_CONTEXT => Some(include_str!("../../contexts/credentials-examples-v2.jsonld")),
+        VC_EXAMPLES_CONTEXT => Some(include_str!(
+            "../../contexts/credentials-examples-v2.jsonld"
+        )),
         _ => None,
     }
 }
@@ -51,12 +53,18 @@ pub(crate) fn status_json(s: &StatusRef) -> Value {
 
 pub(crate) fn status_from(v: Option<&Value>) -> Option<StatusRef> {
     let v = v?;
-    let v = if let Some(a) = v.as_array() { a.first()? } else { v };
+    let v = if let Some(a) = v.as_array() {
+        a.first()?
+    } else {
+        v
+    };
     Some(StatusRef {
         list: v.get("statusListCredential")?.as_str()?.to_owned(),
-        index: v
-            .get("statusListIndex")
-            .and_then(|i| i.as_str().and_then(|s| s.parse().ok()).or_else(|| i.as_u64()))?,
+        index: v.get("statusListIndex").and_then(|i| {
+            i.as_str()
+                .and_then(|s| s.parse().ok())
+                .or_else(|| i.as_u64())
+        })?,
         purpose: v
             .get("statusPurpose")
             .and_then(Value::as_str)
