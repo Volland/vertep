@@ -1544,3 +1544,103 @@ The cache is a revocation window: the model's verifier reads status fresh, so th
 A grant credential is held and presented like any credential; the target verifies format and status, then installs the `Grant` with its issuer and id, still enforced before the journal (M9 design D13).
 
 - motivated_by:: [[decisions#Grants enforced before the journal]] {weight: primary, since: "2026-11-13"}
+
+## A protocol is a role-based choreography and the interface is its projection
+
+An agent protocol is one document with roles, messages and the order of the conversation; "how to talk to me" is that document projected on the roles an agent plays, never a second format (M10 design D1).
+
+- motivated_by:: [[decisions#Grants enforced before the journal]] {weight: secondary, since: "2026-11-13", note: "a grant has no order and no second party"}
+
+Rejected: per-agent interface lists as in DWN protocol definitions, which cannot express order or multi-party cooperation.
+
+## Choreographies are one global chart projected in a restricted subset
+
+The document is one global chart whose transitions are "role X sends M"; projection is mechanical because one role decides at each state, and anything else is rejected at parse time with the state and reason (M10 design D2).
+
+- motivated_by:: [[constraints#Choreography projection needs one deciding role]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[decisions#A protocol is a role-based choreography and the interface is its projection]] {weight: primary, since: "2026-11-13"}
+
+Sequence, choice by one role, loops, and timeout or cancel as ordinary messages are allowed; cross-role parallel regions are not in format version 1. Rejected: per-role charts with a composition check, which every peer would have to model-check.
+
+## Protocols are identified by the hash of their graph
+
+A protocol's identity is `urn:vertep:protocol:sha256:` and the RDFC-1.0 hash of its expanded graph; offers are separate signed statements and discovery is a `VertepProtocol` DID service entry plus an optional query (M10 design D3).
+
+- motivated_by:: [[decisions#Content-addressed chart versions]] {weight: primary, since: "2026-11-13"}
+
+The document is fetched by hash from any source and checked locally, so no registry or trusted host is needed. Rejected: URI identity over a mutable document.
+
+## A protocol space is logical, sealed pairwise and hash-linked
+
+A space is an instance id, a role binding and a history of messages that name the hashes they depend on; each message is sealed once per recipient through the existing relays, and no store or group key is shared (M10 design D4).
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary, since: "2026-11-13"}
+
+A relay holds only items sealed to its owner, so reading only what is encrypted for you holds by construction. Hidden messages stay in the history as hashes. Rejected: a physical shared log under a group key, which needs key management and sub-groups for selective visibility.
+
+## Role gives authority and the agent's policy decides at join
+
+A bound DID in an open instance may send exactly what its role's projection allows; the genesis is signed by the initiator, joins are countersigned, and the agent's policy runs on the genesis before the journal, refusing by default (M10 design D5).
+
+- motivated_by:: [[decisions#Grants enforced before the journal]] {weight: primary, since: "2026-11-13"}
+
+DID grants stay for traffic outside protocols and never widen a role. Rejected: grants on top of protocol checks, which are two sources of truth that can disagree.
+
+## Out-of-order messages wait, and refusals come with proof
+
+A message waits for the messages it depends on in a buffer whose size and timeout the protocol declares, then takes the chart's cancel path; a refusal keeps the signed message so anyone can re-run the check (M10 design D6).
+
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[constraints#Authcrypt is not verifiable by a third party]] {weight: secondary, since: "2026-11-13"}
+
+Two different signed messages from one role with one sequence number are equivocation. Rejected: strict refusal of out-of-order messages, which breaks under normal relay reordering.
+
+## The protocol core is a crate with one-way dependencies
+
+`vertep-kolyada` depends on `vertep-rdf` and primitives only, and `vertep-federation`, `vertep-agent` and the CLI depend on it; test vectors come first and Lean proofs second (M10 design D7).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: secondary, since: "2026-11-13"}
+
+Rejected: growing `vertep-federation`, which would tie the protocol to Vertep's runtime and block implementations in other languages.
+
+## Protocol documents are JSON-LD in a restricted profile
+
+Documents use one frozen, embedded `vk:` context that is never fetched, and payloads are described by a SHACL subset the checker interprets directly (M10 design D8).
+
+- motivated_by:: [[constraints#JSON-LD remote contexts are not loaded]] {weight: primary, since: "2026-11-13"}
+
+The subset's agreement with full SHACL in `vertep-rdf` is a planned test, not yet written. Rejected: full JSON-LD 1.1, and plain JSON with an RDF bridge, which would be a second identity scheme.
+
+## Protocol messages are signed, then sealed
+
+The sender signs the body with its DID key before any transport seals it, and the message hash covers the signature, so authenticity does not depend on the transport and a third party can verify it (M10 design D9).
+
+- motivated_by:: [[constraints#Authcrypt is not verifiable by a third party]] {weight: primary, since: "2026-11-13"}
+
+Messages are therefore non-repudiable. Rejected: transport authentication only, which leaves violation proofs and late-join verification to trust the receiver.
+
+## Sub-protocols make a space a tree of instances
+
+A transition may open a child instance with role bindings from the parent, and the child's completion message closes the parent's step; each checker sees one protocol (M10 design D10).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary, since: "2026-11-13", note: "each instance replays from its journaled messages"}
+
+Rejected: several protocols running as peers in one instance, whose interleaving would break the local projection.
+
+## Charts declare roles and the mailbox checks before the journal
+
+A chart declares `vt:plays`, the mailbox runs the conformance check where grants run and journals the verdict with the input, the send path checks outbound, and checker state is derived on replay (M10 design D11).
+
+- motivated_by:: [[decisions#Verification outcome is journaled with the input]] {weight: primary, since: "2026-11-13"}
+- motivated_by:: [[decisions#Grants enforced before the journal]] {weight: primary, since: "2026-11-13"}
+
+Replay never resolves a DID or verifies a signature again. A send the role may not make fails locally.
+
+## Test vectors are the protocol contract and Lean proves the core after them
+
+Identities, projections, envelope hashes and verdict sequences are published as JSON vectors, and a Lean model proves the core after them (M10 design D12).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-13"}
+
+The model proves that accepted messages are enabled by the projection, that unbound roles are never accepted and that causally consistent orders converge.

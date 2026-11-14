@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent protocols (Kolyada) — Vertep docs</title>
+<meta name="description" content="Kolyada: verifiable role-based agent protocols. One JSON-LD document names roles, messages and a choreography; its identity is the hash of its graph, each role runs its projection, and every message is signed and checked by a pure function.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
+      <li><a href="wallet.html">Agent wallets</a></li>
+      <li><a href="protocols.html" aria-current="page">Agent protocols</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
+    <h1>Agent protocols (Kolyada)</h1>
+    <p class="lede">Kolyada lets an agent say, in a form a stranger can verify, how to talk to it: who sends which message, in which order, to whom. A protocol is one JSON-LD document; its identity is the hash of its graph; every role runs a projection of it; and every message is signed before any transport carries it, so a peer that trusts nobody can still check each step.</p>
+
+    <div class="nb warn">
+      <p>Kolyada is milestone M10, in progress. The core crate <code>vertep-kolyada</code> is built and tested: documents, identity, shapes, projection, signed envelopes, the conformance check, causal delivery, history, sub-protocols, offers and the RDF bridge. Not built yet: the join policy, sealed fan-out and the inbound and outbound checks in the mailbox and send path (in <code>vertep-federation</code>), the <code>vt:plays</code> chart declaration, <code>vt kolyada</code>, and the Lean model. Until then you drive an <code>Instance</code> yourself, as below.</p>
+    </div>
+
+    <h2 id="why">Grants, and what they cannot say</h2>
+    <p>A <a href="distribution.html">grant</a> says "this DID may send this event to this actor". That is enough for a client calling a service. It cannot say "first you ask, then I quote, then you order or cancel, and the auditor sees the quote but nothing else". A protocol says exactly that, in one document every party checks on its own. Inside a protocol instance the role is the authority: a DID bound to a role may send what that role's projection allows, and nothing else, without any grant.</p>
+    <p>The idea follows the Decentralised Web Node notion of published protocols, with three differences. Agents are statecharts, so a protocol is a chart over roles. Mailboxes hold only ciphertext, so a shared space is a logical grouping, not a shared store. And everything is checkable: documents by hash, messages by signature.</p>
+
+    <h2 id="document">A protocol document</h2>
+    <p>A protocol names its roles, its message types with payload shapes, and a choreography: states and transitions of the form "role X sends message M to roles Y". This one is a quote between a buyer, a seller and an auditor:</p>
+    <pre data-lang="JSON-LD"><code>{
+  &quot;@context&quot;: &quot;https://w3id.org/vertep/kolyada/1.0&quot;,
+  &quot;type&quot;: &quot;Protocol&quot;,
+  &quot;version&quot;: &quot;1.0&quot;,
+  &quot;roles&quot;: [&quot;buyer&quot;, &quot;seller&quot;, &quot;auditor&quot;],
+  &quot;messages&quot;: [
+    { &quot;id&quot;: &quot;quote.request&quot;, &quot;payload&quot;: { &quot;fields&quot;: [
+      { &quot;name&quot;: &quot;item&quot;, &quot;datatype&quot;: &quot;string&quot;, &quot;min&quot;: 1, &quot;max&quot;: 1 },
+      { &quot;name&quot;: &quot;qty&quot;, &quot;datatype&quot;: &quot;integer&quot;, &quot;min&quot;: 1, &quot;max&quot;: 1 } ] } },
+    { &quot;id&quot;: &quot;quote&quot;, &quot;payload&quot;: { &quot;fields&quot;: [
+      { &quot;name&quot;: &quot;price&quot;, &quot;datatype&quot;: &quot;number&quot;, &quot;min&quot;: 1, &quot;max&quot;: 1 },
+      { &quot;name&quot;: &quot;currency&quot;, &quot;datatype&quot;: &quot;string&quot;, &quot;in&quot;: [&quot;EUR&quot;, &quot;USD&quot;] } ] } },
+    { &quot;id&quot;: &quot;order&quot; },
+    { &quot;id&quot;: &quot;cancel&quot; },
+    { &quot;id&quot;: &quot;receipt&quot; }
+  ],
+  &quot;initial&quot;: &quot;Idle&quot;,
+  &quot;final&quot;: [&quot;Cancelled&quot;, &quot;Done&quot;],
+  &quot;transitions&quot;: [
+    { &quot;from&quot;: &quot;Idle&quot;, &quot;sender&quot;: &quot;buyer&quot;, &quot;receivers&quot;: [&quot;seller&quot;], &quot;message&quot;: &quot;quote.request&quot;, &quot;to&quot;: &quot;Quoting&quot; },
+    { &quot;from&quot;: &quot;Quoting&quot;, &quot;sender&quot;: &quot;seller&quot;, &quot;receivers&quot;: [&quot;buyer&quot;, &quot;auditor&quot;], &quot;message&quot;: &quot;quote&quot;, &quot;to&quot;: &quot;Decided&quot; },
+    { &quot;from&quot;: &quot;Decided&quot;, &quot;sender&quot;: &quot;buyer&quot;, &quot;receivers&quot;: [&quot;seller&quot;], &quot;message&quot;: &quot;order&quot;, &quot;to&quot;: &quot;Ordered&quot; },
+    { &quot;from&quot;: &quot;Decided&quot;, &quot;sender&quot;: &quot;buyer&quot;, &quot;receivers&quot;: [&quot;seller&quot;], &quot;message&quot;: &quot;cancel&quot;, &quot;to&quot;: &quot;Cancelled&quot; },
+    { &quot;from&quot;: &quot;Ordered&quot;, &quot;sender&quot;: &quot;seller&quot;, &quot;receivers&quot;: [&quot;buyer&quot;], &quot;message&quot;: &quot;receipt&quot;, &quot;to&quot;: &quot;Done&quot; }
+  ],
+  &quot;limits&quot;: { &quot;bufferSize&quot;: 4, &quot;timeoutMs&quot;: 1000 }
+}</code></pre>
+    <table>
+      <thead><tr><th>Member</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>@context</code></td><td>Always <code>https://w3id.org/vertep/kolyada/1.0</code>, embedded in the crate. A document that references any other context is rejected without a network request.</td></tr>
+        <tr><td><code>roles</code></td><td>The role names.</td></tr>
+        <tr><td><code>messages</code></td><td>Message types. A <code>payload</code> shape lists <code>fields</code> with <code>name</code>, <code>datatype</code> (<code>string</code>, <code>integer</code>, <code>number</code>, <code>boolean</code>), <code>min</code>, <code>max</code> and an optional <code>in</code> list: a small SHACL subset the checker interprets itself.</td></tr>
+        <tr><td><code>initial</code>, <code>final</code></td><td>The start state and the end states.</td></tr>
+        <tr><td><code>transitions</code></td><td><code>from</code>, <code>sender</code>, <code>receivers</code>, <code>message</code>, <code>to</code>. Timeouts and cancellations are ordinary messages.</td></tr>
+        <tr><td><code>limits</code></td><td><code>bufferSize</code> and <code>timeoutMs</code> of causal delivery.</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Well-formed choreographies</strong> allow sequence, loops and choice made by one role. A branching state whose options are sent by different roles, or regions running in parallel across roles, is rejected with the state named: one role must decide at every branching point, so each role's projection is well defined.</p>
+
+    <h2 id="identity">Identity and projection</h2>
+    <p>The identity is the SHA-256 of the RDFC-1.0 canonical form of the document's graph, the same scheme as chart version IRIs: two JSON-LD spellings of one protocol have one identity, and a peer fetches a document by hash from anywhere and checks it. The projection onto a role keeps its sends and receives and makes everything else silent; its interface lists, per state, what the role accepts and from whom.</p>
+<pre data-lang="Rust"><code><span class="kd">let</span> protocol <span class="o">=</span> Arc::new(Protocol::parse(QUOTE.as_bytes())<span class="o">?</span>);
+println!(<span class="s">"protocol {}"</span>, protocol.id().as_str());
+<span class="kd">let</span> interface <span class="o">=</span> protocol.interface(<span class="s">"seller"</span>).ok_or(<span class="s">"no seller role"</span>)<span class="o">?</span>;</code></pre>
+<pre class="output" data-lang="Output"><code>protocol urn:vertep:protocol:sha256:45790502561699ae0a09e8e6c58096fcf6de7eca7bb242f3c0ca7b329e287bc6
+  seller accepts in Decided: cancel from buyer
+  seller accepts in Decided: order from buyer
+  seller accepts in Idle: quote.request from buyer</code></pre>
+    <p>An agent may implement its role with any chart or code; the projection fixes only what is visible on the wire.</p>
+
+    <h2 id="space">Opening a space</h2>
+    <p>A space is an instance id, a role binding and a history. The initiator signs a genesis that binds a DID to every role; its hash is the instance id. Every other participant reads it and countersigns with <code>join</code> (or <code>decline</code>); no role may speak before its join.</p>
+<pre data-lang="Rust"><code><span class="kd">let</span> (genesis, <span class="kd">mut</span> b) <span class="o">=</span> Instance::create(protocol.clone(), <span class="o">&amp;</span>buyer, <span class="s">"buyer"</span>, <span class="o">&amp;</span>bindings, None)<span class="o">?</span>;
+<span class="kd">let</span> <span class="kd">mut</span> s <span class="o">=</span> Instance::from_genesis(protocol.clone(), <span class="o">&amp;</span>genesis, SELLER, <span class="o">&amp;</span>verifier, None)
+    .map_err(|reason| reason.as_str())<span class="o">?</span>;
+<span class="kd">let</span> join <span class="o">=</span> s.join(<span class="o">&amp;</span>seller)<span class="o">?</span>;          <span class="c">// sealed to every other role by the transport</span>
+b.receive(<span class="o">&amp;</span>join, <span class="o">&amp;</span>verifier, now_ms);</code></pre>
+    <p><code>Signer</code> and <code>Verifier</code> are traits: in Vertep they come from the key manager and the DID resolver, and the <code>testkit</code> feature has in-memory ones. The crate itself holds no keys and opens no connection.</p>
+
+    <h2 id="messages">Messages and the check</h2>
+    <p>A message body carries the protocol identity, the instance id, the sender's role and a rising sequence number, the hashes it depends on, the roles it is sealed to, its type and its payload. It is signed with the sender's DID key before any transport seals it, so authenticity never depends on the transport (DIDComm authcrypt, for one, convinces only the recipient). <code>Instance::send</code> checks the sender's own projection first, so an agent cannot emit what its role may not send; <code>Instance::receive</code> runs the pure check:</p>
+    <ol>
+      <li>the signature, against the sender's DID;</li>
+      <li>the instance, and that the sender is bound to the role it claims in an open instance;</li>
+      <li>the dependencies: a message whose dependencies are missing is held, in a buffer the protocol bounds;</li>
+      <li>the state: some state the participant may be in enables this message from this role;</li>
+      <li>the payload, against its shape.</li>
+    </ol>
+    <p>The result is <code>Applied</code>, <code>Held</code>, <code>Duplicate</code> or <code>Refused</code> with a reason from a fixed list: <code>signature</code>, <code>wrong instance</code>, <code>role not permitted</code>, <code>not open</code>, <code>missing dependencies</code>, <code>not enabled in state</code>, <code>unknown message</code>, <code>payload shape</code>, <code>recipients</code>, <code>sequence</code>, <code>equivocation</code>, <code>buffer full</code>, <code>bad genesis</code>, <code>already joined</code>. A refused message is kept as a <code>Violation</code> that anyone can re-check, and two different signed messages with one sequence number prove equivocation.</p>
+    <p>The tour runs the whole quote. The auditor holds the seller's quote until it is told the hash of the request it may not read; it cannot place an order; a seller who signs a receipt before any order is refused with proof:</p>
+<pre class="output" data-lang="cargo run -p vertep-kolyada --example quote --features testkit"><code>instance 60e4e1b6f1223ab14efa47917db7b8460943a1bb4355506e19f125177d3ac01a
+status after the joins: Open
+seller &lt;- quote.request: applied c3fb1ef77651
+buyer  &lt;- quote: applied 564cc9cf8e48
+auditor &lt;- quote: held 564cc9cf8e48
+auditor &lt;- hash of the hidden request: applied 564cc9cf8e48
+auditor -&gt; order: refused before sending (role not permitted)
+buyer  &lt;- receipt: refused (not enabled in state); violation re-checks: true
+seller &lt;- order: applied f9e37a4cc0c4
+buyer  &lt;- receipt: applied 7879aa311338
+complete: buyer true, seller true</code></pre>
+
+    <h2 id="history">Hidden messages and history</h2>
+    <p>Each copy of a message is sealed separately to each recipient, so a message sealed to a subset is unreadable to the other roles. Every message still lists the hashes it depends on, so participants compare heads (<code>heads</code>, <code>missing_from</code>) to find a gap, and a participant outside a subset is told the hash alone (<code>observe_hidden</code>), which releases whatever was waiting for it. A late joiner receives the history it may read (<code>history_for</code>), with hidden messages as hashes, and the chain still verifies. A participant knows the protocol state only through what it sees, so its checker keeps the set of states consistent with it.</p>
+    <p>A transition may open a child instance (a payment inside a purchase): its roles are bound from the parent's, participants already in the parent need no new join, and the child's completion ends the parent's waiting state. A space is then a tree of instances under one root genesis.</p>
+
+    <h2 id="discovery">Offers and discovery</h2>
+    <p>An agent says which roles it plays with a signed <code>Offer</code> (optionally expiring, optionally limited to some initiators) and lists its protocols in a <code>VertepProtocol</code> service entry of its DID document. There is no registry: a peer reads the entry, fetches the document by its hash from any source and verifies it (<code>verify_fetched</code>). The RDF bridge adds documents and offers to a graph, so "who offers the seller role of this protocol" is a SPARQL query.</p>
+<pre class="output" data-lang="Output"><code>offer verifies: true
+service entry: {"id":"did:example:seller#kolyada","serviceEndpoint":[{"protocol":"urn:vertep:protocol:sha256:4579…7bc6","roles":["seller"]}],"type":"VertepProtocol"}</code></pre>
+
+    <h2 id="vectors">Test vectors</h2>
+    <p>Another implementation proves it agrees without any Rust: <code>crates/vertep-kolyada/vectors/</code> holds protocol identities, projections, envelope hashes and signatures, and verdict sequences as JSON, and <code>check.mjs</code> checks the envelopes with Node's crypto alone.</p>
+
+    <h2 id="next">What is next</h2>
+    <p>The binding to Vertep actors: a chart declares the roles it plays (<code>vt:plays</code>), the mailbox runs the check where grants run, before any journal append, and journals the verdict with the input, and the send path runs the same check on the actor's own projection. Then <code>vt kolyada</code> (<code>validate</code>, <code>hash</code>, <code>project</code>, <code>offer</code>, <code>check</code>), and a Lean model proving that accepted messages are enabled by the projection, that unbound roles are never accepted and that causally consistent orders converge, with a checker that replays recorded histories.</p>
+    <p>The design notes are in <code>tg.md/views/kolyada.md</code>; the requirements in <code>openspec/changes/m10-agent-protocols</code> (capabilities <code>agent-protocols</code>, <code>protocol-conformance</code> and <code>protocol-spaces</code>); the tour in <code>crates/vertep-kolyada/examples/quote.rs</code>. The article <a href="../articles/kolyada.html">A protocol a stranger can check</a> tells the story behind it.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="wallet.html">← Agent wallets</a>
+      <a href="browser.html">Browser and JavaScript →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

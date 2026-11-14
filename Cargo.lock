@@ -5447,6 +5447,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "vertep-kolyada"
+version = "0.1.5"
+dependencies = [
+ "base64 0.22.1",
+ "ed25519-dalek 3.0.0",
+ "oxigraph",
+ "oxjsonld",
+ "oxrdf",
+ "serde",
+ "serde_json",
+ "serde_json_canonicalizer 0.3.2",
+ "sha2 0.10.9",
+ "vertep-kolyada",
+ "vertep-rdf",
+]
+
+[[package]]
 name = "vertep-macros"
 version = "0.1.5"
 dependencies = [
