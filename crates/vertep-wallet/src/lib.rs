@@ -37,6 +37,7 @@ pub mod credential;
 pub mod error;
 pub mod exchange;
 pub mod format;
+pub mod grants;
 pub mod history;
 pub mod jose;
 pub mod message;

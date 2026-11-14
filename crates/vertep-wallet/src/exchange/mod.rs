@@ -84,6 +84,12 @@ pub struct Verified {
     pub credential: String,
     /// The disclosed claims, with values.
     pub disclosed: Map<String, Value>,
+    /// The key that presented it (the holder), as a `did:key`.
+    pub holder: String,
+    /// The credential types.
+    pub types: Vec<String>,
+    /// The credential's status entry.
+    pub status: Option<StatusRef>,
 }
 
 fn pct(s: &str) -> String {
@@ -919,6 +925,9 @@ impl Exchanges {
                                 issuer: v.credential.issuer.clone(),
                                 credential: v.credential.digest.clone(),
                                 disclosed: v.disclosed,
+                                holder: v.signer.clone(),
+                                types: v.credential.types.clone(),
+                                status: v.credential.status.clone(),
                             },
                         );
                         event(

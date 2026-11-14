@@ -126,8 +126,8 @@
 
 ## 11. Grant credentials from a wallet
 
-- [ ] 11.1 Make grant credentials a wallet credential type. A presented grant is verified (format, then status) and installed as a `Grant` with `issuer` and `id`. Revocation removes it at the next status check (D13)
-- [ ] 11.2 Tests for `Grant presented over an exchange`, `Presented grant enforced before the journal` and `Revoked grant credential refused`, each with `@tg: verifies::`
+- [x] 11.1 Make grant credentials a wallet credential type. A presented grant is verified (format, then status) and installed as a `Grant` with `issuer` and `id`. Revocation removes it at the next status check (D13)
+- [x] 11.2 Tests for `Grant presented over an exchange`, `Presented grant enforced before the journal` and `Revoked grant credential refused`, each with `@tg: verifies::`
 
 ## 12. CLI, docs and annotations
 
