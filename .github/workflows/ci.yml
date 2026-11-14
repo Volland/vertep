@@ -163,9 +163,11 @@ jobs:
 
   python:
     name: Python bindings on Python ${{ matrix.python }}
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which setup-python has no CPython 3.9 for.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         # the oldest and the newest CPython the abi3 wheel supports
         python: ["3.9", "3.13"]
