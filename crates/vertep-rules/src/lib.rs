@@ -29,7 +29,10 @@ pub use error::RulesError;
 pub use types::{Derivation, ENGINE, RulePolicy};
 
 #[cfg(feature = "native")]
-pub use decider::{CheckReport, RuleDecider, check_program, program_text, put_program, verify};
+pub use decider::{
+    CheckReport, Materialized, RuleDecider, check_program, enforce, materialize, program_text,
+    put_program, verify,
+};
 #[cfg(feature = "native")]
 pub use replay::counterfactual;
 
@@ -37,7 +40,8 @@ pub use replay::counterfactual;
 mod unavailable;
 #[cfg(not(feature = "native"))]
 pub use unavailable::{
-    CheckReport, RuleDecider, check_program, counterfactual, program_text, put_program, verify,
+    CheckReport, Materialized, RuleDecider, check_program, counterfactual, enforce, materialize,
+    program_text, put_program, verify,
 };
 
 /// The IRIs a rule program reads. Programs are written against these names.

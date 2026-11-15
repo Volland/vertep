@@ -7,8 +7,8 @@
 use std::path::Path;
 
 use vertep_rules::{
-    Derivation, RuleBundle, RulePolicy, RulesError, check_program, counterfactual, program_text,
-    put_program,
+    Derivation, RuleBundle, RulePolicy, RulesError, check_program, counterfactual, enforce,
+    materialize, program_text, put_program,
 };
 use vertep_tiramemsu::TiramemsuShard;
 
@@ -202,5 +202,40 @@ pub fn counterfactual_cmd(db: &Path, derivations_file: &Path, program_file: &Pat
             ));
         }
         Ok(out)
+    })())
+}
+
+/// `vt rules enforce DB PROGRAM` and `vt rules unenforce DB PROGRAM`: turn commit-time
+/// enforcement on or off. Turning it on checks existing data first and is refused, with the
+/// violations listed, if live data violates the program.
+pub fn enforce_cmd(db: &Path, program: &str, on: bool) -> Outcome {
+    done((|| {
+        enforce(&shard(db)?, program, on).map_err(s)?;
+        Ok(format!(
+            "{} {program}\n",
+            if on {
+                "enforcing"
+            } else {
+                "no longer enforcing"
+            }
+        ))
+    })())
+}
+
+/// `vt rules materialize DB PROGRAM [--fuel N]`: write the program's conclusions as derived facts.
+pub fn materialize_cmd(db: &Path, program: &str, fuel: u64) -> Outcome {
+    done((|| {
+        let m = materialize(&shard(db)?, program, fuel).map_err(s)?;
+        Ok(format!(
+            "derived {}, kept {}, retracted {}{}\n",
+            m.derived.len(),
+            m.existing,
+            m.retracted.len(),
+            if m.non_monotonic {
+                " (non-monotonic: rerun after writes)"
+            } else {
+                ""
+            }
+        ))
     })())
 }

@@ -89,3 +89,30 @@ pub fn check_program(
 ) -> Result<CheckReport, RulesError> {
     Err(RulesError::Unavailable)
 }
+
+/// Always [`RulesError::Unavailable`] without the `native` feature.
+pub fn enforce(_shard: &TiramemsuShard, _program: &str, _on: bool) -> Result<(), RulesError> {
+    Err(RulesError::Unavailable)
+}
+
+/// What a materialization run did (never produced without the engine).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Materialized {
+    /// Statements derived by this run.
+    pub derived: Vec<String>,
+    /// Conclusions that were already derived from the same support.
+    pub existing: usize,
+    /// Earlier conclusions this run no longer derives, retracted.
+    pub retracted: Vec<String>,
+    /// True when the program may be non-monotonic.
+    pub non_monotonic: bool,
+}
+
+/// Always [`RulesError::Unavailable`] without the `native` feature.
+pub fn materialize(
+    _shard: &TiramemsuShard,
+    _program: &str,
+    _fuel: u64,
+) -> Result<Materialized, RulesError> {
+    Err(RulesError::Unavailable)
+}

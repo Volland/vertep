@@ -554,7 +554,12 @@ impl JournalStore for TiramemsuShard {
         });
         match result {
             Ok(_) => Ok(expected.advance(stamped.len() as u64)),
-            Err(e) => Err(abort.unwrap_or_else(|| AppendError::Storage(store_error(e)))),
+            Err(e) => Err(
+                abort.unwrap_or_else(|| match crate::convert::violations(&e) {
+                    Some(violations) => AppendError::Refused { violations },
+                    None => AppendError::Storage(store_error(e)),
+                }),
+            ),
         }
     }
 

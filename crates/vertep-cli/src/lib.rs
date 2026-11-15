@@ -8,7 +8,7 @@
 //! vt convert <chart> --to scxml|yaml|turtle|trig|nquads [-o <file>]
 //! vt certify <chart>                                    run the Lean checker, print the certificate
 //! vt cluster reshard <dir> <out>                        double a stopped cluster's shard count
-//! vt rules put|show|check|diff|bundle|verify-bundle|counterfactual   rule programs (feature `rules`)
+//! vt rules put|show|check|diff|enforce|unenforce|materialize|bundle|verify-bundle|counterfactual   rule programs (feature `rules`)
 //! vt webvh create|update|rotate|deactivate|verify|witness|publish|serve
 //! vt webvh object create | vt webvh custody change      durable-object DIDs and custody changes
 //! ```

@@ -143,6 +143,30 @@ enum RulesCmd {
         /// The bundle file.
         file: PathBuf,
     },
+    /// Turn commit-time enforcement of a program on (checks existing data first).
+    Enforce {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The program IRI.
+        program: String,
+    },
+    /// Turn commit-time enforcement of a program off.
+    Unenforce {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The program IRI.
+        program: String,
+    },
+    /// Write a program's conclusions as derived facts with their support.
+    Materialize {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The program IRI.
+        program: String,
+        /// The step budget.
+        #[arg(long, default_value_t = 1_000_000)]
+        fuel: u64,
+    },
     /// Where recorded decisions would differ under another program version; writes nothing.
     Counterfactual {
         /// The shard's tiramemsu file.
@@ -605,6 +629,9 @@ fn run_rules(command: RulesCmd) -> Outcome {
             out,
         } => rules::bundle(&db, &derivations, &node, out.as_deref()),
         RulesCmd::VerifyBundle { file } => rules::verify_bundle(&file),
+        RulesCmd::Enforce { db, program } => rules::enforce_cmd(&db, &program, true),
+        RulesCmd::Unenforce { db, program } => rules::enforce_cmd(&db, &program, false),
+        RulesCmd::Materialize { db, program, fuel } => rules::materialize_cmd(&db, &program, fuel),
         RulesCmd::Counterfactual {
             db,
             derivations,

@@ -5645,6 +5645,7 @@ name = "vertep-rules"
 version = "0.1.6"
 dependencies = [
  "futures",
+ "oxrdf",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -5652,6 +5653,9 @@ dependencies = [
  "tiramemsu",
  "vertep-agent",
  "vertep-core",
+ "vertep-runtime",
+ "vertep-scxml",
+ "vertep-store",
  "vertep-tiramemsu",
 ]
 

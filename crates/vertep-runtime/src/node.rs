@@ -1674,6 +1674,7 @@ impl Node {
     // @tg: implements:: [[openspec:event-journal#Message Deduplication]]
     // @tg: implements:: [[openspec:event-journal#Inputs Only From The Journal]]
     // @tg: implements:: [[openspec:messaging#Duplicate Reply Suppression]]
+    // @tg: implements:: [[openspec:rule-invariants#Refusal Is Visible And Writes No Entry]]
     fn virtual_turn(&mut self, a: &Address, now: i64) -> bool {
         if let Some(progress) = self.placement_turn(a, now) {
             return progress;
@@ -1789,6 +1790,19 @@ impl Node {
             return true;
         }
         if let Err(e) = self.append(a, va.head, &data, delta.clone()) {
+            // An enforced rule program refused the append ([[openspec:rule-invariants#Refusal Is Visible And Writes No Entry]]):
+            // nothing was written, so the message is dead-lettered with the violations and
+            // acknowledged, and the actor steps down and reloads unchanged.
+            if let AppendError::Refused { violations } = &e {
+                let why: Vec<String> = violations
+                    .iter()
+                    .map(|v| format!("{} ({})", v.constraint, v.statements.join(" ")))
+                    .collect();
+                self.dead_letter(a, &env, &format!("invariant: {}", why.join(", ")), now);
+                let _ = mailbox.ack(&env.message_id);
+                self.stats.deactivations += 1;
+                return true;
+            }
             // compare-and-set lost, fenced or failed: step down, dispatch nothing
             mailbox.release(&env.message_id);
             self.stats.deactivations += 1;

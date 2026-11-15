@@ -335,7 +335,7 @@ Enforced rule programs that refuse a violating journal append at commit, with th
 
 - scheduled_in:: [[roadmap#M15 Rule invariants]]
 
-Not implemented: the change is a draft.
+Mostly implemented in [[components#vertep-rules]]: `enforce`, the refusal path through a running node (dead letter, no entry), the full check on enabling and the delta-versus-full property test; the reference example in the site is not updated.
 
 
 ## Derived facts
@@ -344,7 +344,7 @@ Facts concluded by rules and kept in the actor's graph with their support, retra
 
 - scheduled_in:: [[roadmap#M15 Rule invariants]]
 
-Not implemented: the change is a draft.
+Partly implemented in [[components#vertep-rules]]: `materialize` writes derived facts with support and they fall with their support and with the program; they are not yet in a named graph per actor, and retraction on erasure waits on M12.
 
 
 ## Rule verification
