@@ -14,7 +14,7 @@
 
 ## 3. Derived facts
 
-- [ ] 3.1 Materialize into the actor's graph with support (done: `materialize` writes derived facts with support into the shard; open: placing them in the actor's named graph)
+- [x] 3.1 Materialize into the actor's graph with support (derived facts are members of the graph `<subject>/derived`; not the state graph itself, because the runtime compares the state graph with the machine's state after every turn and would read a derived fact as a state change)
 - [x] 3.2 Retraction and reconciliation when support changes; non-monotonic label surfaced
 - [ ] 3.3 Erasure retracts dependents and journals the retraction (needs `journal-redaction`)
 

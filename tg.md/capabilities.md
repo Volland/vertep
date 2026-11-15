@@ -353,7 +353,7 @@ A rules profile, totality and support-necessity checks, a differential oracle ag
 
 - scheduled_in:: [[roadmap#M16 Verified rules]]
 
-Not implemented: the change is a draft.
+Partly implemented in [[components#vertep-rules]]: the rules profile, support necessity, sampled totality and the Datalog oracle; derivation certificates are open (the go/no-go in the M16 design is partial).
 
 
 ## Rule authoring
@@ -362,4 +362,4 @@ Agent-proposed rules behind an ordered gate with structured errors, shadow evalu
 
 - scheduled_in:: [[roadmap#M17 Agent rules]]
 
-Not implemented: the change is a draft.
+Mostly implemented in [[components#vertep-rules]] (`authoring`): the gate with structured errors, authorship, shadow evaluation, staged journaled promotion, self-governance and diff; the agent tool and the scoped-live behaviour are open.

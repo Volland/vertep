@@ -45,6 +45,9 @@ impl Term {
     }
 }
 
+/// The content of a conclusion's supporting statements, independent of statement ids.
+type Support = BTreeSet<(Term, Term, Term)>;
+
 fn tm<E: std::fmt::Display>(e: E) -> RulesError {
     RulesError::Program(e.to_string())
 }
@@ -101,6 +104,105 @@ impl RuleBundle {
         })
     }
 
+    /// Runs the bundle's rule in a fresh store from its own text, leaving out the statement
+    /// `omit` when given. `None` when the rule then does not conclude the recorded event;
+    /// otherwise the content of the statements the conclusion rests on.
+    fn fresh_support(&self, omit: Option<&str>) -> Result<Option<Support>, RulesError> {
+        let d = &self.derivation;
+        let dir = tempfile::tempdir().map_err(|e| RulesError::Store(e.to_string()))?;
+        let db = Db::open(dir.path().join("verify.db"), OpenOptions::default()).map_err(tm)?;
+        // Includes must exist before the program that accumulates them: store until done.
+        let mut pending: Vec<&ProgramSource> = self.programs.iter().collect();
+        while !pending.is_empty() {
+            let before = pending.len();
+            pending.retain(|p| {
+                db.transact(TxOptions::default(), |t| {
+                    t.store_elpi_program(TmValue::iri(p.iri.clone()), &p.text)?;
+                    Ok(())
+                })
+                .is_err()
+            });
+            if pending.len() == before {
+                return Err(RulesError::Program(
+                    "the bundled programs do not load".to_owned(),
+                ));
+            }
+        }
+        db.transact(TxOptions::default(), |t| {
+            for s in self
+                .statements
+                .iter()
+                .filter(|s| Some(s.eid.as_str()) != omit)
+            {
+                t.assert(
+                    s.s.to_tm().map_err(|e| TmError::custom(e.to_string()))?,
+                    s.p.to_tm().map_err(|e| TmError::custom(e.to_string()))?,
+                    s.o.to_tm().map_err(|e| TmError::custom(e.to_string()))?,
+                    Valid::ALWAYS,
+                )?;
+            }
+            Ok(())
+        })
+        .map_err(tm)?;
+
+        let view = db.now();
+        let opts = ElpiOptions {
+            fuel: d.fuel_limit,
+            ..ElpiOptions::default()
+        };
+        let r = view
+            .elpi_conclude(&ElpiProgram::Stored(TmValue::iri(d.program.clone())), &opts)
+            .map_err(|e| match e {
+                TmError::ElpiOutOfFuel { .. } => RulesError::FuelExhausted {
+                    limit: d.fuel_limit,
+                },
+                e => tm(e),
+            })?;
+        let node = TmValue::iri(d.node.clone());
+        let decision = TmValue::iri(vocab::DECISION);
+        let c = r.conclusions.iter().find(|c| {
+            c.s == node && c.p == decision && event_of(&c.o).as_deref() == Some(&d.event)
+        });
+        let Some(c) = c else { return Ok(None) };
+
+        // Compare supports by content: statement ids differ between stores.
+        let fresh: std::collections::BTreeMap<String, (Term, Term, Term)> = view
+            .triples(None, None, None)
+            .map_err(tm)?
+            .into_iter()
+            .map(|t| {
+                Ok((
+                    t.eid.to_string(),
+                    (
+                        Term::from_tm(&view.decode(t.s).map_err(tm)?)?,
+                        Term::from_tm(&view.decode(t.p).map_err(tm)?)?,
+                        Term::from_tm(&view.decode(t.o).map_err(tm)?)?,
+                    ),
+                ))
+            })
+            .collect::<Result<_, RulesError>>()?;
+        let got: BTreeSet<(Term, Term, Term)> = c
+            .support
+            .iter()
+            .filter_map(|e| fresh.get(&e.to_string()).cloned())
+            .collect();
+        Ok(Some(got))
+    }
+
+    /// The supporting statements the conclusion does not need: each is left out in turn and the
+    /// rule re-run; one whose removal leaves the conclusion standing is reported
+    /// ([[openspec:rule-verification#Support Is Necessary]]).
+    // @tg: implements:: [[openspec:rule-verification#Support Is Necessary]]
+    pub fn unnecessary_support(&self) -> Result<Vec<String>, RulesError> {
+        let mut out = Vec::new();
+        for e in &self.derivation.support {
+            if self.fresh_support(Some(e))?.is_some() {
+                out.push(e.clone());
+            }
+        }
+        Ok(out)
+    }
+
     /// Re-runs the decision in a fresh store with no shard, no decider and no network: the
     /// closure digest must match, and the rule must conclude the recorded event from exactly the
     /// recorded statements.
@@ -130,91 +232,18 @@ impl RuleBundle {
             ));
         }
 
-        let dir = tempfile::tempdir().map_err(|e| RulesError::Store(e.to_string()))?;
-        let db = Db::open(dir.path().join("verify.db"), OpenOptions::default()).map_err(tm)?;
-        // Includes must exist before the program that accumulates them: store until done.
-        let mut pending: Vec<&ProgramSource> = self.programs.iter().collect();
-        while !pending.is_empty() {
-            let before = pending.len();
-            pending.retain(|p| {
-                db.transact(TxOptions::default(), |t| {
-                    t.store_elpi_program(TmValue::iri(p.iri.clone()), &p.text)?;
-                    Ok(())
-                })
-                .is_err()
-            });
-            if pending.len() == before {
-                return Err(RulesError::Program(
-                    "the bundled programs do not load".to_owned(),
-                ));
-            }
-        }
-        db.transact(TxOptions::default(), |t| {
-            for s in &self.statements {
-                t.assert(
-                    s.s.to_tm().map_err(|e| TmError::custom(e.to_string()))?,
-                    s.p.to_tm().map_err(|e| TmError::custom(e.to_string()))?,
-                    s.o.to_tm().map_err(|e| TmError::custom(e.to_string()))?,
-                    Valid::ALWAYS,
-                )?;
-            }
-            Ok(())
-        })
-        .map_err(tm)?;
-
-        let view = db.now();
-        let opts = ElpiOptions {
-            fuel: d.fuel_limit,
-            ..ElpiOptions::default()
-        };
-        let r = view
-            .elpi_conclude(&ElpiProgram::Stored(TmValue::iri(d.program.clone())), &opts)
-            .map_err(|e| match e {
-                TmError::ElpiOutOfFuel { .. } => RulesError::FuelExhausted {
-                    limit: d.fuel_limit,
-                },
-                e => tm(e),
-            })?;
-        let node = TmValue::iri(d.node.clone());
-        let decision = TmValue::iri(vocab::DECISION);
-        let c = r
-            .conclusions
-            .iter()
-            .find(|c| c.s == node && c.p == decision && event_of(&c.o).as_deref() == Some(&d.event))
-            .ok_or_else(|| {
-                RulesError::Diverged(format!(
-                    "the rule does not conclude {} for {}",
-                    d.event, d.node
-                ))
-            })?;
-
-        // Compare supports by content: statement ids differ between stores.
-        let fresh: std::collections::BTreeMap<String, (Term, Term, Term)> = view
-            .triples(None, None, None)
-            .map_err(tm)?
-            .into_iter()
-            .map(|t| {
-                Ok((
-                    t.eid.to_string(),
-                    (
-                        Term::from_tm(&view.decode(t.s).map_err(tm)?)?,
-                        Term::from_tm(&view.decode(t.p).map_err(tm)?)?,
-                        Term::from_tm(&view.decode(t.o).map_err(tm)?)?,
-                    ),
-                ))
-            })
-            .collect::<Result<_, RulesError>>()?;
-        let got: BTreeSet<(Term, Term, Term)> = c
-            .support
-            .iter()
-            .filter_map(|e| fresh.get(&e.to_string()).cloned())
-            .collect();
         let want: BTreeSet<(Term, Term, Term)> = self
             .statements
             .iter()
             .filter(|s| d.support.contains(&s.eid))
             .map(|s| (s.s.clone(), s.p.clone(), s.o.clone()))
             .collect();
+        let Some(got) = self.fresh_support(None)? else {
+            return Err(RulesError::Diverged(format!(
+                "the rule does not conclude {} for {}",
+                d.event, d.node
+            )));
+        };
         if got != want {
             return Err(RulesError::Diverged(
                 "the rule rests on different statements than recorded".to_owned(),

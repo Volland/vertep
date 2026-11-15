@@ -39,6 +39,10 @@ A proposal, edit or promotion is refused if the proposing identity is an actor w
 3. Staged promotion and the self-governance check.
 4. An agent tool, `vt rules propose`, docs.
 
+## Built (2026-11-15)
+
+`vertep_rules::authoring`: `propose` (self-governance, capability, event types, profile, trial run on recorded cases, existing-data check, in that order, each failure a `GateError` with a code), proposals stored as program nodes of their own under `<program>/proposal/<digest>` with authorship and stage statements, `shadow`, `promote` (one stage at a time, a journaled act per step, `Live` supersedes the live program), `diff` and `vt rules propose|shadow|promote`. Findings: (1) the type check scans for event IRIs in the text, so it catches a concluded event the chart does not declare but not a mistyped argument; (2) the capability check is a closure the host supplies, and the CLI reads it from a JSON grants file, so grants from the federation layer are not wired; (3) `Scoped` records the scope but nothing yet makes a decider use a scoped program for that scope; (4) a promoter cannot be the proposer's own governed actor, but nothing stops the proposer from promoting if it also holds the grant.
+
 ## Open Questions
 
 - Who holds the promote grant by default, and can it be a quorum?

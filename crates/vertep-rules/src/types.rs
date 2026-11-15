@@ -1,6 +1,7 @@
 //! Plain data: the policy and the record of one rule decision. No engine here.
 
 use serde::{Deserialize, Serialize};
+use vertep_core::datamodel::Value;
 
 /// The engine pinned by this build: tiramemsu's ELPI integration over lean-elpi. A decision
 /// records it ([[openspec:rule-programs#Rule Version Is Pinned By The Entry]]); replay with
@@ -56,6 +57,10 @@ pub struct Derivation {
     /// The transaction in which the offer and context were written; replay reads the store as
     /// of it.
     pub tx: u64,
+    /// True when every program of the closure was inside the rules profile; otherwise the
+    /// decision is `unchecked` ([[openspec:rule-verification#Rules Profile]]).
+    #[serde(default)]
+    pub profile_checked: bool,
 }
 
 impl Derivation {
@@ -69,4 +74,28 @@ impl Derivation {
             &self.closure_digest[..self.closure_digest.len().min(12)]
         )
     }
+}
+
+/// The suffix of the graph that holds the derived facts about an actor: `<actor>/derived`. It is
+/// a graph of its own, not the actor's state graph, because the runtime compares the state graph
+/// with the machine's state after every turn and would read a derived fact there as a state change.
+pub const DERIVED_GRAPH_SUFFIX: &str = "/derived";
+
+/// The answer of a totality check.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Totality {
+    /// Every checked offer got a decision or an explicit refusal.
+    Total {
+        /// How many offers were run.
+        checked: usize,
+    },
+    /// An offer no clause covers.
+    Gap {
+        /// The offered events.
+        offer: Vec<String>,
+        /// The sample context under which nothing applied.
+        context: Vec<(String, Value)>,
+    },
+    /// The check did not decide, with the reason (never a guess).
+    Unknown(String),
 }

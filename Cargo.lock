@@ -4731,6 +4731,7 @@ dependencies = [
  "lru",
  "serde_json",
  "tm-core",
+ "tm-datalog",
  "tm-elpi",
  "tm-elpi-store",
  "tm-exec",
@@ -4749,6 +4750,19 @@ checksum = "b2919ef1b97edbc16b5f88f033b9618dcee944bf001ddea487cd407f9a27918a"
 dependencies = [
  "lru",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "tm-datalog"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f196acdb46e1f70a00d38a5f20f47ec7578e6c63e5fc459e5b69e3bae6fed6c7"
+dependencies = [
+ "hashbrown 0.16.1",
+ "rustc-hash",
+ "smallvec",
+ "tm-core",
+ "tm-store",
 ]
 
 [[package]]

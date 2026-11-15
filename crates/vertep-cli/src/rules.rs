@@ -6,9 +6,10 @@
 
 use std::path::Path;
 
+use vertep_rules::authoring::{self, Action, Actor, GateContext, Stage};
 use vertep_rules::{
-    Derivation, RuleBundle, RulePolicy, RulesError, check_program, counterfactual, enforce,
-    materialize, program_text, put_program,
+    Derivation, RuleBundle, RulePolicy, RulesError, check_profile, check_program, counterfactual,
+    enforce, materialize, program_text, put_program,
 };
 use vertep_tiramemsu::TiramemsuShard;
 
@@ -237,5 +238,182 @@ pub fn materialize_cmd(db: &Path, program: &str, fuel: u64) -> Outcome {
                 ""
             }
         ))
+    })())
+}
+
+/// Who may do what, from a JSON file: `{"propose": ["id", ...], "promote": ["id", ...]}`.
+#[derive(serde::Deserialize, Default)]
+struct Grants {
+    #[serde(default)]
+    propose: Vec<String>,
+    #[serde(default)]
+    promote: Vec<String>,
+}
+
+fn grants(path: Option<&Path>) -> Result<Grants, String> {
+    match path {
+        Some(p) => serde_json::from_str(&read(p)?).map_err(s),
+        None => Ok(Grants::default()),
+    }
+}
+
+/// Arguments of `vt rules propose`.
+pub struct ProposeArgs<'a> {
+    /// The shard's tiramemsu file.
+    pub db: &'a Path,
+    /// The live program IRI the proposal is for.
+    pub program: &'a str,
+    /// The proposed source.
+    pub file: &'a Path,
+    /// The proposing identity.
+    pub by: &'a str,
+    /// The grant presented.
+    pub grant: &'a str,
+    /// Where the proposal came from.
+    pub source: &'a str,
+    /// The event names the chart declares.
+    pub events: Vec<String>,
+    /// Recorded decisions for the trial run.
+    pub cases: Option<&'a Path>,
+    /// Waive the trial run when there are no cases.
+    pub allow_no_cases: bool,
+    /// The actors the program would govern.
+    pub scope: Vec<String>,
+    /// The grants file.
+    pub grants: Option<&'a Path>,
+}
+
+/// `vt rules propose`: put a program forward through the gate; prints the proposal id.
+pub fn propose(a: &ProposeArgs<'_>) -> Outcome {
+    done((|| {
+        let g = grants(a.grants)?;
+        let cases = match a.cases {
+            Some(p) => derivations(p)?,
+            None => Vec::new(),
+        };
+        let policy = RulePolicy::default();
+        let authorize = |who: &Actor<'_>, act: Action| match act {
+            Action::Propose => g.propose.iter().any(|i| i == who.identity),
+            Action::Promote => g.promote.iter().any(|i| i == who.identity),
+        };
+        let ctx = GateContext {
+            events: &a.events,
+            cases: &cases,
+            allow_no_cases: a.allow_no_cases,
+            authorize: &authorize,
+            policy: &policy,
+        };
+        let by = Actor {
+            identity: a.by,
+            grant: a.grant,
+        };
+        let id = authoring::propose(
+            &shard(a.db)?,
+            a.program,
+            &read(a.file)?,
+            &by,
+            a.source,
+            &a.scope,
+            &ctx,
+        )
+        .map_err(|e| format!("refused: {e}"))?;
+        Ok(format!("proposed {id}\n"))
+    })())
+}
+
+/// `vt rules shadow DB PROPOSAL CASES`: run a proposal beside the live program on recorded cases.
+pub fn shadow_cmd(db: &Path, proposal: &str, cases: &Path) -> Outcome {
+    done((|| {
+        let r = authoring::shadow(
+            &shard(db)?,
+            proposal,
+            &derivations(cases)?,
+            &RulePolicy::default(),
+        )
+        .map_err(|e| format!("refused: {e}"))?;
+        let mut out = format!("{} unchanged, {} differ\n", r.unchanged, r.differs.len());
+        for d in &r.differs {
+            out.push_str(&format!(
+                "{}: {} -> {}\n",
+                d.node,
+                d.recorded_event,
+                d.counterfactual_event.as_deref().unwrap_or("(none)")
+            ));
+        }
+        Ok(out)
+    })())
+}
+
+/// `vt rules promote DB PROPOSAL --to STAGE --by ID`: move a proposal one stage along.
+pub fn promote_cmd(
+    db: &Path,
+    proposal: &str,
+    to: &str,
+    by: &str,
+    grant: &str,
+    scope: Option<&str>,
+    grants_file: Option<&Path>,
+) -> Outcome {
+    done((|| {
+        let to = match to {
+            "shadow" => Stage::Shadow,
+            "scoped" => Stage::Scoped,
+            "live" => Stage::Live,
+            other => return Err(format!("unknown stage {other}: shadow, scoped or live")),
+        };
+        let g = grants(grants_file)?;
+        let policy = RulePolicy::default();
+        let authorize = |who: &Actor<'_>, act: Action| match act {
+            Action::Propose => g.propose.iter().any(|i| i == who.identity),
+            Action::Promote => g.promote.iter().any(|i| i == who.identity),
+        };
+        let ctx = GateContext {
+            events: &[],
+            cases: &[],
+            allow_no_cases: false,
+            authorize: &authorize,
+            policy: &policy,
+        };
+        authoring::promote(
+            &shard(db)?,
+            proposal,
+            to,
+            &Actor {
+                identity: by,
+                grant,
+            },
+            scope,
+            &ctx,
+        )
+        .map_err(|e| format!("refused: {e}"))?;
+        Ok(format!("{proposal} is now {}\n", to.name()))
+    })())
+}
+
+/// `vt rules profile FILE`: whether a program is inside the rules profile, and why not.
+pub fn profile_cmd(file: &Path) -> Outcome {
+    done((|| {
+        let v = check_profile(&read(file)?);
+        if v.is_empty() {
+            return Ok("inside the rules profile\n".to_owned());
+        }
+        Err(v
+            .iter()
+            .map(|x| format!("outside the profile: {} [{}]", x.reason, x.clause))
+            .collect::<Vec<_>>()
+            .join("\n"))
+    })())
+}
+
+/// `vt rules unnecessary BUNDLE`: supporting statements the conclusion does not need.
+pub fn unnecessary_cmd(file: &Path) -> Outcome {
+    done((|| {
+        let b = RuleBundle::from_json(&read(file)?).map_err(s)?;
+        let u = b.unnecessary_support().map_err(s)?;
+        if u.is_empty() {
+            Ok("every supporting statement is needed\n".to_owned())
+        } else {
+            Err(format!("support-not-necessary: {}", u.join(" ")))
+        }
     })())
 }

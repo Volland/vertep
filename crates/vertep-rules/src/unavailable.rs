@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use vertep_tiramemsu::TiramemsuShard;
 
-use crate::{CounterfactualReport, Derivation, RuleBundle, RulePolicy, RulesError};
+use crate::{CounterfactualReport, Derivation, RuleBundle, RulePolicy, RulesError, Totality};
 
 /// A rules decider cannot be built here.
 #[derive(Debug)]
@@ -52,6 +52,11 @@ pub fn counterfactual(
 impl RuleBundle {
     /// Always [`RulesError::Unavailable`] without the `native` feature.
     pub fn export(_shard: &TiramemsuShard, _d: &Derivation) -> Result<RuleBundle, RulesError> {
+        Err(RulesError::Unavailable)
+    }
+
+    /// Always [`RulesError::Unavailable`] without the `native` feature.
+    pub fn unnecessary_support(&self) -> Result<Vec<String>, RulesError> {
         Err(RulesError::Unavailable)
     }
 
@@ -114,5 +119,15 @@ pub fn materialize(
     _program: &str,
     _fuel: u64,
 ) -> Result<Materialized, RulesError> {
+    Err(RulesError::Unavailable)
+}
+
+/// Always [`RulesError::Unavailable`] without the `native` feature.
+pub fn totality(
+    _text: &str,
+    _candidates: &[&str],
+    _contexts: &[Vec<(String, vertep_core::datamodel::Value)>],
+    _policy: &RulePolicy,
+) -> Result<Totality, RulesError> {
     Err(RulesError::Unavailable)
 }

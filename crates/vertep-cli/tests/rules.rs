@@ -206,4 +206,154 @@ tm.conclude (triple S (iri "urn:vt:q") (iri "urn:vt:yes")) [E] :- tm.triple S (i
         );
         assert!(ok(&["rules", "materialize", db_s, PROGRAM]).starts_with("derived 1"));
     }
+
+    // @tg: verifies:: [[openspec:rule-authoring#Promotion Is Staged And Journaled#A step is journaled]] {level: e2e}
+    // @tg: verifies:: [[openspec:rule-verification#Rules Profile#Out of profile]] {level: e2e}
+    #[test]
+    fn propose_shadow_promote_and_profile_from_the_command_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("shard.db");
+        let (db_s, d) = (db.to_str().unwrap(), dir.path());
+        let live = r#"tm.conclude (triple C (iri "urn:vt:decision") (iri "urn:vt:event:approve")) [X, Eo, Ea] :-
+  tm.triple (iri "urn:vt:ctx") (iri "urn:vt:deciding") C X,
+  tm.triple C (iri "urn:vt:offered") (iri "urn:vt:event:approve") Eo,
+  tm.triple C (iri "urn:vt:ctx:amount") (num A) Ea, A =< 50000.
+"#;
+        std::fs::write(d.join("live.elpi"), live).unwrap();
+        std::fs::write(d.join("next.elpi"), live.replace("50000", "30000")).unwrap();
+        std::fs::write(d.join("cut.elpi"), "p X :- q X, !.").unwrap();
+        std::fs::write(
+            d.join("grants.json"),
+            r#"{"propose":["agent:a"],"promote":["reviewer:r"]}"#,
+        )
+        .unwrap();
+        ok(&[
+            "rules",
+            "put",
+            db_s,
+            PROGRAM,
+            d.join("live.elpi").to_str().unwrap(),
+        ]);
+
+        // the profile check
+        assert!(
+            ok(&["rules", "profile", d.join("live.elpi").to_str().unwrap()]).starts_with("inside")
+        );
+        let bad = vt(&["rules", "profile", d.join("cut.elpi").to_str().unwrap()]);
+        assert_eq!(bad.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&bad.stderr).contains("cut"));
+
+        // one recorded decision to try proposals on
+        {
+            let shard = Arc::new(TiramemsuShard::open(&db).unwrap());
+            let dec = RuleDecider::new(shard, PROGRAM, RulePolicy::default()).unwrap();
+            let req = DecisionRequest {
+                state: "s".to_owned(),
+                candidates: vec![Candidate {
+                    event: "approve".to_owned(),
+                    schema: serde_json::json!({}),
+                    schema_hash: String::new(),
+                    decision_guard: None,
+                    source: "s".to_owned(),
+                    index: 0,
+                }],
+                context: ContextView::new(Value::Object(vec![(
+                    "amount".to_owned(),
+                    Value::Number(40_000.0),
+                )])),
+                actor: "https://example.org/a".to_owned(),
+                correlation: "k1".to_owned(),
+                binding: "b".to_owned(),
+                fallback: false,
+            };
+            assert!(matches!(
+                futures::executor::block_on(dec.decide(req)),
+                DecisionOutcome::Decision(_)
+            ));
+            std::fs::write(
+                d.join("cases.json"),
+                serde_json::to_string(&dec.derivations()).unwrap(),
+            )
+            .unwrap();
+        }
+        let (grants, cases, next) = (
+            d.join("grants.json"),
+            d.join("cases.json"),
+            d.join("next.elpi"),
+        );
+
+        // a stranger is refused with a code; the agent passes
+        let refused = vt(&[
+            "rules",
+            "propose",
+            db_s,
+            PROGRAM,
+            next.to_str().unwrap(),
+            "--by",
+            "stranger",
+            "--events",
+            "approve",
+            "--cases",
+            cases.to_str().unwrap(),
+            "--grants",
+            grants.to_str().unwrap(),
+        ]);
+        assert_eq!(refused.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&refused.stderr).contains("capability"));
+        let out = ok(&[
+            "rules",
+            "propose",
+            db_s,
+            PROGRAM,
+            next.to_str().unwrap(),
+            "--by",
+            "agent:a",
+            "--events",
+            "approve",
+            "--cases",
+            cases.to_str().unwrap(),
+            "--grants",
+            grants.to_str().unwrap(),
+        ]);
+        let id = out.trim().strip_prefix("proposed ").unwrap().to_owned();
+
+        assert!(
+            ok(&["rules", "shadow", db_s, &id, cases.to_str().unwrap()])
+                .starts_with("0 unchanged, 1 differ")
+        );
+        // a step may not be skipped
+        let skip = vt(&[
+            "rules",
+            "promote",
+            db_s,
+            &id,
+            "--to",
+            "live",
+            "--by",
+            "reviewer:r",
+            "--grants",
+            grants.to_str().unwrap(),
+        ]);
+        assert_eq!(skip.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&skip.stderr).contains("skipped-step"));
+        for (to, extra) in [("shadow", None), ("scoped", Some("team-a")), ("live", None)] {
+            let mut args = vec![
+                "rules",
+                "promote",
+                db_s,
+                id.as_str(),
+                "--to",
+                to,
+                "--by",
+                "reviewer:r",
+                "--grants",
+                grants.to_str().unwrap(),
+            ];
+            if let Some(sc) = extra {
+                args.extend(["--scope", sc]);
+            }
+            assert!(ok(&args).contains(to));
+        }
+        assert!(ok(&["rules", "show", db_s, PROGRAM]).contains("A =< 30000"));
+    }
 }

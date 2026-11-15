@@ -15,18 +15,75 @@
 
 mod bundle;
 mod error;
+mod profile;
 mod types;
 
+#[cfg(feature = "native")]
+pub mod authoring;
+mod authoring_types;
+#[cfg(not(feature = "native"))]
+pub mod authoring {
+    //! Without the engine only the types exist; every operation returns an `unavailable` error.
+    pub use crate::authoring_types::*;
+    use crate::{CounterfactualReport, Derivation, RulePolicy};
+    use vertep_tiramemsu::TiramemsuShard;
+
+    fn unavailable() -> GateError {
+        GateError {
+            code: "unavailable",
+            clause: None,
+            reason: crate::RulesError::Unavailable.to_string(),
+        }
+    }
+
+    /// Always unavailable without the `native` feature.
+    pub fn propose(
+        _: &TiramemsuShard,
+        _: &str,
+        _: &str,
+        _: &Actor<'_>,
+        _: &str,
+        _: &[String],
+        _: &GateContext<'_>,
+    ) -> Result<String, GateError> {
+        Err(unavailable())
+    }
+
+    /// Always unavailable without the `native` feature.
+    pub fn shadow(
+        _: &TiramemsuShard,
+        _: &str,
+        _: &[Derivation],
+        _: &RulePolicy,
+    ) -> Result<CounterfactualReport, GateError> {
+        Err(unavailable())
+    }
+
+    /// Always unavailable without the `native` feature.
+    pub fn promote(
+        _: &TiramemsuShard,
+        _: &str,
+        _: Stage,
+        _: &Actor<'_>,
+        _: Option<&str>,
+        _: &GateContext<'_>,
+    ) -> Result<(), GateError> {
+        Err(unavailable())
+    }
+}
 #[cfg(feature = "native")]
 mod decider;
 #[cfg(feature = "native")]
 mod replay;
+#[cfg(feature = "native")]
+mod totality;
 
 pub use bundle::{
     BUNDLE_FORMAT, CounterfactualReport, Divergence, ProgramSource, RuleBundle, Stmt, Term,
 };
 pub use error::RulesError;
-pub use types::{Derivation, ENGINE, RulePolicy};
+pub use profile::{HOST_BUILTINS, ProfileViolation, check_profile, clauses};
+pub use types::{DERIVED_GRAPH_SUFFIX, Derivation, ENGINE, RulePolicy, Totality};
 
 #[cfg(feature = "native")]
 pub use decider::{
@@ -35,13 +92,15 @@ pub use decider::{
 };
 #[cfg(feature = "native")]
 pub use replay::counterfactual;
+#[cfg(feature = "native")]
+pub use totality::{MAX_CANDIDATES, totality};
 
 #[cfg(not(feature = "native"))]
 mod unavailable;
 #[cfg(not(feature = "native"))]
 pub use unavailable::{
     CheckReport, Materialized, RuleDecider, check_program, counterfactual, enforce, materialize,
-    program_text, put_program, verify,
+    program_text, put_program, totality, verify,
 };
 
 /// The IRIs a rule program reads. Programs are written against these names.
@@ -58,6 +117,9 @@ pub mod vocab {
     pub const ACTOR: &str = "urn:vt:actor";
     /// `(node urn:vt:state "<id>")`.
     pub const STATE: &str = "urn:vt:state";
+    /// The prefix of an event IRI.
+    /// The event name a program concludes to refuse on purpose.
+    pub const REFUSE: &str = "refuse";
     /// The prefix of an event IRI.
     pub const EVENT_PREFIX: &str = "urn:vt:event:";
     /// The prefix of a context field predicate, `urn:vt:ctx:<field>`.
