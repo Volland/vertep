@@ -504,6 +504,105 @@ impl AgentHost {
         Ok((m, effects))
     }
 
+    /// Explains the entry of `actor` at `position`: derived by replay from the journal and the
+    /// registered chart versions, never stored, and needing no decider
+    /// ([[openspec:decision-records#Explanation View]]).
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`] when the journal cannot be read, has no such entry, or its chart version is
+    /// not registered.
+    // @tg: implements:: [[openspec:decision-records#Explanation View]]
+    // @tg: implements:: [[openspec:decision-records#Rationale Is Labelled As A Claim]]
+    pub fn explain(
+        &self,
+        actor: &str,
+        position: u64,
+    ) -> Result<crate::explain::Explanation, HostError> {
+        use crate::explain::{CLAIM_LABEL, Claim, DecisionRecord, Explanation, effect_line};
+        let entries = self.journal.try_read(actor).map_err(HostError::Journal)?;
+        let entry = entries
+            .iter()
+            .find(|e| e.position == position)
+            .ok_or_else(|| HostError::Unknown(format!("{actor} has no entry {position}")))?;
+        let AgentInput::Start { version } = &entries[0].input else {
+            return Err(HostError::Unknown(actor.to_owned()));
+        };
+        let (before, effects_before) = if position > 1 {
+            let (m, e) = self.replay(actor, &entries, Some(position - 1))?;
+            (m.configuration(), e.len())
+        } else {
+            (Vec::new(), 0)
+        };
+        let (m, effects) = self.replay(actor, &entries, Some(position))?;
+        let after = m.configuration();
+        // The transitions a decision took come from applying its entry on the state before it.
+        let taken = if matches!(entry.input, AgentInput::Decision { .. }) && position > 1 {
+            let (mut prior, _) = self.replay(actor, &entries, Some(position - 1))?;
+            prior
+                .apply(&entry.input, entry.position, entry.ts)
+                .ok()
+                .and_then(|a| a.accepted.into_iter().next())
+                .map(|d| d.taken)
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let decision = match &entry.input {
+            AgentInput::Decision {
+                correlation,
+                event,
+                annotations,
+                ..
+            } => Some((correlation, Some(event.clone()), Some(annotations))),
+            AgentInput::Refusal { correlation, .. } => Some((correlation, None, None)),
+            _ => None,
+        }
+        .map(|(correlation, chosen, annotations)| DecisionRecord {
+            correlation: correlation.clone(),
+            offered: entry.offered.clone().unwrap_or_default(),
+            offered_known: entry.offered.is_some(),
+            chosen,
+            disposition: entry.disposition_or_unknown().to_owned(),
+            decider: annotations.and_then(|a| a.decider.clone()),
+            decider_kind: annotations.and_then(|a| a.decider_kind.clone()),
+            fallback: annotations.is_some_and(|a| a.fallback),
+            taken,
+            claim: annotations
+                .filter(|a| a.rationale.is_some() || a.confidence.is_some())
+                .map(|a| Claim {
+                    claimed_by: a.decider.clone().unwrap_or_else(|| "unknown".to_owned()),
+                    rationale: a.rationale.clone(),
+                    confidence: a.confidence,
+                    label: CLAIM_LABEL,
+                }),
+        });
+        Ok(Explanation {
+            actor: actor.to_owned(),
+            position,
+            ts: entry.ts,
+            input: entry.input.kind().to_owned(),
+            chart_version: version.clone(),
+            entered: after
+                .iter()
+                .filter(|s| !before.contains(s))
+                .cloned()
+                .collect(),
+            exited: before
+                .iter()
+                .filter(|s| !after.contains(s))
+                .cloned()
+                .collect(),
+            state_before: before,
+            state_after: after,
+            effects: effects[effects_before.min(effects.len())..]
+                .iter()
+                .map(effect_line)
+                .collect(),
+            decision,
+        })
+    }
+
     /// The journal of `actor`.
     pub fn journal(&self, actor: &str) -> Vec<JournalEntry> {
         self.journal.read(actor)

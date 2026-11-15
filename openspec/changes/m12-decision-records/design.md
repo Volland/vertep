@@ -53,6 +53,10 @@ Entries already record the transitions they took. When a sealed field a guard re
 
 `JournalEntry` gained optional `disposition` and `offered`. They are not part of `AgentInput`, so replay and the machine ignore them: the machine recomputes every check itself, and the entry fields are the shell's record of what it saw. The host asks `AgentMachine::disposition_of(&input)` before it appends, which repeats the checks of `on_decision` (annotations, candidate, payload schema, enablement) without changing anything. Findings: (1) when a guard turns false while an offer is open, the candidate set shrinks and the offer is re-issued under a new correlation, so the late answer is `stale`, not `refused-guard`; (2) the chart never consults a fallback after a refusal, so `fallback-on-refusal` exists in the enum and is not produced; (3) the Lean oracle reads inputs only, so strict replay of dispositions through Lean (task 2.3) is not done.
 
+### Built (2026-11-15): the explanation view
+
+`AgentHost::explain` replays the journal into a fresh machine up to the entry before and up to the entry, so the view is a difference of two replays, never stored. Findings: (1) it reports entered and exited states and the effects of the entry, not the individual transitions of every microstep: only a decision exposes the transitions it took (`AcceptedDecision.taken`), so for other inputs the state difference stands in; (2) a cold host with no decider bound gives the same explanation as the host that ran the decision, and altering the journal changes it (both tested); (3) for an entry that predates dispositions the view says `unknown` and `offered_known: false` instead of recomputing, which keeps D2 (derived, but never a guess about what the shell saw).
+
 ## Risks / Trade-offs
 
 - **Entry size and write cost grow** with the offer and with sealing. Mitigation: the offer is a list of short event names; benchmarks in `m13-production-readiness` track the cost.

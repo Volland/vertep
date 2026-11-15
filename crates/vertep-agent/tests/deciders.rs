@@ -13,7 +13,7 @@ use vertep_agent::decider::{
     Annotations, Decider, Decision, DecisionOutcome, GuardDecider, HumanDecider, Inbox, LlmDecider,
 };
 use vertep_agent::host::{AgentHost, InstantiateError};
-use vertep_agent::journal::{AgentInput, MemoryJournal};
+use vertep_agent::journal::{AgentInput, AgentJournal, MemoryJournal};
 use vertep_agent::llm::ScriptedProvider;
 use vertep_agent::machine::{AgentChart, ChartError};
 use vertep_agent::vocab;
@@ -1236,4 +1236,117 @@ fn an_entry_written_before_dispositions_reads_as_unknown() {
     n.offered = Some(vec!["a".to_owned()]);
     let back = vertep_agent::journal::JournalEntry::from_json(&n.to_json()).unwrap();
     assert_eq!(back, n);
+}
+
+// ----- Decision records: the explanation view ------------------------------------------------
+
+// @tg: verifies:: [[openspec:decision-records#Explanation View#Explain a referred loan]] {level: integration}
+// @tg: verifies:: [[openspec:decision-records#Rationale Is Labelled As A Claim#The label is in the output]] {level: integration}
+#[test]
+fn explain_lists_the_offer_the_choice_the_disposition_and_what_followed() {
+    let (mut host, _, rec) = reviewing("");
+    let c = rec.requests()[0].correlation.clone();
+    host.deliver_outcome(
+        AGENT,
+        &c,
+        DecisionOutcome::Decision({
+            let mut d = Decision::new("reject", Value::Undefined);
+            d.annotations = Annotations {
+                rationale: Some("looks risky".into()),
+                confidence: Some(0.7),
+                decider: Some("d".into()),
+                decider_kind: Some("custom".into()),
+                ..Annotations::default()
+            };
+            d
+        }),
+    );
+    host.run_until_idle();
+    let n = host
+        .journal(AGENT)
+        .iter()
+        .position(|e| matches!(e.input, AgentInput::Decision { .. }))
+        .unwrap() as u64
+        + 1;
+    let x = host.explain(AGENT, n).unwrap();
+    assert_eq!(x.input, "decision");
+    assert_eq!(x.state_before, vec!["review"]);
+    assert_eq!(x.state_after, vec!["rejected"]);
+    assert_eq!(x.entered, vec!["rejected"]);
+    assert_eq!(x.exited, vec!["review"]);
+    let d = x.decision.as_ref().unwrap();
+    assert_eq!(d.chosen.as_deref(), Some("reject"));
+    assert_eq!(d.disposition, "accepted");
+    assert_eq!(d.offered, vec!["approve", "reject"]);
+    assert!(d.offered_known);
+    assert_eq!(d.taken.len(), 1);
+    // the rationale is the decider's claim, labelled as such, and is not mixed into the facts
+    let claim = d.claim.as_ref().unwrap();
+    assert_eq!(claim.claimed_by, "d");
+    assert_eq!(claim.rationale.as_deref(), Some("looks risky"));
+    assert_eq!(claim.label, "unverified claim by the decider");
+    assert!(x.to_json().contains("unverified claim by the decider"));
+}
+
+// @tg: verifies:: [[openspec:decision-records#Explanation View#Explain needs no decider]] {level: integration}
+// @tg: verifies:: [[openspec:decision-records#Explanation View#Explain is derived]] {level: integration}
+#[test]
+fn explain_needs_no_decider_and_follows_the_journal() {
+    let journal = Arc::new(MemoryJournal::new());
+    let rec = Recording::default();
+    rec.answer(DecisionOutcome::Decision(Decision::new(
+        "reject",
+        Value::Undefined,
+    )));
+    let clock = vertep_runtime::VirtualClock::new(T0);
+    let mut host = vertep_agent::AgentHost::builder(Arc::new(clock.clone()))
+        .journal(journal.clone())
+        .decider("d", Arc::new(rec))
+        .build();
+    spawn(&mut host, review(""));
+    host.send(AGENT, ev("start"));
+    host.run_until_idle();
+    let n = host.journal(AGENT).len() as u64;
+    let live = host.explain(AGENT, n).unwrap();
+
+    // a host with no decider bound, reading the same journal, gives the same explanation
+    let mut audit =
+        vertep_agent::AgentHost::builder(Arc::new(vertep_runtime::VirtualClock::new(T0)))
+            .journal(journal.clone())
+            .build();
+    audit.register(review("")).unwrap();
+    let cold = audit.explain(AGENT, n).unwrap();
+    assert_eq!(live, cold);
+    assert_eq!(audit.stats().decider_calls.values().sum::<usize>(), 0);
+
+    // derived, not stored: change the journal and the explanation changes with it
+    let tampered = Arc::new(MemoryJournal::new());
+    for e in journal.read(AGENT) {
+        let mut e = e;
+        if let AgentInput::Decision { event, .. } = &mut e.input {
+            *event = "approve".to_owned();
+        }
+        tampered.append(AGENT, e).unwrap();
+    }
+    let mut other =
+        vertep_agent::AgentHost::builder(Arc::new(vertep_runtime::VirtualClock::new(T0)))
+            .journal(tampered)
+            .build();
+    other.register(review("")).unwrap();
+    let changed = other.explain(AGENT, n).unwrap();
+    assert_ne!(
+        changed.decision.as_ref().unwrap().chosen,
+        cold.decision.as_ref().unwrap().chosen
+    );
+}
+
+#[test]
+fn explain_reports_an_old_entry_as_unknown_and_a_missing_entry_as_an_error() {
+    let (host, _, _rec) = reviewing("");
+    // entry 1 is the start: no decision, the chart version is named
+    let x = host.explain(AGENT, 1).unwrap();
+    assert!(x.decision.is_none());
+    assert!(x.state_before.is_empty());
+    assert!(!x.chart_version.is_empty());
+    assert!(host.explain(AGENT, 999).is_err());
 }

@@ -31,6 +31,7 @@ pub mod anthropic;
 pub mod decide;
 pub mod decider;
 pub mod enabled;
+pub mod explain;
 pub mod grant;
 pub mod host;
 pub mod journal;
