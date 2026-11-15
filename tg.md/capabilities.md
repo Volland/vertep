@@ -285,7 +285,7 @@ The journal alone explains every decision: disposition and offer on each decisio
 
 - scheduled_in:: [[roadmap#M12 Decision records]]
 
-Not implemented: the change is a draft. The behaviour it fixes is visible in `examples/credit-decision`.
+Partly implemented in [[components#vertep-agent]]: every decision and refusal entry carries a disposition and the offer, set by the shell before it journals the input; old entries read as unknown. The explanation view, the bundle, chained agent journals and counterfactual replay are open. The behaviour it fixes is visible in `examples/credit-decision`.
 
 ## Journal redaction
 

@@ -7,8 +7,8 @@
 
 ## 2. Entry format
 
-- [ ] 2.1 Add `disposition` and `offered` to decision entries, versioned, with old entries read as `unknown`
-- [ ] 2.2 Record `refused-not-offered`, `refused-guard`, `fallback-on-deadline` and `fallback-on-refusal` where the shell decides them
+- [x] 2.1 Add `disposition` and `offered` to decision entries, versioned, with old entries read as `unknown` (`JournalEntry.disposition` and `.offered`, optional fields with serde defaults; set by `AgentHost::turn` from `AgentMachine::disposition_of` before the append; the same fields flow through the memory and store journals)
+- [x] 2.2 Record `refused-not-offered`, `refused-guard`, `fallback-on-deadline` and `fallback-on-refusal` where the shell decides them (also `refused-invalid`, `stale` and `refused-by-decider`; `refused-guard` and `fallback-on-refusal` are defined but no chart path produces them today: a lost guard re-issues the offer so the late answer is `stale`, and no path consults a fallback after a refusal)
 - [ ] 2.3 Conformance vectors for each disposition, replayed through the Lean oracle in strict mode
 
 ## 3. Explanation

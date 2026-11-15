@@ -912,6 +912,70 @@ impl AgentMachine {
             .collect()
     }
 
+    /// What the shell makes of a decision or refusal input, and what was offered, from the open
+    /// offer and the same checks `apply` performs, without changing anything. `None` for other
+    /// inputs. The host records it on the journal entry before the input is applied.
+    // @tg: implements:: [[openspec:decision-records#Decision Disposition Is Recorded]]
+    // @tg: implements:: [[openspec:decision-records#Offer Is Part Of The Record]]
+    pub fn disposition_of(
+        &self,
+        input: &AgentInput,
+    ) -> Option<(crate::journal::Disposition, Vec<String>)> {
+        use crate::journal::Disposition as D;
+        match input {
+            AgentInput::Decision {
+                correlation,
+                event,
+                payload,
+                annotations,
+            } => {
+                let Some((state, offer)) = self.open_slot(correlation) else {
+                    return Some((D::Stale, Vec::new()));
+                };
+                let offered: Vec<String> =
+                    offer.candidates.iter().map(|c| c.event.clone()).collect();
+                if annotations.validate().is_err() {
+                    return Some((D::RefusedInvalid, offered));
+                }
+                let Some(cand) = offer.candidates.iter().find(|c| c.event == *event) else {
+                    return Some((D::RefusedNotOffered, offered));
+                };
+                if validate(&cand.schema, payload).is_err() {
+                    return Some((D::RefusedInvalid, offered));
+                }
+                let chosen = internal(event, payload.clone());
+                let selected = self.probe().and_then(|mut p| {
+                    selected_transition(
+                        &self.chart.compiled,
+                        &self.session,
+                        p.as_mut(),
+                        &state,
+                        &chosen,
+                    )
+                });
+                if selected != Some((cand.source.clone(), cand.index)) {
+                    return Some((D::RefusedGuard, offered));
+                }
+                Some((
+                    if offer.fallback {
+                        D::FallbackOnDeadline
+                    } else {
+                        D::Accepted
+                    },
+                    offered,
+                ))
+            }
+            AgentInput::Refusal { correlation, .. } => {
+                let offered = self
+                    .open_slot(correlation)
+                    .map(|(_, o)| o.candidates.iter().map(|c| c.event.clone()).collect())
+                    .unwrap_or_default();
+                Some((D::RefusedByDecider, offered))
+            }
+            _ => None,
+        }
+    }
+
     /// Whether a decision with this correlation id was already processed.
     pub fn answered(&self, correlation: &str) -> bool {
         self.answered.contains(correlation)

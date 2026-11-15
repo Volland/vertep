@@ -1104,3 +1104,136 @@ fn arbitrary_decider_output_is_safe() {
         "{accepted_total} / {rejected_total}"
     );
 }
+
+// ----- Decision records: disposition and offer ----------------------------------------------
+
+/// The decision-or-refusal entries of the actor's journal.
+fn answer_entries(host: &AgentHost) -> Vec<vertep_agent::journal::JournalEntry> {
+    host.journal(AGENT)
+        .into_iter()
+        .filter(|e| {
+            matches!(
+                e.input,
+                AgentInput::Decision { .. } | AgentInput::Refusal { .. }
+            )
+        })
+        .collect()
+}
+
+// @tg: verifies:: [[openspec:decision-records#Decision Disposition Is Recorded#An accepted answer is marked accepted]] {level: integration}
+// @tg: verifies:: [[openspec:decision-records#Offer Is Part Of The Record#The offer is on the entry]] {level: integration}
+#[test]
+fn an_accepted_answer_is_marked_accepted_and_carries_the_offer() {
+    let (mut host, _, rec) = reviewing("");
+    decide(
+        &mut host,
+        &rec.requests()[0].correlation,
+        "reject",
+        Value::Undefined,
+    );
+    let e = &answer_entries(&host)[0];
+    assert_eq!(e.disposition_or_unknown(), "accepted");
+    // `escalate` is guarded by `level > 3` and level is 1, so it was not enabled and not offered
+    assert_eq!(
+        e.offered.as_deref(),
+        Some(&["approve".to_owned(), "reject".to_owned()][..])
+    );
+}
+
+// @tg: verifies:: [[openspec:decision-records#Decision Disposition Is Recorded#A refused answer is marked refused]] {level: integration}
+#[test]
+fn an_event_that_was_not_offered_is_marked_refused_not_offered() {
+    let (mut host, _, rec) = reviewing("");
+    decide(
+        &mut host,
+        &rec.requests()[0].correlation,
+        "escalate",
+        Value::Undefined,
+    );
+    let e = &answer_entries(&host)[0];
+    assert_eq!(e.disposition_or_unknown(), "refused-not-offered");
+    assert!(!e.offered.as_ref().unwrap().contains(&"escalate".to_owned()));
+    // and the state is the one the chart's refusal path reached: nothing was approved
+    assert_eq!(config(&mut host), vec!["review"]);
+}
+
+#[test]
+fn an_answer_to_an_offer_that_was_replaced_is_stale() {
+    // When `ok` turns false the candidate set shrinks and the offer is re-issued under a new
+    // correlation, so the first decider's late answer is stale (`refused-guard` is the defensive
+    // value for a candidate that lost its guard with no re-offer; the shell does not reach it
+    // through the chart paths of this suite).
+    let (mut host, _, rec) = reviewing("");
+    let first = rec.requests()[0].correlation.clone();
+    host.send(AGENT, ev("flag"));
+    host.run_until_idle();
+    assert_eq!(rec.requests().len(), 2);
+    decide(&mut host, &first, "approve", Value::Undefined);
+    let e = &answer_entries(&host)[0];
+    assert_eq!(e.disposition_or_unknown(), "stale");
+    // the second offer, which is still open, no longer lists `approve`
+    assert!(!rec.offered(1).contains(&"approve".to_owned()));
+}
+
+#[test]
+fn an_answer_with_nothing_open_is_stale() {
+    let (mut host, _, _rec) = reviewing("");
+    decide(&mut host, "no-such-correlation", "reject", Value::Undefined);
+    let e = &answer_entries(&host)[0];
+    assert_eq!(e.disposition_or_unknown(), "stale");
+    assert_eq!(e.offered.as_deref(), Some(&[][..]));
+}
+
+#[test]
+fn a_refusal_is_marked_by_the_decider_and_carries_the_offer() {
+    let rec = Recording::default();
+    rec.answer(DecisionOutcome::refuse("not my call"));
+    let (b, _) = builder();
+    let mut host = b.decider("d", Arc::new(rec.clone())).build();
+    spawn(&mut host, review(""));
+    host.send(AGENT, ev("start"));
+    host.run_until_idle();
+    let e = &answer_entries(&host)[0];
+    assert_eq!(e.disposition_or_unknown(), "refused-by-decider");
+    assert_eq!(e.offered.as_ref().unwrap().len(), 2);
+}
+
+// @tg: verifies:: [[openspec:decision-records#Decision Disposition Is Recorded#A deadline fallback is marked]] {level: integration}
+#[test]
+fn a_deadline_fallback_is_marked() {
+    let slow = Recording::default();
+    let (b, clock) = builder();
+    let mut host = b
+        .decider("d", Arc::new(slow.clone()))
+        .decider(
+            "guards/escalate",
+            Arc::new(GuardDecider::first_enabled(["reject"])),
+        )
+        .build();
+    spawn(
+        &mut host,
+        review(r#"vt:deadline="30s" vt:fallback="guards/escalate""#),
+    );
+    host.send(AGENT, ev("start"));
+    host.run_until_idle();
+    advance(&mut host, &clock, Duration::from_secs(30));
+    assert_eq!(
+        answer_entries(&host)[0].disposition_or_unknown(),
+        "fallback-on-deadline"
+    );
+}
+
+// @tg: verifies:: [[openspec:decision-records#Decision Disposition Is Recorded#An old journal opens]] {level: unit}
+#[test]
+fn an_entry_written_before_dispositions_reads_as_unknown() {
+    let old = r#"{"position":3,"ts":1,"input":{"kind":"refusal","correlation":"c","reason":"r"}}"#;
+    let e = vertep_agent::journal::JournalEntry::from_json(old).unwrap();
+    assert_eq!(e.disposition_or_unknown(), "unknown");
+    assert!(e.offered.is_none());
+    // and a new entry round-trips with its fields
+    let mut n = e.clone();
+    n.disposition = Some(vertep_agent::journal::Disposition::RefusedNotOffered);
+    n.offered = Some(vec!["a".to_owned()]);
+    let back = vertep_agent::journal::JournalEntry::from_json(&n.to_json()).unwrap();
+    assert_eq!(back, n);
+}

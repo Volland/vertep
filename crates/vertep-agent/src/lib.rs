@@ -51,7 +51,9 @@ pub use decider::{
 pub use enabled::{Candidate, enabled_events};
 pub use grant::Grant;
 pub use host::{AgentHost, AgentHostBuilder, AgentState, HostError, InstantiateError};
-pub use journal::{AgentInput, AgentJournal, JournalEntry, MemoryJournal, StoreAgentJournal};
+pub use journal::{
+    AgentInput, AgentJournal, Disposition, JournalEntry, MemoryJournal, StoreAgentJournal,
+};
 pub use llm::{
     ErrorClass, Provider, ProviderError, ProviderRegistry, ProviderRequest, ProviderResult,
     ScriptedProvider, Usage,
