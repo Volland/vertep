@@ -132,3 +132,25 @@ pub(crate) fn store_error(e: Error) -> StoreError {
         other => StoreError::Backend(other.to_string()),
     }
 }
+
+/// The violations an enforced rule program reported, when `e` is a refusal of that kind.
+pub fn violations(e: &Error) -> Option<Vec<vertep_store::Violation>> {
+    match e {
+        Error::ConstraintViolated { violations, .. } => Some(
+            violations
+                .iter()
+                .map(|v| vertep_store::Violation {
+                    program: v.program.clone(),
+                    constraint: v.constraint.clone(),
+                    bindings: v
+                        .bindings
+                        .iter()
+                        .map(|(k, val)| (k.clone(), val.to_string()))
+                        .collect(),
+                    statements: v.eids.iter().map(ToString::to_string).collect(),
+                })
+                .collect(),
+        ),
+        _ => None,
+    }
+}

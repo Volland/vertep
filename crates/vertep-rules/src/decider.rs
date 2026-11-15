@@ -112,6 +112,74 @@ fn closure_digest(view: &tiramemsu::View<'_>, program: &TmValue) -> Result<Strin
     Ok(digest_of(&closure_sources(view, program)?))
 }
 
+/// Turns enforcement of a stored rule program on or off. Turning it on runs the program's full
+/// `tm.violation` check over the shard's current data and is refused, with the violations
+/// listed, if live data violates it; later commits run its `tm.violation-delta` check and refuse
+/// a violating transaction ([[openspec:rule-invariants#Enabling Checks Existing Data]]).
+// @tg: implements:: [[openspec:rule-invariants#Enabling Checks Existing Data]]
+// @tg: implements:: [[openspec:rule-invariants#Delta Check Agrees With Full Check]] {confidence: partial, note: "the checks are tiramemsu's; this crate proves them equal by a property test"}
+// @tg: implements:: [[openspec:rule-invariants#Enforced Program Refuses A Violating Append]] {confidence: partial, note: "the runtime dead-letter path is not built"}
+pub fn enforce(shard: &TiramemsuShard, program: &str, on: bool) -> Result<(), RulesError> {
+    let node = iri(program);
+    shard
+        .db()
+        .transact(TxOptions::default(), |t| {
+            t.enforce_elpi(node.clone(), on)?;
+            Ok(())
+        })
+        .map(|_| ())
+        .map_err(|e| match vertep_tiramemsu::violations(&e) {
+            Some(v) => RulesError::Violations(v),
+            None => RulesError::Program(e.to_string()),
+        })
+}
+
+/// What a materialization run did.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Materialized {
+    /// Statements derived by this run, as the store names them.
+    pub derived: Vec<String>,
+    /// Conclusions that were already derived from the same support.
+    pub existing: usize,
+    /// Earlier conclusions this run no longer derives, retracted.
+    pub retracted: Vec<String>,
+    /// True when the program may be non-monotonic: a later write can invalidate its
+    /// conclusions before the next run ([[decisions#Derived facts live in the actor's graph with their cause]]).
+    pub non_monotonic: bool,
+}
+
+/// Runs a stored program's `tm.conclude` conclusions into the store as derived facts, each with
+/// the statements it states as support. A fact falls with its support and with the program that
+/// concluded it ([[openspec:derived-facts#Derived Facts Carry Support]]).
+// @tg: implements:: [[openspec:derived-facts#Derived Facts Carry Support]] {confidence: partial, note: "derived facts are written to the shard, not yet to a named graph per actor"}
+// @tg: implements:: [[openspec:derived-facts#Derived Facts Retract With Support]]
+pub fn materialize(
+    shard: &TiramemsuShard,
+    program: &str,
+    fuel: u64,
+) -> Result<Materialized, RulesError> {
+    let opts = tiramemsu::MaterializeElpiOptions {
+        elpi: ElpiOptions {
+            fuel,
+            ..ElpiOptions::default()
+        },
+        dry_run: false,
+    };
+    let r = shard
+        .db()
+        .materialize_elpi(&iri(program), &opts)
+        .map_err(|e| match e {
+            TmError::ElpiOutOfFuel { .. } => RulesError::FuelExhausted { limit: fuel },
+            e => RulesError::Program(e.to_string()),
+        })?;
+    Ok(Materialized {
+        derived: r.derived.iter().map(ToString::to_string).collect(),
+        existing: r.existing.len(),
+        retracted: r.reconciled.iter().map(ToString::to_string).collect(),
+        non_monotonic: !r.needs_rerun_after_writes.is_empty(),
+    })
+}
+
 /// The source text of a stored program, now or as of transaction `tx`.
 pub fn program_text(
     shard: &TiramemsuShard,

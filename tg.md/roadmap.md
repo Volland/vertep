@@ -189,11 +189,11 @@ Specified by the OpenSpec change `m14-rules-decider` (capabilities `rule-program
 
 ## M15 Rule invariants
 
-Drafted, not started: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause and with erasure.
+In progress: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause and with erasure.
 
 - precedes:: [[roadmap#M17 Agent rules]]
 
-Specified by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invariants` and `derived-facts`). It needs the erasure design of [[roadmap#M12 Decision records]].
+Specified by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invariants` and `derived-facts`). Enforcement, the runtime refusal path, the full check on enabling, the property test, materialization with support and `vt rules enforce|unenforce|materialize` are built; open: derived facts in a named graph per actor and retraction on erasure, which needs the erasure design of [[roadmap#M12 Decision records]].
 
 ## M16 Verified rules
 

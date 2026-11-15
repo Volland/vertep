@@ -31,7 +31,7 @@ pub mod vocab;
 #[cfg(feature = "testkit")]
 pub mod testkit;
 
-pub use error::{AppendError, StoreError};
+pub use error::{AppendError, StoreError, Violation};
 pub use graph::{GraphCapabilities, GraphStore, QueryResults, RdfCapability, Solutions};
 pub use journal::{
     AppendMeta, Entry, FencingToken, JournalCapabilities, JournalRecord, JournalStore, Position,

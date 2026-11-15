@@ -43,6 +43,12 @@ When a subject's key is destroyed (M12), statements derived from their sealed fi
 3. Materialization into the actor graph, then the erasure rule.
 4. `vt rules enforce`, docs.
 
+## Built (2026-11-15)
+
+Enforcement, the refusal path, the full check on enabling, the delta-versus-full property test, materialization with support and retraction with support, and `vt rules enforce|unenforce|materialize` exist in `vertep-rules`, `vertep-store`, `vertep-tiramemsu`, `vertep-runtime` and `vertep-cli`. The refused turn is checked through a running node: nothing is written, the dead letter names the constraint, and another actor is unaffected.
+
+Findings: (1) the enforcement hook is tiramemsu's, so it applies to every commit in the file, including a host's own writes, not only journal appends; a rule that mentions a status set by the host refuses the host's write too (the property test relies on this); (2) a program needs both a `tm.violation-delta` form for the commit and a `tm.violation` form for enabling, and the two must say the same thing, which the property test checks on 60 random operations; (3) derived facts are written to the shard, not yet to a named graph per actor; (4) erasure retraction (R10) waits on M12.
+
 ## Open Questions
 
 - Should a refusal also be reported to the actor's supervisor as an event?

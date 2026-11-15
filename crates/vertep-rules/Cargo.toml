@@ -24,6 +24,7 @@ native = ["dep:tiramemsu", "dep:tempfile"]
 vertep-core = { workspace = true, features = ["std"] }
 vertep-agent = { workspace = true }
 vertep-tiramemsu = { workspace = true }
+vertep-store = { workspace = true }
 tiramemsu = { workspace = true, optional = true, features = ["elpi"] }
 sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
@@ -31,6 +32,11 @@ serde_json = "1"
 tempfile = { version = "3", optional = true }
 
 [dev-dependencies]
+vertep-store = { workspace = true }
+vertep-runtime = { workspace = true, features = ["tiramemsu"] }
+vertep-scxml = { workspace = true }
+vertep-core = { workspace = true, features = ["std"] }
+oxrdf = { workspace = true }
 futures = "0.3"
 tempfile = "3"
 

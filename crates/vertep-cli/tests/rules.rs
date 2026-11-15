@@ -160,4 +160,50 @@ tm.conclude (triple C (iri "urn:vt:decision") (iri "urn:vt:event:approve")) [X, 
         assert!(c.starts_with("0 unchanged, 1 differ"), "{c}");
         assert!(c.contains("approve -> (none)"), "{c}");
     }
+
+    // @tg: verifies:: [[openspec:rule-invariants#Enabling Checks Existing Data#Live data violates]] {level: e2e}
+    #[test]
+    fn enforce_checks_existing_data_and_materialize_writes_derived_facts() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = dir.path().join("shard.db");
+        let db_s = db.to_str().unwrap();
+        let prog = dir.path().join("p.elpi");
+        std::fs::write(
+            &prog,
+            r#"tm.violation error "never" "always violated" [E] :- tm.triple _ (iri "urn:vt:p") _ E.
+tm.conclude (triple S (iri "urn:vt:q") (iri "urn:vt:yes")) [E] :- tm.triple S (iri "urn:vt:p") _ E.
+"#,
+        )
+        .unwrap();
+        ok(&["rules", "put", db_s, PROGRAM, prog.to_str().unwrap()]);
+        // no data yet: enabling works, and materialize has nothing to derive
+        ok(&["rules", "enforce", db_s, PROGRAM]);
+        assert!(ok(&["rules", "materialize", db_s, PROGRAM]).starts_with("derived 0"));
+        ok(&["rules", "unenforce", db_s, PROGRAM]);
+        // with a violating statement present, enabling is refused and says why
+        {
+            use vertep_tiramemsu::tiramemsu::{TxOptions, Valid, Value};
+            let shard = TiramemsuShard::open(&db).unwrap();
+            shard
+                .db()
+                .transact(TxOptions::default(), |t| {
+                    t.assert(
+                        Value::iri("urn:vt:a"),
+                        Value::iri("urn:vt:p"),
+                        Value::str("x"),
+                        Valid::ALWAYS,
+                    )?;
+                    Ok(())
+                })
+                .unwrap();
+        }
+        let out = vt(&["rules", "enforce", db_s, PROGRAM]);
+        assert_eq!(out.status.code(), Some(1));
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("never"),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(ok(&["rules", "materialize", db_s, PROGRAM]).starts_with("derived 1"));
+    }
 }

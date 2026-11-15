@@ -50,6 +50,19 @@ impl fmt::Display for StoreError {
 
 impl std::error::Error for StoreError {}
 
+/// One violation an enforced rule program reported against a transaction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Violation {
+    /// The rule program that refused, rendered.
+    pub program: String,
+    /// The violated constraint's name.
+    pub constraint: String,
+    /// The program's named variables and their values, rendered.
+    pub bindings: Vec<(String, String)>,
+    /// The statements the violation rests on, as the store names them.
+    pub statements: Vec<String>,
+}
+
 /// Why a journal append wrote nothing.
 ///
 /// Every variant means the same thing for the journal: none of the append's entries, and none
@@ -78,6 +91,12 @@ pub enum AppendError {
     /// The entries are malformed (empty append, wrong graph, duplicate entry IRI, a term the
     /// store cannot hold).
     Invalid(String),
+    /// An enforced rule program refused the append: it would have made a constraint report a
+    /// violation. Nothing was written ([[openspec:rule-invariants#Enforced Program Refuses A Violating Append]]).
+    Refused {
+        /// What was violated.
+        violations: Vec<Violation>,
+    },
     /// The store failed; the transaction was rolled back.
     Storage(StoreError),
 }
@@ -86,6 +105,11 @@ impl AppendError {
     /// True for [`AppendError::Conflict`].
     pub fn is_conflict(&self) -> bool {
         matches!(self, AppendError::Conflict { .. })
+    }
+
+    /// True for [`AppendError::Refused`].
+    pub fn is_refused(&self) -> bool {
+        matches!(self, AppendError::Refused { .. })
     }
 
     /// True for [`AppendError::Fenced`].
@@ -111,6 +135,16 @@ impl fmt::Display for AppendError {
                 f,
                 "append fenced: epoch {epoch} for {scope} is below the accepted epoch {highest}"
             ),
+            AppendError::Refused { violations } => {
+                write!(f, "append refused: ")?;
+                for (i, v) in violations.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{} of {}", v.constraint, v.program)?;
+                }
+                Ok(())
+            }
             AppendError::Unsupported(m) => write!(f, "unsupported append: {m}"),
             AppendError::Invalid(m) => write!(f, "invalid append: {m}"),
             AppendError::Storage(e) => write!(f, "append failed: {e}"),

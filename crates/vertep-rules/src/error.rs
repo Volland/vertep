@@ -25,6 +25,8 @@ pub enum RulesError {
         /// Running now.
         running: String,
     },
+    /// An enforced program reported violations; nothing was changed.
+    Violations(Vec<vertep_store::Violation>),
     /// Replay reached a different conclusion, support or closure than the record.
     Diverged(String),
 }
@@ -42,6 +44,16 @@ impl fmt::Display for RulesError {
             }
             RulesError::EngineMismatch { recorded, running } => {
                 write!(f, "engine version differs: recorded {recorded}, running {running}")
+            }
+            RulesError::Violations(v) => {
+                write!(f, "violations: ")?;
+                for (i, x) in v.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{} ({})", x.constraint, x.statements.join(" "))?;
+                }
+                Ok(())
             }
             RulesError::Diverged(m) => write!(f, "replay diverged: {m}"),
         }
