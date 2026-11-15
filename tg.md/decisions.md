@@ -1164,6 +1164,15 @@ The site carries a German Impressum, Datenschutzerklärung and AGB, plus an Abou
 
 The legal identity (name, Berlin address, supervisory authority) is the one on pavlyshyn.me, so the three sites state one provider. Like the author's site, these pages load no third-party resource: the fonts are self-hosted woff2 files in `site/assets/fonts/`, declared in `site/assets/css/fonts.css`, so the only personal data is the GitHub Pages server log and the Datenschutz says nothing more. The AGB cover consulting, architecture and training services only; the software stays under MIT or Apache-2.0. `about.html` is built from the author's home page, CV and book list. The footer and the main navigation, including those written by `site/tools/sync-examples.py`, link all four pages.
 
+## The site carries the author's book
+
+The site has a page for the author's book, The Goat Does Not Choose the Play, with its cover, summary, contents and a link to Leanpub, and links it from the main and footer navigation and the home page. Proposed 2026-11-15.
+
+- motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: secondary, since: "2026-11-15"}
+- motivated_by:: [[decisions#Legal pages mirror the author's own site]] {weight: secondary}
+
+The cover is a copy kept in `site/assets/img/`, so the page loads no third-party resource and the Datenschutz stays true; the only outward link is the Leanpub address. The page states what the book says about itself and gives no price, which Leanpub sets. `site/tools/sync-examples.py` writes the navigation of the example pages and carries the same link.
+
 ## Site code is highlighted at build time
 
 Rust, XML (SCXML) and YAML blocks on the site are highlighted by `site/tools/highlight.py`, which writes plain `<span class="k">` markup into the committed pages, so the pages still need no script.

@@ -384,3 +384,10 @@ pre:not(.output) .m, pre:not(.output) .mi, pre:not(.output) .mf, pre:not(.output
 pre:not(.output) .l { color: var(--syn-number); }
 pre:not(.output) .c, pre:not(.output) .c1, pre:not(.output) .cm, pre:not(.output) .cs,
 pre:not(.output) .sd { color: var(--syn-comment); font-style: italic; }
+
+/* The book page */
+.book-cover { justify-self: center; max-width: 18rem; width: 100%; }
+.book-cover img { display: block; width: 100%; height: auto; border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); background: #fff; }
+.book-toc { columns: 2 18rem; column-gap: 2.4rem; }
+.book-toc h3 { break-after: avoid; margin-top: 1.2rem; }
+.book-toc ol { margin-top: 0; }
