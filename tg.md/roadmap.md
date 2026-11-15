@@ -180,12 +180,12 @@ Specified by the OpenSpec change `m13-production-readiness` (capabilities `produ
 
 ## M14 Rules decider
 
-Drafted, not started: rule programs stored beside the journal and run by lean-elpi through tiramemsu, a rules decider whose rationale is a derivation over the recorded offer and state, pinned versions and rule-version counterfactuals.
+In progress: rule programs stored beside the journal and run by lean-elpi through tiramemsu, a rules decider whose rationale is a derivation over the recorded offer and state, pinned versions and rule-version counterfactuals.
 
 - precedes:: [[roadmap#M15 Rule invariants]]
 - precedes:: [[roadmap#M16 Verified rules]]
 
-Specified by the OpenSpec change `m14-rules-decider` (capabilities `rule-programs` and `rule-decider`), in [[components#vertep-rules]]. Its first task group is a throwaway spike on `examples/credit-decision` with a go or no-go. The design is in [[views/rules#Rules]]. Native only: see [[constraints#The native rules engine exists for four platforms]].
+Specified by the OpenSpec change `m14-rules-decider` (capabilities `rule-programs` and `rule-decider`), in [[components#vertep-rules]]. The spike ran 2026-11-15 with a go. The crate exists with the program lifecycle, the decider, refusals, fuel and pinning (groups 3 and 4); bundle inclusion, counterfactual replay and `vt rules` (group 5) are open. The design is in [[views/rules#Rules]]. Native only: see [[constraints#The native rules engine exists for four platforms]].
 
 ## M15 Rule invariants
 

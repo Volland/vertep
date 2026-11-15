@@ -20,6 +20,7 @@ members = [
     "crates/vertep-cluster",
     "crates/vertep-federation",
     "crates/vertep-agent",
+    "crates/vertep-rules",
     "crates/vertep-wasm",
     "crates/vertep-py",
     "crates/vertep-objects",
@@ -53,6 +54,7 @@ vertep-runtime = { path = "crates/vertep-runtime", version = "0.1.6" }
 vertep-macros = { path = "crates/vertep-macros", version = "0.1.6" }
 vertep-dm-rust = { path = "crates/vertep-dm-rust", version = "0.1.6" }
 vertep-agent = { path = "crates/vertep-agent", version = "0.1.6" }
+vertep-rules = { path = "crates/vertep-rules", version = "0.1.6" }
 vertep-federation = { path = "crates/vertep-federation", version = "0.1.6" }
 vertep-cluster = { path = "crates/vertep-cluster", version = "0.1.6", default-features = false }
 vertep-objects = { path = "crates/vertep-objects", version = "0.1.6" }

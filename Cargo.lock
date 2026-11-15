@@ -2545,6 +2545,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 
 [[package]]
+name = "leanelpi"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9966bdadf324328ef59b47a42ae1a8d60af27da5b6932306c0a4e901e588ca4"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4721,6 +4731,8 @@ dependencies = [
  "lru",
  "serde_json",
  "tm-core",
+ "tm-elpi",
+ "tm-elpi-store",
  "tm-exec",
  "tm-ir",
  "tm-native",
@@ -4737,6 +4749,28 @@ checksum = "b2919ef1b97edbc16b5f88f033b9618dcee944bf001ddea487cd407f9a27918a"
 dependencies = [
  "lru",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "tm-elpi"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49de4551501e312ff1ca63955831242edb292ffe1ee635142ed541b35a525bed"
+dependencies = [
+ "leanelpi",
+ "tm-core",
+ "tm-store",
+]
+
+[[package]]
+name = "tm-elpi-store"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c1ad6bd692a8f9fa23c559559a092a35c278fe1356e30b3ca06d960b77470dd"
+dependencies = [
+ "tm-core",
+ "tm-elpi",
+ "tm-store",
 ]
 
 [[package]]
@@ -5601,6 +5635,20 @@ dependencies = [
  "vertep-scxml",
  "vertep-testkit",
  "vertep-yaml",
+]
+
+[[package]]
+name = "vertep-rules"
+version = "0.1.6"
+dependencies = [
+ "futures",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tiramemsu",
+ "vertep-agent",
+ "vertep-core",
+ "vertep-tiramemsu",
 ]
 
 [[package]]

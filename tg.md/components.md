@@ -712,7 +712,7 @@ Not built yet: the Lean model, the join policy, sealed fan-out over mailboxes, t
 
 ## vertep-rules
 
-Planned crate for rules: the rules decider, rule program lifecycle over tiramemsu's ELPI, version pinning, enforcement and derived facts, and the gate for proposed rules; off unless the `rules` feature is on.
+Crate for rules, partly built: the rules decider, rule program lifecycle over tiramemsu's ELPI, version pinning, enforcement and derived facts, and the gate for proposed rules; off unless the `rules` feature is on.
 
 - provides:: [[capabilities#Rule programs]] {confidence: partial, note: "planned"}
 - provides:: [[capabilities#Rule decider]] {confidence: partial, note: "planned"}
@@ -729,4 +729,4 @@ Planned crate for rules: the rules decider, rule program lifecycle over tiramems
 - realizes:: [[decisions#The native rules engine is optional behind a feature]]
 - scheduled_in:: [[roadmap#M14 Rules decider]]
 
-Not built: the crate does not exist yet. The spike of `m14-rules-decider` ran on 2026-11-15 with a go (see its `design.md`); the crate lands next. The native library is 154 MB. The engine is lean-elpi, reached through tiramemsu 0.12, which already stores programs, enforces them at commit and materializes conclusions.
+Partly built on 2026-11-15: `put_program`, `RuleDecider`, `verify` and the `Derivation` record, behind the `native` feature, with 10 vectors that run against the real engine (`LEANELPI_DIST` set) and one that runs without it. Open: carrying the derivation on the decision entry (M12), the bundle and counterfactual report, `vt rules`, the wasm test and a CI job. The native library is 154 MB. The engine is lean-elpi, reached through tiramemsu 0.12, which already stores programs, enforces them at commit and materializes conclusions.
