@@ -1,7 +1,7 @@
 ## 1. Spike (throwaway, go/no-go)
 
 - [x] 1.1 Enable tiramemsu `elpi` and `native` in a scratch branch of `vertep-tiramemsu` and build against `libleanelpi` on macOS and Linux
-- [ ] 1.2 Write the credit-decision policy as one ELPI program node and a decider that runs it over the offered candidates (policy and run done in the spike; the `Decider` wiring remains for group 4)
+- [x] 1.2 Write the credit-decision policy as one ELPI program node and a decider that runs it over the offered candidates (the spike ran the policy; `RuleDecider` in group 4 is the decider; `crates/vertep-rules/examples/credit.rs` runs both)
 - [x] 1.3 Check the refused-answer case: the journal alone shows the derivation, and `as_of` replays the previous program
 - [x] 1.4 Record the go/no-go and the numbers (latency per decision, library size) in `design.md`; delete the spike code (the spike was never in the repository)
 
@@ -37,3 +37,8 @@
 ## 6. CI
 
 - [x] 6.1 A `rules` job: the build without the engine, the dependency-graph gates, then the vectors against a checksum-pinned `libleanelpi` for linux-x64 (written, not yet run on GitHub)
+
+## 7. Carried forward at archive
+
+- Scenario `Offer And State Are Statements#One record` (the explanation view reports the offer from the same statements the rule read) needs the M12 explanation view; it is a task of `m12-decision-records` (group 3).
+- Scenario `Derivation Is The Rationale#Forged support` is enforced by tiramemsu, where a statement id is a typed value a program cannot write; no test in this repository can construct a forged id, so it is not reproduced here.

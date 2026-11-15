@@ -7,7 +7,7 @@ openspec: [rule-programs, rule-decider, rule-invariants, derived-facts, rule-ver
 
 How rules would work in Vertep: ELPI programs stored beside the journal by tiramemsu, a rules decider whose rationale is a derivation, enforced invariants, verification and agent-proposed rules.
 
-This view explains milestones M14 to M17 and the crate `vertep-rules`. M14 is partly built (the decider, bundles, counterfactual replay, `vt rules`) and M15 mostly (enforcement, the refusal path, derived facts); M16 and M17 are not. Requirement names in backticks are from the OpenSpec changes `m14-rules-decider`, `m15-rule-invariants`, `m16-verified-rules` and `m17-agent-rules`.
+This view explains milestones M14 to M17 and the crate `vertep-rules`. M14 is delivered and archived (the decider, bundles, counterfactual replay, `vt rules`) and M15 mostly (enforcement, the refusal path, derived facts); M16 and M17 are not. Requirement names in backticks are from the OpenSpec changes `m14-rules-decider`, `m15-rule-invariants`, `m16-verified-rules` and `m17-agent-rules`.
 
 ## One rule decision
 
