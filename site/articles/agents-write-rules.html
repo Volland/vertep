@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An agent that may not rewrite its own rules — Vertep</title>
+<meta name="description" content="How an agent can propose a rule program in Vertep: an ordered gate with repairable errors, shadow runs on recorded cases, promotion one stage at a time, and a structural refusal of self-governance.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="index.html" aria-current="page">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+  <header class="article-head">
+    <p class="kicker">Article the ninth</p>
+    <h1>An agent that may not rewrite its own rules</h1>
+    <p class="byline">Proposing, shadowing and promoting rules, with a gate</p>
+  </header>
+
+  <p class="opening">Rules that agents can write are rules agents can weaken. The question is not whether to let a model draft policy, since a model that has read a year of refused cases is a good drafter, but what stands between its draft and the live system. This is the answer Vertep gives.</p>
+
+  <h2>Four ideas</h2>
+  <p>The design rests on four ideas, in order of importance.</p>
+  <ol>
+    <li><strong>A proposal is inert.</strong> It is stored as a program node of its own, under a name derived from its text, with its author and the grant it used. No decider reads it and no enforcement runs it. Until a person moves it, it changes nothing.</li>
+    <li><strong>The gate fails with something an agent can repair.</strong> Not a message: a stable code, the clause at fault and the reason.</li>
+    <li><strong>Evidence comes before effect.</strong> A proposal runs in shadow beside the live program on recorded cases and records where it would have decided differently, without deciding anything.</li>
+    <li><strong>An actor never changes the rules that govern it.</strong> Not by permission: by construction.</li>
+  </ol>
+
+  <h2>The gate</h2>
+  <p>A proposal passes six checks, in this order, and the first failure stops it:</p>
+  <table>
+    <thead><tr><th>Code</th><th>What was checked</th></tr></thead>
+    <tbody>
+      <tr><td><code>self-governance</code></td><td>The program's scope, the actors it would govern, does not include the proposer.</td></tr>
+      <tr><td><code>capability</code></td><td>The proposing identity may propose, by a function the host supplies.</td></tr>
+      <tr><td><code>type-error</code></td><td>Every event the program concludes is one the chart declares (or <code>refuse</code>).</td></tr>
+      <tr><td><code>profile</code></td><td>The program is inside the rules profile: no cut, no <code>findall</code>, no effects, negation stratified.</td></tr>
+      <tr><td><code>no-cases</code> / <code>trial-failed</code></td><td>A trial run on recorded decisions, under a step budget, succeeds. With no cases the proposal is refused unless a promote-grant holder waives it.</td></tr>
+      <tr><td><code>existing-data</code></td><td>For a program with constraints, the data already in the shard does not violate them.</td></tr>
+    </tbody>
+  </table>
+  <p>The agent reaches the gate through a tool, <code>vt:tool/rules/propose</code>, taking <code>{ text, source }</code> and returning <code>{ proposal }</code>. The caller's identity is fixed when the tool is built; it is never an argument, so an agent cannot claim to be someone else. A refusal comes back as JSON, for example:</p>
+<pre data-lang="JSON"><code>{&quot;code&quot;: &quot;type-error&quot;, &quot;clause&quot;: &quot;tm.conclude (triple C (iri \&quot;urn:vt:decision\&quot;) (iri \&quot;urn:vt:event:reject\&quot;)) ...&quot;, &quot;reason&quot;: &quot;the chart declares no event `reject`&quot;}</code></pre>
+  <p>An agent reads that, edits the clause, and proposes again. The test suite runs exactly this exchange: a first attempt concluding an undeclared event is refused with <code>type-error</code>, a second with the event corrected is stored.</p>
+
+  <h2>Shadow, then stages</h2>
+  <p>Shadow evaluation takes the recorded decisions, runs the proposal over each, and writes a record of every case where its conclusion differs from the recorded one. It can sample every <em>n</em>th case when the history is long. It never decides anything and never appends.</p>
+  <p>Promotion then has three stages, each a separate act that is itself recorded (who, which stage, which scope, the digest of the program):</p>
+  <ol>
+    <li><strong>Shadow.</strong> The proposal is approved for shadow evaluation.</li>
+    <li><strong>Scoped.</strong> It is live for a <em>named scope</em>. A decider bound to that scope runs the proposal; every other decider still runs the live program.</li>
+    <li><strong>Live.</strong> It replaces the live program for everyone, by superseding it, so the old text stays readable.</li>
+  </ol>
+  <p>A stage cannot be skipped: asking for <code>live</code> from <code>proposed</code> is refused with <code>skipped-step</code> and names the step that is missing. Promotion needs a <em>promote grant</em>, which a host would not give to the proposing agent.</p>
+
+  <h2>The rule about rules</h2>
+  <p>Everything above could be undone if an agent were allowed to propose, edit or promote a rule that governs <em>itself</em>. So that is refused structurally. Every proposal declares the actors it would govern; if the proposer, or the identity promoting it, is one of those actors, the answer is <code>self-governance</code>, whatever grants it holds. The check is not a permission an administrator could widen by accident. A different reviewer, holding the promote grant and not governed by the rule, can promote it, and that is the only way a rule reaches the actors it binds.</p>
+
+  <h2>What is left to the host</h2>
+  <p>Two things are deliberately not decided by the library. The capability check is a function the host supplies; the command line reads it from a small JSON file, and wiring federation grant credentials into it is an integration, not part of this change. And a scope is a setting of a decider, not a value of a request. The docs page on <a href="../docs/rules-authoring.html">authoring</a> has the commands and the codes.</p>
+  <p>The general principle is older than any of this: a system that can be changed by what it governs has no governor. The gate is a way of making that sentence true in code.</p>
+</main>
+
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

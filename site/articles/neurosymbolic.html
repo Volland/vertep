@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The model proposes, the structure disposes — Vertep</title>
+<meta name="description" content="What neurosymbolic can mean in a system that must answer for itself: a statechart that offers the moves, rules that decide or constrain, a model that chooses where judgement is needed, and a journal that records all three.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="index.html" aria-current="page">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+  <header class="article-head">
+    <p class="kicker">Article the eighth</p>
+    <h1>The model proposes, the structure disposes</h1>
+    <p class="byline">Neurosymbolic agents without the slogan</p>
+  </header>
+
+  <p class="opening">“Neurosymbolic” is usually said as a hope: the fluency of a network and the reliability of logic, somehow together. This article says what it can mean in a system that has to answer for what it did, and where each half earns its place.</p>
+
+  <h2>The division of labour</h2>
+  <p>Neural networks are good at what is hard to write down: reading a messy document, weighing a case that does not fit a template, saying something a person can follow. They are bad at being the same function twice, at refusing reliably, and at telling you afterwards what they relied on. Symbolic structure is the other way round. A chart, a rule, a type or a shape is easy to inspect and exactly repeatable, and it cannot read a scanned payslip.</p>
+  <p>The useful question is not how to blend them but <em>where each one is allowed to act</em>. In Vertep the answer has four layers, and each layer is something you can point at in a journal.</p>
+
+  <h2>Four layers</h2>
+  <ol>
+    <li><strong>The chart says what is possible.</strong> A statechart has states and transitions. At a <em>decide</em> state it works out which transitions are enabled right now and offers only those. A model cannot approve what policy forbids, because the move is never on the table. This layer is symbolic and exact.</li>
+    <li><strong>A decider chooses among the offered moves.</strong> It may be a model, a person, a guard in a small expression language, an actor, or a <em>rule program</em>. All of them obey one contract: they receive the offer and return a value; the shell validates it, and an answer outside the offer is refused. The decider is where the neural part lives, or the symbolic part, by choice.</li>
+    <li><strong>Rules decide, constrain or derive.</strong> A rule program can be the decider; it can be an <em>invariant</em> enforced when the journal is written, refusing an append that would break it; or it can derive facts with the statements they follow from. This is the symbolic layer that reasons, and it reads the same facts the journal holds.</li>
+    <li><strong>The journal records every input.</strong> The model's answer is journaled as an input before it is used, so a replay consumes the recorded answer and calls no model. The model is not deterministic; the run is.</li>
+  </ol>
+  <p>Read that as a stack of guarantees, not as a pipeline. The journal makes the run repeatable whatever the decider was. The chart bounds what any decider can do. The rules make the reasoning itself inspectable where reasoning is the point.</p>
+
+  <h2>What a model is for, here</h2>
+  <p>A model decider is handed the offer with a schema for each candidate, so its structured output has to be one of the offered events with a payload of the right shape. Its rationale and confidence come back as annotations and are stored as a labelled claim. In the loan example the underwriter model may approve, decline or refer; when it tries to approve a case that policy forbids, the chart has already removed <code>approve</code> from the offer, the answer is refused, and the case goes to a person. The refusal is in the record, with the disposition <code>refused-not-offered</code> and the list of what <em>was</em> offered.</p>
+  <p>That is the first neurosymbolic pattern, and it is the plain one: <strong>the model chooses inside a symbolic envelope</strong>. Nothing about the model is made more reliable; its failures are made harmless and visible.</p>
+
+  <h2>What a rule is for</h2>
+  <p>A rule decider turns the same envelope into the decision. Where a policy is a matter of facts and thresholds, there is no reason to ask a model, and a rule gives a better record: a derivation, not a claim (see <a href="rules-that-explain.html">the previous article</a>). The second pattern is <strong>rules as the decider for the routine, a model for the exceptions</strong>, wired with a fallback or with a chart that routes by state. The chart decides which decider is asked; the journal says which was.</p>
+  <p>The third pattern is subtler. A rule is an <strong>invariant on the record itself</strong>: no approval without a recorded officer review, no entry for a blocked actor. It is enforced at commit, so it binds the model-driven path and the rule-driven path alike, and a violating append is refused, dead-lettered with the name of the constraint, and leaves the journal unchanged. Here the symbolic layer is not a decider at all. It is a guard on the whole system, written once.</p>
+
+  <h2>Where the model may touch the rules</h2>
+  <p>The interesting direction is the reverse one: a model that helps write the rules. An agent that notices a pattern in refused cases can propose a rule, and the neurosymbolic loop closes: the model proposes, a gate and a trial run on recorded cases test it, a person promotes it, and the promoted program runs as symbolic code the model cannot alter. <a href="agents-write-rules.html">The next article</a> is about that gate, and about the one rule it is built around: an actor never changes the rules that govern it.</p>
+
+  <h2>What this is not</h2>
+  <p>It is not a claim that the combination is more accurate. A rule is exactly as good as the policy it encodes, and a model is exactly as good as it is. It is not a proof that the system is fair or lawful either; the verification pages in the docs are explicit about what each check does and does not cover. What it buys is narrower and, for regulated work, usually what is asked for: every decision has a named decider, a recorded offer, a disposition, and either a derivation or a labelled claim; the structure that bounds the model is code you can read; and the same journal replays whatever mix of deciders produced it.</p>
+  <p>Whether the pieces are the right ones is a question for the book too: <a href="../book.html">The Goat Does Not Choose the Play</a> spends its third part on neurosymbolic agents, deciders, and rules and derivations, on a worked lending case. The docs pages for <a href="../docs/agents.html">agents and deciders</a> and <a href="../docs/rules.html">rules</a> are the reference.</p>
+</main>
+
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>
