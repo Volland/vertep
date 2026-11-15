@@ -5346,7 +5346,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vertep"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "tokio",
  "vertep-agent",
@@ -5365,7 +5365,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-agent"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "futures",
  "oxrdf",
@@ -5390,7 +5390,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-cli"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "axum",
  "clap",
@@ -5420,7 +5420,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-cluster"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "base64 0.22.1",
  "proptest",
@@ -5443,7 +5443,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-conformance"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "proptest",
  "quick-xml 0.42.0",
@@ -5464,14 +5464,14 @@ dependencies = [
 
 [[package]]
 name = "vertep-core"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "vertep-dm-cel"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "regex-automata",
  "vertep-core",
@@ -5480,7 +5480,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-dm-ecma"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "boa_engine",
  "vertep-core",
@@ -5488,7 +5488,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-dm-rust"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "trybuild",
  "vertep-core",
@@ -5500,7 +5500,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-examples"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "serde_json",
  "vertep",
@@ -5512,7 +5512,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-federation"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "affinidi-crypto",
  "affinidi-messaging-didcomm",
@@ -5548,7 +5548,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-kolyada"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek 3.0.0",
@@ -5565,7 +5565,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-macros"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5577,7 +5577,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-objects"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305 0.10.1",
@@ -5603,7 +5603,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-oxigraph"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "oxigraph",
  "oxrdf",
@@ -5615,7 +5615,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-py"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "pyo3",
  "serde_json",
@@ -5625,7 +5625,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-rdf"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "jsonschema",
  "oxrdf",
@@ -5642,7 +5642,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-rules"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "futures",
  "oxrdf",
@@ -5661,7 +5661,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-runtime"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "futures",
  "oxrdf",
@@ -5684,7 +5684,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-scxml"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "proptest",
  "quick-xml 0.42.0",
@@ -5694,7 +5694,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-store"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "oxrdf",
  "spareval",
@@ -5704,7 +5704,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-testkit"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "proptest",
  "vertep-core",
@@ -5712,7 +5712,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-tiramemsu"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "oxrdf",
  "tempfile",
@@ -5722,7 +5722,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-tsp-mediator"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -5751,7 +5751,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-wallet"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -5784,7 +5784,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-wasm"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "futures",
  "getrandom 0.3.4",
@@ -5818,7 +5818,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-webvh"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "affinidi-data-integrity",
  "async-trait",
@@ -5842,7 +5842,7 @@ dependencies = [
 
 [[package]]
 name = "vertep-yaml"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "proptest",
  "saphyr-parser",
