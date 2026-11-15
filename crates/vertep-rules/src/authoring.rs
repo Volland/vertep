@@ -234,6 +234,21 @@ pub fn shadow(
     cases: &[Derivation],
     policy: &RulePolicy,
 ) -> Result<CounterfactualReport, GateError> {
+    shadow_every(shard, proposal, cases, policy, 1)
+}
+
+/// As [`shadow`], on every `every`th case in order (1 is all of them), so a long history costs a
+/// fraction of the evaluation. The sample is deterministic: the same cases give the same report.
+pub fn shadow_every(
+    shard: &TiramemsuShard,
+    proposal: &str,
+    cases: &[Derivation],
+    policy: &RulePolicy,
+    every: usize,
+) -> Result<CounterfactualReport, GateError> {
+    let every = every.max(1);
+    let sampled: Vec<Derivation> = cases.iter().step_by(every).cloned().collect();
+    let cases = sampled.as_slice();
     let text =
         program_text(shard, proposal, None).map_err(|e| err("store", None, e.to_string()))?;
     let report = counterfactual(shard, cases, &text, policy)
@@ -364,4 +379,31 @@ pub fn act(shard: &TiramemsuShard, proposal: &str, to: Stage) -> Option<Act> {
         scope: one(vocab::ACT_SCOPE),
         digest: one(vocab::ACT_DIGEST)?,
     })
+}
+
+/// The proposal that is live for `scope` of `program`, when one was promoted to `Scoped` with that
+/// scope name and has not yet gone live for everyone. A decider bound to the scope runs it instead
+/// of the live program ([[openspec:rule-authoring#Promotion Is Staged And Journaled]]).
+pub fn scoped_program(shard: &TiramemsuShard, program: &str, scope: &str) -> Option<String> {
+    let v = shard.db().now();
+    let (Ok(Some(p)), Ok(Some(o))) = (v.encode(&iri(vocab::FOR_PROGRAM)), v.encode(&iri(program)))
+    else {
+        return None;
+    };
+    let mut proposals: Vec<_> = v.triples(None, Some(p), Some(o)).ok()?;
+    proposals.sort_by_key(|t| t.eid);
+    proposals
+        .iter()
+        .rev()
+        .filter_map(|t| match v.decode(t.s) {
+            Ok(TmValue::Iri(id)) => Some(id),
+            _ => None,
+        })
+        .find(|id| {
+            stage(shard, id) == Some(Stage::Scoped)
+                && act(shard, id, Stage::Scoped)
+                    .and_then(|a| a.scope)
+                    .as_deref()
+                    == Some(scope)
+        })
 }

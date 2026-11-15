@@ -21,14 +21,3 @@ A derived fact SHALL be retracted when any statement in its support is retracted
 #### Scenario: Program edited
 - **WHEN** the program is edited so that it no longer concludes the fact
 - **THEN** reconciliation retracts the fact
-
-### Requirement: Erasure Retracts Dependents
-When a subject's key is destroyed under `journal-redaction`, derived facts whose support includes that subject's sealed statements SHALL be retracted, and the retraction MUST be journaled with the erasure. Derived facts that do not depend on them MUST remain.
-
-#### Scenario: Erasing a subject
-- **WHEN** a subject's key is destroyed
-- **THEN** derived facts that rest on their sealed statements are retracted and the erasure entry lists them
-
-#### Scenario: Unrelated facts survive
-- **WHEN** a derived fact rests only on other subjects' statements
-- **THEN** it remains live

@@ -21,7 +21,9 @@ def allowedAxioms : List Name := [``propext, ``Classical.choice, ``Quot.sound]
 
 /-- The main theorems whose axioms are pinned. -/
 def mainTheorems : List Name :=
-  [ ``Vertep.checkWF_iff, ``Vertep.execOkB_iff,
+  [ ``Vertep.RuleCert.check_sound, ``Vertep.RuleCert.check_complete,
+    ``Vertep.RuleCert.triple_in_tape,
+    ``Vertep.checkWF_iff, ``Vertep.execOkB_iff,
     ``Vertep.step_deterministic, ``Vertep.step_deterministic_out, ``Vertep.start_deterministic,
     ``Vertep.Select.choices_run, ``Vertep.Select.selected_enabled,
     ``Vertep.Select.selected_conflictFree, ``Vertep.Select.selected_optimal,

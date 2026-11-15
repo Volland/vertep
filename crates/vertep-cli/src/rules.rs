@@ -11,6 +11,7 @@ use vertep_rules::{
     Derivation, RuleBundle, RulePolicy, RulesError, check_profile, check_program, counterfactual,
     enforce, materialize, program_text, put_program,
 };
+use vertep_rules::{check_certificate, lean_certificate};
 use vertep_tiramemsu::TiramemsuShard;
 
 use crate::commands::Outcome;
@@ -414,6 +415,30 @@ pub fn unnecessary_cmd(file: &Path) -> Outcome {
             Ok("every supporting statement is needed\n".to_owned())
         } else {
             Err(format!("support-not-necessary: {}", u.join(" ")))
+        }
+    })())
+}
+
+/// `vt rules certify BUNDLE [--lean-dir DIR] [--emit FILE]`: the Lean source of a decision's
+/// derivation certificate, checked by the Lean kernel when a built `vertep-lean` directory is
+/// given. Programs outside the certifiable fragment are reported.
+pub fn certify_cmd(file: &Path, lean_dir: Option<&Path>, emit: Option<&Path>) -> Outcome {
+    done((|| {
+        let b = RuleBundle::from_json(&read(file)?).map_err(s)?;
+        let src = lean_certificate(&b).map_err(s)?;
+        if let Some(p) = emit {
+            std::fs::write(p, &src).map_err(s)?;
+        }
+        match lean_dir {
+            Some(d) => {
+                let r =
+                    check_certificate(d, &src).map_err(|e| format!("certification failed: {e}"))?;
+                Ok(format!("certified: {} ({})\n", b.derivation.node, r.axioms))
+            }
+            None => Ok(format!(
+                "certificate written for {}; pass --lean-dir to check it\n",
+                b.derivation.node
+            )),
         }
     })())
 }

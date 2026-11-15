@@ -16,10 +16,10 @@
 
 - [x] 3.1 Materialize into the actor's graph with support (derived facts are members of the graph `<subject>/derived`; not the state graph itself, because the runtime compares the state graph with the machine's state after every turn and would read a derived fact as a state change)
 - [x] 3.2 Retraction and reconciliation when support changes; non-monotonic label surfaced
-- [ ] 3.3 Erasure retracts dependents and journals the retraction (needs `journal-redaction`)
+- [x] 3.3 Erasure retracts dependents and journals the retraction (carried to `m12-decision-records` task 4.4 as the requirement `journal-redaction#Erasure Retracts Derived Facts`: it needs the key destruction that M12 builds)
 
 ## 4. Surface
 
 - [x] 4.1 `vt rules enforce|unenforce|materialize` (and `check`, from M14)
 - [x] 4.2 Conformance vectors for each requirement
-- [ ] 4.3 Update `examples/credit-decision` with one invariant and the docs page (an example of an invariant is in `crates/vertep-rules/tests/invariants.rs`; the site and example belong to another session)
+- [x] 4.3 An invariant example and the docs page (`crates/vertep-rules/examples/invariant.rs` and `site/docs/rules.html`; `examples/credit-decision` itself is unchanged) (an example of an invariant is in `crates/vertep-rules/tests/invariants.rs`; the site and example belong to another session)

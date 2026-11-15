@@ -1,0 +1,14 @@
+deciding three applications by rule:
+  1001  amount 20000, ratio 31%, offered ["approve", "decline", "refer"]
+       derivation: approve from 4 statements by urn:vt:program:loan-policy (closure 73be31fe8c49)
+  1002  amount 80000, ratio 38%, offered ["decline", "refer"]
+       derivation: refer from 3 statements by urn:vt:program:loan-policy (closure 73be31fe8c49)
+  1003  amount 45000, ratio 40%, offered ["approve", "refer"]
+       derivation: approve from 4 statements by urn:vt:program:loan-policy (closure 73be31fe8c49)
+
+the bundle of the first decision, verified with no shard:
+  2403 bytes; urn:vt:decision:1001 concluded approve from 4 statements: verified
+
+the next policy (ceiling 30 000) tried on the recorded decisions:
+  2 unchanged, 1 differ
+  urn:vt:decision:1003: approve -> refer

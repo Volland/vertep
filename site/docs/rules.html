@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rules — Vertep docs</title>
+<meta name="description" content="Rules in Vertep: ELPI programs stored beside the journal, a rules decider whose rationale is a derivation, enforced invariants, offline bundles, counterfactual replay, a Lean certificate, and agent-proposed rules behind a gate.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
+      <li><a href="wallet.html">Agent wallets</a></li>
+      <li><a href="protocols.html">Agent protocols</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+      <li><a href="python.html">Python</a></li>
+      <li><a href="rules.html" aria-current="page">Rules</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
+    <h1>Rules</h1>
+    <p class="lede">A policy that decides cases, written as a program and stored beside the journal it decides for. A decision made by a rule carries the statements it rests on, so it can be re-run offline, tried under the next version of the policy, and checked by the Lean kernel. This page covers the crate <code>vertep-rules</code> and <code>vt rules</code>.</p>
+
+    <h2 id="why">Why rules</h2>
+    <p>The guard decider picks the first enabled candidate in document order, and a model's reason is its own claim. A rule's reason is a <em>derivation</em>: the statements about the case that made the conclusion follow. The engine is ELPI (a λProlog) run by lean-elpi through tiramemsu, which already stores programs as versioned nodes, so the rules and the journal live in one file and one transaction.</p>
+
+    <h2 id="engine">The native library is optional</h2>
+    <p>Rules need the native library <code>libleanelpi</code>, which carries the Lean runtime. It is about 154 MB and exists for macOS and Linux on arm64 and x64, so it is behind a cargo feature that is off by default. Without it every constructor returns the typed error <code>rules-unavailable</code> and nothing falls back to another decider. The browser and Python packages do not contain it.</p>
+    <pre data-lang="Shell"><code>LEANELPI_DIST=/path/to/lean-elpi/dist cargo run -p vertep-rules --features native --example credit
+cargo install vertep-cli --features rules   # vt rules ...</code></pre>
+
+    <h2 id="decider">A rules decider</h2>
+    <p>Before a rule runs, the shell writes the offer and the plain fields of the actor's context as statements in the shard, plus one statement naming the case being decided. Every rule starts from that statement, so a decision costs the size of the case and not of the shard. The rule concludes an event and lists the statements it used:</p>
+    <pre data-lang="ELPI"><code>tm.conclude (triple C (iri "urn:vt:decision") (iri "urn:vt:event:approve")) [X, Eo, Ed, Ea] :-
+  tm.triple (iri "urn:vt:ctx") (iri "urn:vt:deciding") C X,
+  tm.triple C (iri "urn:vt:offered") (iri "urn:vt:event:approve") Eo,
+  tm.triple C (iri "urn:vt:ctx:dti") (num D) Ed, D =&lt; 43,
+  tm.triple C (iri "urn:vt:ctx:amount") (num A) Ea, A =&lt; 50000.</code></pre>
+    <p>If no rule applies the decider refuses with <code>no-applicable-rule</code>; a program may also refuse on purpose by concluding <code>refuse</code>. Evaluation runs under a step budget, never a clock, and the record keeps the program closure's digest, the engine version and the fuel used. The <code>credit</code> example decides three loans, verifies a bundle with no shard, and tries the next policy on the recorded decisions:</p>
+    <pre class="output" data-lang="Output"><code>deciding three applications by rule:
+  1001  amount 20000, ratio 31%, offered [&quot;approve&quot;, &quot;decline&quot;, &quot;refer&quot;]
+       derivation: approve from 4 statements by urn:vt:program:loan-policy (closure 73be31fe8c49)
+  1002  amount 80000, ratio 38%, offered [&quot;decline&quot;, &quot;refer&quot;]
+       derivation: refer from 3 statements by urn:vt:program:loan-policy (closure 73be31fe8c49)
+  1003  amount 45000, ratio 40%, offered [&quot;approve&quot;, &quot;refer&quot;]
+       derivation: approve from 4 statements by urn:vt:program:loan-policy (closure 73be31fe8c49)
+
+the bundle of the first decision, verified with no shard:
+  2403 bytes; urn:vt:decision:1001 concluded approve from 4 statements: verified
+
+the next policy (ceiling 30 000) tried on the recorded decisions:
+  2 unchanged, 1 differ
+  urn:vt:decision:1003: approve -&gt; refer
+</code></pre>
+
+    <h2 id="records">Versions, bundles and counterfactuals</h2>
+    <table>
+      <thead><tr><th>Call</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>put_program</code>, <code>vt rules put</code></td><td>Store or supersede a program; the earlier source stays readable as of its transaction.</td></tr>
+        <tr><td><code>verify</code></td><td>Replay a decision against the rules of its day and report a different engine version.</td></tr>
+        <tr><td><code>RuleBundle</code>, <code>vt rules bundle</code> and <code>verify-bundle</code></td><td>Export a decision with its program closure and supporting statements and re-run it in a fresh store, no shard and no network.</td></tr>
+        <tr><td><code>counterfactual</code>, <code>vt rules counterfactual</code></td><td>Try another program version on recorded decisions; nothing is written.</td></tr>
+        <tr><td><code>vt rules diff</code></td><td>The lines that changed between two versions of a program.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="invariants">Invariants and derived facts</h2>
+    <p>A program with <code>tm.violation-delta</code> and <code>tm.violation</code> clauses can be enforced: <code>vt rules enforce</code> checks the existing data first and is refused, with the violations listed, if live data violates it; after that a journal append that would violate it is refused at commit. The runtime writes no entry, acknowledges the message, records a dead letter that names the constraint and the statements, and the actor steps down unchanged. Enforcement runs on every commit in the file, including a host's own writes. <code>materialize</code> writes a program's conclusions as derived facts with their support, in the graph <code>&lt;subject&gt;/derived</code>; they fall when their support does and when the program stops concluding them.</p>
+
+    <h2 id="verification">Verification</h2>
+    <ul>
+      <li><strong>Profile.</strong> <code>vt rules profile</code> says whether a program is inside the subset the checks are defined for (no cut, <code>findall</code>, input and output or clocks; negation stratified). Decisions from a program outside it are marked unchecked.</li>
+      <li><strong>Support necessity.</strong> <code>vt rules unnecessary</code> removes each supporting statement in turn and reports one whose removal leaves the conclusion standing.</li>
+      <li><strong>Totality.</strong> <code>totality</code> runs every non-empty subset of up to eight candidates under sample contexts and reports an offer nothing answers. It holds for those contexts only, and says <em>unknown</em> beyond the bound.</li>
+      <li><strong>Two engines.</strong> A test runs a Horn program in ELPI and in tiramemsu's Datalog engine on a random graph and requires the same answers.</li>
+      <li><strong>Lean certificate.</strong> <code>vt rules certify BUNDLE --lean-dir lean/vertep-lean</code> writes the decision's derivation as Lean source and the kernel checks that the conclusion follows from the supporting statements under the clause; the theorem depends only on <code>propext</code>. It covers clauses made of <code>tm.triple</code> atoms and integer comparisons; anything else is reported as outside the fragment. It does not check that the clause is the program's (the exporter's parser is trusted) or that the statements are in the store (the host's check).</li>
+    </ul>
+
+    <h2 id="agents">Rules written by agents</h2>
+    <p>An agent proposes a rule through the tool <code>vt:tool/rules/propose</code> or <code>vt rules propose</code>. The proposal passes, in order: the rule that an actor never proposes rules that govern itself, the capability check, the chart's event types, the profile, a trial run on recorded cases under fuel, and a check against existing data. The first failure comes back as a code, the clause and the reason, so the agent can repair it. A passing proposal is stored inert with its author, grant and source. Then <code>vt rules shadow</code> runs it beside the live program and records where it would differ, and <code>vt rules promote</code> moves it one stage at a time (shadow, scoped to a named scope, live), each step a journaled act by an identity holding the promote grant. An actor can neither propose nor promote rules that govern it.</p>
+
+    <h2 id="limits">What is not there</h2>
+    <ul>
+      <li>The derivation is not yet a field of the decision entry, and there is no whole-bundle <code>vt verify-bundle</code>; both belong to the decision-records work.</li>
+      <li>Erasing a data subject's key does not yet retract the derived facts that rest on their statements.</li>
+      <li>Grants for proposing and promoting come from a function the host supplies (a JSON file in the CLI); the federation layer's grant credentials are not wired in.</li>
+      <li>No rules in the browser, Python or Windows builds.</li>
+    </ul>
+
+<div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="python.html">← Python</a>
+      <a href="rdf.html">RDF and versions →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

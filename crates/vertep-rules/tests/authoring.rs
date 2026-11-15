@@ -6,9 +6,10 @@ use std::sync::Arc;
 use vertep_agent::{Candidate, ContextView, Decider, DecisionOutcome, DecisionRequest};
 use vertep_core::datamodel::Value;
 use vertep_rules::authoring::{
-    Action, Actor, GateContext, Stage, act, authorship, diff, promote, propose, shadow,
-    shadow_differences, stage,
+    Action, Actor, GateContext, Stage, act, authorship, diff, promote, propose, scoped_program,
+    shadow, shadow_differences, shadow_every, stage,
 };
+use vertep_rules::tools::{PROPOSE_TOOL, ProposeToolConfig, propose_tool};
 use vertep_rules::{Derivation, RuleDecider, RulePolicy, program_text, put_program};
 use vertep_tiramemsu::TiramemsuShard;
 use vertep_tiramemsu::tiramemsu::{TxOptions, Valid, Value as TmValue};
@@ -435,6 +436,135 @@ fn an_actor_cannot_govern_itself_but_a_reviewer_can_promote_for_it() {
         &gate(&w, &policy),
     )
     .unwrap();
+}
+
+fn tool_for(w: &World, identity: &str) -> vertep_agent::tool::Tool {
+    propose_tool(ProposeToolConfig {
+        shard: w.shard.clone(),
+        program: PROGRAM.to_owned(),
+        identity: identity.to_owned(),
+        grant: "grant:propose".to_owned(),
+        events: w.events.clone(),
+        cases: w.cases.clone(),
+        allow_no_cases: false,
+        scope: Vec::new(),
+        authorize: Arc::new(authorize),
+        policy: RulePolicy::default(),
+    })
+    .unwrap()
+}
+
+fn args(text: &str) -> Value {
+    Value::Object(vec![
+        ("text".to_owned(), Value::String(text.to_owned())),
+        ("source".to_owned(), Value::String("an agent".to_owned())),
+    ])
+}
+
+// @tg: verifies:: [[openspec:rule-authoring#Gate Errors Are Structured#Repair]] {level: integration}
+// @tg: verifies:: [[openspec:rule-authoring#Proposals Pass A Gate#A passing proposal]] {level: integration}
+#[test]
+fn an_agent_repairs_a_rejected_proposal_from_the_error_the_tool_returns() {
+    let w = world();
+    let tool = tool_for(&w, "agent:a");
+    assert_eq!(tool.iri(), PROPOSE_TOOL);
+    // the first attempt concludes an event the chart does not declare
+    let bad = LIVE.replace("event:refer", "event:reject");
+    let err = futures::executor::block_on(tool.run(args(&bad))).unwrap_err();
+    let e: serde_json::Value = serde_json::from_str(&err).unwrap();
+    assert_eq!(e["code"], "type-error");
+    assert!(e["reason"].as_str().unwrap().contains("reject"));
+    // the agent reads the reason, fixes the clause and tries again
+    let fixed = bad.replace("event:reject", "event:refer");
+    let ok = futures::executor::block_on(tool.run(args(&fixed))).unwrap();
+    match ok {
+        Value::Object(f) => {
+            assert!(matches!(&f[0].1, Value::String(id) if id.contains("/proposal/")))
+        }
+        o => panic!("{o:?}"),
+    }
+    // the identity is the tool's, not the caller's: a stranger's tool is refused on capability
+    let stranger = tool_for(&w, "stranger");
+    let err = futures::executor::block_on(stranger.run(args(&fixed))).unwrap_err();
+    assert!(err.contains("\"capability\""), "{err}");
+}
+
+#[test]
+fn a_scoped_proposal_runs_only_for_its_scope_and_shadow_can_sample() {
+    let w = world();
+    let policy = RulePolicy::default();
+    let id = propose(
+        &w.shard,
+        PROGRAM,
+        &tighter(),
+        &AGENT,
+        "s",
+        &[],
+        &gate(&w, &policy),
+    )
+    .unwrap();
+    // a sampled shadow run looks at every second case: 20 000 and 45 000, not 40 000
+    let report = shadow_every(&w.shard, &id, &w.cases, &policy, 2).unwrap();
+    assert_eq!(report.unchanged + report.differs.len(), 2);
+    promote(
+        &w.shard,
+        &id,
+        Stage::Shadow,
+        &REVIEWER,
+        None,
+        &gate(&w, &policy),
+    )
+    .unwrap();
+    assert_eq!(scoped_program(&w.shard, PROGRAM, "team-a"), None);
+    promote(
+        &w.shard,
+        &id,
+        Stage::Scoped,
+        &REVIEWER,
+        Some("team-a"),
+        &gate(&w, &policy),
+    )
+    .unwrap();
+    assert_eq!(
+        scoped_program(&w.shard, PROGRAM, "team-a").as_deref(),
+        Some(id.as_str())
+    );
+    assert_eq!(scoped_program(&w.shard, PROGRAM, "team-b"), None);
+    // a decider bound to team-a runs the proposal; the unbound one and team-b run the live program
+    let team_a = RuleDecider::new(w.shard.clone(), PROGRAM, policy.clone())
+        .unwrap()
+        .with_scope("team-a");
+    let team_b = RuleDecider::new(w.shard.clone(), PROGRAM, policy.clone())
+        .unwrap()
+        .with_scope("team-b");
+    match decide(&team_a, "ta", 40_000.0) {
+        DecisionOutcome::Decision(d) => assert_eq!(d.event, "refer"),
+        o => panic!("{o:?}"),
+    }
+    assert!(team_a.derivations()[0].program.contains("/proposal/"));
+    match decide(&team_b, "tb", 40_000.0) {
+        DecisionOutcome::Decision(d) => assert_eq!(d.event, "approve"),
+        o => panic!("{o:?}"),
+    }
+    match decide(&w.decider, "unbound", 40_000.0) {
+        DecisionOutcome::Decision(d) => assert_eq!(d.event, "approve"),
+        o => panic!("{o:?}"),
+    }
+    // once live, everyone follows it and the scope no longer picks anything out
+    promote(
+        &w.shard,
+        &id,
+        Stage::Live,
+        &REVIEWER,
+        None,
+        &gate(&w, &policy),
+    )
+    .unwrap();
+    assert_eq!(scoped_program(&w.shard, PROGRAM, "team-a"), None);
+    match decide(&team_b, "tb2", 40_000.0) {
+        DecisionOutcome::Decision(d) => assert_eq!(d.event, "refer"),
+        o => panic!("{o:?}"),
+    }
 }
 
 // @tg: verifies:: [[openspec:rule-authoring#Rule Diff#A readable diff]] {level: unit}

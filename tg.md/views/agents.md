@@ -510,7 +510,7 @@ An agent can change its own chart only by proposing a new chart version plus a m
 - describes:: [[capabilities#Chart versioning]]
 - describes:: [[capabilities#Plan charts]]
 
-This is `Self-modification Through Versioning`. The running chart is never patched in place; that would break pinned replay and make decider safety unprovable. The migration is a journal entry, so it can be queried, and undone by forking from a journal position before it.
+This is `Self-modification Through Versioning`. An agent that wants to change its policy (rules, not its chart) proposes a rule program through the gate in [[views/rules#Rules]]: it is stored inert, run in shadow, and promoted one stage at a time by another identity, and an actor can never promote rules that govern it. The running chart is never patched in place; that would break pinned replay and make decider safety unprovable. The migration is a journal entry, so it can be queried, and undone by forking from a journal position before it.
 
 ```mermaid
 sequenceDiagram
