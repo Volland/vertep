@@ -8,6 +8,33 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-15
+
+Milestones M15 to M17 finished and archived (changes `m15-rule-invariants`, `m16-verified-rules`, `m17-agent-rules`); design in `tg.md/views/rules.md`.
+
+### Added
+
+- **`vertep-rules` (M15)**: derived facts are members of the graph `<subject>/derived` (not the
+  state graph); the example `invariant`.
+- **`vertep-rules` (M16)**: `check_profile` and `Derivation.profile_checked`;
+  `RuleBundle::unnecessary_support`; `totality` (sampled over the contexts given); an
+  ELPI-versus-Datalog vector; `lean_certificate` and `check_certificate`: Lean certificates for
+  clauses made of `tm.triple` atoms and integer comparisons, checked by the Lean kernel against the
+  new `VertepLean.RuleCert` (soundness and completeness proved, axioms pinned). Anything outside
+  the fragment is reported, and the clause parser and the store membership of statements are
+  trusted.
+- **`vertep-rules` (M17)**: the `authoring` module (an ordered gate with structured errors, inert
+  proposals with authorship, shadow runs with sampling, staged journaled promotion, a refusal of
+  self-governance, clause diff), the agent tool `vt:tool/rules/propose`, and
+  `RuleDecider::with_scope` for scoped-live programs.
+- **`vt rules`**: `propose`, `shadow`, `promote`, `profile`, `unnecessary`, `certify`.
+- Docs page `site/docs/rules.html`.
+
+### Not yet
+
+- The derivation as a field of the decision entry, the whole-bundle `vt verify-bundle` and
+  retraction of derived facts on erasure belong to M12 (decision records).
+
 ## [0.1.7] - 2026-11-15
 
 Milestones M14 (rules decider) and M15 (rule invariants, most of it). Changes `m14-rules-decider` (archived) and `m15-rule-invariants`; design in `tg.md/views/rules.md`.
