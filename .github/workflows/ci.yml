@@ -27,6 +27,36 @@ jobs:
       - name: vertep-core builds without std
         run: cargo build -p vertep-core --no-default-features --target thumbv7em-none-eabihf
 
+  rules:
+    name: Rules (native engine)
+    runs-on: ubuntu-latest
+    env:
+      LEANELPI_TAG: v0.4.1
+      LEANELPI_SHA256: ad0cf6d5345e70005b6f56e0b95070566ced0f49ff865d05bb2b951be2f64f8a
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Without the engine the crate links no native library and the browser build never sees it
+        run: |
+          cargo test -p vertep-rules
+          cargo test -p vertep-cli --test rules
+          if cargo tree -p vertep-rules -i leanelpi 2>/dev/null; then echo "leanelpi linked without the native feature"; exit 1; fi
+          if cargo tree -p vertep-wasm -i vertep-rules 2>/dev/null; then echo "vertep-rules reaches the wasm build"; exit 1; fi
+      - name: Fetch libleanelpi (checksum pinned)
+        run: |
+          mkdir -p "$RUNNER_TEMP/leanelpi"
+          curl -fsSL -o "$RUNNER_TEMP/leanelpi.tgz" "https://github.com/Volland/lean-elpi/releases/download/${LEANELPI_TAG}/libleanelpi-linux-x64.tar.gz"
+          echo "${LEANELPI_SHA256}  $RUNNER_TEMP/leanelpi.tgz" | sha256sum -c -
+          tar xzf "$RUNNER_TEMP/leanelpi.tgz" -C "$RUNNER_TEMP/leanelpi"
+          echo "LEANELPI_DIST=$RUNNER_TEMP/leanelpi" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$RUNNER_TEMP/leanelpi" >> "$GITHUB_ENV"
+      - name: Vectors against the real engine
+        run: |
+          cargo test -p vertep-rules --features native
+          cargo test -p vertep-cli --features rules --test rules
+          cargo clippy -p vertep-rules --features native --all-targets -- -D warnings
+
   lean:
     name: Lean model
     runs-on: ubuntu-latest
