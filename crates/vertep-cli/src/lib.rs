@@ -12,6 +12,7 @@
 //! vt verify-bundle BUNDLE                     verify an explanation bundle offline
 //! vt rules put|show|check|diff|enforce|unenforce|materialize|propose|shadow|promote|profile|unnecessary|certify|bundle|verify-bundle|counterfactual   rule programs (feature `rules`)
 //! vt kolyada validate|hash|project|offer|check|vectors   agent protocol documents (Kolyada)
+//! vt mailbox check <file>                               check a mailbox configuration (JSON)
 //! vt webvh create|update|rotate|deactivate|verify|witness|publish|serve
 //! vt webvh object create | vt webvh custody change      durable-object DIDs and custody changes
 //! ```

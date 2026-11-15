@@ -784,6 +784,21 @@ impl NodeBuilder {
         self
     }
 
+    /// Sets the mailboxes from a [`MailboxConfig`](crate::MailboxConfig): its default backend
+    /// and routes by scheme, prefix or address. `named` holds the factories its `named`
+    /// backends refer to.
+    ///
+    /// # Errors
+    ///
+    /// [`MailboxError`] as [`MailboxConfig::build`](crate::MailboxConfig::build).
+    pub fn mailbox_config(
+        self,
+        config: &crate::mailbox::MailboxConfig,
+        named: &BTreeMap<String, Arc<dyn MailboxFactory>>,
+    ) -> Result<Self, MailboxError> {
+        Ok(self.mailboxes(Arc::new(config.build(named)?)))
+    }
+
     /// The mailbox implementation for addresses of `scheme`.
     pub fn mailboxes_for_scheme(mut self, scheme: &str, f: Arc<dyn MailboxFactory>) -> Self {
         self.scheme_mailboxes.insert(scheme.to_owned(), f);

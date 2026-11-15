@@ -259,7 +259,7 @@ as of entry 1: ["paid"]
     <table>
       <thead><tr><th>Piece</th><th>Implementations</th><th>Notes</th></tr></thead>
       <tbody>
-        <tr><td>Mailboxes</td><td><code>MemoryMailboxes</code>, <code>StoreMailboxes</code>; <code>RelayInbox</code> in <code>vertep-federation</code> for actors behind a DID relay</td><td>Store-backed mailboxes live in the actor's storage and outlive the process. Set with <code>NodeBuilder::mailboxes</code>, or per IRI scheme with <code>mailboxes_for_scheme</code>.</td></tr>
+        <tr><td>Mailboxes</td><td><code>MemoryMailboxes</code>, <code>StoreMailboxes</code>; <code>RelayInbox</code> in <code>vertep-federation</code> for actors behind a DID relay</td><td>Store-backed mailboxes live in the actor's storage and outlive the process. Set with <code>NodeBuilder::mailboxes</code>, per IRI scheme with <code>mailboxes_for_scheme</code>, or per address with <a href="#mailbox-backends"><code>RoutedMailboxes</code></a>.</td></tr>
         <tr><td>Transports</td><td><code>LocalTransport</code> (the SCXML Event I/O Processor, alias <code>scxml</code>); the cluster, DIDComm, TSP and WebSocket processors</td><td>Each is an SCXML Event I/O Processor that <code>&lt;send type="…"&gt;</code> selects; <code>_event.origintype</code> names the one that delivered.</td></tr>
         <tr><td>Directory</td><td>a <code>Resolver</code> per IRI scheme</td><td>Resolution depends only on the address, so reactivation or relocation keeps it. <code>handle.register_resolver(scheme, resolver)</code>.</td></tr>
         <tr><td>Placement</td><td>none on a single node; <code>ClusterNode</code> in a cluster</td><td>Answers <code>Local</code>, <code>Remote(mailbox)</code> or <code>Hold</code> before a message is delivered or an actor activated.</td></tr>
@@ -267,6 +267,21 @@ as of entry 1: ["paid"]
     </table>
     <p>Mailbox order is promised per sender and receiver only. Across senders there is no order, which is what makes relays and clusters possible at all.</p>
     <p>The WebSocket Event I/O Processor (feature <code>websocket</code>) links a server node and browser nodes. Its frames and delivery rules are on <a href="browser.html">Browser and JavaScript</a>.</p>
+
+    <h3 id="mailbox-backends">Choosing where mailboxes live</h3>
+    <p>Which backend holds an actor's messages is configuration, not chart content. <code>RoutedMailboxes</code> is a mailbox factory that picks a backend per address: rules match a scheme, a prefix or one exact address, the first match wins, and a default serves the rest. Pass it to <code>NodeBuilder::mailboxes</code> (or the federation's <code>local_mailboxes</code>).</p>
+    <table>
+      <thead><tr><th>Backend</th><th>Messages live in</th><th>Survives a restart</th></tr></thead>
+      <tbody>
+        <tr><td><code>Memory</code></td><td>the process</td><td>no</td></tr>
+        <tr><td><code>Store(storage)</code></td><td>a graph store, which need not be the node's journal store: a <code>MemoryStore</code>, a tiramemsu directory (<code>MailboxBackend::tiramemsu(dir, shards)</code>) or any <code>Storage</code></td><td>with a file-backed store</td></tr>
+        <tr><td><code>Custom(factory)</code></td><td>whatever the factory uses, for example a <code>RelayInbox</code> whose pickup source is a remote TSP mediator, so the mediator holds the messages</td><td>at the relay, until acknowledged</td></tr>
+      </tbody>
+    </table>
+<pre data-lang="Rust"><code><span class="k">let</span> boxes = RoutedMailboxes::new(MailboxBackend::Memory)
+    .route(AddressMatch::Scheme(<span class="s">"did"</span>.into()), MailboxBackend::Custom(inbox))
+    .route(AddressMatch::Prefix(<span class="s">"vt://orders/"</span>.into()), MailboxBackend::tiramemsu(dir, <span class="mi">4</span>)<span class="o">?</span>);</code></pre>
+    <p>The same router can be written as JSON and applied with <code>NodeBuilder::mailbox_config(&amp;config, &amp;named)</code>; <code>named</code> maps the names the file uses to factories the application registers. <a href="cli.html#mailbox"><code>vt mailbox check</code></a> validates a file without opening anything. A tiramemsu file has one writer per process, so a mailbox directory is not opened twice, and there is no in-memory tiramemsu: the in-memory choice is <code>MemoryStore</code>.</p>
 
     <h2 id="journal">The journal</h2>
     <p>A virtual actor's state is a deterministic replay of the inputs it accepted. The journal is the only source of truth; the current-state graph, snapshots and any external graph store are derived from it.</p>

@@ -12,6 +12,14 @@ The runtime SHALL deliver every message for an actor through a mailbox contract 
 - **WHEN** an application configures a store-backed mailbox instead of the in-memory mailbox for an address scheme
 - **THEN** charts addressed by that scheme run unchanged and receive the same events in the same order
 
+#### Scenario: Mailbox backend routed per address
+- **WHEN** an application routes one address prefix to a tiramemsu-backed mailbox and leaves the rest in memory
+- **THEN** a restart recovers the messages of the routed prefix and none of the others
+
+#### Scenario: Mailbox routes from configuration
+- **WHEN** a JSON configuration names a default backend and routes by scheme, prefix or address
+- **THEN** the built router sends each address to its backend, and a route naming an unregistered backend is rejected at build time
+
 #### Scenario: Unacknowledged message is redelivered
 - **WHEN** an actor fails before its turn for a message is durable
 - **THEN** the message is not acknowledged and the mailbox delivers it again on the next activation

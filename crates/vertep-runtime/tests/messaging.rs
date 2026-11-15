@@ -210,6 +210,50 @@ fn shared_store_mailboxes_keep_each_others_rows() {
     assert_eq!(vertep_runtime::MailboxFactory::recover(&boxes), vec![a]);
 }
 
+// @tg: verifies:: [[openspec:messaging#Pluggable Mailboxes#Mailbox backend routed per address]] {level: integration}
+#[test]
+fn routed_tiramemsu_mailbox_survives_a_restart_and_memory_does_not() {
+    use vertep_runtime::{AddressMatch, MailboxBackend, MailboxFactory, RoutedMailboxes};
+    let dir = tempfile::tempdir().unwrap();
+    let routed = |disk: MailboxBackend| {
+        RoutedMailboxes::new(MailboxBackend::Memory)
+            .route(AddressMatch::Prefix("urn:vertep:test:disk".into()), disk)
+    };
+    let disk = Address::parse("urn:vertep:test:disk1").unwrap();
+    let mem = Address::parse("urn:vertep:test:mem1").unwrap();
+    {
+        let boxes = routed(MailboxBackend::tiramemsu(dir.path(), 2).unwrap());
+        boxes
+            .create(&disk)
+            .enqueue(Envelope::new("urn:vertep:test:d1", &disk, ev("one")))
+            .unwrap();
+        boxes
+            .create(&mem)
+            .enqueue(Envelope::new("urn:vertep:test:m1", &mem, ev("two")))
+            .unwrap();
+    }
+    let boxes = routed(MailboxBackend::tiramemsu(dir.path(), 2).unwrap());
+    assert_eq!(boxes.recover(), vec![disk.clone()]);
+    assert_eq!(boxes.create(&disk).pending().len(), 1);
+    assert!(boxes.create(&mem).pending().is_empty());
+}
+
+// @tg: verifies:: [[openspec:messaging#Pluggable Mailboxes#Mailbox routes from configuration]] {level: integration}
+#[test]
+fn node_builder_takes_mailboxes_from_a_config() {
+    use vertep_runtime::MailboxConfig;
+    let store = Arc::new(MemoryStore::new());
+    let clock = VirtualClock::new(T0);
+    let builder = || Node::builder(store.clone(), shell(&clock));
+    let cfg = MailboxConfig::from_json(
+        r#"{"routes":[{"match":{"scheme":"nowhere"},"backend":{"named":"missing"}}]}"#,
+    )
+    .unwrap();
+    assert!(builder().mailbox_config(&cfg, &Default::default()).is_err());
+    let ok = MailboxConfig::default();
+    assert!(builder().mailbox_config(&ok, &Default::default()).is_ok());
+}
+
 // @tg: verifies:: [[openspec:messaging#Pluggable Transports#Local transport as Event I/O Processor]] {level: integration}
 #[test]
 fn local_transport_as_event_io_processor() {
