@@ -15,6 +15,7 @@
 
 - [ ] 3.1 `explain(actor, position)` in `vertep-agent`, derived by replay
 - [ ] 3.2 Label rationale as a claim in the view and the JSON schema
+- [ ] 3.2a Carry the rule decider's `Derivation` (support statements, closure digest, engine) on the decision entry with rationale kind `derivation`, and report the offer in the explanation view from the same statements the rule read (`rule-decider#Offer And State Are Statements#One record`, carried from `m14-rules-decider`)
 - [ ] 3.3 Expose through `vertep-wasm` and `vertep-py`
 - [ ] 3.4 Update `examples/credit-decision` to print the disposition and the offer for each decision, and re-record its output
 
