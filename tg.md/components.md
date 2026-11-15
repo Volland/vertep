@@ -11,6 +11,7 @@ flowchart TD
     facade["vertep (facade)"]
     cli["vertep-cli"]
     wasm["vertep-wasm"]
+    py["vertep-py"]
     agent["vertep-agent"]
     objects["vertep-objects"]
     mediator["vertep-tsp-mediator"]
@@ -21,6 +22,7 @@ flowchart TD
     fed["vertep-federation"]
     runtime["vertep-runtime"]
     tira["vertep-tiramemsu"]
+    rules["vertep-rules"]
     oxi["vertep-oxigraph"]
     store["vertep-store"]
     rdf["vertep-rdf"]
@@ -38,7 +40,10 @@ flowchart TD
     facade --> agent & cluster & fed & objects & runtime & macros & tira & wallet
     cli --> scxml & yaml & rdf & lean & webvh & wallet
     wasm --> runtime & tira
+    py --> wasm
     agent --> runtime & cel & rdf
+    rules --> agent & tira & runtime
+    cli --> rules
     objects --> runtime & store & fed & cluster
     mediator --> fed & store & tira & webvh
     webvh --> fed & objects
@@ -300,12 +305,12 @@ The tokio shell: actors and lifecycle classes, mailboxes, transports, the direct
 - realizes:: [[decisions#SCXML-native actors with vt extensions]]
 - realizes:: [[decisions#IRI identity and lifecycle classes]]
 - realizes:: [[decisions#Identity, mailbox and transport layers]]
+- realizes:: [[decisions#Mailbox backend is chosen per address]]
 - realizes:: [[decisions#Event-sourced actors]]
 - realizes:: [[decisions#Non-blocking request and deferred events]]
 - realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the shell half"}
 - realizes:: [[decisions#WebSocket is a transport and an Event I/O Processor]] {confidence: partial, note: "the frames, the link and the server end"}
 - realizes:: [[decisions#WebSocket sends stay owed until the peer acknowledges them]]
-- realizes:: [[decisions#Mailbox backend is chosen per address]]
 - realizes:: [[decisions#Hosts instantiate CEL charts typed]]
 - uses:: [[components#vertep-dm-cel]] {kind: dev, note: "typed CEL actor tests"}
 - provides:: [[capabilities#WASM bindings]] {confidence: partial, note: "the server end of the WebSocket Event I/O Processor"}
@@ -594,6 +599,23 @@ Typed CEL since 2026-11-12: the worker's `Datamodels` registry forwards `create_
 
 Open: publishing. A smaller storage-free build (the original 600 KB target) needs a non-SPARQL `GraphStore` read path and is follow-up work.
 
+## vertep-py
+
+The PyO3 extension module of the Python package `vertep`: the actor system's command bridge, a system or virtual clock and Python guards and actions.
+
+- provides:: [[capabilities#Python bindings]] {confidence: full}
+- uses:: [[components#vertep-wasm]] {kind: required, note: "System and its command bridge, with the journal feature and tiramemsu's native host"}
+- uses:: [[components#vertep-runtime]] {kind: required, note: "Shell::virtual_time and the clock trait"}
+- realizes:: [[decisions#Python bindings wrap the command bridge]]
+- realizes:: [[decisions#The Python clock moves only inside calls]]
+- realizes:: [[decisions#A Python system belongs to one thread]]
+- realizes:: [[decisions#Python callables are the implementations module]]
+- realizes:: [[decisions#One abi3 wheel per platform, published with Trusted Publishing]]
+- realizes:: [[decisions#Event-sourced actors]] {confidence: partial, note: "journals written from Python replay in Rust and JavaScript"}
+- scheduled_in:: [[roadmap#M11 Python bindings]]
+
+Implemented 2026-11-14: `Core` (`command`, `pump`, `wait`, `now`, `next_deadline`, `export`, `close`) in `crates/vertep-py`, and the package in `bindings/python` (`ActorSystem`, `Actor`, `Snapshot`, `Subscription`, typed errors). Built by maturin; the crate is a workspace member with `publish = false`, its own lints (the PyO3 macros emit `unsafe`) and `test = false`, because its tests are Python's and a Rust test binary would link libpython. Open: the first PyPI release.
+
 ## vertep-cli
 
 The `vt` command: convert between SCXML, YAML and RDF, validate and hash charts, run the conformance suite and call the Lean checker for certificates.
@@ -605,10 +627,13 @@ The `vt` command: convert between SCXML, YAML and RDF, validate and hash charts,
 - uses:: [[components#vertep-lean]] {kind: optional, note: "vt certify"}
 - uses:: [[components#vertep-webvh]] {kind: required, note: "vt webvh"}
 - provides:: [[capabilities#webvh hosting]] {confidence: partial, note: "the vt webvh commands"}
+- realizes:: [[decisions#Mailbox backend is chosen per address]] {confidence: partial, note: "vt mailbox check validates a mailbox configuration file"}
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
 - scheduled_in:: [[roadmap#M8 did:webvh hosting]] {note: "vt webvh"}
 
 Implemented 2026-11-11: the `vt` binary with `typecheck`, `schema` (JSON Schema, SHACL, CEL; Rust waits for the macro crate), `validate`, `hash`, `convert` between SCXML, YAML and RDF formats, and `certify` per [[decisions#vt certify runs the Lean checker as a process]]. Exit codes: 0 success, 1 the chart fails, 2 usage or I/O.
+
+`vt mailbox check FILE` parses a mailbox configuration, validates it without opening a store, and lists the default, each route and the names an application must register (exit 1 when invalid, 2 when unreadable).
 
 Since M8, `vt webvh` creates, updates, rotates, deactivates, verifies, witnesses, publishes and serves `did:webvh` DIDs, creates durable-object DIDs (`object create`) and prepares custody changes (`custody change`). Keys stay in a file key manager directory; `dids/<did>/` beside them holds the update-key names and the working log.
 
@@ -627,14 +652,11 @@ The facade crate an application depends on, re-exporting the other crates behind
 
 Implemented 2026-11-11: re-exports core, store and RDF, plus runtime, tiramemsu and SCXML behind default features and ECMAScript on request; `examples/quickstart.rs` runs one virtual actor with a delayed send and a time-travel query.
 
-- realizes:: [[decisions#Mailbox backend is chosen per address]] {confidence: partial, note: "vt mailbox check validates a mailbox configuration file"}
 ## vertep-examples
 
 Runnable examples for newcomers and the documentation site, one binary per example with its charts, and tests that hold every example to its recorded output.
 
 - uses:: [[components#vertep]] {kind: required, note: "the facade with the agent feature: core, SCXML, runtime, tiramemsu, agents"}
-`vt mailbox check FILE` parses a mailbox configuration, validates it without opening a store, and lists the default, each route and the names an application must register (exit 1 when invalid, 2 when unreadable).
-
 - uses:: [[components#vertep-dm-cel]] {kind: required, note: "the facade does not re-export the CEL datamodel"}
 - uses:: [[components#vertep-dm-rust]] {kind: required, note: "statechart! and the rust datamodel"}
 - uses:: [[components#vertep-cli]] {kind: dev, note: "the vt commands as a library, to check their recorded outputs"}
@@ -690,3 +712,24 @@ Implemented 2026-11-14 for the core, with 45 tests and a language-neutral vector
 `vectors/` holds the published test vectors and `vectors/check.mjs` checks the envelope ones with Node alone. A participant tracks the states it may be in, not one state: a transition it takes no part in is silent and a message hidden from it counts as one unknown step. Signing and DID resolution enter through the traits, so the crate has no transport or key code.
 
 Not built yet: the Lean model, the join policy, sealed fan-out over mailboxes, the inbound and outbound checks at the mailbox and send path, the `vt:plays` declaration and `vt kolyada`. These are the federation, runtime and CLI tasks of `m10-agent-protocols`, and they will realize [[decisions#Charts declare roles and the mailbox checks before the journal]].
+
+## vertep-rules
+
+Planned crate for rules: the rules decider, rule program lifecycle over tiramemsu's ELPI, version pinning, enforcement and derived facts, and the gate for proposed rules; off unless the `rules` feature is on.
+
+- provides:: [[capabilities#Rule programs]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Rule decider]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Rule invariants]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Derived facts]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Rule verification]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Rule authoring]] {confidence: partial, note: "planned"}
+- uses:: [[components#vertep-agent]] {kind: required, note: "the Decider trait and decision records"}
+- uses:: [[components#vertep-tiramemsu]] {kind: required, note: "tiramemsu's elpi and native features, behind a rules feature"}
+- uses:: [[components#vertep-runtime]] {kind: required, note: "the refusal path and dead letters"}
+- uses:: [[components#vertep-lean]] {kind: optional, note: "planned: the derivation certificate checker"}
+- realizes:: [[decisions#Rules live per shard, in the journal's file]]
+- realizes:: [[decisions#A rule decision's rationale is the support of its conclusion]]
+- realizes:: [[decisions#The native rules engine is optional behind a feature]]
+- scheduled_in:: [[roadmap#M14 Rules decider]]
+
+Not built: the crate does not exist yet. The spike of `m14-rules-decider` ran on 2026-11-15 with a go (see its `design.md`); the crate lands next. The native library is 154 MB. The engine is lean-elpi, reached through tiramemsu 0.12, which already stores programs, enforces them at commit and materializes conclusions.

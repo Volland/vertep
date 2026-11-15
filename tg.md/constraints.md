@@ -286,3 +286,27 @@ DIDComm authcrypt authenticates a sender only to the recipient, so a recipient c
 
 - constrains:: [[decisions#Protocol messages are signed, then sealed]] {strength: must, source: "DIDComm Messaging v2"}
 - constrains:: [[decisions#Out-of-order messages wait, and refusals come with proof]] {strength: must, source: "DIDComm Messaging v2"}
+
+## PyPI releases are immutable
+
+A file uploaded to PyPI or TestPyPI can never be replaced or re-uploaded under the same version; a bad release can only be yanked and superseded by a new version.
+
+- constrains:: [[decisions#One abi3 wheel per platform, published with Trusted Publishing]] {strength: must, source: "PyPI file-name reuse policy"}
+
+## Erasure rules
+
+GDPR Article 17 and similar rules require personal data to be erasable on request, which an append-only, hash-chained journal does not allow by rewriting.
+
+- constrains:: [[decisions#Explanation is the process record, not a story about it]] {strength: must, source: "GDPR Article 17"}
+
+## The native rules engine exists for four platforms
+
+The engine library `libleanelpi` carries the Lean runtime and is built for darwin and linux on arm64 and x64 only; on WebAssembly and Windows tiramemsu's ELPI calls answer `Unsupported`.
+
+- constrains:: [[decisions#The native rules engine is optional behind a feature]] {strength: must, source: "tiramemsu lat.md/elpi.md#Native Library Distribution"}
+
+## An actor that governs its own rules defeats review
+
+If an actor could propose, edit or promote the rules that bind it, review would bind nobody; the limit has to be structural, not only a permission.
+
+- constrains:: [[decisions#An actor cannot govern itself]] {strength: must, source: "design of m17-agent-rules"}

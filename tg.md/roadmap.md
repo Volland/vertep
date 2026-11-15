@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in eleven milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in eighteen milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -24,6 +24,17 @@ flowchart LR
     M8 --> M9
     M5 --> M10["M10 Agent protocols<br/>m10-agent-protocols"]
     M2 --> M10
+    M6 --> M11["M11 Python bindings<br/>m11-python-bindings"]
+    M3 --> M12["M12 Decision records<br/>m12-decision-records"]
+    M7 --> M12
+    M11 --> M13["M13 Production readiness<br/>m13-production-readiness"]
+    M12 --> M13
+    M12 --> M14["M14 Rules decider<br/>m14-rules-decider"]
+    M13 --> M14
+    M14 --> M15["M15 Rule invariants<br/>m15-rule-invariants"]
+    M14 --> M16["M16 Verified rules<br/>m16-verified-rules"]
+    M15 --> M17["M17 Agent rules<br/>m17-agent-rules"]
+    M16 --> M17
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
@@ -65,6 +76,7 @@ Deciders at choice points, LLM actors with journaled results and tool actors, an
 
 - precedes:: [[roadmap#M7 Durable objects]] {note: "the durable agent journal"}
 - precedes:: [[roadmap#M9 Agent wallet]] {note: "consent is a decide state"}
+- precedes:: [[roadmap#M12 Decision records]] {note: "decision entries gain a disposition and an offer"}
 
 Delivered by the OpenSpec change `m3-agents`.
 
@@ -98,6 +110,8 @@ Archived 2026-11-11 with 27 requirements. Interop with a third-party mediator (H
 
 The core and a browser shell compiled to WebAssembly, with a TypeScript API and a tiramemsu journal in OPFS.
 
+- precedes:: [[roadmap#M11 Python bindings]] {note: "the Python binding wraps the command bridge M6 defined"}
+
 Delivered by the OpenSpec change `m6-wasm-js`.
 
 ## M7 Durable objects
@@ -105,6 +119,7 @@ Delivered by the OpenSpec change `m6-wasm-js`.
 DID-addressed durable objects with verifiable journals, decentralised custody over TSP with quorum-promised epochs, the durable agent journal, and a TSP mailbox mediator.
 
 - precedes:: [[roadmap#M8 did:webvh hosting]] {note: "custodian-set changes publish witnessed DID log entries"}
+- precedes:: [[roadmap#M12 Decision records]] {note: "the hash-chained journal envelope is reused for agent journals"}
 
 Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. Creating and hosting `did:webvh` logs followed in [[roadmap#M8 did:webvh hosting]].
 
@@ -133,3 +148,61 @@ Agents publish verifiable role-based protocols, hash-identified JSON-LD choreogr
 Delivered by the OpenSpec change `m10-agent-protocols` (capabilities `agent-protocols`, `protocol-conformance` and `protocol-spaces`), in [[components#vertep-kolyada]]. The design is in [[views/kolyada#Kolyada]]. Test vectors come first and the Lean model second.
 
 The layer is called Kolyada. The core crate was implemented 2026-11-14: documents, identity, projection, signed envelopes, the conformance check, causal delivery, instances and offers, with test vectors. Open: the join policy, sealed fan-out and the mailbox binding in `vertep-federation`, the `vt:plays` declaration, `vt kolyada` and the Lean model.
+
+## M11 Python bindings
+
+The actor system from Python as a PyO3 extension and a pure-Python API, installed with `pip install vertep`, on the JavaScript bindings' command bridge.
+
+- precedes:: [[roadmap#M13 Production readiness]] {note: "the wheel build joins the reproducible toolchain"}
+
+Delivered by the OpenSpec change `m11-python-bindings` (capability `python-bindings`), in [[components#vertep-py]]. The design is in [[views/python#Python]].
+
+Implemented 2026-11-14: the crate and the package `vertep` in `bindings/python` with 27 tests that prove each scenario and run every example, examples in `examples/python`, the docs page, a CI job and the release workflow. Open: reserving the name on PyPI, the TestPyPI dry run of every platform's wheel and the first upload, which are the maintainer's (`bindings/python/RELEASING.md`).
+
+## M12 Decision records
+
+Drafted, not started: a journal that alone explains each decision, exports as a bundle verified offline, can be chained and signed, replays counterfactually, and lets personal data be erased by key destruction.
+
+- precedes:: [[roadmap#M13 Production readiness]] {note: "benchmarks track the cost of offers and sealing"}
+- precedes:: [[roadmap#M14 Rules decider]] {note: "a derivation is a rationale kind beside a claim; the offer is recorded as statements"}
+
+Specified by the OpenSpec change `m12-decision-records` (capabilities `decision-records` and `journal-redaction`), motivated by the credit-decision example, in which a refused answer reads as an accepted one. The positioning it serves is [[decisions#Explanation is the process record, not a story about it]].
+
+## M13 Production readiness
+
+Drafted, not started: stability tiers, a reproducible toolchain, a benchmark suite with a regression gate, a supply-chain gate, a docs-versus-behaviour audit, a tested ten-minute path, journal shipping between nodes and WebSocket live delivery.
+
+- precedes:: [[roadmap#M14 Rules decider]] {note: "rules start only after production readiness"}
+
+Specified by the OpenSpec change `m13-production-readiness` (capabilities `production-readiness` and `journal-shipping`, and an addition to `relay-mailboxes`). It also tracks the open Lean custody proof (M7 task 10.4) and the open M10 items. New milestones wait for it, see [[decisions#New milestones wait for production readiness]].
+
+## M14 Rules decider
+
+Drafted, not started: rule programs stored beside the journal and run by lean-elpi through tiramemsu, a rules decider whose rationale is a derivation over the recorded offer and state, pinned versions and rule-version counterfactuals.
+
+- precedes:: [[roadmap#M15 Rule invariants]]
+- precedes:: [[roadmap#M16 Verified rules]]
+
+Specified by the OpenSpec change `m14-rules-decider` (capabilities `rule-programs` and `rule-decider`), in [[components#vertep-rules]]. Its first task group is a throwaway spike on `examples/credit-decision` with a go or no-go. The design is in [[views/rules#Rules]]. Native only: see [[constraints#The native rules engine exists for four platforms]].
+
+## M15 Rule invariants
+
+Drafted, not started: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause and with erasure.
+
+- precedes:: [[roadmap#M17 Agent rules]]
+
+Specified by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invariants` and `derived-facts`). It needs the erasure design of [[roadmap#M12 Decision records]].
+
+## M16 Verified rules
+
+Drafted, not started: a rules profile, totality and support-necessity checks, a differential oracle against Datalog and derivation certificates checked in Lean.
+
+- precedes:: [[roadmap#M17 Agent rules]]
+
+Specified by the OpenSpec change `m16-verified-rules` (capability `rule-verification`). It begins with a go or no-go on lean-elpi's LF layer for a real derivation.
+
+## M17 Agent rules
+
+Drafted, not started: agents propose rules that pass an ordered gate, run in shadow and are promoted by journaled acts, and no actor can change the rules that govern it.
+
+Specified by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`), building on the grants of [[roadmap#M5 Federation]].
