@@ -8,6 +8,29 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-15
+
+Milestone M12 (decision records), first slice: the entry format. Change `m12-decision-records`.
+
+### Added
+
+- **`vertep-agent`**: every decision and refusal entry of an agent journal carries a
+  `disposition` (`accepted`, `refused-not-offered`, `refused-guard`, `refused-invalid`, `stale`,
+  `fallback-on-deadline`, `fallback-on-refusal` (reserved), `refused-by-decider`) and the `offered`
+  events, set by the host from `AgentMachine::disposition_of` before it journals the input.
+  Entries written by earlier versions open and read as `unknown`
+  (`JournalEntry::disposition_or_unknown`).
+
+### Changed
+
+- `JournalEntry` has two new public fields; code that builds one with a struct literal needs
+  `disposition: None, offered: None` (before 1.0 a minor version may break APIs).
+
+### Not yet
+
+- The explanation view, bundles, chained agent journals, redaction and counterfactual replay of
+  M12, and strict replay of dispositions through the Lean oracle.
+
 ## [0.1.8] - 2026-11-15
 
 Milestones M15 to M17 finished and archived (changes `m15-rule-invariants`, `m16-verified-rules`, `m17-agent-rules`); design in `tg.md/views/rules.md`.
