@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Goat Does Not Choose the Play — a book</title>
+<meta name="description" content="The Goat Does Not Choose the Play: a book on building AI agents that can explain themselves afterwards, with statecharts, journaled inputs and replayable runs, on a worked consumer-lending case. 17 chapters, about 75,000 words, one runnable Rust crate per chapter.">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/fonts.css">
+<link rel="stylesheet" href="assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="index.html"><img src="assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="why.html">Why</a>
+      <a href="regulated.html">Regulated</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="examples/index.html">Examples</a>
+      <a href="articles/index.html">Articles</a>
+      <a href="book.html" aria-current="page">Book</a>
+      <a href="vertepnyk.html">Vertepnyk</a>
+      <a href="about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero hatched">
+  <div class="hero-inner">
+    <div>
+      <p class="kicker">The book</p>
+      <h1>The Goat Does Not Choose the Play</h1>
+      <p class="lede">Your agent did something, and a person with the right to ask wants to know why. “The model said so” is not an answer. This book teaches one architecture and then builds it, in a domain where the question is not optional: consumer credit decisions.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://leanpub.com/thegoatthatdontchooseaplay">Get it on Leanpub</a>
+        <a class="btn" href="why.html">Why Vertep</a>
+      </div>
+    </div>
+    <div class="book-cover">
+      <a href="https://leanpub.com/thegoatthatdontchooseaplay"><img src="assets/img/goat-book-cover.png" alt="Cover of The Goat Does Not Choose the Play" width="571" height="914"></a>
+    </div>
+  </div>
+</section>
+
+<section class="band"><div class="band-inner">
+  <h2>The picture</h2>
+  <p class="sub">The liveliest figure on the stage does not choose the play.</p>
+  <p>In the Ukrainian vertep, the travelling nativity puppet theatre, the goat is the liveliest figure on the stage. She dances, she is struck down, she comes back to life, and the crowd loves her. But she does not choose the play. That is the right picture of a language model inside a program: clever, lively, and not to be trusted with the whole plot.</p>
+  <p>The book's answer is a statechart that offers the moves, a decider (a language model, a person or a rule set) that may only pick among them, and a journal in which every input is recorded. The model is not deterministic; the run is, because the model's answer is recorded as an input. So the run replays exactly, and the record explains itself.</p>
+</div></section>
+
+<section class="band hatched"><div class="band-inner">
+  <h2>What you get</h2>
+  <div class="cards">
+    <div class="card"><div class="card-head"><span class="num">17</span><h3>Chapters in four parts</h3></div><div class="card-body"><p>About 75,000 words, with figures and a companion code repository.</p></div></div>
+    <div class="card"><div class="card-head"><span class="num">1</span><h3>Runnable crate per chapter</h3></div><div class="card-body"><p>Every block of program output in the text was printed by that program. Charts are XML and a small expression language; the host programs are short enough to read as pseudocode. You do not need to know Rust.</p></div></div>
+    <div class="card"><div class="card-head"><span class="num">⚖</span><h3>One running case</h3></div><div class="card-body"><p>Kalyna Credit, a fictional lender, decides consumer loans with a model’s help. You read its legal obligations as an engineer, read its record as an auditor would, and operate it in production.</p></div></div>
+  </div>
+  <p>The book is written against Vertep 0.1.7, the open-source Rust system on this site. But it is about the architecture: every concept is explained so that a reader on another stack can carry it away. Where it describes what a regulation asks of a system, it gives an engineer’s reading and tells you to check it with counsel, and the last chapter lists what the architecture does not answer and when you should not use it.</p>
+</div></section>
+
+<section class="band"><div class="band-inner">
+  <h2>Who it is for</h2>
+  <ul>
+    <li>Engineers and architects building agents, LLM-driven or not, that must be able to say afterwards what happened and why.</li>
+    <li>Technical leads who will be asked by a compliance officer to explain the design.</li>
+    <li>Compliance, risk and audit people who have been handed a design and a suspicion.</li>
+  </ul>
+  <p>You should be able to read code (Python or TypeScript is fine), have called an LLM API, and know what a state machine is in the loose sense. You do not need to know Harel statecharts, SCXML, actors, Datalog or Prolog, or session types: chapters 3 to 6 teach them.</p>
+</div></section>
+
+<section class="band hatched"><div class="band-inner">
+  <h2>Contents</h2>
+  <div class="book-toc">
+<h3>Part I. The stage and the goat</h3>
+<ol start="1">
+  <li>Why an agent loop cannot explain itself</li>
+  <li>What “deterministic” means for an agent</li>
+</ol>
+<h3>Part II. Statecharts, Harel and actors</h3>
+<ol start="3">
+  <li>From booleans to states</li>
+  <li>Reading and writing charts</li>
+  <li>Regions, history and time</li>
+  <li>Actors: many small machines, one mailbox each</li>
+</ol>
+<h3>Part III. Neurosymbolic agents</h3>
+<ol start="7">
+  <li>Neurosymbolic agents</li>
+  <li>The choice point: deciders</li>
+  <li>Rules and derivations</li>
+  <li>Proof, conformance and what they do not cover</li>
+</ol>
+<h3>Part IV. Kalyna Credit: a regulated decision</h3>
+<ol start="11">
+  <li>The regulated domain: what the rules ask for</li>
+  <li>Building the decision</li>
+  <li>The audit trail</li>
+  <li>Security: threats, identity, custody</li>
+  <li>Operating it: shards, versions, incidents</li>
+  <li>Agents that talk: protocols you can check</li>
+  <li>Limits, and what this does not answer</li>
+</ol>
+  </div>
+  <p>Appendices include a map from regulatory requirement to mechanism.</p>
+  <div class="actions"><a class="btn primary" href="https://leanpub.com/thegoatthatdontchooseaplay">Get it on Leanpub</a></div>
+</div></section>
+
+<section class="band"><div class="band-inner">
+  <h2>The author</h2>
+  <p>Volodymyr Pavlyshyn writes about agent memory, knowledge graphs, self-sovereign identity and decentralised architecture, and is the author of Vertep. See the <a href="about.html">about page</a>.</p>
+</div></section>
+
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="why.html" style="color:inherit">Why</a><a href="regulated.html" style="color:inherit">Regulated</a><a href="docs/index.html" style="color:inherit">Docs</a><a href="examples/index.html" style="color:inherit">Examples</a><a href="articles/index.html" style="color:inherit">Articles</a><a href="vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="impressum.html" style="color:inherit">Impressum</a><a href="datenschutz.html" style="color:inherit">Datenschutz</a><a href="agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>
