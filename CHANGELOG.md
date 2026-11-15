@@ -8,6 +8,24 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-15
+
+Milestone M12 (decision records), second slice: the explanation view.
+
+### Added
+
+- **`vertep-agent`**: `AgentHost::explain(actor, position)` returns an `Explanation` derived by
+  replay from the journal and the registered chart versions, never stored: the state before and
+  after, the states entered and exited, the effects of the entry, and for a decision the offer,
+  the choice, the disposition, the decider, the transitions taken and the rationale as a claim
+  labelled `unverified claim by the decider`. `Explanation::to_json` for tools. A host with no
+  decider bound gives the same explanation as the host that ran the decision.
+
+### Not yet
+
+- The explanation bundle with `vt explain` and `vt verify-bundle`, chained agent journals,
+  redaction and counterfactual replay of M12; exposure through `vertep-wasm` and `vertep-py`.
+
 ## [0.1.9] - 2026-11-15
 
 Milestone M12 (decision records), first slice: the entry format. Change `m12-decision-records`.
