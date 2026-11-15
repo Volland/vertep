@@ -4,9 +4,9 @@
 
 use std::sync::Arc;
 
-use vertep_rules::{RuleDecider, RulePolicy, RulesError};
 #[cfg(feature = "native")]
-use vertep_rules::{put_program, verify};
+use vertep_rules::{RuleBundle, counterfactual, put_program, verify};
+use vertep_rules::{RuleDecider, RulePolicy, RulesError};
 use vertep_tiramemsu::TiramemsuShard;
 
 const PROGRAM: &str = "urn:vt:program:loan-policy";
@@ -300,5 +300,91 @@ mod with_engine {
             reason(answer(&d, request("i2", 20_000.0, 31.0, &["approve"]))),
             "no-applicable-rule"
         );
+    }
+
+    // @tg: verifies:: [[openspec:rule-decider#Bundle Includes Rule Closure#Offline re-run]] {level: integration}
+    #[test]
+    fn a_bundle_re_runs_offline_without_the_shard() {
+        let (dir, shard) = shard();
+        let d = decider(&shard);
+        answer(&d, request("b1", 20_000.0, 31.0, &["approve", "refer"]));
+        let rec = d.derivations().remove(0);
+        let json = RuleBundle::export(&shard, &rec).unwrap().to_json();
+        // the shard and its file are gone: verification needs only the bundle
+        drop(d);
+        drop(shard);
+        drop(dir);
+        let bundle = RuleBundle::from_json(&json).unwrap();
+        assert_eq!(bundle.programs.len(), 1);
+        assert_eq!(bundle.statements.len(), rec.support.len());
+        bundle.verify(&RulePolicy::default()).unwrap();
+    }
+
+    // @tg: verifies:: [[openspec:rule-decider#Bundle Includes Rule Closure#Tampered program]] {level: integration}
+    #[test]
+    fn a_tampered_bundle_fails() {
+        let (_d, shard) = shard();
+        let d = decider(&shard);
+        answer(&d, request("b2", 20_000.0, 31.0, &["approve"]));
+        let bundle = RuleBundle::export(&shard, &d.derivations().remove(0)).unwrap();
+        // the program source is altered
+        let mut p = bundle.clone();
+        p.programs[0].text = p.programs[0].text.replace("50000", "90000");
+        assert!(matches!(
+            p.verify(&RulePolicy::default()),
+            Err(RulesError::Diverged(_))
+        ));
+        // a supporting statement is altered: the rule no longer concludes from it
+        let mut st = bundle.clone();
+        for s in &mut st.statements {
+            if s.p == vertep_rules::Term::Iri("urn:vt:ctx:amount".to_owned()) {
+                s.o = vertep_rules::Term::Int(99_999);
+            }
+        }
+        assert!(matches!(
+            st.verify(&RulePolicy::default()),
+            Err(RulesError::Diverged(_))
+        ));
+        // the unchanged bundle still verifies
+        bundle.verify(&RulePolicy::default()).unwrap();
+    }
+
+    // @tg: verifies:: [[openspec:rule-decider#Rule Version Counterfactual#New policy]] {level: integration}
+    #[test]
+    fn a_new_policy_is_tried_on_old_decisions_without_changing_the_journal() {
+        let (_d, shard) = shard();
+        let d = decider(&shard);
+        answer(&d, request("k1", 20_000.0, 31.0, &["approve", "refer"]));
+        answer(&d, request("k2", 40_000.0, 31.0, &["approve", "refer"]));
+        answer(&d, request("k3", 80_000.0, 31.0, &["approve", "refer"]));
+        let recorded = d.derivations();
+        assert_eq!(
+            recorded
+                .iter()
+                .map(|r| r.event.as_str())
+                .collect::<Vec<_>>(),
+            ["approve", "approve", "refer"]
+        );
+        let tx_before = shard.last_tx().unwrap();
+        let next = POLICY
+            .replace("A =< 50000", "A =< 30000")
+            .replace("A > 50000", "A > 30000");
+        let report = counterfactual(&shard, &recorded, &next, &RulePolicy::default()).unwrap();
+        assert_eq!(report.unchanged, 2);
+        assert_eq!(report.differs.len(), 1);
+        let diff = &report.differs[0];
+        assert_eq!(diff.recorded_event, "approve");
+        assert_eq!(diff.counterfactual_event.as_deref(), Some("refer"));
+        assert!(!diff.counterfactual_support.is_empty());
+        assert_eq!(
+            shard.last_tx().unwrap(),
+            tx_before,
+            "the journal is untouched"
+        );
+        // the live program is untouched too: a new decision still follows the original
+        match answer(&d, request("k4", 40_000.0, 31.0, &["approve", "refer"])) {
+            DecisionOutcome::Decision(dec) => assert_eq!(dec.event, "approve"),
+            o => panic!("{o:?}"),
+        }
     }
 }

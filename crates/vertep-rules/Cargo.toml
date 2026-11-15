@@ -18,7 +18,7 @@ default = []
 # Links the native `libleanelpi` (found through `LEANELPI_DIST`) through tiramemsu's `elpi`
 # feature. Without it every constructor fails with `RulesError::Unavailable` and nothing is
 # linked. Off by default: the library is large and exists for four platforms only.
-native = ["dep:tiramemsu"]
+native = ["dep:tiramemsu", "dep:tempfile"]
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
@@ -26,11 +26,17 @@ vertep-agent = { workspace = true }
 vertep-tiramemsu = { workspace = true }
 tiramemsu = { workspace = true, optional = true, features = ["elpi"] }
 sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = { version = "3", optional = true }
 
 [dev-dependencies]
-tempfile = "3"
 futures = "0.3"
-serde_json = "1"
+tempfile = "3"
+
+[[example]]
+name = "credit"
+required-features = ["native"]
 
 [lints]
 workspace = true

@@ -185,7 +185,7 @@ In progress: rule programs stored beside the journal and run by lean-elpi throug
 - precedes:: [[roadmap#M15 Rule invariants]]
 - precedes:: [[roadmap#M16 Verified rules]]
 
-Specified by the OpenSpec change `m14-rules-decider` (capabilities `rule-programs` and `rule-decider`), in [[components#vertep-rules]]. The spike ran 2026-11-15 with a go. The crate exists with the program lifecycle, the decider, refusals, fuel and pinning (groups 3 and 4); bundle inclusion, counterfactual replay and `vt rules` (group 5) are open. The design is in [[views/rules#Rules]]. Native only: see [[constraints#The native rules engine exists for four platforms]].
+Specified by the OpenSpec change `m14-rules-decider` (capabilities `rule-programs` and `rule-decider`), in [[components#vertep-rules]]. The spike ran 2026-11-15 with a go. The crate exists with the program lifecycle, the decider, refusals, fuel and pinning, rule bundles that verify offline, counterfactual replay under another program version, `vt rules` and a CI job. Open and waiting on M12: the derivation as a field of the decision entry and the whole-bundle `vt verify-bundle`; open here: a chart-level rules declaration and a wasm compile check. The design is in [[views/rules#Rules]]. Native only: see [[constraints#The native rules engine exists for four platforms]].
 
 ## M15 Rule invariants
 

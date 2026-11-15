@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use vertep_cli::{Outcome, SchemaFormat, Surface, commands, wallet, webvh};
+use vertep_cli::{Outcome, SchemaFormat, Surface, commands, rules, wallet, webvh};
 
 /// Tools for Vertep charts in SCXML, YAML and RDF.
 #[derive(Parser)]
@@ -74,6 +74,83 @@ enum Cmd {
     Wallet {
         #[command(subcommand)]
         command: WalletCmd,
+    },
+    /// Rule programs beside a shard's journal (needs a build with the `rules` feature).
+    Rules {
+        #[command(subcommand)]
+        command: RulesCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum RulesCmd {
+    /// Store or supersede a rule program from a file.
+    Put {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The program IRI.
+        program: String,
+        /// The ELPI source.
+        file: PathBuf,
+    },
+    /// Print a program's source, now or as of a transaction.
+    Show {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The program IRI.
+        program: String,
+        /// Read the store as of this transaction.
+        #[arg(long)]
+        as_of: Option<u64>,
+    },
+    /// Load a program and run it once over the current data.
+    Check {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The program IRI.
+        program: String,
+        /// The step budget.
+        #[arg(long, default_value_t = 1_000_000)]
+        fuel: u64,
+    },
+    /// The lines that changed between two versions of a program.
+    Diff {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The program IRI.
+        program: String,
+        /// The earlier transaction.
+        #[arg(long)]
+        from: u64,
+        /// The later transaction.
+        #[arg(long)]
+        to: u64,
+    },
+    /// Export one decision's bundle: derivation, program closure and supporting statements.
+    Bundle {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// A JSON file with the derivations the decider recorded.
+        derivations: PathBuf,
+        /// The decision node.
+        node: String,
+        /// Write the bundle here instead of standard output.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Re-run a decision offline from its bundle alone.
+    VerifyBundle {
+        /// The bundle file.
+        file: PathBuf,
+    },
+    /// Where recorded decisions would differ under another program version; writes nothing.
+    Counterfactual {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// A JSON file with the derivations the decider recorded.
+        derivations: PathBuf,
+        /// The other program's source.
+        program_file: PathBuf,
     },
 }
 
@@ -495,6 +572,7 @@ fn main() -> ExitCode {
         } => commands::cluster_reshard(&dir, &out),
         Cmd::Webvh { command } => run_webvh(command),
         Cmd::Wallet { command } => run_wallet(command),
+        Cmd::Rules { command } => run_rules(command),
     };
     print!("{}", out.stdout);
     eprint!("{}", out.stderr);
@@ -507,6 +585,32 @@ fn split(list: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .map(str::to_owned)
         .collect()
+}
+
+fn run_rules(command: RulesCmd) -> Outcome {
+    match command {
+        RulesCmd::Put { db, program, file } => rules::put(&db, &program, &file),
+        RulesCmd::Show { db, program, as_of } => rules::show(&db, &program, as_of),
+        RulesCmd::Check { db, program, fuel } => rules::check(&db, &program, fuel),
+        RulesCmd::Diff {
+            db,
+            program,
+            from,
+            to,
+        } => rules::diff(&db, &program, from, to),
+        RulesCmd::Bundle {
+            db,
+            derivations,
+            node,
+            out,
+        } => rules::bundle(&db, &derivations, &node, out.as_deref()),
+        RulesCmd::VerifyBundle { file } => rules::verify_bundle(&file),
+        RulesCmd::Counterfactual {
+            db,
+            derivations,
+            program_file,
+        } => rules::counterfactual_cmd(&db, &derivations, &program_file),
+    }
 }
 
 fn run_wallet(command: WalletCmd) -> Outcome {

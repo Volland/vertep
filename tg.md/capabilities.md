@@ -317,7 +317,7 @@ Rule programs stored in the shard beside the journal, versioned by supersede, pi
 
 - scheduled_in:: [[roadmap#M14 Rules decider]]
 
-Not implemented: the change is a draft.
+Partly implemented in [[components#vertep-rules]]: storage, supersede, closure digest, engine pinning, fuel and the typed unavailable error; the browser-build check is a dependency-graph gate.
 
 
 ## Rule decider
@@ -326,7 +326,7 @@ A decider whose answer is a derivation over the offer and state written as state
 
 - scheduled_in:: [[roadmap#M14 Rules decider]]
 
-Not implemented: the change is a draft.
+Partly implemented in [[components#vertep-rules]]: the decider, derivation support, refusals, bundles that verify offline and counterfactual replay; the entry field and the whole-bundle verification wait on M12.
 
 
 ## Rule invariants

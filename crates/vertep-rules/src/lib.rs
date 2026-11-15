@@ -13,22 +13,32 @@
 //! @tg: implements:: [[decisions#Rules live per shard, in the journal's file]] {confidence: partial}
 //! @tg: implements:: [[decisions#The native rules engine is optional behind a feature]]
 
+mod bundle;
 mod error;
 mod types;
 
 #[cfg(feature = "native")]
 mod decider;
+#[cfg(feature = "native")]
+mod replay;
 
+pub use bundle::{
+    BUNDLE_FORMAT, CounterfactualReport, Divergence, ProgramSource, RuleBundle, Stmt, Term,
+};
 pub use error::RulesError;
 pub use types::{Derivation, ENGINE, RulePolicy};
 
 #[cfg(feature = "native")]
-pub use decider::{RuleDecider, put_program, verify};
+pub use decider::{CheckReport, RuleDecider, check_program, program_text, put_program, verify};
+#[cfg(feature = "native")]
+pub use replay::counterfactual;
 
 #[cfg(not(feature = "native"))]
 mod unavailable;
 #[cfg(not(feature = "native"))]
-pub use unavailable::{RuleDecider, put_program, verify};
+pub use unavailable::{
+    CheckReport, RuleDecider, check_program, counterfactual, program_text, put_program, verify,
+};
 
 /// The IRIs a rule program reads. Programs are written against these names.
 pub mod vocab {

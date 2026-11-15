@@ -68,24 +68,101 @@ pub fn put_program(shard: &TiramemsuShard, program: &str, text: &str) -> Result<
         .map_err(|e| RulesError::Program(e.to_string()))
 }
 
-/// The digest of a program closure as `view` sees it.
-fn closure_digest(view: &tiramemsu::View<'_>, program: &TmValue) -> Result<String, RulesError> {
+pub(crate) fn iri_text(v: &TmValue) -> String {
+    match v {
+        TmValue::Iri(s) => s.clone(),
+        other => format!("{other:?}"),
+    }
+}
+
+/// The IRI and source text of a program and of each program it includes, sorted by IRI, as
+/// `view` sees them.
+pub(crate) fn closure_sources(
+    view: &tiramemsu::View<'_>,
+    program: &TmValue,
+) -> Result<Vec<(String, String)>, RulesError> {
     let info = view
         .elpi_program_info(program)
         .map_err(|e| RulesError::Program(e.to_string()))?;
-    let mut h = Sha256::new();
-    h.update(format!("{program:?}\0{}\0{}\n", info.statement, info.text));
-    let mut inc: Vec<String> = info
-        .includes
-        .iter()
-        .map(|(p, e)| format!("{p:?}\0{e}"))
-        .collect();
-    inc.sort();
-    for i in inc {
-        h.update(i);
-        h.update("\n");
+    let mut out = vec![(iri_text(program), info.text.clone())];
+    for (p, _) in &info.includes {
+        let i = view
+            .elpi_program_info(p)
+            .map_err(|e| RulesError::Program(e.to_string()))?;
+        out.push((iri_text(p), i.text));
     }
-    Ok(h.finalize().iter().map(|b| format!("{b:02x}")).collect())
+    out.sort();
+    out.dedup();
+    Ok(out)
+}
+
+/// The digest of a program closure: it depends on the text only, so it holds in any store.
+pub(crate) fn digest_of(sources: &[(String, String)]) -> String {
+    let mut h = Sha256::new();
+    for (iri, text) in sources {
+        h.update(iri.as_bytes());
+        h.update([0]);
+        h.update(text.as_bytes());
+        h.update([b'\n']);
+    }
+    h.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn closure_digest(view: &tiramemsu::View<'_>, program: &TmValue) -> Result<String, RulesError> {
+    Ok(digest_of(&closure_sources(view, program)?))
+}
+
+/// The source text of a stored program, now or as of transaction `tx`.
+pub fn program_text(
+    shard: &TiramemsuShard,
+    program: &str,
+    tx: Option<u64>,
+) -> Result<String, RulesError> {
+    let node = iri(program);
+    let view = match tx {
+        Some(t) => shard.db().as_of(TimeRef::Tx(t)),
+        None => shard.db().now(),
+    };
+    view.elpi_program_info(&node)
+        .map(|i| i.text)
+        .map_err(|e| RulesError::Program(e.to_string()))
+}
+
+/// What a trial run of a stored program found.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CheckReport {
+    /// Conclusions over the current data.
+    pub conclusions: usize,
+    /// Steps used.
+    pub fuel_used: u64,
+    /// True when the program may be non-monotonic.
+    pub non_monotonic: bool,
+}
+
+/// Loads a stored program and runs it once over the current data under `fuel`, so that a
+/// syntax or type error, or a runaway rule, shows before the program decides anything.
+pub fn check_program(
+    shard: &TiramemsuShard,
+    program: &str,
+    fuel: u64,
+) -> Result<CheckReport, RulesError> {
+    let opts = ElpiOptions {
+        fuel,
+        ..ElpiOptions::default()
+    };
+    shard
+        .db()
+        .now()
+        .elpi_conclude(&ElpiProgram::Stored(iri(program)), &opts)
+        .map(|r| CheckReport {
+            conclusions: r.conclusions.len(),
+            fuel_used: r.cost.fuel_used,
+            non_monotonic: r.non_monotonic,
+        })
+        .map_err(|e| match e {
+            TmError::ElpiOutOfFuel { .. } => RulesError::FuelExhausted { limit: fuel },
+            e => RulesError::Program(e.to_string()),
+        })
 }
 
 /// A decider that runs a stored rule program over the offer

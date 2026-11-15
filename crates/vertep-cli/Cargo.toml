@@ -17,6 +17,12 @@ categories = ["command-line-utilities", "development-tools"]
 name = "vt"
 path = "src/main.rs"
 
+[features]
+default = []
+# vt rules: rule programs, bundles and counterfactuals; links the native engine library
+# (`LEANELPI_DIST`), so it is off by default.
+rules = ["vertep-rules/native"]
+
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
 vertep-scxml = { workspace = true }
@@ -32,6 +38,8 @@ vertep-webvh = { workspace = true, features = ["custody", "server"] }
 vertep-federation = { workspace = true }
 vertep-objects = { workspace = true }
 serde = { version = "1", features = ["derive"] }
+vertep-rules = { workspace = true }
+vertep-tiramemsu = { workspace = true }
 # vt wallet: agent wallets, OpenID4VCI offers and the conformance kit.
 vertep-wallet = { workspace = true, features = ["sd-jwt", "oid4vc", "testkit"] }
 vertep-runtime = { workspace = true }
@@ -41,8 +49,9 @@ axum = { version = "0.7.9", default-features = false, features = ["http1", "toki
 
 [dev-dependencies]
 tempfile = "3"
+vertep-agent = { workspace = true }
+futures = "0.3"
 vertep-wallet = { workspace = true }
-vertep-tiramemsu = { workspace = true }
 vertep-store = { workspace = true, features = ["testkit"] }
 
 [lints]

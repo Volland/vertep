@@ -73,6 +73,10 @@ Task group 1 ran as a throwaway crate against tiramemsu 0.12.0 with feature `elp
 - **Forged support** is not shown by this spike: the engine's type checker rejects a literal eid (`int` against `stmt`), so a forge would have to reuse an eid from another `tm.triple`, which tiramemsu's own suite tests.
 - **Not done:** wiring the program into a `Decider` (task 1.2 is half done: the policy and the run are shown, the trait is not), and the refused-answer path through the chart.
 
+Verified later in the same milestone: a bundle (`RuleBundle`) re-runs a decision in a fresh store from its own text, with the closure digest over program text only, so it does not depend on statement ids; `counterfactual` replays decisions under another program text against the store as of each decision's transaction and writes nothing; `vt rules` wraps both.
+
+Known limits: (1) a bundle carries only the supporting statements, so offline re-running is sound for monotone programs and may fail to conclude for a program that uses negation over statements outside the support; (2) the forged-support scenario is enforced by tiramemsu (a statement id is a typed value a program cannot write), so it is not reproduced here; (3) the browser-build scenario is held by a dependency-graph gate, not by a wasm compile, because the wasm toolchain does not build on this machine (`z3` mismatch, see the toolchain note); (4) the engine identifier is a constant, as tiramemsu exposes no engine version.
+
 Consequences for the design: R3 gains a context statement naming the case being decided and every rule starts from it; the support of a decision always includes it; and `vertep-rules` must not call the unscoped form.
 
 ## Open Questions
