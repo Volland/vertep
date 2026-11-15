@@ -305,6 +305,7 @@ The tokio shell: actors and lifecycle classes, mailboxes, transports, the direct
 - realizes:: [[decisions#No-std core and tokio shell]] {confidence: partial, note: "the shell half"}
 - realizes:: [[decisions#WebSocket is a transport and an Event I/O Processor]] {confidence: partial, note: "the frames, the link and the server end"}
 - realizes:: [[decisions#WebSocket sends stay owed until the peer acknowledges them]]
+- realizes:: [[decisions#Mailbox backend is chosen per address]]
 - realizes:: [[decisions#Hosts instantiate CEL charts typed]]
 - uses:: [[components#vertep-dm-cel]] {kind: dev, note: "typed CEL actor tests"}
 - provides:: [[capabilities#WASM bindings]] {confidence: partial, note: "the server end of the WebSocket Event I/O Processor"}
@@ -626,11 +627,14 @@ The facade crate an application depends on, re-exporting the other crates behind
 
 Implemented 2026-11-11: re-exports core, store and RDF, plus runtime, tiramemsu and SCXML behind default features and ECMAScript on request; `examples/quickstart.rs` runs one virtual actor with a delayed send and a time-travel query.
 
+- realizes:: [[decisions#Mailbox backend is chosen per address]] {confidence: partial, note: "vt mailbox check validates a mailbox configuration file"}
 ## vertep-examples
 
 Runnable examples for newcomers and the documentation site, one binary per example with its charts, and tests that hold every example to its recorded output.
 
 - uses:: [[components#vertep]] {kind: required, note: "the facade with the agent feature: core, SCXML, runtime, tiramemsu, agents"}
+`vt mailbox check FILE` parses a mailbox configuration, validates it without opening a store, and lists the default, each route and the names an application must register (exit 1 when invalid, 2 when unreadable).
+
 - uses:: [[components#vertep-dm-cel]] {kind: required, note: "the facade does not re-export the CEL datamodel"}
 - uses:: [[components#vertep-dm-rust]] {kind: required, note: "statechart! and the rust datamodel"}
 - uses:: [[components#vertep-cli]] {kind: dev, note: "the vt commands as a library, to check their recorded outputs"}

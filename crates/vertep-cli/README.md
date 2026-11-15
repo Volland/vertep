@@ -269,6 +269,25 @@ After the nodes stop and the lease dump is empty:
 resharded 4 to 8 shards: 0 actors, 0 entries copied to data-8
 ```
 
+### vt mailbox check
+
+Checks a mailbox configuration file (JSON) without opening any store: the default backend and
+the ordered routes by scheme, prefix or exact address, each to `memory`, a `tiramemsu`
+directory or a `named` backend the application registers (for example a relay inbox over a TSP
+mediator). It prints the routes and the names to register. Exit 1 when the file is invalid
+(zero shards, an empty match or name), 2 when it cannot be read.
+
+```sh
+vt mailbox check mailboxes.json
+```
+
+```text
+default -> memory
+scheme did -> named tsp
+prefix vt://orders/ -> tiramemsu data/orders-mailboxes (4 shards)
+register before build: tsp
+```
+
 ### did:webvh
 
 `vt webvh` creates and hosts `did:webvh` DIDs with keys in a file key manager directory
@@ -334,6 +353,7 @@ fn main() -> std::io::Result<()> {
 | `vt gen ts <chart> [--name NAME]` | `commands::gen_ts` | TypeScript module for `@vertep/web` |
 | `vt certify <chart>` | `commands::certify` | run the Lean checker, print the certificate |
 | `vt cluster reshard <dir> <out>` | `commands::cluster_reshard` | double a stopped cluster's shard count |
+| `vt mailbox check <file>` | `commands::mailbox_check` | validate a mailbox configuration |
 | `vt webvh create\|update\|rotate\|deactivate\|verify\|witness\|publish\|serve` | `webvh` | author, verify, witness, publish and serve `did:webvh` DIDs |
 | `vt webvh object create`, `vt webvh custody change` | `webvh::object_create`, `webvh::custody_change_cmd` | durable-object DIDs and custodian-set changes |
 

@@ -60,6 +60,11 @@ enum Cmd {
         #[command(subcommand)]
         command: GenCmd,
     },
+    /// Mailbox configuration.
+    Mailbox {
+        #[command(subcommand)]
+        command: MailboxCmd,
+    },
     /// Cluster operations.
     Cluster {
         #[command(subcommand)]
@@ -433,6 +438,15 @@ enum GenCmd {
 }
 
 #[derive(Subcommand)]
+enum MailboxCmd {
+    /// Check a mailbox configuration file (JSON) without opening any store.
+    Check {
+        /// The configuration file.
+        file: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
 enum ClusterCmd {
     /// Double the shard count of a stopped cluster (offline).
     Reshard {
@@ -493,6 +507,9 @@ fn main() -> ExitCode {
         Cmd::Cluster {
             command: ClusterCmd::Reshard { dir, out },
         } => commands::cluster_reshard(&dir, &out),
+        Cmd::Mailbox {
+            command: MailboxCmd::Check { file },
+        } => commands::mailbox_check(&file),
         Cmd::Webvh { command } => run_webvh(command),
         Cmd::Wallet { command } => run_wallet(command),
     };

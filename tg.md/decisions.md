@@ -51,6 +51,16 @@ Every actor address is an IRI, and actors belong to one of three lifecycle class
 
 A [[glossary#Virtual actor]] is never created or destroyed and is reached only by messages. An [[glossary#Invoked actor]] lives while its invoking state is active. A [[glossary#Stateless worker]] is pooled and keeps no journal. One Orleans turn equals one SCXML macrostep.
 
+## Mailbox backend is chosen per address
+
+A `RoutedMailboxes` factory picks the mailbox backend per address (scheme, prefix or exact match, first rule wins, with a default), so one node can mix in-memory, tiramemsu-backed and relay-held mailboxes without changing charts.
+
+- motivated_by:: [[decisions#Identity, mailbox and transport layers]] {weight: primary, since: "2026-11-15"}
+
+Backends are `Memory`, `Store(Arc<dyn Storage>)` (a tiramemsu directory, a memory store or any other `Storage`, not necessarily the node's journal store) and `Custom(factory)`. A `RelayInbox` is a factory, so a route to it makes a mediator, including a remote TSP one, hold those actors' messages. A tiramemsu file has one writer per process, so a mailbox directory is not shared with a second open. In-memory tiramemsu is not offered: the in-memory choice is `MemoryStore`.
+
+The same routing is written as JSON (`MailboxConfig`): a `default` backend and ordered `routes` of `{match: scheme|prefix|exact, backend: memory|tiramemsu{dir,shards}|named}`. A `named` backend is looked up in a map of factories the application registers, which is how a relay inbox over a remote TSP mediator is chosen from a file. The embedding application reads the file with `NodeBuilder::mailbox_config(&MailboxConfig::from_json(..)?, &named)`, or `MailboxConfig::build` for the federation's `local_mailboxes`. `vt mailbox check FILE` validates a file offline: it checks shape, shard counts and empty matches, and lists the names to register, but cannot open stores or resolve names. The CLI does not build nodes, so it never runs the router.
+
 ## Identity, mailbox and transport layers
 
 Identity, mailbox and transport are three separately pluggable layers: an IRI resolves to mailboxes, and mailboxes deliver over transports that are SCXML Event I/O Processors.

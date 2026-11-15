@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The vt command — Vertep docs</title>
-<meta name="description" content="Every subcommand of vt, the Vertep command line: typecheck, schema, validate, hash, convert, gen ts, certify, cluster reshard and webvh, with their flags, exit codes and real runs on real charts.">
+<meta name="description" content="Every subcommand of vt, the Vertep command line: typecheck, schema, validate, hash, convert, gen ts, certify, cluster reshard, mailbox check and webvh, with their flags, exit codes and real runs on real charts.">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/fonts.css">
 <link rel="stylesheet" href="../assets/css/vertep.css">
@@ -107,6 +107,7 @@ Options:
         <tr><td><code>vt webvh &lt;command&gt;</code></td><td>Creates, updates, rotates, verifies, witnesses, publishes and serves <code>did:webvh</code> DIDs; creates durable-object DIDs and custody changes.</td><td><a href="#webvh">webvh</a></td></tr>
       </tbody>
     </table>
+        <tr><td><code>vt mailbox check &lt;file&gt;</code></td><td>Validates a mailbox configuration file without opening any store.</td><td><a href="#mailbox">mailbox check</a></td></tr>
 
     <h2 id="reading">How vt reads a chart</h2>
     <p>Every subcommand that takes a chart accepts any surface. <code>vt</code> picks the reader from the file extension. When the extension is unknown it looks at the content: XML that contains <code>&lt;scxml</code> is SCXML, a line starting with <code>vertep:</code> is YAML, a document starting with <code>@prefix</code> or <code>PREFIX</code> is read as TriG, and anything else as N-Quads. The rules live in <code>crates/vertep-cli/src/surface.rs</code>.</p>
@@ -772,6 +773,33 @@ replication_factor = 1</code></pre>
     <h2 id="webvh">vt webvh</h2>
     <p><code>vt webvh</code> creates and hosts <code>did:webvh</code> DIDs, the public DIDs of durable objects and of <code>vt-mediator</code>. Keys live in a file key manager directory (<code>--keys</code>). Beside the key files, <code>dids/&lt;did&gt;/</code> holds what the controller needs and no private key: the update key names and the working log. A log is published only once it verifies. The runs below start in an empty directory.</p>
 <pre class="output" data-lang="vt webvh --help"><code>Create, update, witness, publish and serve did:webvh DIDs
+    <h2 id="mailbox">vt mailbox check</h2>
+
+<pre class="output" data-lang="vt mailbox check --help"><code>Check a mailbox configuration file (JSON) without opening any store
+
+Usage: vt mailbox check &lt;FILE&gt;
+
+Arguments:
+  &lt;FILE&gt;  The configuration file
+
+Options:
+  -h, --help  Print help</code></pre>
+
+    <p>A node's mailboxes can be chosen per address from a JSON file (see <a href="runtime.html#mailbox-backends">Choosing where mailboxes live</a>). <code>check</code> reads the file, validates its shape and prints what it means. It opens no store and resolves no names, so it is safe to run before the node exists. Run on this file:</p>
+
+<pre data-lang="JSON"><code>{ "default": "memory",
+  "routes": [
+    { "match": { "scheme": "did" }, "backend": { "named": "tsp" } },
+    { "match": { "prefix": "vt://orders/" },
+      "backend": { "tiramemsu": { "dir": "data/orders-mailboxes", "shards": 4 } } } ] }</code></pre>
+
+<pre class="output" data-lang="vt mailbox check mailboxes.json"><code>default -&gt; memory
+scheme did -&gt; named tsp
+prefix vt://orders/ -&gt; tiramemsu data/orders-mailboxes (4 shards)
+register before build: tsp</code></pre>
+
+    <p>The last line lists the <code>named</code> backends the application has to register before it builds the router, such as a relay inbox over a TSP mediator. Exit codes: 0 valid, 1 invalid (zero shards, an empty directory, match or name, or a file that is not a configuration), 2 the file cannot be read.</p>
+
 
 Usage: vt webvh &lt;COMMAND&gt;
 

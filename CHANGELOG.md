@@ -6,6 +6,16 @@ All notable changes to Vertep are recorded here. The format follows
 
 All crates of the workspace and both npm packages share one version.
 
+## [Unreleased]
+
+### Added
+
+- **Mailbox backends per address.** `RoutedMailboxes` picks a mailbox backend per address (scheme,
+  prefix or exact match; first rule wins), with `MailboxBackend` = `Memory`, `Store(Storage)`
+  (tiramemsu directory via `MailboxBackend::tiramemsu`, or any `Storage`) or `Custom(factory)`
+  such as a relay inbox over a remote TSP mediator. `MailboxConfig` is the same thing as JSON;
+  `NodeBuilder::mailbox_config` applies it and `vt mailbox check FILE` validates one offline.
+
 ## [0.1.5] - 2026-11-14
 
 Milestone M9: agent wallets. Change `m9-agent-wallet`; design in `tg.md/views/wallet.md`.
