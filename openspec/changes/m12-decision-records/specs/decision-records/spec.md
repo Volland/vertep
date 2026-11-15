@@ -5,7 +5,7 @@ Makes the journal of a decision-making actor sufficient to explain, verify and r
 ## ADDED Requirements
 
 ### Requirement: Decision Disposition Is Recorded
-A decision journal entry SHALL record a disposition, one of `accepted`, `refused-not-offered`, `refused-guard`, `fallback-on-deadline` or `fallback-on-refusal`. The shell MUST set it from the validation it performed, and MUST NOT derive it later from the next state. Entries written before this requirement exist MUST read as `unknown`.
+A decision journal entry, and the entry of a decider's refusal, SHALL record a disposition, one of `accepted`, `refused-not-offered`, `refused-guard`, `refused-invalid`, `stale`, `fallback-on-deadline`, `fallback-on-refusal` or `refused-by-decider`. The shell MUST set it from the validation it performed before it journaled the input, and MUST NOT derive it later from the next state. `refused-invalid` is an answer whose annotations or payload fail validation; `stale` is an answer with no open offer; `refused-guard` is an offered event whose transition was no longer enabled; `fallback-on-refusal` is reserved for a chart path that consults a fallback after a refusal, which does not exist yet. Entries written before this requirement exist MUST read as `unknown`.
 
 #### Scenario: A refused answer is marked refused
 - **WHEN** a decider answers with an event that was not among the offered candidates

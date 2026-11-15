@@ -49,6 +49,10 @@ Sensitive fields are sealed with a per-subject data key (AEAD); the entry hash c
 
 Entries already record the transitions they took. When a sealed field a guard reads is unreadable, replay does not re-evaluate that guard; it follows the recorded transition and marks the result `replay: recorded` instead of `replay: verified`. Open question for implementation: whether a snapshot taken before erasure may still carry the erased value, and the policy for purging snapshots (proposed: snapshots hold sealed fields too, under the same key).
 
+### Built (2026-11-15): the entry format
+
+`JournalEntry` gained optional `disposition` and `offered`. They are not part of `AgentInput`, so replay and the machine ignore them: the machine recomputes every check itself, and the entry fields are the shell's record of what it saw. The host asks `AgentMachine::disposition_of(&input)` before it appends, which repeats the checks of `on_decision` (annotations, candidate, payload schema, enablement) without changing anything. Findings: (1) when a guard turns false while an offer is open, the candidate set shrinks and the offer is re-issued under a new correlation, so the late answer is `stale`, not `refused-guard`; (2) the chart never consults a fallback after a refusal, so `fallback-on-refusal` exists in the enum and is not produced; (3) the Lean oracle reads inputs only, so strict replay of dispositions through Lean (task 2.3) is not done.
+
 ## Risks / Trade-offs
 
 - **Entry size and write cost grow** with the offer and with sealing. Mitigation: the offer is a list of short event names; benchmarks in `m13-production-readiness` track the cost.

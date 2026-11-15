@@ -343,6 +343,8 @@ impl AgentHost {
                     input: AgentInput::Start {
                         version: version.as_str().to_owned(),
                     },
+                    disposition: None,
+                    offered: None,
                 },
             )
             .map_err(|e| InstantiateError::Start(e.to_string()))?;
@@ -776,6 +778,12 @@ impl AgentHost {
         }
         let position = self.heads.get(actor).copied().unwrap_or(0) + 1;
         let ts = self.now_ms();
+        // The shell validates the answer against the open offer before it journals it, so the
+        // entry says what was offered and what became of the answer.
+        let (disposition, offered) = match m.disposition_of(&input) {
+            Some((d, o)) => (Some(d), Some(o)),
+            None => (None, None),
+        };
         self.journal
             .append(
                 actor,
@@ -783,6 +791,8 @@ impl AgentHost {
                     position,
                     ts,
                     input: input.clone(),
+                    disposition,
+                    offered,
                 },
             )
             .map_err(HostError::Journal)?;

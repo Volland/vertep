@@ -123,6 +123,47 @@ impl AgentInput {
     }
 }
 
+/// What the shell made of a decider's answer, set from the validation it performed when it
+/// accepted the input and never derived later from the state that followed
+/// ([[openspec:decision-records#Decision Disposition Is Recorded]]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Disposition {
+    /// The answer was an offered, enabled event and was taken.
+    Accepted,
+    /// The answer named an event that was not among the offered candidates.
+    RefusedNotOffered,
+    /// The answer was offered but its transition was no longer enabled (its guard was false).
+    RefusedGuard,
+    /// The answer failed validation: its annotations or its payload against the event's schema.
+    RefusedInvalid,
+    /// No offer with that correlation was open (already answered, closed or superseded).
+    Stale,
+    /// The fallback decider answered after the deadline of the first offer passed, and was taken.
+    FallbackOnDeadline,
+    /// The fallback decider answered after the first decider refused. No chart path consults a
+    /// fallback after a refusal yet, so the shell does not produce this value today.
+    FallbackOnRefusal,
+    /// The decider declined to answer (a refusal input).
+    RefusedByDecider,
+}
+
+impl Disposition {
+    /// The disposition's name as it appears in the journal.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Disposition::Accepted => "accepted",
+            Disposition::RefusedNotOffered => "refused-not-offered",
+            Disposition::RefusedGuard => "refused-guard",
+            Disposition::RefusedInvalid => "refused-invalid",
+            Disposition::Stale => "stale",
+            Disposition::FallbackOnDeadline => "fallback-on-deadline",
+            Disposition::FallbackOnRefusal => "fallback-on-refusal",
+            Disposition::RefusedByDecider => "refused-by-decider",
+        }
+    }
+}
+
 /// One journal entry.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct JournalEntry {
@@ -132,9 +173,22 @@ pub struct JournalEntry {
     pub ts: i64,
     /// The input.
     pub input: AgentInput,
+    /// For a decision or refusal input: what the shell made of it. Absent on entries written
+    /// before dispositions existed, which read as unknown ([`JournalEntry::disposition_or_unknown`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disposition: Option<Disposition>,
+    /// For a decision or refusal input: the events that were offered, in offer order, as of the
+    /// offer ([[openspec:decision-records#Offer Is Part Of The Record]]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offered: Option<Vec<String>>,
 }
 
 impl JournalEntry {
+    /// The disposition as a name, or `unknown` for an entry that predates dispositions.
+    pub fn disposition_or_unknown(&self) -> &'static str {
+        self.disposition.map_or("unknown", Disposition::as_str)
+    }
+
     /// The entry as JSON text.
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()

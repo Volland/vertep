@@ -163,7 +163,7 @@ Implemented 2026-11-14: the crate and the package `vertep` in `bindings/python` 
 
 ## M12 Decision records
 
-Drafted, not started: a journal that alone explains each decision, exports as a bundle verified offline, can be chained and signed, replays counterfactually, and lets personal data be erased by key destruction.
+In progress (entry format built): a journal that alone explains each decision, exports as a bundle verified offline, can be chained and signed, replays counterfactually, and lets personal data be erased by key destruction.
 
 - precedes:: [[roadmap#M13 Production readiness]] {note: "benchmarks track the cost of offers and sealing"}
 - precedes:: [[roadmap#M14 Rules decider]] {note: "a derivation is a rationale kind beside a claim; the offer is recorded as statements"}
