@@ -199,14 +199,14 @@ Specified by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invar
 
 ## M16 Verified rules
 
-Drafted, not started: a rules profile, totality and support-necessity checks, a differential oracle against Datalog and derivation certificates checked in Lean.
+In progress: a rules profile, totality and support-necessity checks, a differential oracle against Datalog (built) and derivation certificates checked in Lean (open).
 
 - precedes:: [[roadmap#M17 Agent rules]]
 
-Specified by the OpenSpec change `m16-verified-rules` (capability `rule-verification`). It begins with a go or no-go on lean-elpi's LF layer for a real derivation.
+Specified by the OpenSpec change `m16-verified-rules` (capability `rule-verification`). The go or no-go on lean-elpi's LF layer came out partial: Horn derivations over a fact tape certify, live host builtins do not, and tiramemsu does not give the derivation tree; certificates are open.
 
 ## M17 Agent rules
 
-Drafted, not started: agents propose rules that pass an ordered gate, run in shadow and are promoted by journaled acts, and no actor can change the rules that govern it.
+In progress: agents propose rules that pass an ordered gate, run in shadow and are promoted by journaled acts, and no actor can change the rules that govern it.
 
-Specified by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`), building on the grants of [[roadmap#M5 Federation]].
+Specified by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`), building on the grants of [[roadmap#M5 Federation]]. Built: the gate, authorship, shadow runs, staged promotion, self-governance and `vt rules propose|shadow|promote`; open: the agent tool, grants from the federation layer and scoped-live behaviour.

@@ -32,6 +32,7 @@ serde_json = "1"
 tempfile = { version = "3", optional = true }
 
 [dev-dependencies]
+tiramemsu = { workspace = true, features = ["datalog"] }
 vertep-store = { workspace = true }
 vertep-runtime = { workspace = true, features = ["tiramemsu"] }
 vertep-scxml = { workspace = true }

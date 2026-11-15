@@ -81,6 +81,25 @@ fn a_derived_fact_has_its_cause_and_falls_with_it() {
         );
     }
 
+    // the conclusion is a member of the derived-facts graph of its subject, not of the state graph
+    {
+        let v = s.db().now();
+        let g = v
+            .encode(&Value::iri("https://example.org/loans/1/derived"))
+            .unwrap()
+            .expect("graph exists");
+        let members = v.graph_members(g).unwrap();
+        assert!(
+            members.iter().any(|e| e.to_string() == m.derived[0]),
+            "{members:?}"
+        );
+        assert!(
+            v.encode(&Value::iri("https://example.org/loans/1"))
+                .unwrap()
+                .is_some()
+        );
+    }
+
     // running again derives nothing new
     let again = materialize(&s, PROGRAM, 100_000).unwrap();
     assert!(again.derived.is_empty() && again.existing == 1, "{again:?}");

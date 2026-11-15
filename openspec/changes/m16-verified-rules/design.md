@@ -40,6 +40,22 @@ Same split as `vt certify`: a Rust-side step exports the derivation (program clo
 4. Totality.
 5. Certificates and the Lean checker, with axioms pinned.
 
+## Go/no-go result (2026-11-15): partial
+
+A delegated, read-only investigation on a copy of lean-elpi v0.4.1 (Lean 4.35.0) found:
+
+- **Horn derivations over a fact tape: go.** `lf_signature`, `lf_export` and `lf_certify` turned a small signature (facts standing in for `tm.triple` answers, one rule) and the query `holds c1 approve` into a theorem the Lean kernel accepts with no axioms; a query with no derivation is refused; a corrupted certificate is rejected by lean-elpi's own test.
+- **Live host builtins: no-go.** The LF layer is a closed language with no hook for host predicates, so the answers to `tm.triple` must be a tape: an ordered list of ground `(S, P, O, eid)` tuples, one per answer consumed, produced by the Rust engine beside the derivation and trusted as input. The kernel then proves that the conclusion follows from this support under the program (R13's sufficiency); that each statement is really in the store stays with the existing eid check.
+- **Untested:** negation, lists, `findall` and cut (expected unsupported), scale at thousands of facts, and whether emitted rules match the ELPI program (needs a differential test).
+- **Smallest path (recommended): skip lean-elpi's search.** Rust emits Lean source (inductives for the terms, the facts and the rules as constructors, `theorem cert := .r_decide .t2 .t1`) and bare `lean` checks it in about half a second with no new `require` in the lakefile; the encoding mirrors `lf_export`. The alternative is to depend on lean-elpi from `vertep-lean`, which needs a pinned version and a tiramemsu-to-LF translation.
+- **Blocker for either path:** tiramemsu returns the support but not the derivation tree (which clause, which facts, in what order), so a Rust exporter needs a replay or recording step. Estimates, not measured: exporter 5 to 8 days, Lean checker 2 to 4 days, pinned-axiom and corrupted-certificate tests 1 to 2 days.
+
+Decision: certificates (group 5) stay open and are not started here; the profile, support necessity, totality and the Datalog oracle are built and tested.
+
+## Built (2026-11-15)
+
+`check_profile` (lexical, with a stratification check on predicate names), `Derivation.profile_checked`, `RuleBundle::unnecessary_support`, `totality` (every non-empty subset of up to 8 candidates under the given sample contexts, with `unknown` beyond that; a program refuses on purpose by concluding `refuse`), an ELPI-against-Datalog vector on a random graph, and `vt rules profile|unnecessary`. The totality answer holds for the sample contexts only; it does not reason about all values.
+
 ## Open Questions
 
 - Does the LF layer produce a proof term for a program that uses `tm.*` host builtins, or must their answers be taken as a tape, as the datamodel is for `step`?

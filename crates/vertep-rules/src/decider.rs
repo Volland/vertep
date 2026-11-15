@@ -11,7 +11,7 @@ use vertep_core::datamodel::Value;
 use vertep_tiramemsu::TiramemsuShard;
 
 use crate::vocab;
-use crate::{Derivation, RulePolicy, RulesError};
+use crate::{DERIVED_GRAPH_SUFFIX, Derivation, RulePolicy, RulesError};
 
 fn iri(s: impl Into<String>) -> TmValue {
     TmValue::iri(s)
@@ -172,12 +172,58 @@ pub fn materialize(
             TmError::ElpiOutOfFuel { .. } => RulesError::FuelExhausted { limit: fuel },
             e => RulesError::Program(e.to_string()),
         })?;
+    place_in_actor_graphs(
+        shard,
+        r.derived.iter().chain(r.existing.iter()).copied().collect(),
+    )?;
     Ok(Materialized {
         derived: r.derived.iter().map(ToString::to_string).collect(),
         existing: r.existing.len(),
         retracted: r.reconciled.iter().map(ToString::to_string).collect(),
         non_monotonic: !r.needs_rerun_after_writes.is_empty(),
     })
+}
+
+/// Adds each derived statement to the derived-facts graph of its subject, when the subject is an
+/// IRI ([[openspec:derived-facts#Derived Facts Carry Support]]).
+fn place_in_actor_graphs(
+    shard: &TiramemsuShard,
+    ids: std::collections::BTreeSet<tiramemsu::Eid>,
+) -> Result<(), RulesError> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let view = shard.db().now();
+    let mut place = Vec::new();
+    for t in view
+        .triples(None, None, None)
+        .map_err(|e| RulesError::Store(e.to_string()))?
+    {
+        if ids.contains(&t.eid)
+            && let TmValue::Iri(subject) = view
+                .decode(t.s)
+                .map_err(|e| RulesError::Store(e.to_string()))?
+        {
+            place.push((t.eid, format!("{subject}{DERIVED_GRAPH_SUFFIX}")));
+        }
+    }
+    shard
+        .db()
+        .transact(TxOptions::default(), |tx| {
+            for (eid, graph) in &place {
+                tx.add_to_graph(
+                    *eid,
+                    TmValue::iri(graph.clone()),
+                    tiramemsu::AssertOpts {
+                        valid: Valid::ALWAYS,
+                        on_existing: tiramemsu::OnExisting::Return,
+                    },
+                )?;
+            }
+            Ok(())
+        })
+        .map(|_| ())
+        .map_err(|e| RulesError::Store(e.to_string()))
 }
 
 /// The source text of a stored program, now or as of transaction `tx`.
@@ -231,6 +277,13 @@ pub fn check_program(
             TmError::ElpiOutOfFuel { .. } => RulesError::FuelExhausted { limit: fuel },
             e => RulesError::Program(e.to_string()),
         })
+}
+
+/// True when every program of the closure is inside the rules profile.
+fn profile_checked(view: &tiramemsu::View<'_>, program: &TmValue) -> bool {
+    closure_sources(view, program)
+        .map(|srcs| srcs.iter().all(|(_, t)| crate::check_profile(t).is_empty()))
+        .unwrap_or(false)
 }
 
 /// A decider that runs a stored rule program over the offer
@@ -392,6 +445,10 @@ impl RuleDecider {
             .iter()
             .find_map(|c| mine.iter().find(|(e, _)| *e == c.event));
         let Some((event, support)) = chosen else {
+            // a program may refuse on purpose by concluding `refuse`
+            if mine.iter().any(|(e, _)| e == vocab::REFUSE) {
+                return Err(refuse("explicit-refusal"));
+            }
             return Err(refuse("not-offered"));
         };
 
@@ -407,6 +464,7 @@ impl RuleDecider {
             fuel_limit: self.policy.fuel,
             fuel_used: result.cost.fuel_used,
             tx,
+            profile_checked: profile_checked(&view, &program),
         };
         let mut decision = Decision::new(event.clone(), Value::Undefined);
         decision.annotations = Annotations {

@@ -143,6 +143,80 @@ enum RulesCmd {
         /// The bundle file.
         file: PathBuf,
     },
+    /// Put a rule program forward through the gate (capability, types, profile, trial run).
+    Propose {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The live program IRI the proposal is for.
+        program: String,
+        /// The proposed ELPI source.
+        file: PathBuf,
+        /// The proposing identity.
+        #[arg(long)]
+        by: String,
+        /// The grant presented.
+        #[arg(long, default_value = "grant:propose")]
+        grant: String,
+        /// Where the proposal came from.
+        #[arg(long, default_value = "cli")]
+        source: String,
+        /// The event names the chart declares, comma separated.
+        #[arg(long)]
+        events: String,
+        /// A JSON file with the derivations to try the proposal on.
+        #[arg(long)]
+        cases: Option<PathBuf>,
+        /// Waive the trial run when there are no cases.
+        #[arg(long)]
+        allow_no_cases: bool,
+        /// The actors the program would govern, comma separated.
+        #[arg(long, default_value = "")]
+        scope: String,
+        /// A JSON file `{"propose": [...], "promote": [...]}`.
+        #[arg(long)]
+        grants: Option<PathBuf>,
+    },
+    /// Run a proposal in shadow on recorded cases; records the differences, decides nothing.
+    Shadow {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The proposal id.
+        proposal: String,
+        /// A JSON file with the derivations to try it on.
+        cases: PathBuf,
+    },
+    /// Move a proposal one stage along: shadow, scoped, live.
+    Promote {
+        /// The shard's tiramemsu file.
+        db: PathBuf,
+        /// The proposal id.
+        proposal: String,
+        /// The stage to move to.
+        #[arg(long)]
+        to: String,
+        /// The promoting identity.
+        #[arg(long)]
+        by: String,
+        /// The grant presented.
+        #[arg(long, default_value = "grant:promote")]
+        grant: String,
+        /// The scope name, for `scoped`.
+        #[arg(long)]
+        scope: Option<String>,
+        /// A JSON file `{"propose": [...], "promote": [...]}`.
+        #[arg(long)]
+        grants: Option<PathBuf>,
+    },
+    /// Whether a program is inside the rules profile, and why not.
+    Profile {
+        /// The program source.
+        file: PathBuf,
+    },
+    /// Supporting statements of a bundle's decision that the conclusion does not need.
+    Unnecessary {
+        /// The bundle file.
+        file: PathBuf,
+    },
     /// Turn commit-time enforcement of a program on (checks existing data first).
     Enforce {
         /// The shard's tiramemsu file.
@@ -629,6 +703,55 @@ fn run_rules(command: RulesCmd) -> Outcome {
             out,
         } => rules::bundle(&db, &derivations, &node, out.as_deref()),
         RulesCmd::VerifyBundle { file } => rules::verify_bundle(&file),
+        RulesCmd::Propose {
+            db,
+            program,
+            file,
+            by,
+            grant,
+            source,
+            events,
+            cases,
+            allow_no_cases,
+            scope,
+            grants,
+        } => rules::propose(&rules::ProposeArgs {
+            db: &db,
+            program: &program,
+            file: &file,
+            by: &by,
+            grant: &grant,
+            source: &source,
+            events: split(&events),
+            cases: cases.as_deref(),
+            allow_no_cases,
+            scope: split(&scope),
+            grants: grants.as_deref(),
+        }),
+        RulesCmd::Shadow {
+            db,
+            proposal,
+            cases,
+        } => rules::shadow_cmd(&db, &proposal, &cases),
+        RulesCmd::Promote {
+            db,
+            proposal,
+            to,
+            by,
+            grant,
+            scope,
+            grants,
+        } => rules::promote_cmd(
+            &db,
+            &proposal,
+            &to,
+            &by,
+            &grant,
+            scope.as_deref(),
+            grants.as_deref(),
+        ),
+        RulesCmd::Profile { file } => rules::profile_cmd(&file),
+        RulesCmd::Unnecessary { file } => rules::unnecessary_cmd(&file),
         RulesCmd::Enforce { db, program } => rules::enforce_cmd(&db, &program, true),
         RulesCmd::Unenforce { db, program } => rules::enforce_cmd(&db, &program, false),
         RulesCmd::Materialize { db, program, fuel } => rules::materialize_cmd(&db, &program, fuel),
