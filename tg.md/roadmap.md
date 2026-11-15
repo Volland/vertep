@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in fourteen milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in eighteen milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -29,6 +29,12 @@ flowchart LR
     M7 --> M12
     M11 --> M13["M13 Production readiness<br/>m13-production-readiness"]
     M12 --> M13
+    M12 --> M14["M14 Rules decider<br/>m14-rules-decider"]
+    M13 --> M14
+    M14 --> M15["M15 Rule invariants<br/>m15-rule-invariants"]
+    M14 --> M16["M16 Verified rules<br/>m16-verified-rules"]
+    M15 --> M17["M17 Agent rules<br/>m17-agent-rules"]
+    M16 --> M17
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
@@ -160,6 +166,7 @@ Implemented 2026-11-14: the crate and the package `vertep` in `bindings/python` 
 Drafted, not started: a journal that alone explains each decision, exports as a bundle verified offline, can be chained and signed, replays counterfactually, and lets personal data be erased by key destruction.
 
 - precedes:: [[roadmap#M13 Production readiness]] {note: "benchmarks track the cost of offers and sealing"}
+- precedes:: [[roadmap#M14 Rules decider]] {note: "a derivation is a rationale kind beside a claim; the offer is recorded as statements"}
 
 Specified by the OpenSpec change `m12-decision-records` (capabilities `decision-records` and `journal-redaction`), motivated by the credit-decision example, in which a refused answer reads as an accepted one. The positioning it serves is [[decisions#Explanation is the process record, not a story about it]].
 
@@ -167,4 +174,37 @@ Specified by the OpenSpec change `m12-decision-records` (capabilities `decision-
 
 Drafted, not started: stability tiers, a reproducible toolchain, a benchmark suite with a regression gate, a supply-chain gate, a docs-versus-behaviour audit, a tested ten-minute path, journal shipping between nodes and WebSocket live delivery.
 
+- precedes:: [[roadmap#M14 Rules decider]] {note: "rules start only after production readiness"}
+
 Specified by the OpenSpec change `m13-production-readiness` (capabilities `production-readiness` and `journal-shipping`, and an addition to `relay-mailboxes`). It also tracks the open Lean custody proof (M7 task 10.4) and the open M10 items. New milestones wait for it, see [[decisions#New milestones wait for production readiness]].
+
+## M14 Rules decider
+
+Drafted, not started: rule programs stored beside the journal and run by lean-elpi through tiramemsu, a rules decider whose rationale is a derivation over the recorded offer and state, pinned versions and rule-version counterfactuals.
+
+- precedes:: [[roadmap#M15 Rule invariants]]
+- precedes:: [[roadmap#M16 Verified rules]]
+
+Specified by the OpenSpec change `m14-rules-decider` (capabilities `rule-programs` and `rule-decider`), in [[components#vertep-rules]]. Its first task group is a throwaway spike on `examples/credit-decision` with a go or no-go. The design is in [[views/rules#Rules]]. Native only: see [[constraints#The native rules engine exists for four platforms]].
+
+## M15 Rule invariants
+
+Drafted, not started: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause and with erasure.
+
+- precedes:: [[roadmap#M17 Agent rules]]
+
+Specified by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invariants` and `derived-facts`). It needs the erasure design of [[roadmap#M12 Decision records]].
+
+## M16 Verified rules
+
+Drafted, not started: a rules profile, totality and support-necessity checks, a differential oracle against Datalog and derivation certificates checked in Lean.
+
+- precedes:: [[roadmap#M17 Agent rules]]
+
+Specified by the OpenSpec change `m16-verified-rules` (capability `rule-verification`). It begins with a go or no-go on lean-elpi's LF layer for a real derivation.
+
+## M17 Agent rules
+
+Drafted, not started: agents propose rules that pass an ordered gate, run in shadow and are promoted by journaled acts, and no actor can change the rules that govern it.
+
+Specified by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`), building on the grants of [[roadmap#M5 Federation]].
