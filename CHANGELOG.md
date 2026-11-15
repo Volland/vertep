@@ -8,6 +8,45 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-15
+
+Milestones M14 (rules decider) and M15 (rule invariants, most of it). Changes `m14-rules-decider` (archived) and `m15-rule-invariants`; design in `tg.md/views/rules.md`.
+
+### Added
+
+- **`vertep-rules`** (new crate, first published in this release): rule programs stored in the
+  shard's tiramemsu file and run by lean-elpi through tiramemsu. A `RuleDecider` answers with the
+  event its conclusion names and the statements that conclusion rests on as its rationale (a
+  derivation, not a claim); `Derivation` pins the program closure by digest, the engine and the
+  fuel; `verify` replays a decision against the rules of its day; `RuleBundle` re-runs a decision
+  offline in a fresh store; `counterfactual` tries another program version on recorded decisions
+  and writes nothing; `enforce` turns commit-time enforcement on (checking existing data first);
+  `materialize` writes derived facts with their support. Everything that needs the engine is
+  behind the `native` feature, off by default: without it constructors return
+  `RulesError::Unavailable` and nothing native is linked. The native library `libleanelpi` is
+  about 154 MB and exists for darwin and linux on arm64 and x64.
+- **`vt rules`** (feature `rules` of `vertep-cli`, off by default): `put`, `show`, `check`, `diff`,
+  `enforce`, `unenforce`, `materialize`, `bundle`, `verify-bundle`, `counterfactual`.
+- **`DeciderKind::Rules`** in `vertep-agent`.
+- **`AppendError::Refused`** and **`Violation`** in `vertep-store`; `vertep-tiramemsu` maps an
+  enforced program's violation to it. The runtime dead-letters a refused turn: nothing is written,
+  the message is acknowledged and the actor steps down unchanged.
+- Specs for M16 (verified rules) and M17 (agent rules), and the example
+  `crates/vertep-rules/examples/credit.rs`.
+
+### Changed
+
+- `AppendError` and `DeciderKind` each gain a variant. Code that matches them exhaustively needs a
+  new arm (before 1.0 a minor version may break APIs).
+
+### Not yet
+
+- The derivation is not yet a field of the decision entry and there is no whole-bundle
+  `vt verify-bundle` (both wait on M12). Derived facts are written to the shard, not to a named
+  graph per actor, and are not retracted on erasure.
+- The npm packages and the Python package carry the new version but the rules decider is not part
+  of them: the native library is not built for WebAssembly or Python.
+
 ## [0.1.6] - 2026-11-14
 
 Milestones M10 (agent protocols, core) and M11 (Python bindings), plus the regulated-work documentation. Changes `m10-agent-protocols` (core) and `m11-python-bindings`; designs in `tg.md/views/kolyada.md` and `tg.md/views/python.md`.
