@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing rules — Vertep docs</title>
+<meta name="description" content="How to write a Vertep rule program: the shape of a clause, the vocabulary the shell provides, patterns for decisions, invariants and derived facts, and the profile that keeps a rule checkable.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
+      <li><a href="wallet.html">Agent wallets</a></li>
+      <li><a href="protocols.html">Agent protocols</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+      <li><a href="python.html">Python</a></li>
+      <li><a href="rules.html">Rules</a></li>
+      <li><a href="rules-writing.html" aria-current="page">Writing rules</a></li>
+      <li><a href="rules-operating.html">Operating rules</a></li>
+      <li><a href="rules-verification.html">Checking rules</a></li>
+      <li><a href="rules-authoring.html">Rules written by agents</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · <a href="rules.html">Rules</a></p>
+    <h1>Writing rules</h1>
+    <p class="lede">A rule program is a small ELPI program that reads the statements the shell wrote about one decision and concludes an event. This page is the reference for its shape, the names it can use, and the patterns that cover most policies.</p>
+
+    <h2 id="shape">The shape of a decision rule</h2>
+    <p>A decision rule is a clause whose head is <code>tm.conclude</code>, a triple that names the decision and the event it concludes, and a list of the statements it rests on. The body is a sequence of lookups and comparisons.</p>
+<pre data-lang="ELPI"><code>tm.conclude (triple C (iri &quot;urn:vt:decision&quot;) (iri &quot;urn:vt:event:approve&quot;)) [X, Eo, Ed, Ea] :-
+  tm.triple (iri &quot;urn:vt:ctx&quot;) (iri &quot;urn:vt:deciding&quot;) C X,
+  tm.triple C (iri &quot;urn:vt:offered&quot;) (iri &quot;urn:vt:event:approve&quot;) Eo,
+  tm.triple C (iri &quot;urn:vt:ctx:dti&quot;) (num D) Ed, D =&lt; 43,
+  tm.triple C (iri &quot;urn:vt:ctx:amount&quot;) (num A) Ea, A =&lt; 50000.</code></pre>
+    <ul>
+      <li><code>tm.triple S P O E</code> reads one statement: subject, predicate, object, and the variable that is bound to the statement's id. Bound arguments become index lookups, so a rule that starts from one decision node is cheap however large the shard is.</li>
+      <li>The list after the triple is the <strong>support</strong>: the ids the conclusion rests on. The host refuses a support that names a statement the run did not read.</li>
+      <li>Variables start with a capital letter. <code>_</code> is a variable you do not need.</li>
+    </ul>
+
+    <h2 id="terms">Terms</h2>
+    <table>
+      <thead><tr><th>Written</th><th>Means</th></tr></thead>
+      <tbody>
+        <tr><td><code>(iri "urn:vt:event:approve")</code></td><td>An IRI.</td></tr>
+        <tr><td><code>(str "blocked")</code></td><td>A plain string.</td></tr>
+        <tr><td><code>(num N)</code></td><td>An integer; <code>N</code> is an ELPI <code>int</code> you can compare. Written with a variable it matches only integers.</td></tr>
+      </tbody>
+    </table>
+    <p>The shell turns the fields of a decision's context into statements: an integral number becomes an integer, another number a double, a string a plain string, a boolean a boolean literal. Arrays, objects and absent values are skipped, so a rule can only read what is plainly data.</p>
+
+    <h2 id="vocabulary">The vocabulary the shell provides</h2>
+    <table>
+      <thead><tr><th>Statement</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>(urn:vt:ctx  urn:vt:deciding  C)</code></td><td>The decision being made is the node <code>C</code>. <strong>Start every rule here.</strong></td></tr>
+        <tr><td><code>(C  urn:vt:offered  urn:vt:event:NAME)</code></td><td>The chart offered this event, written in offer order.</td></tr>
+        <tr><td><code>(C  urn:vt:ctx:FIELD  value)</code></td><td>A plain field of the actor's context.</td></tr>
+        <tr><td><code>(C  urn:vt:actor  "…")</code> and <code>(C  urn:vt:state  "…")</code></td><td>The actor's address and the decide state.</td></tr>
+        <tr><td><code>(C  urn:vt:decision  urn:vt:event:NAME)</code></td><td>What a rule concludes.</td></tr>
+      </tbody>
+    </table>
+    <p>The decision node is <code>urn:vt:decision:&lt;correlation&gt;</code>, one per offer. The context statement exists only for the length of one evaluation, so two decisions never see each other.</p>
+    <p><strong>Why start from the context statement.</strong> <code>tm.conclude</code> runs over the whole view. A rule that does not start from one decision enumerates every decision in the shard: on a shard with 2&nbsp;000 cases that took 118 ms against 0.27 ms for the same rule scoped by the context statement. The decider never calls the unscoped form.</p>
+
+    <h2 id="choosing">How a conclusion becomes a decision</h2>
+    <ul>
+      <li>The decider takes the <strong>first offered event, in offer order, that the program concluded</strong>. Order your offer, not your clauses, when two events could both apply.</li>
+      <li>If nothing was concluded: refusal <code>no-applicable-rule</code>. If something was concluded but none of it was offered: <code>not-offered</code>. If the program concluded <code>urn:vt:event:refuse</code> and no offered event: <code>explicit-refusal</code>.</li>
+      <li>A run that exceeds the step budget is a refusal <code>fuel-exhausted</code>; the default budget is 1&nbsp;000&nbsp;000 steps, set in <code>RulePolicy</code>.</li>
+    </ul>
+
+    <h2 id="patterns">Patterns</h2>
+    <h3>Refer above a ceiling</h3>
+<pre data-lang="ELPI"><code>tm.conclude (triple C (iri &quot;urn:vt:decision&quot;) (iri &quot;urn:vt:event:refer&quot;)) [X, Eo, Ea] :-
+  tm.triple (iri &quot;urn:vt:ctx&quot;) (iri &quot;urn:vt:deciding&quot;) C X,
+  tm.triple C (iri &quot;urn:vt:offered&quot;) (iri &quot;urn:vt:event:refer&quot;) Eo,
+  tm.triple C (iri &quot;urn:vt:ctx:amount&quot;) (num A) Ea, A &gt; 50000.</code></pre>
+    <h3>Refuse on purpose</h3>
+    <p>A catch-all that answers every case with <code>refuse</code> turns a silent gap into a recorded refusal, and is what the totality check looks for:</p>
+<pre data-lang="ELPI"><code>tm.conclude (triple C (iri &quot;urn:vt:decision&quot;) (iri &quot;urn:vt:event:refuse&quot;)) [X] :-
+  tm.triple (iri &quot;urn:vt:ctx&quot;) (iri &quot;urn:vt:deciding&quot;) C X.</code></pre>
+    <h3>Share a limit between programs</h3>
+    <p>A program can include another stored program. The closure digest of a decision covers the text of every included program.</p>
+<pre data-lang="ELPI"><code>accumulate &lt;urn:vt:program:limits&gt;.
+
+tm.conclude (triple C (iri &quot;urn:vt:decision&quot;) (iri &quot;urn:vt:event:approve&quot;)) [X, Ea] :-
+  tm.triple (iri &quot;urn:vt:ctx&quot;) (iri &quot;urn:vt:deciding&quot;) C X,
+  tm.triple C (iri &quot;urn:vt:ctx:amount&quot;) (num A) Ea,
+  ceiling Max, A =&lt; Max.</code></pre>
+    <p>where <code>urn:vt:program:limits</code> holds <code>pred ceiling o:int.</code> and <code>ceiling 50000.</code>. The included program must be stored first. Note that a number written in an included program is not a statement, so it does not appear in the support; if you want the limit itself on the record, store it as a statement and read it with <code>tm.triple</code>.</p>
+
+    <h3>An invariant on the journal</h3>
+    <p>Constraints are written twice: a <code>tm.violation-delta</code> form that runs at commit, seeded by what the transaction added or retracted, and a <code>tm.violation</code> form that runs over everything, when enforcement is turned on. The two must say the same thing; a property test in the crate checks that they do for the example.</p>
+<pre data-lang="ELPI"><code>tm.violation-delta &quot;blocked_actor&quot; &quot;the actor is blocked&quot; [E1, E2] :-
+  tm.added _ (iri &quot;https://w3id.org/vertep/vt#actor&quot;) A E1,
+  tm.triple A (iri &quot;urn:vt:status&quot;) (str &quot;blocked&quot;) E2.
+tm.violation-delta &quot;blocked_actor&quot; &quot;the actor is blocked&quot; [E1, E2] :-
+  tm.added A (iri &quot;urn:vt:status&quot;) (str &quot;blocked&quot;) E2,
+  tm.triple _ (iri &quot;https://w3id.org/vertep/vt#actor&quot;) A E1.
+tm.violation error &quot;blocked_actor&quot; &quot;the actor is blocked&quot; [E1, E2] :-
+  tm.triple _ (iri &quot;https://w3id.org/vertep/vt#actor&quot;) A E1,
+  tm.triple A (iri &quot;urn:vt:status&quot;) (str &quot;blocked&quot;) E2.</code></pre>
+    <p>The second delta clause is easy to forget: a constraint can also be broken by <em>adding the status</em> to an actor that already has entries. Enforcement runs on every commit in the file, including the host's own writes, so this clause refuses that write too.</p>
+
+    <h3>A derived fact with its cause</h3>
+    <p>A <code>tm.conclude</code> whose conclusion is not a decision derives a fact. <code>materialize</code> writes it with its support:</p>
+<pre data-lang="ELPI"><code>tm.conclude (triple C (iri &quot;urn:vt:risk&quot;) (iri &quot;urn:vt:high&quot;)) [E1, E2] :-
+  tm.triple C (iri &quot;urn:vt:amount&quot;) (num A) E1, A &gt; 50000,
+  tm.triple C (iri &quot;urn:vt:flag&quot;) (str &quot;open&quot;) E2.</code></pre>
+
+    <h2 id="profile">Stay inside the profile</h2>
+    <p>Do not use: the cut (<code>!</code>), <code>std.findall</code> and other solution collectors, printing or reading, halting, time or random predicates, or any <code>tm.*</code> builtin other than <code>tm.triple</code>, <code>tm.conclude</code>, <code>tm.violation</code>, <code>tm.violation-delta</code>, <code>tm.added</code>, <code>tm.retracted</code> and <code>tm.valid</code>. Do not put negation inside a recursion. <code>vt rules profile FILE</code> reports every offending clause. A program outside the profile still runs, but its decisions are marked unchecked and no certificate is made for them.</p>
+
+    <h2 id="testing">Testing a rule</h2>
+    <ol>
+      <li><code>vt rules profile program.elpi</code> before you store it.</li>
+      <li>Store it in a scratch shard with <code>vt rules put</code> and run <code>vt rules check</code>: it loads the program and runs it once under the step budget, so a syntax or type error shows up before anything decides.</li>
+      <li>Run the example crate: <code>cargo run -p vertep-rules --features native --example credit</code> is a template for a decider, a bundle and a counterfactual in thirty lines.</li>
+      <li>Try the next version on recorded decisions with <code>vt rules counterfactual</code>, and run the totality check on your sample contexts. <a href="rules-verification.html">Checking rules</a> has the details.</li>
+    </ol>
+
+<div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="rules.html">← Rules</a>
+      <a href="rules-operating.html">Operating rules →</a>
+    </nav>
+  </main>
+</div>
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

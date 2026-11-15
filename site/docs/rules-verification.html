@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checking rules — Vertep docs</title>
+<meta name="description" content="The checks around a Vertep rule decision: the rules profile, support necessity, sampled totality, an ELPI-against-Datalog vector, and a Lean certificate for a fragment, each with what it establishes and what it does not.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
+      <li><a href="wallet.html">Agent wallets</a></li>
+      <li><a href="protocols.html">Agent protocols</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+      <li><a href="python.html">Python</a></li>
+      <li><a href="rules.html">Rules</a></li>
+      <li><a href="rules-writing.html">Writing rules</a></li>
+      <li><a href="rules-operating.html">Operating rules</a></li>
+      <li><a href="rules-verification.html" aria-current="page">Checking rules</a></li>
+      <li><a href="rules-authoring.html">Rules written by agents</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · <a href="rules.html">Rules</a></p>
+    <h1>Checking rules</h1>
+    <p class="lede">Five checks, from cheap and lexical to a Lean kernel. For each: what to run, what a pass means, and what it does not mean.</p>
+
+    <h2 id="summary">At a glance</h2>
+    <table>
+      <thead><tr><th>Check</th><th>Run it with</th><th>A pass means</th><th>It does not mean</th></tr></thead>
+      <tbody>
+        <tr><td>Profile</td><td><code>vt rules profile FILE</code></td><td>The program uses only the part of the language whose meaning is order-independent and effect-free.</td><td>That it is correct. The check is lexical.</td></tr>
+        <tr><td>Support necessity</td><td><code>vt rules unnecessary BUNDLE</code></td><td>Every cited statement was needed for the conclusion.</td><td>That nothing else mattered, such as constants in the program text.</td></tr>
+        <tr><td>Totality</td><td><code>vertep_rules::totality</code></td><td>No offer in the sample falls through unanswered.</td><td>Anything about contexts you did not sample.</td></tr>
+        <tr><td>Two engines</td><td>test <code>oracle</code></td><td>ELPI and Datalog agree on a Horn join.</td><td>Agreement on negation, or on the data both read.</td></tr>
+        <tr><td>Lean certificate</td><td><code>vt rules certify BUNDLE --lean-dir DIR</code></td><td>For a clause of statement lookups and integer comparisons, the conclusion follows from the recorded statements.</td><td>That the clause is the program's, or that the statements are in the store.</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="profile">The rules profile</h2>
+    <p>The profile is what the other checks are defined for. A program is outside it if it uses a cut, a solution collector (<code>findall</code>), printing or reading, halting, time or random predicates, an unknown <code>tm.*</code> builtin or a <code>std.</code> or <code>io.</code> builtin, or negates a predicate inside its own recursion. The check reads the text clause by clause: strings and comments are ignored, and the dependency graph is built from predicate names, so it flags exactly what it can see and accepts what it cannot.</p>
+<pre data-lang="Shell"><code>$ vt rules profile cut.elpi
+outside the profile: cut makes the meaning depend on the order of clauses [p X :- q X, !.]</code></pre>
+    <p>The decider records, on each derivation, whether its whole program closure was inside the profile (<code>profile_checked</code>).</p>
+
+    <h2 id="necessity">Support necessity</h2>
+    <p>For each supporting statement of a bundle's decision, the check runs the rule in a fresh store with that one statement left out. A conclusion that still holds means the statement was not needed.</p>
+<pre data-lang="Shell"><code>$ vt rules unnecessary bundle.json
+every supporting statement is needed
+# or:
+support-not-necessary: e99999</code></pre>
+
+    <h2 id="totality">Totality</h2>
+<pre data-lang="Rust"><code>use vertep_rules::{Totality, totality};
+
+let events = [&quot;approve&quot;, &quot;refer&quot;];
+let contexts = vec![vec![(&quot;amount&quot;.to_owned(), Value::Number(10.0))],
+                    vec![(&quot;amount&quot;.to_owned(), Value::Number(80_000.0))]];
+match totality(POLICY, &amp;events, &amp;contexts, &amp;RulePolicy::default())? {
+    Totality::Total { checked } =&gt; println!(&quot;{checked} offers answered&quot;),
+    Totality::Gap { offer, context } =&gt; println!(&quot;nothing answers {offer:?} under {context:?}&quot;),
+    Totality::Unknown(why) =&gt; println!(&quot;not decided: {why}&quot;),
+}</code></pre>
+    <p>The check runs the rule decider on every non-empty subset of the candidates (at most eight, so at most 255 offers) under each sample context, in a scratch store. A conclusion of <code>refuse</code> counts as an answer. It is a sampled check by design: it never claims anything about values you did not give it.</p>
+
+    <h2 id="oracle">Two engines</h2>
+    <p>The test <code>crates/vertep-rules/tests/oracle.rs</code> builds a random graph, asks tiramemsu's Datalog engine for <code>grand(X, Z) :- parent(X, Y), parent(Y, Z)</code>, asks the ELPI engine for the same join, and requires equal answers. It is a regression guard on the engine, not a general equivalence proof.</p>
+
+    <h2 id="certificate">The Lean certificate</h2>
+    <p>The exporter finds the clause that derives the decision, matches its atoms against the bundle's statements to find a binding, and writes Lean source of this shape:</p>
+<pre data-lang="Lean"><code>import VertepLean.RuleCert
+open Vertep.RuleCert
+
+def tape : List Fact := [
+  { s := .iri &quot;urn:vt:ctx&quot;, p := .iri &quot;urn:vt:deciding&quot;, o := .iri &quot;urn:vt:decision:c1&quot;, eid := &quot;e5&quot; },
+  { s := .iri &quot;urn:vt:decision:c1&quot;, p := .iri &quot;urn:vt:ctx:amount&quot;, o := .int (20000), eid := &quot;e4&quot; } ]
+
+def clause : Clause := {
+  headS := .var &quot;C&quot;, headP := .term (.iri &quot;urn:vt:decision&quot;), headO := .term (.iri &quot;urn:vt:event:approve&quot;),
+  support := [&quot;X&quot;, &quot;Ea&quot;],
+  body := [ .triple (.term (.iri &quot;urn:vt:ctx&quot;)) (.term (.iri &quot;urn:vt:deciding&quot;)) (.var &quot;C&quot;) &quot;X&quot;,
+            .triple (.var &quot;C&quot;) (.term (.iri &quot;urn:vt:ctx:amount&quot;)) (.num &quot;A&quot;) &quot;Ea&quot;,
+            .cmp .le (.var &quot;A&quot;) (.term (.int 50000)) ] }
+
+def binding : Binding := [(&quot;C&quot;, .iri &quot;urn:vt:decision:c1&quot;), (&quot;X&quot;, .str &quot;e5&quot;), (&quot;Ea&quot;, .str &quot;e4&quot;), (&quot;A&quot;, .int 20000)]
+
+theorem cert : check tape clause binding (.iri &quot;urn:vt:decision:c1&quot;) (.iri &quot;urn:vt:decision&quot;)
+    (.iri &quot;urn:vt:event:approve&quot;) [&quot;e5&quot;, &quot;e4&quot;] = true := by decide
+#print axioms cert</code></pre>
+    <p><code>check</code> accepts an instance when every body atom holds under the binding against the tape, the head instantiates to the conclusion, and the support variables are bound to the recorded ids. <code>check_sound</code> and <code>check_complete</code> prove that this is the same as the instance being a derivation; <code>triple_in_tape</code> proves a statement id bound through a lookup really is on the tape. The axioms of all three are pinned in <code>VertepTests.Axioms</code>. The command runs the file with <code>lake env lean</code> as a process and refuses a theorem that depends on <code>sorryAx</code> or a native-code axiom.</p>
+<pre data-lang="Shell"><code>cd lean/vertep-lean &amp;&amp; lake build VertepLean        # once
+vt rules certify bundle.json --lean-dir lean/vertep-lean
+certified: urn:vt:decision:1001 (&#x27;cert&#x27; depends on axioms: [propext])
+vt rules certify bundle.json --emit Cert.lean          # just write the source</code></pre>
+    <h3>What is trusted</h3>
+    <ul>
+      <li>The Rust parser that reads the clause out of the program text. Lean checks the instance it is given, not that it is the program's clause.</li>
+      <li>That each statement on the tape is in the store, which is the host's own check.</li>
+      <li>The engine version in the file: a certificate for a different engine version is not produced.</li>
+    </ul>
+    <h3>What is outside the fragment</h3>
+    <p>Negation, other predicates, and arithmetic other than integer comparison. The exporter reports <code>outside the certifiable fragment: …</code> and never guesses. Widening it is possible (lean-elpi's own proof-term layer certifies Horn derivations over a fact tape) but needs tiramemsu to return the derivation tree, which it does not today.</p>
+
+    <p>The articles <a href="../articles/what-a-proof-covers.html">What a certificate proves, and what it does not</a> and <a href="../articles/rules-that-explain.html">A reason that is not a story</a> put these checks in context.</p>
+
+<div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="rules-operating.html">← Operating rules</a>
+      <a href="rules-authoring.html">Rules written by agents →</a>
+    </nav>
+  </main>
+</div>
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

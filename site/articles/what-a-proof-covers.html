@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What a certificate proves, and what it does not — Vertep</title>
+<meta name="description" content="The checks Vertep puts around a rule decision: a profile, support necessity, sampled totality, a second engine, and a Lean certificate for a fragment. For each, what it establishes and what it leaves out.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="index.html" aria-current="page">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+  <header class="article-head">
+    <p class="kicker">Article the tenth</p>
+    <h1>What a certificate proves, and what it does not</h1>
+    <p class="byline">Checking rule decisions: profile, support, totality, two engines and a Lean kernel</p>
+  </header>
+
+  <p class="opening">Formal verification has a way of sounding like a blanket. This article goes through the five checks around a rule decision one at a time and, for each, says what it establishes and what it does not, because the second half is the half that matters to anyone relying on it.</p>
+
+  <h2>1. The profile: a smaller language</h2>
+  <p>ELPI is a full logic programming language, and most of it is the wrong tool for a policy. The <strong>rules profile</strong> is the subset the other checks are defined for: no cut, no <code>findall</code>, no input or output, no clocks or randomness, only the host's own builtins, and negation that is stratified (it does not pass through a recursion). A program outside the profile still runs, but its decisions are marked <em>unchecked</em>.</p>
+  <p><strong>Establishes:</strong> the program is written in the part of the language whose meaning does not depend on clause order or the outside world. <strong>Does not:</strong> that it is correct. And the check is lexical, with a stratification test on predicate names; it does not parse the language, so it is exact about what it flags and conservative about what it cannot see.</p>
+
+  <h2>2. Support necessity: no padding</h2>
+  <p>A rule lists the statements it rests on. That list could be too short (the host checks every listed statement was read) or too long: a rule can cite a fact it did not need, which makes the explanation look better than it is. <strong>Support necessity</strong> removes each cited statement in turn, re-runs the rule in a fresh store, and reports any statement whose removal leaves the conclusion standing.</p>
+  <p><strong>Establishes:</strong> every listed statement was needed. <strong>Does not:</strong> that the list is <em>complete</em> in a causal sense. A rule that reads a threshold from a constant in its own text has no statement for it.</p>
+
+  <h2>3. Totality: no silent gap</h2>
+  <p>The worst rule is one that quietly does nothing for a case nobody thought of. <strong>Totality</strong> runs the rule decider on every non-empty subset of up to eight candidate events, under each sample context you give it, in a scratch store, and reports the first offer that nothing answers. An explicit refusal clause, a conclusion of <code>refuse</code>, counts as an answer.</p>
+  <p><strong>Establishes:</strong> for those offers and those contexts, nothing falls through. <strong>Does not:</strong> anything about other values. It does not reason over all numbers; it runs the samples, and says <em>unknown</em> beyond the eight-candidate bound rather than guessing.</p>
+
+  <h2>4. Two engines: a second opinion</h2>
+  <p>The engine is lean-elpi, reached through tiramemsu. tiramemsu also has a Datalog engine. For a Horn program, a test runs the same join in both on a random graph and requires the same answers. <strong>Establishes:</strong> the two agree on that program class, so an engine bug would have to be shared. <strong>Does not:</strong> cover programs with negation or arithmetic the Datalog side lacks, or any fault in the data they both read.</p>
+
+  <h2>5. The kernel: a certificate</h2>
+  <p>The strongest check hands the derivation to Lean. For a decision, the exporter writes Lean source: the facts the rule read (the <em>tape</em>), the clause, and a binding of its variables. The Lean module <code>VertepLean.RuleCert</code> states what it means for that instance to derive the conclusion, and a theorem, proved by <code>decide</code>, says it does. The kernel checks the theorem. We checked the checker too: <code>check_sound</code> and <code>check_complete</code> are proved, they depend only on <code>propext</code> and <code>Quot.sound</code>, and the axioms are pinned in the build.</p>
+  <p>It works, and the test suite shows both sides. A valid certificate is accepted. The same instance with its conclusion changed from <code>approve</code> to <code>refer</code> is rejected by the kernel, and so is one whose amount is edited above the ceiling so that the comparison fails.</p>
+  <p><strong>Establishes:</strong> that, for a clause made of statement lookups and integer comparisons, the recorded conclusion follows from the recorded statements. <strong>Does not</strong> establish three things, and they should be read before the word &ldquo;certified&rdquo; is relied on:</p>
+  <ul>
+    <li><strong>It covers a fragment.</strong> Clauses of <code>tm.triple</code> atoms and integer comparisons. Negation and other predicates are reported as outside it, never guessed.</li>
+    <li><strong>The clause is the exporter's reading.</strong> Lean checks the instance it is given, not that the clause is the program's. The Rust parser that extracts the clause from the program text is trusted.</li>
+    <li><strong>The facts are the tape.</strong> That each statement on the tape is really in the store is the host's own check, outside the proof.</li>
+  </ul>
+  <p>There is also a reason it is a fragment. An investigation of lean-elpi's own proof-term layer found that it certifies Horn derivations over a fixed set of facts but has no hook for a host predicate like <code>tm.triple</code>; its answers have to become a tape, and tiramemsu returns the support but not the derivation tree. So the certificate takes the narrow path, and the design records what the wider one would cost.</p>
+
+  <h2>Reading them together</h2>
+  <p>No check here says a policy is <em>right</em>. They say something smaller and more useful: the rule is in a language whose meaning is stable, it cites what it used and only that, it answers every case we tried, a second engine agrees, and, for the simplest class of rule, a proof kernel agrees the conclusion follows. Each of those removes one way for a decision record to mislead. The docs page on <a href="../docs/rules-verification.html">checking rules</a> has the commands, and the <a href="rules-that-explain.html">first article</a> in this series shows the record the checks are about.</p>
+</main>
+
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

@@ -51,6 +51,10 @@
       <li><a href="browser.html">Browser and JavaScript</a></li>
       <li><a href="python.html">Python</a></li>
       <li><a href="rules.html" aria-current="page">Rules</a></li>
+      <li><a href="rules-writing.html">Writing rules</a></li>
+      <li><a href="rules-operating.html">Operating rules</a></li>
+      <li><a href="rules-verification.html">Checking rules</a></li>
+      <li><a href="rules-authoring.html">Rules written by agents</a></li>
     </ul>
     <h4>Reference</h4>
     <ul>
@@ -64,6 +68,8 @@
     <p class="breadcrumb"><a href="index.html">Docs</a> · Running</p>
     <h1>Rules</h1>
     <p class="lede">A policy that decides cases, written as a program and stored beside the journal it decides for. A decision made by a rule carries the statements it rests on, so it can be re-run offline, tried under the next version of the policy, and checked by the Lean kernel. This page covers the crate <code>vertep-rules</code> and <code>vt rules</code>.</p>
+
+    <p>This page is the overview. The reference is in four more pages: <a href="rules-writing.html">Writing rules</a> (the shape of a rule, the vocabulary, patterns), <a href="rules-operating.html">Operating rules</a> (storing, versioning, bundles, counterfactuals, enforcement, the commands), <a href="rules-verification.html">Checking rules</a> (the profile, support necessity, totality, two engines, the Lean certificate) and <a href="rules-authoring.html">Rules written by agents</a>. Four articles give the reasoning: <a href="../articles/rules-that-explain.html">A reason that is not a story</a>, <a href="../articles/neurosymbolic.html">The model proposes, the structure disposes</a>, <a href="../articles/agents-write-rules.html">An agent that may not rewrite its own rules</a> and <a href="../articles/what-a-proof-covers.html">What a certificate proves, and what it does not</a>.</p>
 
     <h2 id="why">Why rules</h2>
     <p>The guard decider picks the first enabled candidate in document order, and a model's reason is its own claim. A rule's reason is a <em>derivation</em>: the statements about the case that made the conclusion follow. The engine is ELPI (a λProlog) run by lean-elpi through tiramemsu, which already stores programs as versioned nodes, so the rules and the journal live in one file and one transaction.</p>
@@ -136,7 +142,7 @@ the next policy (ceiling 30 000) tried on the recorded decisions:
 
     <nav class="pager" aria-label="Pages">
       <a href="python.html">← Python</a>
-      <a href="rdf.html">RDF and versions →</a>
+      <a href="rules-writing.html">Writing rules →</a>
     </nav>
   </main>
 </div>

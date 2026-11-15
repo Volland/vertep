@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A reason that is not a story — Vertep</title>
+<meta name="description" content="A decision made by a rule carries the statements it rests on, so it can be re-run offline, tried under the next version of the policy and checked. How Vertep&#x27;s rules decider works, on a loan.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="index.html" aria-current="page">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+  <header class="article-head">
+    <p class="kicker">Article the seventh</p>
+    <h1>A reason that is not a story</h1>
+    <p class="byline">Rules as a decider whose rationale is a derivation</p>
+  </header>
+
+  <p class="opening">Ask a language model why it approved a loan and it will give you a fluent answer. Ask a rule, and it gives you a list: these three facts about this case, and this clause. The first is a story the system tells about itself. The second is something you can check.</p>
+
+  <h2>Two kinds of reason</h2>
+  <p>A decider in Vertep chooses among the moves a chart offers: a language model, a person, or a program. Whatever it says about <em>why</em> is recorded, but the record treats the two cases differently. A model's rationale is its own account, kept and labelled as an <strong>unverified claim</strong>: the system stored what the model said and makes no promise that it is the cause. A rule's rationale is a <strong>derivation</strong>: the statements about the case that made the conclusion follow, listed by the rule itself, each of them a fact in the same file as the journal.</p>
+  <p>That difference is the point of this article. It is not that rules are smarter than models. It is that a rule's reason can be re-run.</p>
+
+  <h2>A policy as a program</h2>
+  <p>The credit example has a policy: approve if the debt-to-income ratio is at most 43% and the amount at most 50&nbsp;000, and the chart actually offered <code>approve</code>. In Vertep that is a short program in ELPI, a λProlog, stored as a node in the same tiramemsu file as the journal it decides for:</p>
+<pre data-lang="ELPI"><code>tm.conclude (triple C (iri &quot;urn:vt:decision&quot;) (iri &quot;urn:vt:event:approve&quot;)) [X, Eo, Ed, Ea] :-
+  tm.triple (iri &quot;urn:vt:ctx&quot;) (iri &quot;urn:vt:deciding&quot;) C X,
+  tm.triple C (iri &quot;urn:vt:offered&quot;) (iri &quot;urn:vt:event:approve&quot;) Eo,
+  tm.triple C (iri &quot;urn:vt:ctx:dti&quot;) (num D) Ed, D =&lt; 43,
+  tm.triple C (iri &quot;urn:vt:ctx:amount&quot;) (num A) Ea, A =&lt; 50000.</code></pre>
+  <p>Before the rule runs, the shell writes the offer and the plain fields of the case as statements, plus one that names the decision being made. The rule starts from that statement, finds the offered event, reads the two numbers, compares them, and concludes. The list in square brackets, <code>[X, Eo, Ed, Ea]</code>, is the part that matters: the statements the conclusion rests on. The engine checks that every one of them was actually read during the run, so a rule cannot cite a fact it never looked at.</p>
+
+  <h2>What the record shows</h2>
+  <p>The <code>credit</code> example in the crate <code>vertep-rules</code> decides three applications and prints what the record says. Nothing below is written by hand:</p>
+<pre class="output" data-lang="Output"><code>deciding three applications by rule:
+  1001  amount 20000, ratio 31%, offered [&quot;approve&quot;, &quot;decline&quot;, &quot;refer&quot;]
+       derivation: approve from 4 statements by urn:vt:program:loan-policy (closure 73be31fe8c49)
+  1002  amount 80000, ratio 38%, offered [&quot;decline&quot;, &quot;refer&quot;]
+       derivation: refer from 3 statements by urn:vt:program:loan-policy (closure 73be31fe8c49)
+  1003  amount 45000, ratio 40%, offered [&quot;approve&quot;, &quot;refer&quot;]
+       derivation: approve from 4 statements by urn:vt:program:loan-policy (closure 73be31fe8c49)
+
+the bundle of the first decision, verified with no shard:
+  2403 bytes; urn:vt:decision:1001 concluded approve from 4 statements: verified
+
+the next policy (ceiling 30 000) tried on the recorded decisions:
+  2 unchanged, 1 differ
+  urn:vt:decision:1003: approve -&gt; refer</code></pre>
+  <p>Loan 1002 asked for 80&nbsp;000 against a ceiling of 50&nbsp;000, and was offered only <code>decline</code> and <code>refer</code>. The rule concluded <code>refer</code> from three statements: the decision it was making, the fact that <code>refer</code> was offered, and the amount. That is the whole explanation, and each line of it is a statement an auditor can open.</p>
+  <p>The line also names a closure digest, <code>73be31fe8c49</code>. A decision does not say <em>a</em> policy, it says <em>this</em> text of the policy, hashed, together with the engine version and the step budget it ran under. Edit the policy tomorrow and yesterday's decisions still point at yesterday's text, which the file keeps: a program is edited by superseding it, never overwritten.</p>
+
+  <h2>Without the shard</h2>
+  <p>The third block of the output is the one regulators care about. Take the first decision and export a <strong>bundle</strong>: the derivation, the program, and the supporting statements. The bundle is a plain JSON file of about 2.4 kilobytes. A fresh process, with no shard, no model and no network, loads the program, asserts the statements, runs the rule, and checks that it concludes the same event from the same statements. If someone edits the program text in the bundle, the digest no longer matches and verification fails. If they edit a statement, the rule no longer concludes the event, and it fails differently.</p>
+  <p>There is a limit worth stating, because it is a real one. A bundle carries only the statements the conclusion rests on. For a rule that only <em>reads</em> facts, that is enough. For a rule that reasons about what is <em>absent</em>, negation over facts outside the support, the offline run may not conclude what the live one did. The design notes say so, and the profile checks in the next article are how you keep rules on the right side of it.</p>
+
+  <h2>What would the new rules have done?</h2>
+  <p>The last block asks the question every policy change raises: if we had had the next version of the policy, which of our decisions would differ? <code>counterfactual</code> takes the recorded decisions and a program text, runs the program against the store <em>as it was at each decision's transaction</em>, and reports where the answer changes. With the ceiling dropped to 30&nbsp;000, loan 1003 (45&nbsp;000) would have been referred instead of approved, and the other two stand. Nothing is written: the journal and the live program are untouched, and the report can be handed to whoever must sign off on the change.</p>
+
+  <h2>When there is no answer</h2>
+  <p>A rule can fail to apply, and the decider says so. If nothing concludes, the answer is a refusal with the reason <code>no-applicable-rule</code>, never a default; a chart that wants a default declares a fallback decider. If the program concludes an event that was not offered, that is a refusal too (<code>not-offered</code>). If it runs out of steps, it is a refusal with the budget in the reason. A program may also refuse on purpose by concluding <code>refuse</code>. Evaluation is bounded by steps, never by a clock, so a replay uses the same budget as the original.</p>
+
+  <h2>Why this and not a better prompt</h2>
+  <p>A prompt can be asked to explain itself, and the explanation will be plausible. What it cannot be is <em>re-run</em>: the same model next month is a different function. A rule over recorded facts is the same function until its text changes, and the text is part of the record. That is the line this project keeps drawing between a story about a decision and the process that made it, and rules are the decider that sits on the right side of it. They are not always the right decider. A case that needs judgement belongs to a model or a person, and the chart is what keeps either from stepping outside the moves the policy allows.</p>
+  <p>The <a href="../docs/rules.html">Rules page</a> in the docs has the whole surface, and the next pages go through <a href="../docs/rules-writing.html">writing rules</a>, <a href="../docs/rules-operating.html">operating them</a> and <a href="../docs/rules-verification.html">checking them</a>. The native engine library behind all of this is large and exists for macOS and Linux only, so rules are an optional feature: the browser and Python packages do not contain them.</p>
+</main>
+
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

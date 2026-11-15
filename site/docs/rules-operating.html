@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operating rules — Vertep docs</title>
+<meta name="description" content="Running Vertep rules: setting up the engine, storing and versioning programs, the rules decider and its records, bundles, counterfactual replay, enforcement and derived facts, scoped deciders, and the vt rules commands.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
+      <li><a href="wallet.html">Agent wallets</a></li>
+      <li><a href="protocols.html">Agent protocols</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+      <li><a href="python.html">Python</a></li>
+      <li><a href="rules.html">Rules</a></li>
+      <li><a href="rules-writing.html">Writing rules</a></li>
+      <li><a href="rules-operating.html" aria-current="page">Operating rules</a></li>
+      <li><a href="rules-verification.html">Checking rules</a></li>
+      <li><a href="rules-authoring.html">Rules written by agents</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · <a href="rules.html">Rules</a></p>
+    <h1>Operating rules</h1>
+    <p class="lede">Everything you do with a rule program once it is written: put it in a shard, bind it as a decider, read what it recorded, export a decision, try a new version, enforce an invariant. The commands are in one table at the end.</p>
+
+    <h2 id="setup">Setup</h2>
+    <p>Rules run on the native library <code>libleanelpi</code>. It carries the Lean runtime, is about 154&nbsp;MB, and exists for macOS and Linux on arm64 and x64, so everything that needs it is behind a cargo feature that is off by default.</p>
+<pre data-lang="Shell"><code># the library comes from a lean-elpi release (libleanelpi-&lt;platform&gt;.tar.gz)
+export LEANELPI_DIST=/path/to/unpacked/dist
+export DYLD_LIBRARY_PATH=$LEANELPI_DIST      # LD_LIBRARY_PATH on Linux
+
+cargo test -p vertep-rules --features native
+cargo install vertep-cli --features rules     # vt rules ...</code></pre>
+    <p>Without the feature, constructors return the typed error <code>rules-unavailable</code> and nothing falls back to another decider. The repository's CI job <code>rules</code> downloads a checksum-pinned library for Linux and runs the vectors against it.</p>
+
+    <h2 id="decider">A rules decider</h2>
+<pre data-lang="Rust"><code>use std::sync::Arc;
+use vertep_rules::{RuleDecider, RulePolicy, put_program};
+use vertep_tiramemsu::TiramemsuShard;
+
+let shard = Arc::new(TiramemsuShard::open(&quot;shard.db&quot;)?);
+put_program(&amp;shard, &quot;urn:vt:program:loan-policy&quot;, POLICY)?;
+
+let decider = Arc::new(RuleDecider::new(
+    shard.clone(), &quot;urn:vt:program:loan-policy&quot;, RulePolicy::default())?);
+let host = AgentHost::builder(clock)
+    .decider(&quot;underwriter&quot;, decider.clone())   // bound by name, like any decider
+    .build();
+// after the run:
+let derivations = decider.derivations();       // the record of each decision</code></pre>
+    <p>A <code>Derivation</code> holds the decision node, the event, the supporting statement ids, the digest of the program closure, the engine version, the step budget and the steps used, the transaction in which the offer was written, and whether the closure was inside the rules profile. In this release the derivation is returned by the decider; carrying it on the journal's decision entry belongs to the decision-records work.</p>
+
+    <h2 id="versions">Versions</h2>
+    <p>A program is a node in the shard's file, edited by superseding its source statement. The earlier text is not lost: read it as of any transaction.</p>
+<pre data-lang="Shell"><code>vt rules put   shard.db urn:vt:program:loan-policy next.elpi
+vt rules show  shard.db urn:vt:program:loan-policy --as-of 12
+vt rules diff  shard.db urn:vt:program:loan-policy --from 12 --to 40</code></pre>
+    <p>A decision pins its closure by digest, the engine version and the fuel. <code>verify</code> replays a decision against the rules in force at its transaction and reports a different engine version, a changed closure, or a different conclusion or support, and a replay under a different engine version is refused with an engine-mismatch error.</p>
+
+    <h2 id="bundles">Bundles</h2>
+    <p>A bundle is one decision with everything needed to re-run it: the derivation, the program closure, and the supporting statements.</p>
+<pre data-lang="Shell"><code>vt rules bundle shard.db derivations.json urn:vt:decision:1001 --out bundle.json
+vt rules verify-bundle bundle.json     # no shard, no model, no network</code></pre>
+    <p>Verification checks the engine version and the closure digest, loads the programs and statements into a fresh store, runs the rule, and compares the concluded event and the content of the support (statement ids differ between stores, so it compares triples). A bundle carries only the supporting statements, so offline re-running is sound for rules that read facts; a rule that depends on the <em>absence</em> of other statements may not conclude offline what it did live.</p>
+
+    <h2 id="counterfactual">Counterfactuals</h2>
+<pre data-lang="Shell"><code>vt rules counterfactual shard.db derivations.json next.elpi
+# 2 unchanged, 1 differ
+# urn:vt:decision:1003: approve -&gt; refer</code></pre>
+    <p>Each recorded decision is replayed against the store as of its own transaction, with the offer in its recorded order, under the other program text. Nothing is written. A decision for which the other version concludes nothing is reported with the reason (<code>no-applicable-rule</code>, <code>not-offered</code>, <code>fuel-exhausted</code>).</p>
+
+    <h2 id="enforcement">Enforcement</h2>
+    <p><code>vt rules enforce</code> turns a stored program's constraints on. It first runs the full check over the shard's current data and is refused, with the violations listed, if live data already violates it. After that, a journal append that would add a violation is refused at commit:</p>
+    <ul>
+      <li>the transaction aborts and nothing is written: the journal and its head are unchanged;</li>
+      <li>the store reports <code>AppendError::Refused</code> with the constraint name, its bindings and the offending statement ids;</li>
+      <li>the runtime acknowledges the message, records a <strong>dead letter</strong> whose reason is <code>invariant: &lt;constraint&gt; (&lt;statements&gt;)</code>, and the actor steps down and reloads unchanged.</li>
+    </ul>
+<pre data-lang="Output"><code>enforcing urn:vt:program:no-blocked-actor
+actors/blocked is marked blocked
+append for fine: committed, journal at 1
+append for blocked: refused by blocked_actor (2 statements); journal still at 0</code></pre>
+    <p>Enforcement is tiramemsu's, so it applies to <em>every</em> commit in the file, including a host's own writes, not only journal appends. Keep constraints about the journal narrow. <code>vt rules unenforce</code> turns it off.</p>
+
+    <h2 id="derived">Derived facts</h2>
+    <p><code>vt rules materialize</code> writes the conclusions of a program as facts, each with its support. They are members of the graph <code>&lt;subject&gt;/derived</code>, deliberately not the actor's state graph: the runtime compares the state graph with the machine's state after every turn and would read a derived fact there as a state change. A derived fact falls when any statement in its support is retracted, and when an edit to the program stops it concluding the fact. The report says whether the program may be non-monotonic (uses negation): such a program needs a re-run after writes. Retracting derived facts when a subject's key is destroyed is part of the decision-records work and is not built yet.</p>
+
+    <h2 id="scoped">Scoped deciders</h2>
+    <p>A decider bound to a scope runs the proposal promoted for that scope, and the live program otherwise:</p>
+<pre data-lang="Rust"><code>let team_a = RuleDecider::new(shard.clone(), PROGRAM, policy)?.with_scope(&quot;team-a&quot;);</code></pre>
+    <p>See <a href="rules-authoring.html">Rules written by agents</a>.</p>
+
+    <h2 id="commands">The <code>vt rules</code> commands</h2>
+    <p>All need a build with the <code>rules</code> feature; without it they print <code>rules-unavailable</code> and exit 2. <code>DB</code> is the shard's tiramemsu file.</p>
+    <table>
+      <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>put DB PROGRAM FILE</code></td><td>Store or supersede a program.</td></tr>
+        <tr><td><code>show DB PROGRAM [--as-of TX]</code></td><td>Print a program's source.</td></tr>
+        <tr><td><code>check DB PROGRAM [--fuel N]</code></td><td>Load the program and run it once under a step budget.</td></tr>
+        <tr><td><code>diff DB PROGRAM --from TX --to TX</code></td><td>Lines that changed between two versions.</td></tr>
+        <tr><td><code>enforce</code> / <code>unenforce DB PROGRAM</code></td><td>Turn commit-time enforcement on (checking existing data) or off.</td></tr>
+        <tr><td><code>materialize DB PROGRAM [--fuel N]</code></td><td>Write the program's conclusions as derived facts.</td></tr>
+        <tr><td><code>bundle DB DERIVATIONS NODE [--out FILE]</code></td><td>Export one decision's bundle.</td></tr>
+        <tr><td><code>verify-bundle FILE</code></td><td>Re-run a decision offline from its bundle.</td></tr>
+        <tr><td><code>counterfactual DB DERIVATIONS FILE</code></td><td>Where recorded decisions would differ under another program.</td></tr>
+        <tr><td><code>profile FILE</code></td><td>Whether a program is inside the rules profile, and why not.</td></tr>
+        <tr><td><code>unnecessary BUNDLE</code></td><td>Supporting statements the conclusion does not need.</td></tr>
+        <tr><td><code>certify BUNDLE [--lean-dir DIR] [--emit FILE]</code></td><td>The Lean certificate of a decision, checked by the kernel when a built <code>vertep-lean</code> is given.</td></tr>
+        <tr><td><code>propose</code>, <code>shadow</code>, <code>promote</code></td><td>Agent-proposed rules; see <a href="rules-authoring.html">authoring</a>.</td></tr>
+      </tbody>
+    </table>
+    <p><code>DERIVATIONS</code> is a JSON array of the derivations a decider recorded (<code>serde_json::to_string(&amp;decider.derivations())</code>).</p>
+
+<div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="rules-writing.html">← Writing rules</a>
+      <a href="rules-verification.html">Checking rules →</a>
+    </nav>
+  </main>
+</div>
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>
