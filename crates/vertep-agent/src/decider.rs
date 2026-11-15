@@ -238,6 +238,8 @@ pub enum DeciderKind {
     Human,
     /// Another actor through `vt:request`.
     Actor,
+    /// A rule program run over the offer ([[openspec:rule-decider#Rule Decider]]).
+    Rules,
     /// A user-supplied implementation.
     Custom,
 }
@@ -250,6 +252,7 @@ impl DeciderKind {
             DeciderKind::Llm => "llm",
             DeciderKind::Human => "human",
             DeciderKind::Actor => "actor",
+            DeciderKind::Rules => "rules",
             DeciderKind::Custom => "custom",
         }
     }

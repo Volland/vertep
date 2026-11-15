@@ -22,6 +22,7 @@ flowchart TD
     fed["vertep-federation"]
     runtime["vertep-runtime"]
     tira["vertep-tiramemsu"]
+    rules["vertep-rules"]
     oxi["vertep-oxigraph"]
     store["vertep-store"]
     rdf["vertep-rdf"]
@@ -41,6 +42,8 @@ flowchart TD
     wasm --> runtime & tira
     py --> wasm
     agent --> runtime & cel & rdf
+    rules --> agent & tira & runtime
+    cli --> rules
     objects --> runtime & store & fed & cluster
     mediator --> fed & store & tira & webvh
     webvh --> fed & objects
@@ -628,6 +631,7 @@ The `vt` command: convert between SCXML, YAML and RDF, validate and hash charts,
 
 Implemented 2026-11-11: the `vt` binary with `typecheck`, `schema` (JSON Schema, SHACL, CEL; Rust waits for the macro crate), `validate`, `hash`, `convert` between SCXML, YAML and RDF formats, and `certify` per [[decisions#vt certify runs the Lean checker as a process]]. Exit codes: 0 success, 1 the chart fails, 2 usage or I/O.
 
+
 Since M8, `vt webvh` creates, updates, rotates, deactivates, verifies, witnesses, publishes and serves `did:webvh` DIDs, creates durable-object DIDs (`object create`) and prepares custody changes (`custody change`). Keys stay in a file key manager directory; `dids/<did>/` beside them holds the update-key names and the working log.
 
 ## vertep
@@ -705,3 +709,24 @@ Implemented 2026-11-14 for the core, with 45 tests and a language-neutral vector
 `vectors/` holds the published test vectors and `vectors/check.mjs` checks the envelope ones with Node alone. A participant tracks the states it may be in, not one state: a transition it takes no part in is silent and a message hidden from it counts as one unknown step. Signing and DID resolution enter through the traits, so the crate has no transport or key code.
 
 Not built yet: the Lean model, the join policy, sealed fan-out over mailboxes, the inbound and outbound checks at the mailbox and send path, the `vt:plays` declaration and `vt kolyada`. These are the federation, runtime and CLI tasks of `m10-agent-protocols`, and they will realize [[decisions#Charts declare roles and the mailbox checks before the journal]].
+
+## vertep-rules
+
+Crate for rules, partly built: the rules decider, rule program lifecycle over tiramemsu's ELPI, version pinning, enforcement and derived facts, and the gate for proposed rules; off unless the `rules` feature is on.
+
+- provides:: [[capabilities#Rule programs]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Rule decider]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Rule invariants]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Derived facts]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Rule verification]] {confidence: partial, note: "planned"}
+- provides:: [[capabilities#Rule authoring]] {confidence: partial, note: "planned"}
+- uses:: [[components#vertep-agent]] {kind: required, note: "the Decider trait and decision records"}
+- uses:: [[components#vertep-tiramemsu]] {kind: required, note: "tiramemsu's elpi and native features, behind a rules feature"}
+- uses:: [[components#vertep-runtime]] {kind: required, note: "the refusal path and dead letters"}
+- uses:: [[components#vertep-lean]] {kind: optional, note: "planned: the derivation certificate checker"}
+- realizes:: [[decisions#Rules live per shard, in the journal's file]]
+- realizes:: [[decisions#A rule decision's rationale is the support of its conclusion]]
+- realizes:: [[decisions#The native rules engine is optional behind a feature]]
+- scheduled_in:: [[roadmap#M14 Rules decider]]
+
+Built on 2026-11-15 for M14: `put_program`, `RuleDecider`, `verify`, `Derivation`, `RuleBundle` (exports and verifies offline), `counterfactual`, `check_program`, and `vt rules` in `vertep-cli` (feature `rules`), behind the `native` feature, with 13 vectors that run against the real engine (`LEANELPI_DIST` set), a CLI end-to-end test and a CI job. Open: carrying the derivation on the decision entry (M12), the whole-bundle `vt verify-bundle` (M12), a chart-level rules declaration, and the wasm compile check (a dependency-graph gate stands in for it). The native library is 154 MB. The engine is lean-elpi, reached through tiramemsu 0.12, which already stores programs, enforces them at commit and materializes conclusions.

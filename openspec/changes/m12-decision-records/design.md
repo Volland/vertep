@@ -27,13 +27,15 @@ A decision entry gains `disposition` and `offered` (the candidate events enabled
 
 Reasons: [[decisions#Event-sourced actors]] makes the journal the truth; an offer is an input the shell produced, so recording it is recording an input.
 
+The offer is recorded in a form from which statements in the entry's graph can be written, so that a rule decider (`m14-rules-decider`) reads the same record the explanation view reports and no second copy exists.
+
 ### D2. The explanation view is derived, never stored
 
 `explain(actor, position)` is computed from entries and chart versions by replay, so it cannot disagree with the journal. The bundle stores the journal slice, not a precomputed explanation, and `verify-bundle` recomputes the view and compares it with the manifest.
 
 ### D3. Rationale is typed as a claim
 
-Annotations from a decider are carried in the view as `claimed_by` plus text, under a heading that the schema and the docs name as unverified. Alternative rejected: merging the rationale into a single "reason" field, which invites readers to treat it as established.
+Annotations from a decider are carried in the view as `claimed_by` plus text, under a heading that the schema and the docs name as unverified. A rationale has a kind, `claim` or `derivation`; a derivation (from a rule decider, `m14-rules-decider`) lists the supporting statements and the program closure and is not labelled unverified. The bundle manifest has room for rule program closures and an engine version. Alternative rejected: merging the rationale into a single "reason" field, which invites readers to treat it as established.
 
 ### D4. Agent journal integrity reuses the durable-objects chain
 

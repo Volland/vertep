@@ -1701,3 +1701,158 @@ After M10 and M11 are finished, no new milestone starts until `m13-production-re
 - motivated_by:: [[decisions#Full SCXML first]] {weight: secondary, since: "2026-11-14", note: "depth in the strongest layers before breadth"}
 
 Rejected: continuing at the same pace, because adoption comes from depth in the layers people use first.
+
+## Rules live per shard, in the journal's file
+
+A rule program is a node in the same tiramemsu file as the journal it decides for, so one transaction covers an entry and the rules it was decided under, and as_of gives versioned rules. Proposed 2026-11-14 (M14 R1).
+
+- motivated_by:: [[decisions#Two storage traits with tiramemsu as default]] {weight: primary, since: "2026-11-14"}
+- motivated_by:: [[constraints#Tiramemsu has a single writer per file]] {weight: secondary}
+
+Rejected: one shared policy file, which needs replication and pinning across shards, and rules inside the chart, which couple policy releases to chart versions.
+
+
+## A rule decision's rationale is the support of its conclusion
+
+A rules decider returns the statements its conclusion states as support, labelled a derivation and kept distinct from a decider's claim; the host checks the eids were read by the run. Proposed 2026-11-14 (M14 R2).
+
+- motivated_by:: [[decisions#Explanation is the process record, not a story about it]] {weight: primary, since: "2026-11-14"}
+
+Rejected: storing a proof tree, which the host cannot see because backtracking makes the facts used something the author threads.
+
+
+## The offer and the state are statements a rule can read
+
+Before a rule runs, the shell writes the offered candidates and the actor's context as statements in the entry's graph, so the rule and its support can refer to them. Proposed 2026-11-14 (M14 R3).
+
+- motivated_by:: [[decisions#Explanation is the process record, not a story about it]] {weight: secondary, since: "2026-11-14"}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary}
+
+A context statement naming the case being decided scopes every rule to it, since an unscoped run enumerates every case in the shard (measured in the M14 spike: 118 ms against 0.27 ms with 2 000 cases).
+
+Rejected: passing the offer as a goal argument, because the support could not point at it.
+
+
+## No applicable rule is a refusal, never a default
+
+If no rule applies, the program has no solution or fuel runs out, the rules decider refuses with a reason; a chart that wants a default declares a fallback decider. Proposed 2026-11-14 (M14 R4).
+
+- motivated_by:: [[decisions#Explanation is the process record, not a story about it]] {weight: secondary, since: "2026-11-14"}
+
+
+## Rule evaluation is fuel-bounded and pinned to an engine version
+
+Every rule run has a step budget and no wall clock; the entry records engine version, fuel limit and fuel used, and replay reports a different engine. Proposed 2026-11-14 (M14 R5).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-14"}
+
+Rejected: pinning only the program, because an engine upgrade could change a conclusion invisibly.
+
+
+## The native rules engine is optional behind a feature
+
+Rules need the native engine library behind a cargo feature that is off by default; without it a chart declaring a rules decider fails to load with a typed error and never falls back to another decider. Proposed 2026-11-14 (M14 R6).
+
+- motivated_by:: [[constraints#The native rules engine exists for four platforms]] {weight: primary, since: "2026-11-14"}
+
+A Rust evaluator for a rules profile, which would run everywhere, is a possible later milestone and is not decided here.
+
+
+## A refused append writes no entry and dead-letters the message
+
+When an enforced rule program refuses a journal append, the transaction aborts, nothing is written, and the message is dead-lettered with the violation name, text and offending statements. Proposed 2026-11-14 (M15 R7).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-14"}
+
+Rejected: writing a refusal entry, which would be an input the actor never processed and would complicate replay.
+
+
+## The delta check is an optimization and the full check is the meaning
+
+An enforced rule program is correct when its commit-time delta check refuses exactly the transactions whose full check gains a violation, shown by a property test. Proposed 2026-11-14 (M15 R8).
+
+- motivated_by:: [[constraints#Tiramemsu has a single writer per file]] {weight: secondary, since: "2026-11-14"}
+
+
+## Derived facts live in the actor's graph with their cause
+
+Rule-derived facts are written into the graph of the actor they concern with their support, so dependents and the explanation view reach them, and non-monotonic programs are labelled for rerun. Proposed 2026-11-14 (M15 R9).
+
+- motivated_by:: [[decisions#Explanation is the process record, not a story about it]] {weight: secondary, since: "2026-11-14"}
+
+
+## Erasure retracts what depends on the erased
+
+When a subject's key is destroyed, derived facts resting on their sealed statements are retracted and the retraction is journaled with the erasure; unrelated derived facts remain. Proposed 2026-11-14 (M15 R10).
+
+- motivated_by:: [[constraints#Erasure rules]] {weight: primary, since: "2026-11-14"}
+
+Rejected: keeping derived facts that quote erased values, which would defeat erasure.
+
+
+## A rules profile defines what can be checked
+
+A documented subset of the rule language (typed, stratified, no findall, cut, I/O or time) is the one part for which totality, support necessity and certificates are defined; other programs run and are marked unchecked. Proposed 2026-11-14 (M16 R11).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-14"}
+
+Rejected: checking all of the language, which is undecidable in general and which the engine only partly covers.
+
+
+## Totality is a static check over offers
+
+For a program in the profile and a decide state, a check decides whether every offer yields a decision or an explicit refusal and reports a counterexample offer, or reports unknown within its bound. Proposed 2026-11-14 (M16 R12).
+
+- motivated_by:: [[decisions#Explanation is the process record, not a story about it]] {weight: secondary, since: "2026-11-14"}
+
+
+## Support is checked for necessity and certificates check sufficiency
+
+Offline, removing each supporting statement must stop the conclusion, and a proof term checked in Lean shows the conclusion follows from the support; together they replace trusting the author's stated support. Proposed 2026-11-14 (M16 R13).
+
+- motivated_by:: [[decisions#Lean verification bridge]] {weight: primary, since: "2026-11-14"}
+
+
+## Derivation certificates are checked by Lean as a process
+
+A rule decision's derivation is exported to a file and checked by the Lean package as a process, as vt certify does for charts, so the Lean runtime stays out of the Rust build. Proposed 2026-11-14 (M16 R14).
+
+- motivated_by:: [[decisions#vt certify runs the Lean checker as a process]] {weight: primary, since: "2026-11-14"}
+
+Rejected: linking the checker into the Rust build.
+
+
+## A proposed rule is an inert program node
+
+A proposed rule program is stored in state proposed with its author and is never read by a decider or enforced until promoted, so proposals keep their history. Proposed 2026-11-14 (M17 R15).
+
+- motivated_by:: [[decisions#Explanation is the process record, not a story about it]] {weight: secondary, since: "2026-11-14"}
+
+Rejected: holding proposals outside the store, where they would lose authorship and history.
+
+
+## The rule gate is ordered and its errors are terms
+
+A proposal passes capability, type, profile, trial run on recorded cases and existing-data checks in that order, and the first failure returns a stable code, the clause and the reason so an agent can repair it. Proposed 2026-11-14 (M17 R16).
+
+- motivated_by:: [[decisions#Explanation is the process record, not a story about it]] {weight: secondary, since: "2026-11-14"}
+
+Rejected: free-text errors, which agents cannot repair reliably.
+
+
+## Rules are shadowed before they are live
+
+A proposed program runs in shadow beside the live one and records differences without deciding, then moves to a named scope, then live, each step a journaled act under a promote grant. Proposed 2026-11-14 (M17 R17).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: secondary, since: "2026-11-14"}
+
+Rejected: a single activate flag, which leaves no evidence between proposal and effect.
+
+
+## An actor cannot govern itself
+
+A rule program that would govern an actor's decisions or appends cannot be proposed, edited or promoted by that actor or by one its identity controls, whatever grants it holds. Proposed 2026-11-14 (M17 R18).
+
+- motivated_by:: [[constraints#An actor that governs its own rules defeats review]] {weight: primary, since: "2026-11-14"}
+
+Rejected: relying on grants alone, because a broad grant could still include self-governance.

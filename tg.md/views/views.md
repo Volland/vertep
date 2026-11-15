@@ -15,3 +15,4 @@ Architecture views of Vertep, typed `View`: each explains a slice of the system 
 - [[durable-objects]] — DID-addressed durable objects, custody epochs over TSP, keepers and failover
 - [[kolyada]] — Kolyada, the agent protocol layer: hash-identified choreographies, role projection, signed messages and spaces over sealed mailboxes
 - [[wallet]] — the agent wallet, role charts, plugin interfaces, consent, the Lean exchange model and conformance
+- [[rules]] — rules as ELPI programs beside the journal: the rules decider, invariants, verification and agent-proposed rules (planned, M14 to M17)

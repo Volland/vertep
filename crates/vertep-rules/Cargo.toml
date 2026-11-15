@@ -1,0 +1,42 @@
+[package]
+name = "vertep-rules"
+description = "Rule programs beside the journal: a rules decider whose rationale is a derivation, run by lean-elpi through tiramemsu"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+readme = "README.md"
+homepage = "https://volland.github.io/vertep/"
+documentation = "https://docs.rs/vertep-rules"
+keywords = ["vertep", "rules", "lambda-prolog", "decisions", "explainability"]
+categories = ["database"]
+
+[features]
+default = []
+# Links the native `libleanelpi` (found through `LEANELPI_DIST`) through tiramemsu's `elpi`
+# feature. Without it every constructor fails with `RulesError::Unavailable` and nothing is
+# linked. Off by default: the library is large and exists for four platforms only.
+native = ["dep:tiramemsu", "dep:tempfile"]
+
+[dependencies]
+vertep-core = { workspace = true, features = ["std"] }
+vertep-agent = { workspace = true }
+vertep-tiramemsu = { workspace = true }
+tiramemsu = { workspace = true, optional = true, features = ["elpi"] }
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = { version = "3", optional = true }
+
+[dev-dependencies]
+futures = "0.3"
+tempfile = "3"
+
+[[example]]
+name = "credit"
+required-features = ["native"]
+
+[lints]
+workspace = true

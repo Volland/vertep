@@ -1,7 +1,7 @@
 ---
 type: Capability
 status: draft
-openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces, python-bindings, decision-records, journal-redaction, production-readiness, journal-shipping]
+openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces, python-bindings, decision-records, journal-redaction, production-readiness, journal-shipping, rule-programs, rule-decider, rule-invariants, derived-facts, rule-verification, rule-authoring]
 ---
 # Capabilities
 
@@ -310,3 +310,56 @@ A pull protocol that replicates a journal between cluster nodes in order with di
 - scheduled_in:: [[roadmap#M13 Production readiness]]
 
 Not implemented: the change is a draft; it closes the gap noted in [[roadmap#M4 Cluster]].
+
+## Rule programs
+
+Rule programs stored in the shard beside the journal, versioned by supersede, pinned by digest and engine version on every decision, bounded by fuel, and available only where the native engine is. OpenSpec: `rule-programs`.
+
+- scheduled_in:: [[roadmap#M14 Rules decider]]
+
+Partly implemented in [[components#vertep-rules]]: storage, supersede, closure digest, engine pinning, fuel and the typed unavailable error; the browser-build check is a dependency-graph gate.
+
+
+## Rule decider
+
+A decider whose answer is a derivation over the offer and state written as statements; its support is the rationale, no applicable rule is a refusal, bundles carry the program and counterfactuals vary its version. OpenSpec: `rule-decider`.
+
+- scheduled_in:: [[roadmap#M14 Rules decider]]
+
+Partly implemented in [[components#vertep-rules]]: the decider, derivation support, refusals, bundles that verify offline and counterfactual replay; the entry field and the whole-bundle verification wait on M12.
+
+
+## Rule invariants
+
+Enforced rule programs that refuse a violating journal append at commit, with the refusal dead-lettered, a full check on enabling and a delta check proven equal to it. OpenSpec: `rule-invariants`.
+
+- scheduled_in:: [[roadmap#M15 Rule invariants]]
+
+Not implemented: the change is a draft.
+
+
+## Derived facts
+
+Facts concluded by rules and kept in the actor's graph with their support, retracted with it and with erasure. OpenSpec: `derived-facts`.
+
+- scheduled_in:: [[roadmap#M15 Rule invariants]]
+
+Not implemented: the change is a draft.
+
+
+## Rule verification
+
+A rules profile, totality and support-necessity checks, a differential oracle against Datalog and derivation certificates checked in Lean. OpenSpec: `rule-verification`.
+
+- scheduled_in:: [[roadmap#M16 Verified rules]]
+
+Not implemented: the change is a draft.
+
+
+## Rule authoring
+
+Agent-proposed rules behind an ordered gate with structured errors, shadow evaluation, staged journaled promotion and a refusal of self-governance. OpenSpec: `rule-authoring`.
+
+- scheduled_in:: [[roadmap#M17 Agent rules]]
+
+Not implemented: the change is a draft.
