@@ -15,17 +15,17 @@
 
 ## 3. Program lifecycle
 
-- [ ] 3.1 `vertep-rules` crate: store, supersede and read program nodes through `vertep-tiramemsu`
-- [ ] 3.2 Closure digest and engine version recorded on the decision entry
-- [ ] 3.3 Fuel policy and recorded fuel used
-- [ ] 3.4 Typed `rules-unavailable` error on unsupported builds, with a test on the wasm build
+- [x] 3.1 `vertep-rules` crate: store, supersede and read program nodes through `vertep-tiramemsu`
+- [x] 3.2 Closure digest and engine version recorded in the `Derivation` (the decision entry field itself is M12's)
+- [x] 3.3 Fuel policy and recorded fuel used
+- [ ] 3.4 Typed `rules-unavailable` error on unsupported builds (done for the build without `native`, tested; the wasm build test remains)
 
 ## 4. Decider
 
-- [ ] 4.1 Write the offer, the actor context and a `ctx deciding <case>` statement as statements in the entry graph; every rule starts from the context statement
-- [ ] 4.2 `RuleDecider` returning event, payload and support, rationale kind `derivation`
-- [ ] 4.3 Refusal when no rule applies or the event is not offered
-- [ ] 4.4 Conformance vectors for accept, refuse, no rule, fuel exhausted, engine version mismatch
+- [x] 4.1 Write the offer, the actor context and a `ctx deciding <case>` statement as statements in the entry graph; every rule starts from the context statement
+- [x] 4.2 `RuleDecider` returning event and support, rationale kind `derivation` (`DeciderKind::Rules` added to `vertep-agent`; support is returned through `RuleDecider::derivations`)
+- [x] 4.3 Refusal when no rule applies or the event is not offered
+- [x] 4.4 Conformance vectors for accept, refuse, no rule, fuel exhausted, engine version mismatch
 
 ## 5. Records
 
