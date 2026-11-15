@@ -14,6 +14,7 @@
 //! @tg: implements:: [[decisions#The native rules engine is optional behind a feature]]
 
 mod bundle;
+mod certificate;
 mod error;
 mod profile;
 mod types;
@@ -76,11 +77,14 @@ mod decider;
 #[cfg(feature = "native")]
 mod replay;
 #[cfg(feature = "native")]
+pub mod tools;
+#[cfg(feature = "native")]
 mod totality;
 
 pub use bundle::{
     BUNDLE_FORMAT, CounterfactualReport, Divergence, ProgramSource, RuleBundle, Stmt, Term,
 };
+pub use certificate::{CertReport, check_certificate, lean_certificate};
 pub use error::RulesError;
 pub use profile::{HOST_BUILTINS, ProfileViolation, check_profile, clauses};
 pub use types::{DERIVED_GRAPH_SUFFIX, Derivation, ENGINE, RulePolicy, Totality};

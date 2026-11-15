@@ -105,6 +105,19 @@ impl std::fmt::Display for GateError {
     }
 }
 
+impl GateError {
+    /// The error as JSON text with the fields `code`, `clause` and `reason`, for an agent to read
+    /// and repair its proposal from.
+    pub fn to_json(&self) -> String {
+        serde_json::json!({
+            "code": self.code,
+            "clause": self.clause,
+            "reason": self.reason,
+        })
+        .to_string()
+    }
+}
+
 impl std::error::Error for GateError {}
 
 #[cfg_attr(not(feature = "native"), allow(dead_code))]

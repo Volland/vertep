@@ -291,6 +291,7 @@ fn profile_checked(view: &tiramemsu::View<'_>, program: &TmValue) -> bool {
 pub struct RuleDecider {
     shard: Arc<TiramemsuShard>,
     program: String,
+    scope: Option<String>,
     policy: RulePolicy,
     log: Mutex<Vec<Derivation>>,
 }
@@ -313,9 +314,25 @@ impl RuleDecider {
         Ok(RuleDecider {
             shard,
             program: program.to_owned(),
+            scope: None,
             policy,
             log: Mutex::new(Vec::new()),
         })
+    }
+
+    /// Binds the decider to a scope: while a proposal of this program is `Scoped` for the scope, it
+    /// runs that proposal instead of the live program.
+    pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
+        self.scope = Some(scope.into());
+        self
+    }
+
+    /// The program to run now: the proposal scoped to this decider's scope, else the live program.
+    fn effective_program(&self) -> String {
+        self.scope
+            .as_deref()
+            .and_then(|s| crate::authoring::scoped_program(&self.shard, &self.program, s))
+            .unwrap_or_else(|| self.program.clone())
     }
 
     /// The derivations of the decisions made so far, oldest first. The caller records them on
@@ -336,7 +353,8 @@ impl RuleDecider {
         let node_iri = format!("{}{}", vocab::NODE_PREFIX, request.correlation);
         let node = iri(node_iri.clone());
         let ctx = vt(vocab::CTX);
-        let program = iri(self.program.clone());
+        let program_name = self.effective_program();
+        let program = iri(program_name.clone());
 
         // The offer, the actor, the state and the plain context fields become statements in
         // one transaction, with the context statement that scopes every rule to this decision
@@ -456,7 +474,7 @@ impl RuleDecider {
             node: node_iri,
             actor: request.actor.clone(),
             state: request.state.clone(),
-            program: self.program.clone(),
+            program: program_name,
             event: event.clone(),
             support: support.clone(),
             closure_digest: digest,

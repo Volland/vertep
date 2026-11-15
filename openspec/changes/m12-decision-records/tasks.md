@@ -25,6 +25,8 @@
 - [ ] 4.2 `vt explain` and `vt verify-bundle`, verifying offline
 - [ ] 4.3 Tamper vectors: altered entry, missing chart, wrong digest
 
+- [ ] 4.4 Retract the derived facts of `vertep-rules` that rest on an erased subject's sealed statements, and journal the retraction with the erasure (`journal-redaction#Erasure Retracts Derived Facts`, carried from `m15-rule-invariants` 3.3)
+
 ## 5. Integrity
 
 - [ ] 5.1 Opt-in hash chain and signatures on agent journals, sharing the `vertep-objects` envelope

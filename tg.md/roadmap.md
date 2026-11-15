@@ -191,22 +191,22 @@ Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m14-rules-decider` w
 
 ## M15 Rule invariants
 
-In progress: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause and with erasure.
+Delivered: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause and with erasure.
 
 - precedes:: [[roadmap#M17 Agent rules]]
 
-Specified by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invariants` and `derived-facts`). Enforcement, the runtime refusal path, the full check on enabling, the property test, materialization with support and `vt rules enforce|unenforce|materialize` are built; open: derived facts in a named graph per actor and retraction on erasure, which needs the erasure design of [[roadmap#M12 Decision records]].
+Delivered by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invariants` and `derived-facts`), in [[components#vertep-rules]]. Enforcement, the runtime refusal path, the full check on enabling, the delta-versus-full property test, materialization with support into the graph `<subject>/derived` and `vt rules enforce|unenforce|materialize` are built. Retraction of derived facts on erasure moved to [[roadmap#M12 Decision records]] (task 4.4, requirement `journal-redaction#Erasure Retracts Derived Facts`), because it needs the key destruction M12 builds. Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m15-rule-invariants` with 6 requirements in `openspec/specs/`. Merged in pull requests 13 and 16.
 
 ## M16 Verified rules
 
-In progress: a rules profile, totality and support-necessity checks, a differential oracle against Datalog (built) and derivation certificates checked in Lean (open).
+Delivered: a rules profile, totality and support-necessity checks, a differential oracle against Datalog and derivation certificates checked in Lean for a fragment.
 
 - precedes:: [[roadmap#M17 Agent rules]]
 
-Specified by the OpenSpec change `m16-verified-rules` (capability `rule-verification`). The go or no-go on lean-elpi's LF layer came out partial: Horn derivations over a fact tape certify, live host builtins do not, and tiramemsu does not give the derivation tree; certificates are open.
+Delivered by the OpenSpec change `m16-verified-rules` (capability `rule-verification`). The go or no-go on lean-elpi's LF layer came out partial (see its design), so certificates take the narrow path: the Rust exporter writes Lean source for clauses of `tm.triple` atoms and integer comparisons, and `VertepLean.RuleCert` checks it with proved soundness and completeness theorems; negation and other predicates are reported as outside the fragment, and the clause parser is trusted. Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m16-verified-rules` with 5 requirements in `openspec/specs/`.
 
 ## M17 Agent rules
 
-In progress: agents propose rules that pass an ordered gate, run in shadow and are promoted by journaled acts, and no actor can change the rules that govern it.
+Delivered: agents propose rules that pass an ordered gate, run in shadow and are promoted by journaled acts, and no actor can change the rules that govern it.
 
-Specified by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`), building on the grants of [[roadmap#M5 Federation]]. Built: the gate, authorship, shadow runs, staged promotion, self-governance and `vt rules propose|shadow|promote`; open: the agent tool, grants from the federation layer and scoped-live behaviour.
+Delivered by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`), building on the grants of [[roadmap#M5 Federation]]. Built: the gate with structured errors, authorship, shadow runs (with sampling), staged promotion, scoped-live deciders, the self-governance limit, the agent tool `vt:tool/rules/propose` and `vt rules propose|shadow|promote`. Grants come from a function the host supplies; wiring federation grant credentials into it is left to the host. Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m17-agent-rules` with 7 requirements in `openspec/specs/`.

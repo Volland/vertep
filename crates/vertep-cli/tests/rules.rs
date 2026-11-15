@@ -132,6 +132,35 @@ tm.conclude (triple C (iri "urn:vt:decision") (iri "urn:vt:event:approve")) [X, 
             "--out",
             bundle.to_str().unwrap(),
         ]);
+        // the certificate of the decision, as Lean source, and checked by the kernel when built
+        let cert = db_p.join("Cert.lean");
+        let emitted = ok(&[
+            "rules",
+            "certify",
+            bundle.to_str().unwrap(),
+            "--emit",
+            cert.to_str().unwrap(),
+        ]);
+        assert!(emitted.starts_with("certificate written"), "{emitted}");
+        assert!(
+            std::fs::read_to_string(&cert)
+                .unwrap()
+                .contains("theorem cert")
+        );
+        let lean = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../lean/vertep-lean");
+        if lean
+            .join(".lake/build/lib/lean/VertepLean/RuleCert.olean")
+            .exists()
+        {
+            let c = ok(&[
+                "rules",
+                "certify",
+                bundle.to_str().unwrap(),
+                "--lean-dir",
+                lean.to_str().unwrap(),
+            ]);
+            assert!(c.starts_with("certified: urn:vt:decision:cli1"), "{c}");
+        }
         let v = ok(&["rules", "verify-bundle", bundle.to_str().unwrap()]);
         assert!(
             v.starts_with("verified: urn:vt:decision:cli1 concluded approve"),

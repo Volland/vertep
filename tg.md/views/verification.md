@@ -427,3 +427,14 @@ flowchart LR
 ```
 
 The datamodel trait object at the kernel boundary is the main obstacle; when Aeneas work starts, the kernel will be parameterized by a request and answer interface identical to the answer tape, which is already the Lean abstraction.
+
+## Rule certificates
+
+A rule decision of the certifiable fragment is checked by the Lean kernel: the Rust exporter writes the clause, the supporting statements and the binding as Lean source, and `VertepLean.RuleCert` states and decides that the conclusion follows.
+
+- describes:: [[capabilities#Rule verification]]
+- describes:: [[decisions#Support is checked for necessity and certificates check sufficiency]]
+- describes:: [[decisions#Derivation certificates are checked by Lean as a process]]
+
+`Derivation Certificate` is built for clauses made of `tm.triple` atoms and integer comparisons: `check_sound`, `check_complete` and `triple_in_tape` are proved, the certificate theorem depends only on `propext`, and `vt rules certify` runs the checker as a process like `vt certify`. The clause parser and the statements' presence in the store are trusted; see the M16 design for the limits.
+

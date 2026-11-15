@@ -81,3 +81,4 @@ import VertepLean.TypedStep.Hoare
 import VertepLean.TypedStep.Exec
 import VertepLean.TypedStep.Interp
 import VertepLean.TypedStep.Theorem
+import VertepLean.RuleCert

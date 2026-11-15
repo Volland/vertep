@@ -55,3 +55,14 @@ A chart type SHALL be able to declare a retention horizon for sensitive fields. 
 #### Scenario: No policy, no expiry
 - **WHEN** a chart type declares no retention horizon
 - **THEN** nothing expires
+
+### Requirement: Erasure Retracts Derived Facts
+When a subject's key is destroyed by key destruction, derived facts whose support includes that subject's sealed statements SHALL be retracted, and the retraction MUST be journaled with the erasure. Derived facts that do not depend on them MUST remain.
+
+#### Scenario: Erasing a subject
+- **WHEN** a subject's key is destroyed
+- **THEN** derived facts that rest on their sealed statements are retracted and the erasure entry lists them
+
+#### Scenario: Unrelated facts survive
+- **WHEN** a derived fact rests only on other subjects' statements
+- **THEN** it remains live

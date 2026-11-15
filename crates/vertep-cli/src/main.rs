@@ -207,6 +207,17 @@ enum RulesCmd {
         #[arg(long)]
         grants: Option<PathBuf>,
     },
+    /// The Lean certificate of a decision's derivation, checked by the Lean kernel.
+    Certify {
+        /// The bundle file.
+        file: PathBuf,
+        /// A built `lean/vertep-lean` directory to check the certificate in.
+        #[arg(long)]
+        lean_dir: Option<PathBuf>,
+        /// Write the Lean source here.
+        #[arg(long)]
+        emit: Option<PathBuf>,
+    },
     /// Whether a program is inside the rules profile, and why not.
     Profile {
         /// The program source.
@@ -750,6 +761,11 @@ fn run_rules(command: RulesCmd) -> Outcome {
             scope.as_deref(),
             grants.as_deref(),
         ),
+        RulesCmd::Certify {
+            file,
+            lean_dir,
+            emit,
+        } => rules::certify_cmd(&file, lean_dir.as_deref(), emit.as_deref()),
         RulesCmd::Profile { file } => rules::profile_cmd(&file),
         RulesCmd::Unnecessary { file } => rules::unnecessary_cmd(&file),
         RulesCmd::Enforce { db, program } => rules::enforce_cmd(&db, &program, true),

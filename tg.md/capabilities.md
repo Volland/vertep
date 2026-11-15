@@ -335,7 +335,7 @@ Enforced rule programs that refuse a violating journal append at commit, with th
 
 - scheduled_in:: [[roadmap#M15 Rule invariants]]
 
-Mostly implemented in [[components#vertep-rules]]: `enforce`, the refusal path through a running node (dead letter, no entry), the full check on enabling and the delta-versus-full property test; the reference example in the site is not updated.
+Implemented in [[components#vertep-rules]]: `enforce`, the refusal path through a running node (dead letter, no entry), the full check on enabling and the delta-versus-full property test.
 
 
 ## Derived facts
@@ -344,7 +344,7 @@ Facts concluded by rules and kept in the actor's graph with their support, retra
 
 - scheduled_in:: [[roadmap#M15 Rule invariants]]
 
-Partly implemented in [[components#vertep-rules]]: `materialize` writes derived facts with support and they fall with their support and with the program; they are not yet in a named graph per actor, and retraction on erasure waits on M12.
+Implemented in [[components#vertep-rules]]: `materialize` writes derived facts with support into the graph `<subject>/derived`; they fall with their support and with the program. Retraction on erasure is a requirement of [[capabilities#Journal redaction]].
 
 
 ## Rule verification
@@ -353,7 +353,7 @@ A rules profile, totality and support-necessity checks, a differential oracle ag
 
 - scheduled_in:: [[roadmap#M16 Verified rules]]
 
-Partly implemented in [[components#vertep-rules]]: the rules profile, support necessity, sampled totality and the Datalog oracle; derivation certificates are open (the go/no-go in the M16 design is partial).
+Implemented in [[components#vertep-rules]]: the rules profile, support necessity, sampled totality, the Datalog oracle and Lean certificates for clauses of `tm.triple` atoms and integer comparisons.
 
 
 ## Rule authoring
@@ -362,4 +362,4 @@ Agent-proposed rules behind an ordered gate with structured errors, shadow evalu
 
 - scheduled_in:: [[roadmap#M17 Agent rules]]
 
-Mostly implemented in [[components#vertep-rules]] (`authoring`): the gate with structured errors, authorship, shadow evaluation, staged journaled promotion, self-governance and diff; the agent tool and the scoped-live behaviour are open.
+Implemented in [[components#vertep-rules]] (`authoring`, `tools`): the gate with structured errors, authorship, shadow runs, staged journaled promotion, scoped-live deciders, self-governance, diff and the agent tool.

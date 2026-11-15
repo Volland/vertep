@@ -45,5 +45,9 @@ tempfile = "3"
 name = "credit"
 required-features = ["native"]
 
+[[example]]
+name = "invariant"
+required-features = ["native"]
+
 [lints]
 workspace = true

@@ -1,0 +1,4 @@
+enforcing urn:vt:program:no-blocked-actor
+actors/blocked is marked blocked
+append for fine: committed, journal at 1
+append for blocked: refused by blocked_actor (2 statements); journal still at 0
