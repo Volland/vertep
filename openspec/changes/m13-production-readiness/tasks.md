@@ -6,33 +6,33 @@
 
 ## 2. Tiers and docs honesty
 
-- [ ] 2.1 Tier metadata in every crate and npm package manifest
-- [ ] 2.2 Script that renders the README and site tier tables, and a CI check that they are current
-- [ ] 2.3 Audit every "not yet" and "delivered" statement in `site/` and `tg.md/roadmap.md` against the code, starting with the agent-journal warning on the decider-agent page
-- [ ] 2.4 Fix each disagreement, in the code or the text
+- [x] 2.1 Tier metadata in every crate and npm package manifest
+- [x] 2.2 Script that renders the README and site tier tables, and a CI check that they are current
+- [x] 2.3 Audit every "not yet" and "delivered" statement in `site/` and `tg.md/roadmap.md` against the code, starting with the agent-journal warning on the decider-agent page
+- [x] 2.4 Fix each disagreement, in the code or the text
 
 ## 3. Toolchain
 
-- [ ] 3.1 `scripts/build-wasm.sh` with pinned versions and the LLVM workaround
-- [ ] 3.2 Container definition and a CI job that builds `@vertep/web` and the Python wheel from a clean checkout
-- [ ] 3.3 Document the one-command build in `CONTRIBUTING.md`
+- [x] 3.1 `scripts/build-wasm.sh` with pinned versions and the LLVM workaround
+- [x] 3.2 Container definition and a CI job that builds `@vertep/web` and the Python wheel from a clean checkout
+- [x] 3.3 Document the one-command build in `CONTRIBUTING.md`
 
 ## 4. Benchmarks
 
-- [ ] 4.1 `benches/` for step, journal append, replay, decider round trip
+- [ ] 4.1 (owned by `m18-runtime-performance` phase 0) `benches/` for step, journal append, replay, decider round trip
 - [ ] 4.2 Size and cold-start measurements for `@vertep/web` and the wheel
 - [ ] 4.3 Regression gate against the last release's recorded results
 - [ ] 4.4 Results page under `site/` with machine and commit
 
 ## 5. Supply chain
 
-- [ ] 5.1 `deny.toml` for advisories and licences, enforced in CI
-- [ ] 5.2 SBOM per release
-- [ ] 5.3 Signed release artifacts and provenance for crates, npm and wheels
+- [x] 5.1 `deny.toml` for advisories and licences, enforced in CI
+- [x] 5.2 SBOM per release (`scripts/sbom.sh`, `release.yml`; first run at release 0.1.12)
+- [x] 5.3 Signed release artifacts and provenance for crates, npm and wheels (attestations for npm tarballs, wheels and SBOMs; crates.io has no signing, see `constraints#crates.io has no signed provenance`)
 
 ## 6. Ten-minute path
 
-- [ ] 6.1 A CI job that follows the site's quick start on a clean runner and the credit-decision example, and fails if either breaks
+- [x] 6.1 A CI job that follows the site's quick start on a clean runner and the credit-decision example, and fails if either breaks
 
 ## 7. Journal shipping and WebSocket
 

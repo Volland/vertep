@@ -10,6 +10,7 @@ drift from the manifests. Run it from anywhere after a tier changes:
 
     python3 site/tools/tiers.py           # rewrite the tables
     python3 site/tools/tiers.py --check   # exit 1 if a tier is missing or a table is stale (CI)
+    python3 site/tools/tiers.py --self-test  # prove both failures on a scratch copy (CI)
 
 Needs Python 3.11 or later (tomllib).
 """
@@ -162,5 +163,43 @@ def main(argv):
     print(f"{len(packages)} packages: {counts}" + ("; tables are current" if check else ""))
 
 
+def self_test():
+    """Run both failure cases of the check on a scratch copy of the manifests and tables."""
+    import shutil
+    import tempfile
+
+    global ROOT, README, PAGE
+    real = ROOT
+    files = ["Cargo.toml", "README.md", "site/docs/tiers.html", "bindings/python/pyproject.toml"]
+    files += [str(p.relative_to(real)) for p in real.glob("crates/*/Cargo.toml")]
+    files += [str(p.relative_to(real)) for p in real.glob("bindings/js/packages/*/package.json")]
+    with tempfile.TemporaryDirectory() as tmp:
+        for f in files:
+            (Path(tmp) / f).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(real / f, Path(tmp) / f)
+        ROOT, README, PAGE = Path(tmp), Path(tmp) / "README.md", Path(tmp) / "site/docs/tiers.html"
+        manifest = Path(tmp) / "crates/vertep-core/Cargo.toml"
+        original = manifest.read_text()
+
+        # @tg: verifies:: [[openspec:production-readiness#Stability Tiers#A tier is declared]] {level: integration}
+        manifest.write_text(re.sub(r'(?m)^tier = .*\n', "", original, count=1))
+        _, problems = collect()
+        assert any("vertep-core declares no tier" in p for p in problems), problems
+
+        # @tg: verifies:: [[openspec:production-readiness#Stability Tiers#A table cannot drift]] {level: integration}
+        manifest.write_text(re.sub(r'(?m)^tier = .*$', 'tier = "experimental"', original, count=1))
+        try:
+            main(["--check"])
+        except SystemExit as e:
+            assert e.code == 1, e.code
+        else:
+            raise AssertionError("a changed tier with a stale table passed the check")
+    ROOT, README, PAGE = real, real / "README.md", real / "site" / "docs" / "tiers.html"
+    print("self-test: a missing tier is named and a stale table fails the check")
+
+
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    if "--self-test" in sys.argv[1:]:
+        self_test()
+    else:
+        main(sys.argv[1:])

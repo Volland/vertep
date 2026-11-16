@@ -8,8 +8,28 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-11-16
+
+Milestone M12 (decision records): redaction completed. Milestone M13 (production readiness):
+tiers, docs audit, toolchain, supply chain and the ten-minute path.
+
 ### Added
 
+- **Recorded outcomes** (`vertep-agent`): a journal entry carries an optional `outcome` (the
+  answers of the conditions evaluated, the transitions taken, the configuration after). The host
+  now applies an input, appends it with its outcome, then performs the effects. After an erased
+  value, replay follows the recorded outcome instead of re-evaluating, so a fresh host reaches
+  the state the actor was really in; `AgentHost::replay_report` and `AgentMachine::apply_following`.
+  `replay: recorded` now appears only when a condition could have read an erased value.
+- **Sensitive-field marks** (type language): `@sensitive`, `@subject` and `@retain(P30D)` on
+  record fields, projected to JSON Schema (`x-vt-sensitive`, `x-vt-subject`, `x-vt-retention`)
+  and SHACL (`vt:sensitive`, `vt:dataSubject`, `vt:retention`); `SealPolicy::from_chart`.
+- **Erasure retracts derived facts** (`vertep-rules`): `retract_erased` and `RetractOnErasure`
+  (an `ErasureHook` for `SealingJournal`) retract the subject's statements and every rule-derived
+  fact resting on them in one recorded transaction; the erasure entry lists the derived facts.
+- **Stability tiers** (M13): every crate and package declares `stable`, `preview` or
+  `experimental` in its manifest; `site/tools/tiers.py` renders the README and
+  `site/docs/tiers.html` tables, and CI fails on a missing tier or a stale table.
 - **Reproducible build** (M13): `scripts/build.sh [--container]` builds `@vertep/web`,
   `@vertep/dm-ecma` and the Python wheel from a clean checkout and smoke-tests each, with every
   tool version pinned in `scripts/toolchain.env` and the image in `.devcontainer/Dockerfile`;
@@ -24,8 +44,9 @@ All crates of the workspace and both npm packages share one version.
 
 ### Fixed
 
-- The `vt --help` output on the getting-started page and the credit-decision example page were
-  stale; both now show what the code prints.
+- A docs audit of the site, README and roadmap against the code fixed about 80 stale or wrong
+  statements (agent journal, redaction, Python on PyPI, npm tags, `vt` commands, Kolyada, Lean
+  counts); the `vt --help` output and the credit-decision page now show what the code prints.
 
 ## [0.1.11] - 2026-11-16
 

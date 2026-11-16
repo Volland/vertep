@@ -25,7 +25,7 @@
 - [x] 4.2 `vt explain BUNDLE` and `vt verify-bundle BUNDLE`, verifying offline (the bundle is exported by `AgentHost::export_bundle`; the CLI reads a file)
 - [x] 4.3 Tamper vectors: altered entry, missing chart, wrong digest
 
-- [ ] 4.4 Retract the derived facts of `vertep-rules` that rest on an erased subject's sealed statements, and journal the retraction with the erasure (`journal-redaction#Erasure Retracts Derived Facts`, carried from `m15-rule-invariants` 3.3)
+- [x] 4.4 Retract the derived facts of `vertep-rules` that rest on an erased subject's sealed statements, and journal the retraction with the erasure (`journal-redaction#Erasure Retracts Derived Facts`, carried from `m15-rule-invariants` 3.3)
 
 ## 5. Integrity
 
@@ -39,16 +39,16 @@
 
 ## 7. Redaction
 
-- [ ] 7.1 `sensitive` marker in the type language, with SHACL and JSON Schema projections (the runtime `SealPolicy` exists; the type-language marker does not)
+- [x] 7.1 `sensitive` marker in the type language, with SHACL and JSON Schema projections (`@sensitive`, `@subject`, `@retain(P30D)`; `SealPolicy::from_chart`)
 - [x] 7.2 Sealing of sensitive fields with a per-subject key behind a `KeyStore` trait
 - [x] 7.3 Erasure entry and key destruction
-- [ ] 7.4 Replay in recorded mode after erasure, with the result marked (the marker is built, `Explanation.replay`; following recorded transitions instead of re-evaluating the guard is not: entries do not record transitions yet)
+- [x] 7.4 Replay in recorded mode after erasure, with the result marked (entries record their outcome; replay follows it after an erased value)
 - [x] 7.5 Retention policy and expiry as erasure
-- [ ] 7.6 Decide the snapshot policy (open question in D6) and record it
+- [x] 7.6 Decide the snapshot policy (open question in D6) and record it
 
 ## 8. Annotations and docs
 
-- [ ] 8.1 For each requirement, annotate the implementing code with `@tg: implements:: [[openspec:<capability>#<Requirement>]]`
-- [ ] 8.2 For each scenario, annotate its test with `@tg: verifies:: [[openspec:<capability>#<Requirement>#<Scenario>]]`
-- [ ] 8.3 Update `site/regulated.html`, `site/articles/explainable-by-construction.html` and `site/articles/regulated-decisions.html` where they say a feature is not built
-- [ ] 8.4 Run `tg check`, `tg ontology check` and `tg trace decision-records --gaps`, and the same for `journal-redaction`, and close every gap
+- [x] 8.1 For each requirement, annotate the implementing code with `@tg: implements:: [[openspec:<capability>#<Requirement>]]`
+- [x] 8.2 For each scenario, annotate its test with `@tg: verifies:: [[openspec:<capability>#<Requirement>#<Scenario>]]`
+- [x] 8.3 Update `site/regulated.html`, `site/articles/explainable-by-construction.html` and `site/articles/regulated-decisions.html` where they say a feature is not built
+- [x] 8.4 Run `tg check`, `tg ontology check` and `tg trace decision-records --gaps`, and the same for `journal-redaction`, and close every gap

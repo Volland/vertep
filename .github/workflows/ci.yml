@@ -97,6 +97,8 @@ jobs:
       # README and site/docs/tiers.html tables are the ones its manifests render.
       - name: Stability tier tables match the manifests
         run: python3 site/tools/tiers.py --check
+      - name: The tier check fails on a missing tier and on a stale table
+        run: python3 site/tools/tiers.py --self-test
 
   differential:
     name: Nightly Rust vs Lean differential
