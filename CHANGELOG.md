@@ -8,6 +8,25 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+### Added
+
+- **Reproducible build** (M13): `scripts/build.sh [--container]` builds `@vertep/web`,
+  `@vertep/dm-ecma` and the Python wheel from a clean checkout and smoke-tests each, with every
+  tool version pinned in `scripts/toolchain.env` and the image in `.devcontainer/Dockerfile`;
+  on macOS it works around Homebrew LLVM's missing `libz3` by itself. `CONTRIBUTING.md` documents it.
+- **Supply chain** (M13): `deny.toml` (advisories, licences, bans, sources) enforced in CI with
+  three recorded advisory exceptions; a release workflow that writes CycloneDX SBOMs, builds the
+  npm tarballs in the pinned image, attests tarballs, SBOMs, wheels and the sdist with signed
+  GitHub build provenance, verifies the attestations and attaches everything to the release.
+- **Ten-minute path** (M13): `scripts/ten-minute-path.py` runs the site's quick start and the
+  credit-decision page as written and fails, naming the step, when a command fails or prints
+  something other than the page shows; CI runs it on a clean runner.
+
+### Fixed
+
+- The `vt --help` output on the getting-started page and the credit-decision example page were
+  stale; both now show what the code prints.
+
 ## [0.1.11] - 2026-11-16
 
 Milestone M12 (decision records), the rest of the first part: bundles, signed journals,

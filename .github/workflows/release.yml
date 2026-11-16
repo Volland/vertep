@@ -1,0 +1,127 @@
+# Supply-chain artifacts of a release (M13 production-readiness, "Supply Chain Gate"):
+#
+#   - the gate again: cargo deny on the tagged commit, so a release cannot ship an open advisory;
+#   - CycloneDX SBOMs for every crate and both npm packages (scripts/sbom.sh);
+#   - the npm tarballs of @vertep/web and @vertep/dm-ecma, built by the one-command build in the
+#     pinned container (scripts/build.sh --container --only npm) and smoke-tested;
+#   - a signed build-provenance attestation (Sigstore, through GitHub artifact attestations) for
+#     every tarball and SBOM, which a consumer checks with
+#         gh attestation verify vertep-web-0.1.11.tgz --repo Volland/vertep
+#   - all of it attached to the GitHub release.
+#
+# Wheels and the sdist are attested in .github/workflows/python-release.yml, which builds them.
+# Nothing here publishes to npm or crates.io: publishing stays with the maintainer, see
+# CONTRIBUTING.md ("Releases and the supply chain") for publishing the attested tarballs with
+# npm provenance. A manual run (Actions > Release artifacts > Run workflow) builds and attests
+# everything and keeps it as a workflow artifact without touching a release.
+name: Release artifacts
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Supply chain gate on the release commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.21.0
+      - run: scripts/check-supply-chain.sh
+      - name: The tag and the workspace carry one version
+        if: github.event_name == 'release'
+        run: |
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+          [ "${GITHUB_REF_NAME#v}" = "$version" ] || { echo "tag $GITHUB_REF_NAME, workspace $version" >&2; exit 1; }
+
+  sbom:
+    name: SBOMs (CycloneDX)
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-cyclonedx@0.5.10
+      - run: scripts/sbom.sh
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/sbom/*.cdx.json
+      - name: The attestations verify as a consumer would check them
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-attestations.sh dist/sbom/*.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: dist/sbom
+
+  npm:
+    name: npm tarballs (pinned container)
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: scripts
+          file: .devcontainer/Dockerfile
+          tags: vertep-build:release
+          load: true
+          cache-from: type=gha,scope=vertep-build
+      - name: scripts/build.sh --container --only npm
+        env:
+          VERTEP_BUILD_IMAGE: vertep-build:release
+          VERTEP_SKIP_IMAGE_BUILD: "1"
+        run: scripts/build.sh --container --only npm
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/npm/*.tgz
+      - name: The attestations verify as a consumer would check them
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-attestations.sh dist/npm/*.tgz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm
+          path: dist/npm
+
+  attach:
+    name: Attach to the GitHub release
+    if: github.event_name == 'release'
+    needs: [sbom, npm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+      - name: Upload the tarballs and the SBOMs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd assets/sbom && tar czf ../sbom-cyclonedx.tar.gz ./*.cdx.json)
+          gh release upload "$GITHUB_REF_NAME" assets/npm/*.tgz assets/sbom-cyclonedx.tar.gz \
+            assets/sbom/vertep-web.npm.cdx.json assets/sbom/vertep-dm-ecma.npm.cdx.json \
+            assets/sbom/vertep.cdx.json assets/sbom/vertep-cli.cdx.json assets/sbom/vertep-py.cdx.json \
+            --repo "$GITHUB_REPOSITORY" --clobber

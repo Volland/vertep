@@ -316,3 +316,9 @@ If an actor could propose, edit or promote the rules that bind it, review would 
 The browser build depends on exact LLVM and `wasm-bindgen` versions: `wasm-bindgen` must match the version in `Cargo.lock`, and a Homebrew LLVM can break when a dependency such as z3 is upgraded under it.
 
 - constrains:: [[decisions#The toolchain is a script and a container]] {strength: must, source: "M13 review; maintainer build of @vertep/web 0.1.10"}
+
+## crates.io has no signed provenance
+
+crates.io records a checksum for each crate file but no signature and no build provenance, so a consumer cannot verify a published crate against the workflow that built it.
+
+- constrains:: [[decisions#Release artifacts carry signed build provenance]] {strength: must, source: "crates.io, 2026-11"}

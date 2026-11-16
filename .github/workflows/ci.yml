@@ -233,3 +233,72 @@ jobs:
         run: |
           . .venv/bin/activate
           maturin sdist
+
+  # M13 production-readiness, "Supply Chain Gate": an open advisory, a licence outside deny.toml's
+  # list, a yanked crate or an unknown source fails CI (and the release workflow runs it again).
+  supply-chain:
+    name: Supply chain gate (cargo deny, npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny@0.21.0
+      - name: Advisories, licences, bans and sources of the Rust workspace
+        run: scripts/check-supply-chain.sh
+      - name: deny.toml rejects a dependency with an open advisory
+        run: scripts/check-supply-chain.sh --self-test
+      - name: Advisories of what the npm packages install
+        working-directory: bindings/js
+        run: npm audit --omit=dev --audit-level=low
+
+  # M13 production-readiness, "Reproducible Toolchain": the one documented command, inside the
+  # pinned image, from a clean checkout (no target/ cache), builds @vertep/web, @vertep/dm-ecma and
+  # the Python wheel and smoke-tests each. Only the image layers and the crate downloads are cached.
+  reproducible-build:
+    name: Reproducible build (pinned container, clean checkout)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: The pins agree, and a drifted wasm-bindgen pin fails naming both versions
+        run: scripts/check-toolchain.sh --self-test
+      - uses: docker/setup-buildx-action@v3
+      - name: The build image (.devcontainer/Dockerfile)
+        uses: docker/build-push-action@v6
+        with:
+          context: scripts
+          file: .devcontainer/Dockerfile
+          tags: vertep-build:ci
+          load: true
+          cache-from: type=gha,scope=vertep-build
+          cache-to: type=gha,mode=max,scope=vertep-build
+      - uses: actions/cache@v4
+        with:
+          path: target/container-cargo-registry
+          key: container-cargo-registry-${{ hashFiles('Cargo.lock') }}
+          restore-keys: container-cargo-registry-
+      - name: scripts/build.sh --container
+        env:
+          VERTEP_BUILD_IMAGE: vertep-build:ci
+          VERTEP_SKIP_IMAGE_BUILD: "1"
+        run: scripts/build.sh --container
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-build
+          path: dist
+          retention-days: 7
+
+  # M13 production-readiness, "Ten Minute Path": the site's quick start (site/docs/index.html,
+  # from #build) and the credit-decision example page, followed on a clean runner with only what
+  # the pages say to install (rustup picks the toolchain from rust-toolchain.toml); no build cache.
+  ten-minute-path:
+    name: Ten-minute path (site quick start and credit-decision, clean runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: A drifted page or a failing command fails and names the step
+        run: python3 scripts/ten-minute-path.py --self-test
+      - name: Follow the pages
+        run: python3 scripts/ten-minute-path.py ${{ github.event_name == 'schedule' && '--full' || '' }}
