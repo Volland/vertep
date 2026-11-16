@@ -8,6 +8,7 @@ openspec: [agent-protocols, protocol-conformance, protocol-spaces]
 How agents say, in a form a stranger can verify, how to talk to them: a hash-identified choreography projected onto roles, signed messages sealed per recipient, and spaces where several agents cooperate through ordinary mailboxes.
 
 - describes:: [[components#vertep-kolyada]]
+- describes:: [[components#vertep-federation]]
 - describes:: [[capabilities#Agent protocols]]
 - describes:: [[capabilities#Protocol conformance]]
 - describes:: [[capabilities#Protocol spaces]]
@@ -24,7 +25,7 @@ How agents say, in a form a stranger can verify, how to talk to them: a hash-ide
 - describes:: [[constraints#Choreography projection needs one deciding role]]
 - describes:: [[constraints#Authcrypt is not verifiable by a third party]]
 
-This view explains milestone M10 and the crate `vertep-kolyada`, whose core is built; the join policy, mailbox binding and Lean model are not. Requirement names in backticks are from the OpenSpec change `m10-agent-protocols`. The relays that carry the messages are in [[views/distribution#Distribution#Relay mailboxes]], and the grants this replaces inside a protocol are in [[views/distribution#Distribution#Authenticated origin and grants]].
+This view explains milestone M10 and the crate `vertep-kolyada`, whose core is built; the join policy and sealed fan-out are built in `vertep-federation`, and the mailbox binding and Lean model are not. Requirement names in backticks are from the OpenSpec change `m10-agent-protocols`. The relays that carry the messages are in [[views/distribution#Distribution#Relay mailboxes]], and the grants this replaces inside a protocol are in [[views/distribution#Distribution#Authenticated origin and grants]].
 
 ## The idea
 
@@ -48,7 +49,7 @@ flowchart LR
 `Protocol Document` fixes one JSON-LD profile with a frozen `vk:` context embedded in the crate. The document names roles, message types with payload shapes, and states with transitions of the form "role X sends message M".
 
 - **Identity.** `Protocol Identity` hashes the RDFC-1.0 canonical form of the expanded graph, the same scheme as chart version IRIs, so two JSON-LD spellings of one protocol have one identity.
-- **Shapes.** `Payload Shapes` uses a small SHACL subset that the checker interprets itself. Its agreement with the full SHACL validation in `vertep-rdf` is a planned test, not yet written.
+- **Shapes.** `Payload Shapes` uses a small SHACL subset that the checker interprets itself. `Shape::to_shacl` writes the same shape as SHACL Core, and a generated test holds the checker's verdict equal to full SHACL validation in `vertep-rdf` on valid and near-miss payloads and on every vector payload.
 - **Well-formedness.** `Well-Formed Choreography` accepts sequence, choice by one role, loops, and timeout or cancel as ordinary messages. It rejects choices decided by different roles and parallel regions across roles, naming the state.
 - **Foreign contexts.** A document that references any other context is rejected without a network request.
 
@@ -106,6 +107,17 @@ sequenceDiagram
 `Pairwise Sealed Fan-Out` sends one separately sealed copy per recipient through the existing mailboxes and relays.
 
 A relay holds only what is sealed to its owner, so an actor can read only messages encrypted for it, and a message sealed to a subset is unreadable to the other roles.
+
+```mermaid
+flowchart LR
+    S["sender: signed message"] --> FO["fan-out: one copy per recipient DID"]
+    FO -->|"sealed to B, TSP direct"| MB["B's TSP endpoint"]
+    FO -->|"sealed to C, DIDComm forward"| MC["mediator, held for C"]
+    FO -->|"in process"| LC["local channel for D"]
+    MB --> PB["B: open, policy or check, journal, ack"]
+    MC --> PC["C: open, policy or check, journal, ack"]
+    LC --> PD["D: policy or check, journal"]
+```
 
 `Hash-Linked History` makes the shared view. Each message lists the hashes it depends on, so participants compare heads to find a missing or divergent message. A late joiner receives the history it may read and verifies it against the hashes; messages hidden from it appear as hashes only, so the chain still verifies.
 
@@ -174,4 +186,8 @@ The core crate follows the design with a few choices the design left open.
 - **The RDF bridge** is in `vertep-kolyada`, not `vertep-rdf`, because `vertep-rdf` cannot depend on it. It adds a protocol's graph and the triples of an offer, and a SPARQL query over them lists the DIDs that offer a role.
 - **Vectors.** `identity.json`, `projection.json`, `envelope.json` and `verdicts.json` are checked against the Rust implementation, and `check.mjs` checks the envelope with Node's crypto alone.
 - **Docs.** `site/docs/protocols.html` documents the format and the API, and `site/articles/kolyada.html` tells the story; both quote the runnable tour `crates/vertep-kolyada/examples/quote.rs` (`cargo run -p vertep-kolyada --example quote --features testkit`).
-- **Not yet built.** The join policy, sealed fan-out over mailboxes, the inbound and outbound checks in the mailbox and send path, the `vt:plays` declaration, `vt kolyada`, the Lean model, and the agreement test between the SHACL subset and full SHACL.
+- **Spaces on the wire.** `vertep-federation::protocol` holds the join policy and the fan-out. `JoinPolicy` admits a genesis when one rule admits its protocol, the agent's role, the initiator and an optional credential check; the default has no rules and refuses every genesis. The policy reads the genesis alone, so a refused genesis costs no resolution, no signature check and no journal append.
+- **Fan-out.** `SpaceTransport::fan_out` sends one copy per recipient DID through the relay protocols the outbox uses, trying the routes of the recipient's DID document in order, or an in-process `LocalChannel`. A sender without a TSP service skips TSP routes, since the peer must resolve the sender's VID. The signed message rides as JSON text in a relay envelope named `kolyada.message`, so no transport touches the signed bytes.
+- **The participant.** `SpaceMember` holds the documents an agent knows, its policy, its instances and a journal of admitted genesis messages and accepted messages. It acknowledges a relay copy once the message is journaled, a duplicate, or refused and recorded; a copy held for dependencies, or naming an instance whose genesis has not arrived, stays at the relay. `ActorSigner` and `ResolverVerifier` are the key-manager and DID-resolver adapters.
+- **Shape semantics.** To match SHACL, the checker counts distinct values (an RDF graph holds a literal once, while each object is its own node), and an `in` list holds only strings, numbers and booleans.
+- **Not yet built.** The inbound and outbound checks in an actor's mailbox and send path (until then the `SpaceMember` journal stands beside the actor's), the `vt:plays` declaration, `vt kolyada` and the Lean model. Fan-out sends at once and has no retry queue of its own.

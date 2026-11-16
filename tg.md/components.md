@@ -392,6 +392,7 @@ Trust-boundary actors: DID identities and resolution, authenticated senders, gra
 
 - provides:: [[capabilities#DID identity]] {confidence: full}
 - provides:: [[capabilities#Relay mailboxes]] {confidence: full}
+- provides:: [[capabilities#Protocol spaces]] {confidence: partial, note: "join policy, pairwise sealed fan-out and the participant (module protocol); the mailbox and chart binding are open"}
 - uses:: [[components#vertep-runtime]] {kind: required}
 - uses:: [[components#vertep-core]] {kind: required}
 - uses:: [[components#vertep-kolyada]] {kind: required, note: "spaces, join policy and the inbound and outbound conformance checks"}
@@ -412,10 +413,13 @@ Trust-boundary actors: DID identities and resolution, authenticated senders, gra
 - realizes:: [[decisions#Transport selection follows the DID document]]
 - realizes:: [[decisions#Relay outbox owns cross-trust retries]]
 - realizes:: [[decisions#Pinned relay protocol libraries]]
+- realizes:: [[decisions#A protocol space is logical, sealed pairwise and hash-linked]] {confidence: partial, note: "pairwise sealed fan-out over the relays; the instance and history are in vertep-kolyada"}
+- realizes:: [[decisions#Role gives authority and the agent's policy decides at join]] {confidence: partial, note: "the join policy, refusing by default"}
 - realizes:: [[decisions#TSP pickup is a versioned protocol inside TSP]] {note: "the protocol and its client, tsp_mailbox::TspMailboxClient"}
 - realizes:: [[decisions#Live delivery is a WebSocket binding of pickup]] {note: "the live seam, and Pickup 3.0 live mode in MediatorClient"}
 - scheduled_in:: [[roadmap#M5 Federation]]
 - scheduled_in:: [[roadmap#M7 Durable objects]] {note: "the TSP mailbox client and live delivery"}
+- scheduled_in:: [[roadmap#M10 Agent protocols]] {note: "protocol spaces: join policy and sealed fan-out"}
 
 Cargo features `didcomm`, `tsp` and `webvh` select the protocol libraries; `testkit` adds an in-process DIDComm mediator and TSP intermediary for tests. Since M7:
 

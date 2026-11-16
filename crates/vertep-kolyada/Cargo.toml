@@ -17,7 +17,7 @@ categories = ["network-programming", "cryptography", "data-structures"]
 # Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
 # README and the site by site/tools/tiers.py; CI fails when they differ.
 tier = "experimental"
-tier-reason = "Core only: join policy, sealed fan-out, chart role binding, vt kolyada and the Lean model are open (M10)"
+tier-reason = "Chart role binding, vt kolyada and the Lean model are open (M10); join policy and sealed fan-out are in vertep-federation"
 
 [features]
 default = []
@@ -40,6 +40,8 @@ ed25519-dalek = { version = "3", optional = true }
 [dev-dependencies]
 vertep-kolyada = { path = ".", features = ["testkit"] }
 oxigraph = { workspace = true }
+# Generated shapes and payloads for the agreement test with full SHACL.
+proptest = "1.12"
 
 [[example]]
 name = "quote"
