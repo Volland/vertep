@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -160,7 +161,7 @@ tm.violation error &quot;blocked_actor&quot; &quot;the actor is blocked&quot; [E
     <ol>
       <li><code>vt rules profile program.elpi</code> before you store it.</li>
       <li>Store it in a scratch shard with <code>vt rules put</code> and run <code>vt rules check</code>: it loads the program and runs it once under the step budget, so a syntax or type error shows up before anything decides.</li>
-      <li>Run the example crate: <code>cargo run -p vertep-rules --features native --example credit</code> is a template for a decider, a bundle and a counterfactual in thirty lines.</li>
+      <li>Run the example crate: <code>cargo run -p vertep-rules --features native --example credit</code> is a template for a decider, a bundle and a counterfactual in about a hundred lines (<code>crates/vertep-rules/examples/credit.rs</code>).</li>
       <li>Try the next version on recorded decisions with <code>vt rules counterfactual</code>, and run the totality check on your sample contexts. <a href="rules-verification.html">Checking rules</a> has the details.</li>
     </ol>
 

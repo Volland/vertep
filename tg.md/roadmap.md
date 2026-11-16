@@ -114,7 +114,7 @@ The core and a browser shell compiled to WebAssembly, with a TypeScript API and 
 
 Delivered by the OpenSpec change `m6-wasm-js`.
 
-Archived 2026-11-14 as `openspec/changes/archive/2026-11-14-m6-wasm-js` with 15 requirements in `openspec/specs/wasm-bindings`. The npm packages are published (`next` 0.1.3, `latest` 0.1.2).
+Archived 2026-11-14 as `openspec/changes/archive/2026-11-14-m6-wasm-js` with 15 requirements in `openspec/specs/wasm-bindings`. The npm packages are published under the `next` tag (0.1.10 on 2026-11-16; 0.1.11 is not on npm yet), and `latest` still points at 0.1.2.
 
 ## M7 Durable objects
 
@@ -159,16 +159,18 @@ The actor system from Python as a PyO3 extension and a pure-Python API, installe
 
 Delivered by the OpenSpec change `m11-python-bindings` (capability `python-bindings`), in [[components#vertep-py]]. The design is in [[views/python#Python]].
 
-Implemented 2026-11-14: the crate and the package `vertep` in `bindings/python` with 27 tests that prove each scenario and run every example, examples in `examples/python`, the docs page, a CI job and the release workflow. PyPI and TestPyPI pending publishers and the `pypi` and `testpypi` environments were set up by the maintainer on 2026-11-14. Open: the TestPyPI dry run of every platform's wheel and the first upload, in release 0.1.6 (`bindings/python/RELEASING.md`).
+Implemented 2026-11-14: the crate and the package `vertep` in `bindings/python` with 27 tests that prove each scenario and run every example, examples in `examples/python`, the docs page, a CI job and the release workflow. PyPI and TestPyPI pending publishers and the `pypi` and `testpypi` environments were set up by the maintainer on 2026-11-14. The package is on PyPI from 0.1.9 (0.1.9, 0.1.10 and 0.1.11 are published); the change is not archived, and tasks 5.6 (TestPyPI dry run of every platform's wheel) and 5.7 (first upload) are still unticked in its task list.
 
 ## M12 Decision records
 
-In progress (entry format built): a journal that alone explains each decision, exports as a bundle verified offline, can be chained and signed, replays counterfactually, and lets personal data be erased by key destruction.
+In progress, most of it built: a journal that alone explains each decision, exports as a bundle verified offline, can be chained and signed, replays counterfactually, and lets personal data be erased by key destruction.
 
 - precedes:: [[roadmap#M13 Production readiness]] {note: "benchmarks track the cost of offers and sealing"}
 - precedes:: [[roadmap#M14 Rules decider]] {note: "a derivation is a rationale kind beside a claim; the offer is recorded as statements"}
 
 Specified by the OpenSpec change `m12-decision-records` (capabilities `decision-records` and `journal-redaction`), motivated by the credit-decision example, in which a refused answer reads as an accepted one. The positioning it serves is [[decisions#Explanation is the process record, not a story about it]].
+
+Built in `vertep-agent`, `vertep-objects` and `vertep-cli`: the disposition and offer on decision entries (0.1.9), `AgentHost::explain` (0.1.10), and in 0.1.11 the bundle with `vt explain` and `vt verify-bundle`, the rule derivation on the decision entry, signed chained agent journals (`ChainedAgentSealer`), `AgentHost::counterfactual`, and redaction (`SealingJournal`, `erase`, `expire`, `replay: recorded`). Open: the `sensitive` marker in the type language, replay that follows recorded transitions after an erasure, retraction of rule-derived facts on erasure, the snapshot policy, exposure through `vertep-wasm` and `vertep-py`, disposition vectors through the Lean oracle in strict mode, and the decision-records View.
 
 ## M13 Production readiness
 
@@ -178,6 +180,8 @@ In progress (2026-11-16): stability tiers, a reproducible toolchain, a benchmark
 
 Specified by the OpenSpec change `m13-production-readiness` (capabilities `production-readiness` and `journal-shipping`, and an addition to `relay-mailboxes`). It also tracks the open Lean custody proof (M7 task 10.4) and the open M10 items. New milestones wait for it, see [[decisions#New milestones wait for production readiness]].
 
+Stability tiers are declared in every crate, npm and Python manifest and rendered into the README and `site/docs/tiers.html` by `site/tools/tiers.py`, which CI runs in check mode. The first docs-versus-behaviour audit (2026-11-16, release 0.1.11) corrected the site pages and this roadmap; the rest of the change is not built yet.
+
 ## M14 Rules decider
 
 Delivered: rule programs stored beside the journal and run by lean-elpi through tiramemsu, a rules decider whose rationale is a derivation over the recorded offer and state, pinned versions and rule-version counterfactuals.
@@ -185,13 +189,13 @@ Delivered: rule programs stored beside the journal and run by lean-elpi through 
 - precedes:: [[roadmap#M15 Rule invariants]]
 - precedes:: [[roadmap#M16 Verified rules]]
 
-Delivered by the OpenSpec change `m14-rules-decider` (capabilities `rule-programs` and `rule-decider`), in [[components#vertep-rules]]. The spike ran 2026-11-15 with a go. The crate exists with the program lifecycle, the decider, refusals, fuel and pinning, rule bundles that verify offline, counterfactual replay under another program version, `vt rules` and a CI job. Open and waiting on M12: the derivation as a field of the decision entry and the whole-bundle `vt verify-bundle`; open here: a chart-level rules declaration and a wasm compile check. The design is in [[views/rules#Rules]]. Native only: see [[constraints#The native rules engine exists for four platforms]].
+Delivered by the OpenSpec change `m14-rules-decider` (capabilities `rule-programs` and `rule-decider`), in [[components#vertep-rules]]. The spike ran 2026-11-15 with a go. The crate exists with the program lifecycle, the decider, refusals, fuel and pinning, rule bundles that verify offline, counterfactual replay under another program version, `vt rules` and a CI job. The two items that waited on M12 were built there in 0.1.11: the derivation travels on the decision entry (`Annotations.derivation`, M12 task 3.2a) and `vt verify-bundle` checks an agent bundle offline (re-running a derivation stays with `vt rules verify-bundle`). Open here: a chart-level rules declaration and a wasm compile check. The design is in [[views/rules#Rules]]. Native only: see [[constraints#The native rules engine exists for four platforms]].
 
 Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m14-rules-decider` with 10 requirements in `openspec/specs/` (`rule-programs` and `rule-decider`). Two scenarios are not proven here and are recorded in the change's last task group: `One record` moves to `m12-decision-records` (task 3.2a), and `Forged support` is enforced by tiramemsu. Merged in pull request 12.
 
 ## M15 Rule invariants
 
-Delivered: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause and with erasure.
+Delivered: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause; retraction on erasure moved to M12 and is not built.
 
 - precedes:: [[roadmap#M17 Agent rules]]
 

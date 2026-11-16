@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-wallet"
 keywords = ["wallet", "credentials", "sd-jwt", "openid4vc", "did"]
 categories = ["cryptography", "authentication"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "experimental"
+tier-reason = "Exchange model proven in Lean, but no user outside the project"
+
 [features]
 default = ["sd-jwt"]
 # The Vertep Credential Exchange over TSP relationships.

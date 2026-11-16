@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-store"
 keywords = ["vertep", "event-sourcing", "journal", "rdf", "sparql"]
 categories = ["database"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "stable"
+tier-reason = "The journal and graph contracts and their test kit; the journal protocol is checked against the Lean model"
+
 [features]
 default = []
 # The shared backend test kit (`vertep_store::testkit`): every backend runs it from its tests.

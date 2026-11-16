@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-agent"
 keywords = ["llm", "agents", "statecharts", "scxml", "deterministic"]
 categories = ["asynchronous"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "preview"
+tier-reason = "Decider safety and grants proven in Lean and runs replayed through the oracle, but the decision-record work of M12 (0.1.9 to 0.1.11) is new and still open"
+
 [features]
 default = []
 # The reference provider: the Anthropic Messages API (request and response mapping over an

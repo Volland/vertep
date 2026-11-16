@@ -10,6 +10,12 @@ authors.workspace = true
 # Shipped as the npm packages in `bindings/js`, not on crates.io.
 publish = false
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "preview"
+tier-reason = "Tested in Node.js and headless Chrome in CI; ships as @vertep/web, not on crates.io; the browser build depends on a pinned local LLVM"
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

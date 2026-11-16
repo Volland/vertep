@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The vt command — Vertep docs</title>
-<meta name="description" content="Every subcommand of vt, the Vertep command line: typecheck, schema, validate, hash, convert, gen ts, certify, cluster reshard and webvh, with their flags, exit codes and real runs on real charts.">
+<meta name="description" content="Every subcommand of vt, the Vertep command line: typecheck, schema, validate, hash, convert, gen ts, certify, cluster reshard, webvh, wallet, explain, verify-bundle and rules, with their flags, exit codes and real runs on real charts.">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/fonts.css">
 <link rel="stylesheet" href="../assets/css/vertep.css">
@@ -61,13 +61,14 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html" aria-current="page">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
   <main id="main" class="content">
     <p class="breadcrumb"><a href="index.html">Docs</a> · Reference</p>
     <h1>The vt command</h1>
-    <p class="lede"><code>vt</code> checks, hashes, converts and certifies charts, generates TypeScript for the browser, reshards a stopped cluster, and creates, witnesses, publishes and serves <code>did:webvh</code> DIDs. This page lists every subcommand with its real help text and a real run on a chart from the repository.</p>
+    <p class="lede"><code>vt</code> checks, hashes, converts and certifies charts, generates TypeScript for the browser, reshards a stopped cluster, creates, witnesses, publishes and serves <code>did:webvh</code> DIDs, runs agent wallets, verifies explanation bundles offline, and manages rule programs. This page lists every subcommand with its real help text and a real run on a chart from the repository.</p>
 
     <p>All outputs on this page come from the <code>vt</code> binary built from the current sources. Commands are run from the repository root unless the text says otherwise. Very long outputs are trimmed, and each trim is marked.</p>
 
@@ -77,26 +78,31 @@
 <pre data-lang="Shell"><code>cargo build --release -p vertep-cli
 ./target/release/vt --version</code></pre>
 
-<pre class="output" data-lang="Output"><code>vt 0.1.0</code></pre>
+<pre class="output" data-lang="Output"><code>vt 0.1.11</code></pre>
 
     <p>You can also run it through Cargo without building a release binary: <code>cargo run -p vertep-cli -- validate &lt;chart&gt;</code>. Or install it into <code>~/.cargo/bin</code> with <code>cargo install --path crates/vertep-cli</code>. The examples below write <code>vt</code> for whichever you use.</p>
 
 <pre data-lang="Shell"><code>vt --help</code></pre>
 
-<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert and certify
+<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles and rules
 
 Usage: vt &lt;COMMAND&gt;
 
 Commands:
-  typecheck  Type-check a chart and report every error with its location
-  schema     Print a projection of the chart's types
-  validate   Check well-formedness and SHACL conformance
-  hash       Print the chart version IRI
-  convert    Convert a chart to another surface, refusing lossy conversions
-  certify    Run the Lean checker and print the certificate
-  gen        Generate code from a chart
-  cluster    Cluster operations
-  help       Print this message or the help of the given subcommand(s)
+  typecheck      Type-check a chart and report every error with its location
+  schema         Print a projection of the chart's types
+  validate       Check well-formedness and SHACL conformance
+  hash           Print the chart version IRI
+  convert        Convert a chart to another surface, refusing lossy conversions
+  certify        Run the Lean checker and print the certificate
+  gen            Generate code from a chart
+  cluster        Cluster operations
+  webvh          Create, update, witness, publish and serve did:webvh DIDs
+  wallet         Agent wallets: issue, accept, present and verify credentials
+  explain        Verify an explanation bundle offline and print what it explains
+  verify-bundle  Verify an explanation bundle offline: no decider, no network, no runtime
+  rules          Rule programs beside a shard's journal (needs a build with the `rules` feature)
+  help           Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help
@@ -114,6 +120,10 @@ Options:
         <tr><td><code>vt certify &lt;chart&gt;</code></td><td>Runs the Lean-compiled checker and prints its certificate.</td><td><a href="#certify">certify</a></td></tr>
         <tr><td><code>vt cluster reshard &lt;dir&gt; &lt;out&gt;</code></td><td>Doubles the shard count of a stopped cluster.</td><td><a href="#reshard">cluster reshard</a></td></tr>
         <tr><td><code>vt webvh &lt;command&gt;</code></td><td>Creates, updates, rotates, verifies, witnesses, publishes and serves <code>did:webvh</code> DIDs; creates durable-object DIDs and custody changes.</td><td><a href="#webvh">webvh</a></td></tr>
+        <tr><td><code>vt wallet &lt;command&gt;</code></td><td>Creates agent wallets, issues, accepts, presents, verifies and revokes credentials, and runs the wallet conformance kit.</td><td><a href="wallet.html#cli">Agent wallets</a></td></tr>
+        <tr><td><code>vt explain &lt;bundle&gt;</code></td><td>Verifies an explanation bundle offline and prints what each journal position explains.</td><td><a href="#explain">explain</a></td></tr>
+        <tr><td><code>vt verify-bundle &lt;bundle&gt;</code></td><td>Verifies an explanation bundle offline, with no decider, network or runtime.</td><td><a href="#explain">explain</a></td></tr>
+        <tr><td><code>vt rules &lt;command&gt;</code></td><td>Stores, checks, proposes, promotes and certifies rule programs beside a shard's journal. Only in a build with the <code>rules</code> feature, which is off by default.</td><td><a href="rules-operating.html#commands">Operating rules</a></td></tr>
       </tbody>
     </table>
 
@@ -838,14 +848,29 @@ published: site/example.org/objects/ticket-8812/did.json</code></pre>
     <h3 id="webvh-publish">Publish and serve</h3>
     <p><code>publish</code> writes to a directory (<code>--out</code>), into a git working copy that it commits and pushes (<code>--git DIR [--subdir docs] [--branch main]</code>), or to a directory followed by a command (<code>--root DIR --command aws s3 sync . s3://bucket</code>). A failed <code>git push</code> or command is reported with its exit status and error output. <code>vt webvh serve --root site [--domain example.org]</code> serves a site directory: <code>text/jsonl</code> logs, JSON witness files, CORS, a cache lifetime capped by the DID's <code>ttl</code>, and nothing outside the root. It belongs behind a TLS proxy, since <code>did:webvh</code> resolves over HTTPS.</p>
 
+    <h2 id="explain">vt explain and vt verify-bundle</h2>
+    <p>An explanation bundle is one agent's journal up to a position, the chart versions it ran under and a manifest of digests, exported by <code>AgentHost::export_bundle</code> (see <a href="agents.html#records">Agents and deciders</a>). Both commands verify it offline: they re-hash every chart, check every entry against the manifest, replay the journal into a fresh host and recompute each explanation, without calling a decider. <code>verify-bundle</code> only reports; <code>explain</code> also prints what each position did, or one position with <code>--position N</code>, as JSON with <code>--json</code>. On the test fixture <code>crates/vertep-agent/tests/fixtures/review-bundle.json</code>:</p>
+<pre data-lang="Shell"><code>vt verify-bundle crates/vertep-agent/tests/fixtures/review-bundle.json
+vt explain crates/vertep-agent/tests/fixtures/review-bundle.json</code></pre>
+<pre class="output" data-lang="Output"><code>verified: https://example.org/agents/a1 positions 1 to 3 (3 explanations recomputed, 0 decider calls)
+https://example.org/agents/a1 (verified offline)
+entry 1 (start) [] -&gt; [idle]
+entry 2 (event) [idle] -&gt; [review]
+    then: offer https://example.org/agents/a1/decision/2.0 to `d`: approve, reject
+entry 3 (decision) [review] -&gt; [rejected]
+    accepted: offered [approve, reject], chose reject</code></pre>
+    <p>A copy whose third entry was edited to choose <code>approve</code> is refused with exit code 1:</p>
+<pre class="output" data-lang="vt verify-bundle (exit 1)"><code>verification failed: entry 3 was altered</code></pre>
+    <p>A bundle is self-consistent, not signed: someone who rewrites the entries and the manifest together produces a bundle that verifies. Tie it to a signer with a chained, signed agent journal.</p>
+
     <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
 
     <h2 id="library">vt as a library</h2>
-    <p>Every subcommand is also a function in the <code>vertep_cli::commands</code> module, which returns an <code>Outcome</code> holding standard output, standard error and the exit code. The runnable examples use it to compare recorded command output with the real one, so documented output that drifts fails the build. See the <a href="../examples/index.html">examples</a>.</p>
+    <p>Every subcommand is also a function in the <code>vertep_cli</code> crate (the chart commands in <code>vertep_cli::commands</code>, the others in <code>webvh</code>, <code>wallet</code>, <code>explain</code> and <code>rules</code>), which returns an <code>Outcome</code> holding standard output, standard error and the exit code. The runnable examples use it to compare recorded command output with the real one, so documented output that drifts fails the build. See the <a href="../examples/index.html">examples</a>.</p>
 
     <nav class="pager" aria-label="Pages">
       <a href="verification.html">← Verification</a>
-      <a href="../examples/index.html">Examples →</a>
+      <a href="tiers.html">Stability tiers →</a>
     </nav>
   </main>
 </div>

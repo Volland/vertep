@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -135,7 +136,7 @@ println!(<span class="s">"protocol {}"</span>, protocol.id().as_str());
 <pre data-lang="Rust"><code><span class="kd">let</span> (genesis, <span class="kd">mut</span> b) <span class="o">=</span> Instance::create(protocol.clone(), <span class="o">&amp;</span>buyer, <span class="s">"buyer"</span>, <span class="o">&amp;</span>bindings, None)<span class="o">?</span>;
 <span class="kd">let</span> <span class="kd">mut</span> s <span class="o">=</span> Instance::from_genesis(protocol.clone(), <span class="o">&amp;</span>genesis, SELLER, <span class="o">&amp;</span>verifier, None)
     .map_err(|reason| reason.as_str())<span class="o">?</span>;
-<span class="kd">let</span> join <span class="o">=</span> s.join(<span class="o">&amp;</span>seller)<span class="o">?</span>;          <span class="c">// sealed to every other role by the transport</span>
+<span class="kd">let</span> join <span class="o">=</span> s.join(<span class="o">&amp;</span>seller)<span class="o">?</span>;          <span class="c">// for every other role; sealing it is the transport's job</span>
 b.receive(<span class="o">&amp;</span>join, <span class="o">&amp;</span>verifier, now_ms);</code></pre>
     <p><code>Signer</code> and <code>Verifier</code> are traits: in Vertep they come from the key manager and the DID resolver, and the <code>testkit</code> feature has in-memory ones. The crate itself holds no keys and opens no connection.</p>
 
@@ -163,7 +164,7 @@ buyer  &lt;- receipt: applied 7879aa311338
 complete: buyer true, seller true</code></pre>
 
     <h2 id="history">Hidden messages and history</h2>
-    <p>Each copy of a message is sealed separately to each recipient, so a message sealed to a subset is unreadable to the other roles. Every message still lists the hashes it depends on, so participants compare heads (<code>heads</code>, <code>missing_from</code>) to find a gap, and a participant outside a subset is told the hash alone (<code>observe_hidden</code>), which releases whatever was waiting for it. A late joiner receives the history it may read (<code>history_for</code>), with hidden messages as hashes, and the chain still verifies. A participant knows the protocol state only through what it sees, so its checker keeps the set of states consistent with it.</p>
+    <p>A message names the roles it is sealed to, and the transport is meant to seal each copy separately to each of them, so that a message sealed to a subset is unreadable to the other roles; that pairwise fan-out is one of the parts not built yet, so nothing in Vertep seals the copies for you today. Every message still lists the hashes it depends on, so participants compare heads (<code>heads</code>, <code>missing_from</code>) to find a gap, and a participant outside a subset is told the hash alone (<code>observe_hidden</code>), which releases whatever was waiting for it. A late joiner receives the history it may read (<code>history_for</code>), with hidden messages as hashes, and the chain still verifies. A participant knows the protocol state only through what it sees, so its checker keeps the set of states consistent with it.</p>
     <p>A transition may open a child instance (a payment inside a purchase): its roles are bound from the parent's, participants already in the parent need no new join, and the child's completion ends the parent's waiting state. A space is then a tree of instances under one root genesis.</p>
 
     <h2 id="discovery">Offers and discovery</h2>

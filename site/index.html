@@ -238,19 +238,21 @@
 <section class="band hatched">
   <div class="band-inner">
     <h2>Get Vertep</h2>
-    <p class="sub">Rust crates on crates.io, JavaScript packages on npm, source on GitHub.</p>
+    <p class="sub">Rust crates on crates.io, JavaScript packages on npm, a Python package on PyPI, source on GitHub.</p>
     <div class="split">
       <div>
 <pre data-lang="Cargo.toml"><code>[dependencies]
 vertep = "0.1"</code></pre>
 <pre data-lang="Shell"><code>cargo install vertep-cli      # the vt command
-npm install @vertep/web       # browsers and Node.js</code></pre>
+npm install @vertep/web@next  # browsers and Node.js
+pip install vertep            # Python</code></pre>
       </div>
       <div>
         <ul>
           <li><a href="https://crates.io/crates/vertep">vertep on crates.io</a>, the facade crate, and the <a href="https://crates.io/search?q=vertep">other crates</a></li>
           <li><a href="https://docs.rs/vertep">API reference on docs.rs</a></li>
           <li><a href="https://www.npmjs.com/package/@vertep/web">@vertep/web</a> and <a href="https://www.npmjs.com/package/@vertep/dm-ecma">@vertep/dm-ecma</a> on npm</li>
+          <li><a href="https://pypi.org/project/vertep/">vertep on PyPI</a>, the Python bindings</li>
           <li><a href="vertepnyk.html">Vertepnyk</a>, the visual designer and simulator for charts, in VS Code, Obsidian or a desktop app</li>
           <li><a href="https://github.com/Volland/vertep">Source, issues and specs on GitHub</a></li>
           <li><a href="docs/index.html">Getting started</a> and <a href="examples/index.html">runnable examples</a></li>
@@ -263,10 +265,10 @@ npm install @vertep/web       # browsers and Node.js</code></pre>
 <section class="band ink">
   <div class="band-inner">
     <h2>Where it stands</h2>
-    <p class="sub">Version 0.1.x. Eleven milestones, from the SCXML core to agent protocols, are built or in progress. Every requirement is traced from its spec to the code that implements it and the test or proof that checks it. It is young software: try it on a small case first, and tell us what breaks.</p>
+    <p class="sub">Version 0.1.x. Eighteen milestones, from the SCXML core to rule deciders and decision records, are built or in progress. Every requirement is traced from its spec to the code that implements it and the test or proof that checks it. It is young software: try it on a small case first, and tell us what breaks.</p>
     <div class="cards">
-      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Specified</h3></div><div class="card-body"><p>Nearly 400 requirements in OpenSpec, with scenarios, linked to decisions and constraints in a typed graph.</p></div></div>
-      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Built</h3></div><div class="card-body"><p>Twenty-five workspace crates and two npm packages: core, surfaces, runtime, agents, cluster, federation, durable objects, a TSP mediator, <code>did:webvh</code> hosting, agent wallets, agent protocols and WebAssembly.</p></div></div>
+      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Specified</h3></div><div class="card-body"><p>More than 450 requirements in OpenSpec, with scenarios, linked to decisions and constraints in a typed graph.</p></div></div>
+      <div class="card"><div class="card-head"><span class="num">✶</span><h3>Built</h3></div><div class="card-body"><p>Twenty-seven workspace crates, two npm packages and a Python package: core, surfaces, runtime, agents, rule deciders, decision records, cluster, federation, durable objects, a TSP mediator, <code>did:webvh</code> hosting, agent wallets, agent protocols, WebAssembly and Python.</p></div></div>
       <div class="card"><div class="card-head"><span class="num">✶</span><h3>Checked</h3></div><div class="card-body"><p>The W3C SCXML suite, Rust-against-Lean differential traces, container fault tests, and Lean theorems with no <code>sorry</code>.</p></div></div>
     </div>
   </div>

@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-rdf"
 keywords = ["rdf", "shacl", "ontology", "statechart", "semantic-web"]
 categories = ["encoding", "science", "data-structures"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "stable"
+tier-reason = "Lossless RDF round trip over the W3C suite; SHACL shapes equivalence and the round trip proven in Lean"
+
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
 # RDF 1.2 terms (triple terms, directional literals) and the RDFC-1.0 blank node labelling.

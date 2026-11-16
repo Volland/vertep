@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-objects"
 keywords = ["actors", "event-sourcing", "did", "tsp", "replication"]
 categories = ["network-programming", "cryptography"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "experimental"
+tier-reason = "No user outside the project; custody safety under custodian-set changes is checked by search, not proven (M7 task 10.4)"
+
 [features]
 default = []
 # The TSP replica link (custody messages between host and custodian VIDs).

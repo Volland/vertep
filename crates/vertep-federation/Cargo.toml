@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-federation"
 keywords = ["did", "didcomm", "tsp", "decentralized", "actors"]
 categories = ["cryptography", "network-programming"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "experimental"
+tier-reason = "No user outside the project; WebSocket live delivery is not bound"
+
 [features]
 default = []
 # The `did:webvh` method resolver with log verification (DIF didwebvh-rs).

@@ -369,7 +369,7 @@ Four programs in `python/` use the `vertep` package, each with its output record
 ```sh
 cd bindings/python
 python -m venv .venv && . .venv/bin/activate
-pip install maturin && maturin develop          # or `pip install vertep` once it is published
+pip install maturin && maturin develop          # or `pip install vertep` from PyPI
 python ../../examples/python/quickstart.py
 pytest                                           # runs the bindings' tests and every example
 ```

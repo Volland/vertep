@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-core"
 keywords = ["scxml", "statechart", "state-machine", "no-std", "interpreter"]
 categories = ["no-std", "data-structures", "algorithms"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "stable"
+tier-reason = "W3C SCXML IRP suite in CI, Rust-against-Lean differential traces, type soundness of step proven in Lean, no_std and wasm32 builds in CI"
+
 [features]
 default = ["std"]
 std = []

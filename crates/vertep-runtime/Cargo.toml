@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-runtime"
 keywords = ["statecharts", "scxml", "actors", "event-sourcing", "durable"]
 categories = ["asynchronous", "concurrency"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "stable"
+tier-reason = "Journal protocol property tests with the Lean model as oracle; examples held to recorded output"
+
 [features]
 default = []
 # `Storage` for the tiramemsu backend.

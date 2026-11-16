@@ -10,6 +10,12 @@ authors.workspace = true
 # Shipped as the `vertep` wheel and sdist built by maturin from `bindings/python`, not on crates.io.
 publish = false
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "preview"
+tier-reason = "pytest runs every scenario and example on CPython 3.9 and 3.13; ships as the vertep wheel, not on crates.io"
+
 [lib]
 name = "_vertep"
 crate-type = ["cdylib", "rlib"]

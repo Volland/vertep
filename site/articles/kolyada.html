@@ -67,6 +67,8 @@
   <h2>Where it stands</h2>
   <p>The core crate, <code>vertep-kolyada</code>, is built: documents and their identity, payload shapes, projection, signed envelopes, the conformance check, causal delivery, history, sub-protocols, offers and the RDF bridge, with test vectors that Node can check on its own. A runnable tour walks the purchase above from document to receipt:</p>
 <pre data-lang="Shell"><code>cargo run -p vertep-kolyada --example quote --features testkit</code></pre>
+  <p>Two parts of the space described above are not built yet: the join policy, a participant's own rule for whether to countersign, and the sealing of each copy to its recipient over Vertep's mailboxes. The crate signs the recipient roles into each message and shows every other participant only its hash; sealing is left to the transport for now.</p>
+
   <p>Next comes the part that makes it disappear into ordinary agents: a chart declares the roles it plays, its mailbox runs the check where grants run today, before anything is journaled, and the verdict is journaled with the message so that replay never verifies again. After that, the <code>vt kolyada</code> command, and the Lean model that proves accepted messages are always allowed by the projection, that unbound roles are never accepted, and that participants who see messages in different but causally consistent orders end in the same place.</p>
   <p>The <a href="../docs/protocols.html">Agent protocols page</a> in the docs has the document format, the API and the full run of the tour.</p>
 </main>

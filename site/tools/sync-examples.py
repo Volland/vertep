@@ -180,7 +180,7 @@ EXAMPLES = [
         "title": "Credit decision",
         "num": "VI",
         "summary": "A regulated loan decision: a hard policy limit, a model that cannot approve what policy forbids, a human officer, and an audit from the journal alone.",
-        "lede": "A lender lets a model underwrite consumer loans inside a chart that holds the policy. Three applications are decided, then an auditor opens the same journal with no decider bound and reads what was offered, who chose and why. A scripted decider stands in for the model, so the example needs no network.",
+        "lede": "A lender lets a model underwrite consumer loans inside a chart that holds the policy. Three applications are decided, then an auditor opens the same journal with no decider bound and reads what was offered, who chose and why, exports a bundle that verifies offline, and replays the decisions under a stricter policy. A scripted decider stands in for the model, so the example needs no network.",
         "files": ["credit-decision/loan.scxml", "credit-decision/main.rs", "credit-decision/expected-output.txt"],
         "body": lambda: [
             ("h2", "The chart"),
@@ -194,9 +194,11 @@ EXAMPLES = [
             ("out", (read("credit-decision/expected-output.txt"), "Output")),
             ("ul", [
                 "Loan 1001 was approved by the underwriter, who was offered all three moves.",
-                "On loan 1002 the amount is over the ceiling, so <code>approve</code> was never offered: the underwriter answered it anyway, the chart refused the answer, and an officer decided. The journal keeps the refused answer with its rationale.",
+                "On loan 1002 the amount is over the ceiling, so <code>approve</code> was never offered: the underwriter answered it anyway, the chart refused the answer, and an officer decided. The journal keeps the refused answer with its rationale and its disposition, <code>refused-not-offered</code>.",
                 "Loan 1003 was declined by rule. The journal has no decision entry because nobody was asked.",
                 "The audit replays nine entries with zero decider calls, and <code>state_at</code> shows the process as of every entry.",
+                "<code>export_bundle</code> writes loan 1002's journal, its chart and a manifest of digests; <code>Bundle::verify</code> recomputes the four explanations from the JSON alone, with no decider call.",
+                "<code>counterfactual</code> replays the recorded decisions under a chart with the approval ceiling cut to 15&nbsp;000, without touching the journal: loan 1001's approval is no longer offered at entry 3, so it would have gone to an officer.",
             ]),
             ("nb", "This example shows how a record can explain a decision. It is not a compliance product: what a regulator requires of a lender is a legal question, and the articles <a href=\"../articles/explainable-by-construction.html\">Explainable by construction</a> and <a href=\"../articles/regulated-decisions.html\">Three regulated decisions</a> say what the record does and does not cover."),
         ],
@@ -354,7 +356,7 @@ def index_page() -> str:
     )
     main = f"""    <p class="breadcrumb">Examples</p>
     <h1>Examples</h1>
-    <p class="lede">Six small programs, one idea each. They live in <code>examples/</code> in the repository, and <code>cargo test -p vertep-examples</code> runs every one and compares what it prints with the output shown on these pages.</p>
+    <p class="lede">Seven small programs, one idea each. They live in <code>examples/</code> in the repository, and <code>cargo test -p vertep-examples</code> runs every one and compares what it prints with the output shown on these pages. Four more, in <code>examples/python/</code>, use the Python package <code>vertep</code>; the bindings' tests run them the same way.</p>
     <div class="cards">
 {cards}
     </div>

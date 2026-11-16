@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stability tiers — Vertep docs</title>
+<meta name="description" content="Which Vertep crates and packages are stable, preview or experimental, and the evidence behind each tier, generated from the manifests.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
+      <li><a href="wallet.html">Agent wallets</a></li>
+      <li><a href="protocols.html">Agent protocols</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+      <li><a href="python.html">Python</a></li>
+      <li><a href="rules.html">Rules</a></li>
+      <li><a href="rules-writing.html">Writing rules</a></li>
+      <li><a href="rules-operating.html">Operating rules</a></li>
+      <li><a href="rules-verification.html">Checking rules</a></li>
+      <li><a href="rules-authoring.html">Rules written by agents</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html" aria-current="page">Stability tiers</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Reference</p>
+    <h1>Stability tiers</h1>
+    <p class="lede">Vertep is version 0.1.x and its parts are not equally mature. Each crate and package declares a tier in its manifest, and the tables below and in the README are generated from those declarations, so they cannot say more than the manifests do.</p>
+
+    <h2 id="meaning">What a tier means</h2>
+    <table>
+      <thead><tr><th>Tier</th><th>Evidence behind it</th><th>What to expect</th></tr></thead>
+      <tbody>
+        <tr><td><strong>stable</strong></td><td>Checked against a reference from outside its own tests: the W3C SCXML conformance suite, the Lean model as a differential oracle, or the storage contract kit. Used by the examples that are held to their recorded output.</td><td>Behaviour you can rely on. Before 1.0 a minor version may still change an API, and the CHANGELOG says so.</td></tr>
+        <tr><td><strong>preview</strong></td><td>Well tested and used by examples or bindings, but with no outside reference, with recent large changes, or with open tasks in its milestone.</td><td>Works for the documented cases; expect API changes and gaps that the docs pages name.</td></tr>
+        <tr><td><strong>experimental</strong></td><td>Specified and tested by its own suite, sometimes with a Lean model, but with open items on the roadmap and no user outside the project yet.</td><td>Try it, report what breaks, and do not build on it unaided.</td></tr>
+      </tbody>
+    </table>
+    <p>A tier moves up when the evidence changes: an outside reference, a user outside the project, or its open tasks closed. The reasons below are one line each; the docs page of each part names its gaps in full.</p>
+
+    <h2 id="packages">Crates and packages</h2>
+<!-- tiers:begin -->
+    <h3 id="stable">Stable (10)</h3>
+    <table>
+      <thead><tr><th>Package</th><th>Where</th><th>Why this tier</th></tr></thead>
+      <tbody>
+        <tr><td><code>vertep</code></td><td><a href="https://crates.io/crates/vertep">crates.io</a></td><td>Default features (runtime, tiramemsu, scxml) are stable crates; each optional feature has the tier of the crate it enables</td></tr>
+        <tr><td><code>vertep-core</code></td><td><a href="https://crates.io/crates/vertep-core">crates.io</a></td><td>W3C SCXML IRP suite in CI, Rust-against-Lean differential traces, type soundness of step proven in Lean, no_std and wasm32 builds in CI</td></tr>
+        <tr><td><code>vertep-scxml</code></td><td><a href="https://crates.io/crates/vertep-scxml">crates.io</a></td><td>Reads the whole W3C SCXML suite in CI; SCXML and RDF round trips over the suite</td></tr>
+        <tr><td><code>vertep-dm-ecma</code></td><td><a href="https://crates.io/crates/vertep-dm-ecma">crates.io</a></td><td>The ecmascript variant of the W3C SCXML suite in CI</td></tr>
+        <tr><td><code>vertep-rdf</code></td><td><a href="https://crates.io/crates/vertep-rdf">crates.io</a></td><td>Lossless RDF round trip over the W3C suite; SHACL shapes equivalence and the round trip proven in Lean</td></tr>
+        <tr><td><code>vertep-conformance</code></td><td>not published</td><td>The W3C SCXML conformance harness and Lean differential, run in CI on every change (not published)</td></tr>
+        <tr><td><code>vertep-dm-cel</code></td><td><a href="https://crates.io/crates/vertep-dm-cel">crates.io</a></td><td>The CEL variant of the W3C SCXML suite in CI; the type checker's projections are proven in Lean</td></tr>
+        <tr><td><code>vertep-store</code></td><td><a href="https://crates.io/crates/vertep-store">crates.io</a></td><td>The journal and graph contracts and their test kit; the journal protocol is checked against the Lean model</td></tr>
+        <tr><td><code>vertep-tiramemsu</code></td><td><a href="https://crates.io/crates/vertep-tiramemsu">crates.io</a></td><td>Passes the store contract kit; the default durable backend of the facade and the durable-actor example</td></tr>
+        <tr><td><code>vertep-runtime</code></td><td><a href="https://crates.io/crates/vertep-runtime">crates.io</a></td><td>Journal protocol property tests with the Lean model as oracle; examples held to recorded output</td></tr>
+      </tbody>
+    </table>
+    <h3 id="preview">Preview (12)</h3>
+    <table>
+      <thead><tr><th>Package</th><th>Where</th><th>Why this tier</th></tr></thead>
+      <tbody>
+        <tr><td><code>vertep-testkit</code></td><td>not published</td><td>Property-test generators used by the conformance differential; test-only, not published</td></tr>
+        <tr><td><code>vertep-yaml</code></td><td><a href="https://crates.io/crates/vertep-yaml">crates.io</a></td><td>Own round-trip and layout tests and the typed-order example; no external suite</td></tr>
+        <tr><td><code>vertep-oxigraph</code></td><td><a href="https://crates.io/crates/vertep-oxigraph">crates.io</a></td><td>Passes the store contract kit; used by no example</td></tr>
+        <tr><td><code>vertep-macros</code></td><td><a href="https://crates.io/crates/vertep-macros">crates.io</a></td><td>Compile-time checks tested through vertep-dm-rust and the rust-macro example; no external suite</td></tr>
+        <tr><td><code>vertep-dm-rust</code></td><td><a href="https://crates.io/crates/vertep-dm-rust">crates.io</a></td><td>Compile-fail and projection tests and the rust-macro example; no external suite</td></tr>
+        <tr><td><code>vertep-cli</code></td><td><a href="https://crates.io/crates/vertep-cli">crates.io</a></td><td>Commands held to recorded output by the examples tests; explain, verify-bundle and rules are new</td></tr>
+        <tr><td><code>vertep-agent</code></td><td><a href="https://crates.io/crates/vertep-agent">crates.io</a></td><td>Decider safety and grants proven in Lean and runs replayed through the oracle, but the decision-record work of M12 (0.1.9 to 0.1.11) is new and still open</td></tr>
+        <tr><td><code>vertep-wasm</code></td><td>ships as @vertep/web</td><td>Tested in Node.js and headless Chrome in CI; ships as @vertep/web, not on crates.io; the browser build depends on a pinned local LLVM</td></tr>
+        <tr><td><code>vertep-py</code></td><td>ships as vertep on PyPI</td><td>pytest runs every scenario and example on CPython 3.9 and 3.13; ships as the vertep wheel, not on crates.io</td></tr>
+        <tr><td><code>@vertep/dm-ecma</code></td><td><a href="https://www.npmjs.com/package/@vertep/dm-ecma">npm</a></td><td>Built and tested with @vertep/web in CI; same npm tags</td></tr>
+        <tr><td><code>@vertep/web</code></td><td><a href="https://www.npmjs.com/package/@vertep/web">npm</a></td><td>Tested in Node.js and headless Chrome with a size budget in CI; npm latest is still 0.1.2, next carries the current line</td></tr>
+        <tr><td><code>vertep (Python)</code></td><td><a href="https://pypi.org/project/vertep/">PyPI</a></td><td>pytest runs every scenario and example on CPython 3.9 and 3.13; on PyPI since 0.1.9; no agents, cluster or federation yet</td></tr>
+      </tbody>
+    </table>
+    <h3 id="experimental">Experimental (8)</h3>
+    <table>
+      <thead><tr><th>Package</th><th>Where</th><th>Why this tier</th></tr></thead>
+      <tbody>
+        <tr><td><code>vertep-cluster</code></td><td><a href="https://crates.io/crates/vertep-cluster">crates.io</a></td><td>Fault injection replayed through the Lean lease model, but no user outside the project and no journal shipping protocol yet</td></tr>
+        <tr><td><code>vertep-federation</code></td><td><a href="https://crates.io/crates/vertep-federation">crates.io</a></td><td>No user outside the project; WebSocket live delivery is not bound</td></tr>
+        <tr><td><code>vertep-rules</code></td><td><a href="https://crates.io/crates/vertep-rules">crates.io</a></td><td>Native only (a 154 MB prebuilt engine for macOS and Linux), no wasm, Windows or Python; first published in 0.1.7</td></tr>
+        <tr><td><code>vertep-objects</code></td><td><a href="https://crates.io/crates/vertep-objects">crates.io</a></td><td>No user outside the project; custody safety under custodian-set changes is checked by search, not proven (M7 task 10.4)</td></tr>
+        <tr><td><code>vertep-tsp-mediator</code></td><td><a href="https://crates.io/crates/vertep-tsp-mediator">crates.io</a></td><td>No user outside the project</td></tr>
+        <tr><td><code>vertep-webvh</code></td><td><a href="https://crates.io/crates/vertep-webvh">crates.io</a></td><td>No user outside the project; one witness-update vector refused on purpose</td></tr>
+        <tr><td><code>vertep-wallet</code></td><td><a href="https://crates.io/crates/vertep-wallet">crates.io</a></td><td>Exchange model proven in Lean, but no user outside the project</td></tr>
+        <tr><td><code>vertep-kolyada</code></td><td><a href="https://crates.io/crates/vertep-kolyada">crates.io</a></td><td>Core only: join policy, sealed fan-out, chart role binding, vt kolyada and the Lean model are open (M10)</td></tr>
+      </tbody>
+    </table>
+<!-- tiers:end -->
+
+    <h2 id="how">How the tables are kept</h2>
+    <p>A crate declares its tier in <code>Cargo.toml</code>, an npm package in its <code>package.json</code>, and the Python package in <code>pyproject.toml</code>:</p>
+    <pre data-lang="TOML"><code>[package.metadata.vertep]
+tier = "stable"
+tier-reason = "W3C SCXML IRP suite in CI, ..."</code></pre>
+    <pre data-lang="JSON"><code>"vertep": { "tier": "preview", "tierReason": "..." }</code></pre>
+    <p><code>python3 site/tools/tiers.py</code> rewrites the table on this page and in the README. CI runs it with <code>--check</code>, which fails when a crate or package declares no tier, names an unknown one, or when a table differs from the manifests.</p>
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="cli.html">← The vt command</a>
+      <a href="../examples/index.html">Examples →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

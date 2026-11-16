@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-macros"
 keywords = ["statechart", "state-machine", "scxml", "macro", "dsl"]
 categories = ["rust-patterns", "data-structures"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "preview"
+tier-reason = "Compile-time checks tested through vertep-dm-rust and the rust-macro example; no external suite"
+
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
 # include_chart! reads SCXML and YAML files with the surfaces' own readers (no RDF, no store).

@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -71,7 +72,7 @@
 
     <h2 id="what">What Vertep is</h2>
     <p>Vertep is a Rust workspace for W3C SCXML statecharts. You write a chart in SCXML, in YAML or with a Rust macro. Vertep runs it as an <strong>actor</strong>: a long-lived process with an IRI address that handles one event at a time and writes every event it accepts to a <strong>journal</strong> before it acts on it. Because the journal is complete, the actor can be stopped, moved and replayed, and its state can be read back as it was at any earlier moment.</p>
-    <p>The same chart also projects to RDF. Its version is the hash of its canonical RDF form, so a journal always records exactly which chart produced it. A chart can mark a state as a choice point (<code>vt:decide</code>); there a guard, a person or a language model picks the next event, but only from the events the chart enables in that state. Actors run on one node, in a cluster, across trust boundaries with DIDs, or in the browser through WebAssembly. A Lean model of the semantics checks the Rust core trace by trace.</p>
+    <p>The same chart also projects to RDF. Its version is the hash of its canonical RDF form, so a journal always records exactly which chart produced it. A chart can mark a state as a choice point (<code>vt:decide</code>); there a guard, a person, a language model or a rule program picks the next event, but only from the events the chart enables in that state. Actors run on one node, in a cluster, across trust boundaries with DIDs, or in the browser through WebAssembly. A Lean model of the semantics checks the Rust core trace by trace.</p>
 
     <table>
       <thead><tr><th>Layer</th><th>Crates</th></tr></thead>
@@ -80,13 +81,14 @@
         <tr><td>Surfaces, datamodels, RDF</td><td><code>vertep-scxml</code>, <code>vertep-yaml</code>, <code>vertep-macros</code>, <code>vertep-dm-ecma</code>, <code>vertep-dm-cel</code>, <code>vertep-dm-rust</code>, <code>vertep-rdf</code></td></tr>
         <tr><td>Storage</td><td><code>vertep-store</code>, <code>vertep-tiramemsu</code> (default), <code>vertep-oxigraph</code></td></tr>
         <tr><td>Runtime shell</td><td><code>vertep-runtime</code> on tokio</td></tr>
-        <tr><td>Agents</td><td><code>vertep-agent</code></td></tr>
-        <tr><td>Distribution</td><td><code>vertep-cluster</code>, <code>vertep-federation</code></td></tr>
-        <tr><td>Bindings and tools</td><td><code>vertep-wasm</code>, <code>vertep-cli</code> (the <code>vt</code> command), the <code>vertep</code> facade; npm packages <code>@vertep/web</code> and <code>@vertep/dm-ecma</code> under <code>bindings/js</code></td></tr>
+        <tr><td>Agents</td><td><code>vertep-agent</code>, <code>vertep-wallet</code>, <code>vertep-rules</code> (rule programs; its engine builds on macOS and Linux only), <code>vertep-kolyada</code> (agent protocols)</td></tr>
+        <tr><td>Distribution</td><td><code>vertep-cluster</code>, <code>vertep-federation</code>, <code>vertep-webvh</code>, <code>vertep-objects</code> (durable objects), <code>vertep-tsp-mediator</code> (<code>vt-mediator</code>)</td></tr>
+        <tr><td>Bindings and tools</td><td><code>vertep-wasm</code>, <code>vertep-py</code>, <code>vertep-cli</code> (the <code>vt</code> command), the <code>vertep</code> facade; npm packages <code>@vertep/web</code> and <code>@vertep/dm-ecma</code> under <code>bindings/js</code>; the Python package <code>vertep</code> under <code>bindings/python</code></td></tr>
+        <tr><td>Testing (not published)</td><td><code>vertep-conformance</code>, <code>vertep-testkit</code></td></tr>
         <tr><td>Formal model</td><td><code>lean/vertep-lean</code> (Lean 4)</td></tr>
       </tbody>
     </table>
-    <p>Most applications depend on one crate, the facade <code>vertep</code>, and turn on what they need with cargo features: <code>runtime</code>, <code>tiramemsu</code> and <code>scxml</code> are on by default; <code>ecmascript</code>, <code>agent</code>, <code>cluster</code> and <code>federation</code> are opt-in (see <code>crates/vertep/Cargo.toml</code>).</p>
+    <p>Most applications depend on one crate, the facade <code>vertep</code>, and turn on what they need with cargo features: <code>runtime</code>, <code>tiramemsu</code> and <code>scxml</code> are on by default; <code>ecmascript</code>, <code>agent</code>, <code>cluster</code>, <code>federation</code>, <code>objects</code> and <code>wallet</code> are opt-in (see <code>crates/vertep/Cargo.toml</code>). <code>vertep-rules</code> and <code>vertep-kolyada</code> are not in the facade; depend on them directly.</p>
 
     <h2 id="prerequisites">Prerequisites</h2>
     <table>
@@ -101,11 +103,13 @@
     <p>With <code>rustup</code> installed you do not pick the Rust version yourself: the first <code>cargo</code> command inside the repository installs the toolchain named in <code>rust-toolchain.toml</code>, together with <code>rustfmt</code>, <code>clippy</code> and the <code>wasm32-unknown-unknown</code> and <code>thumbv7em-none-eabihf</code> targets. The embedded target is there because the core is <code>no_std</code>: CI runs <code>cargo build -p vertep-core --no-default-features --target thumbv7em-none-eabihf</code> to show it needs no standard library.</p>
 
     <h2 id="install">Installing</h2>
-    <p>The crates are on <a href="https://crates.io/crates/vertep">crates.io</a> and the JavaScript packages on <a href="https://www.npmjs.com/package/@vertep/web">npm</a>. Most Rust programs depend on the facade crate <code>vertep</code> and turn on the layers they need with features; the API reference is on <a href="https://docs.rs/vertep">docs.rs</a>.</p>
+    <p>The crates are on <a href="https://crates.io/crates/vertep">crates.io</a>, the JavaScript packages on <a href="https://www.npmjs.com/package/@vertep/web">npm</a> and the Python package on <a href="https://pypi.org/project/vertep/">PyPI</a>. Most Rust programs depend on the facade crate <code>vertep</code> and turn on the layers they need with features; the API reference is on <a href="https://docs.rs/vertep">docs.rs</a>.</p>
 <pre data-lang="TOML"><code>[dependencies]
 vertep = "0.1"</code></pre>
 <pre data-lang="Shell"><code>cargo install vertep-cli          # the vt command
-npm install @vertep/web           # browsers and Node.js; add @vertep/dm-ecma for ECMAScript charts</code></pre>
+npm install @vertep/web@next      # browsers and Node.js; add @vertep/dm-ecma@next for ECMAScript charts
+pip install vertep                # Python 3.9 or later</code></pre>
+    <p>On npm the <code>next</code> tag is <code>0.1.10</code> and <code>latest</code> is still the older <code>0.1.2</code>, so install with <code>@next</code>; <code>0.1.11</code> is on crates.io and PyPI but not yet on npm.</p>
 
     <h2 id="build">Building from source</h2>
     <p>To work on Vertep itself, or to run the examples and the proofs, build from a checkout:</p>
@@ -115,20 +119,25 @@ cargo build --workspace          # every crate and the examples
 cargo test --workspace           # what CI runs on every push
 cargo build --release -p vertep-cli
 ./target/release/vt --help</code></pre>
-<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert and certify
+<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles and rules
 
 Usage: vt &lt;COMMAND&gt;
 
 Commands:
-  typecheck  Type-check a chart and report every error with its location
-  schema     Print a projection of the chart's types
-  validate   Check well-formedness and SHACL conformance
-  hash       Print the chart version IRI
-  convert    Convert a chart to another surface, refusing lossy conversions
-  certify    Run the Lean checker and print the certificate
-  gen        Generate code from a chart
-  cluster    Cluster operations
-  help       Print this message or the help of the given subcommand(s)
+  typecheck      Type-check a chart and report every error with its location
+  schema         Print a projection of the chart's types
+  validate       Check well-formedness and SHACL conformance
+  hash           Print the chart version IRI
+  convert        Convert a chart to another surface, refusing lossy conversions
+  certify        Run the Lean checker and print the certificate
+  gen            Generate code from a chart
+  cluster        Cluster operations
+  webvh          Create, update, witness, publish and serve did:webvh DIDs
+  wallet         Agent wallets: issue, accept, present and verify credentials
+  explain        Verify an explanation bundle offline and print what it explains
+  verify-bundle  Verify an explanation bundle offline: no decider, no network, no runtime
+  rules          Rule programs beside a shard's journal (needs a build with the `rules` feature)
+  help           Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help

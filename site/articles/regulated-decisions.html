@@ -124,7 +124,7 @@
 
   <h2>What you still have to do</h2>
 
-  <p>Write the right rules. Review them for fairness and legality. Validate your model. Secure access to the journals, and decide what personal data may go in them: today, keep it out of events and refer to it, because a journal is append-only and the redaction scheme is only specified, not built. Vertep makes the rules explicit, enforced and recorded. It does not make them correct.</p>
+  <p>Write the right rules. Review them for fairness and legality. Validate your model. Secure access to the journals, and decide what personal data may go in them. A journal is append-only: fields you mark sensitive can be sealed under a per-subject key and erased by destroying the key, but the marking is a policy you give at run time, the only key store shipped keeps keys in memory, and what you do not mark stays readable. Keeping personal data out of events and referring to it is still the simpler course. Vertep makes the rules explicit, enforced and recorded. It does not make them correct.</p>
 
   <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
 

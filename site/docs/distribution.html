@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -278,9 +279,9 @@ cluster.attach(node.handle());</code></pre>
     </table>
     <p>Whatever the method, a relay mailbox acknowledges a message only after the turn that processed it is in the journal, so a crash means redelivery, never loss.</p>
 
-    <h3 id="keys">Keys, and what a wallet would add</h3>
+    <h3 id="keys">Keys and the agent wallet</h3>
     <p>Every signature, decryption and key agreement goes through the <code>KeyManager</code> trait. Two implementations ship: <code>InMemoryKeyManager</code> and <code>FileKeyManager</code>. An HSM or a cloud KMS fits behind the same trait. An actor's identity (<code>ActorIdentity</code>) holds its DID and the names of its keys, never the keys. Keys rotate without changing the DID. TSP relationships are kept by the OpenWallet Foundation <code>tsp_sdk</code>, and capability grants can arrive as W3C verifiable credentials from a trusted issuer.</p>
-    <p>There is no agent wallet yet. Vertep does not store the credentials an agent holds or present them to others. It speaks no credential-exchange protocol (OpenID4VC, or DIDComm issue and present), offers no selective disclosure, and ships no key store beyond files. That is a candidate for a later milestone, with presentations going through a journaled decision rather than a model's say-so.</p>
+    <p>The credentials an agent holds live in its wallet, the crate <code>vertep-wallet</code> (facade feature <code>wallet</code>). It keeps credentials encrypted at rest, issues, presents and verifies them, and runs every exchange as a journaled role chart whose consent step is a <code>vt:decide</code> state, so a presentation goes through a journaled decision rather than a model's say-so. It speaks the Vertep Credential Exchange over TSP and, with the feature <code>oid4vc</code>, OpenID4VCI and OpenID4VP; SD-JWT VC gives selective disclosure. DIDComm issue and present are not implemented, and no key store beyond files ships. See <a href="wallet.html">Agent wallets</a>.</p>
     <p>Private keys stay behind the <code>KeyManager</code> trait (<code>InMemoryKeyManager</code>, <code>FileKeyManager</code>) and never enter journals, snapshots, the graph or datamodels: a never-forget store could only erase them by destroying the key that encrypts them. Rotating a key keeps the DID, with a grace period for retired keys. <code>Federation::provision</code> creates an actor's keys and DID and binds the DID to a chart type and key on the node.</p>
 
     <h3 id="admission">Authenticated senders and grants</h3>
@@ -316,7 +317,7 @@ SELECT ?grantee ?event ?until WHERE {
       <li><strong>DIDComm v2.</strong> The sender authcrypts (or anoncrypts) to the recipient and wraps one forward message per routing key. The receiving node picks up in batches. A remote mediator is bound through Mediator Coordination 2.0 and Message Pickup 3.0.</li>
       <li><strong>TSP.</strong> The actor's DID maps to a TSP identifier; messages go direct when the endpoint is reachable, or routed through intermediaries, nested so that only the final recipient opens them.</li>
       <li><strong>The TSP mediator.</strong> TSP itself defines no store-and-forward, so Vertep ships one: <code>vt-mediator</code> (crate <code>vertep-tsp-mediator</code>) keeps a durable mailbox per recipient. A client (<code>tsp_mailbox::TspMailboxClient</code>) registers and picks up through a small protocol carried inside TSP. The mediator stores only sealed bytes. It runs as one binary or in Docker, with <code>did = "peer"</code>, <code>"web:&lt;host&gt;"</code> or <code>"webvh:&lt;host&gt;"</code>.</li>
-      <li><strong>Live delivery.</strong> Both kinds of mediator can push messages over a WebSocket instead of waiting for a pickup: Message Pickup 3.0 live delivery for DIDComm (<code>MediatorClient::with_live</code>), and live sessions for the TSP mediator.</li>
+      <li><strong>Live delivery.</strong> Both kinds of mediator can push messages over a WebSocket instead of waiting for a pickup: Message Pickup 3.0 live delivery for DIDComm (<code>MediatorClient::with_live</code>), and live sessions for the TSP mediator. The WebSocket client is <code>WsLiveNetwork</code> in <code>vertep-tsp-mediator</code>; <code>vertep-federation</code> itself has only the <code>LiveNetwork</code> seam and an in-process network, and a WebSocket transport with polling fallback in it is not built yet.</li>
       <li><strong>Acknowledge after the append.</strong> The receiving mailbox acknowledges a message to the relay only after the turn that processed it is durable, or when it drops it as a duplicate. A crash causes redelivery, never loss.</li>
       <li><strong>Transport choice.</strong> The relay outbox tries the DID document's services in preference order, TSP first and then DIDComm by default, with fallback. <code>&lt;send type="tsp"&gt;</code> or <code>type="didcomm"</code> restricts a send to one transport.</li>
       <li><strong>Undeliverable.</strong> Unreachable recipients are retried with backoff (by default 5 attempts, starting at 1 s and doubling up to 60 s). After that the sending chart receives <code>error.communication</code> with the send id and the reason, without ever blocking.</li>
@@ -356,7 +357,7 @@ vt webvh serve --root ./site --addr 127.0.0.1:8080        # behind a TLS proxy</
       <ul>
         <li><strong>Third-party mediators are tested over HTTP only.</strong> Interop with Hyperledger Identus runs in Docker when <code>VERTEP_MEDIATOR_INTEROP=1</code> is set, and is skipped otherwise. The <code>vt-mediator</code> WebSocket client speaks <code>ws://</code> only, so TLS needs a proxy in front.</li>
         <li><strong>The facade's <code>federation</code> feature does not enable <code>did:webvh</code>.</strong> Enable the <code>webvh</code> feature on <code>vertep-federation</code> to resolve it, and use <code>vertep-webvh</code> to write and host it.</li>
-        <li><strong>No agent wallet.</strong> Credentials are used only for capability grants (<a href="#keys">above</a>).</li>
+        <li><strong>The wallet speaks no DIDComm credential protocol.</strong> Its exchanges run over TSP or OpenID4VC (<a href="#keys">above</a>).</li>
         <li><strong>No Lean proofs cover federation.</strong> It is checked by interop and integration tests only.</li>
       </ul>
     </div>

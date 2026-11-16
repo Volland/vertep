@@ -51,7 +51,7 @@
   <main id="main" class="content">
     <p class="breadcrumb"><a href="index.html">Examples</a> · VI</p>
     <h1>Credit decision</h1>
-    <p class="lede">A lender lets a model underwrite consumer loans inside a chart that holds the policy. Three applications are decided, then an auditor opens the same journal with no decider bound and reads what was offered, who chose and why. A scripted decider stands in for the model, so the example needs no network.</p>
+    <p class="lede">A lender lets a model underwrite consumer loans inside a chart that holds the policy. Three applications are decided, then an auditor opens the same journal with no decider bound and reads what was offered, who chose and why, exports a bundle that verifies offline, and replays the decisions under a stricter policy. A scripted decider stands in for the model, so the example needs no network.</p>
     <p>Files: <code>examples/credit-decision/loan.scxml</code>, <code>examples/credit-decision/main.rs</code>, <code>examples/credit-decision/expected-output.txt</code>. All commands run from the repository root.</p>
     <h2 id="the-chart">The chart</h2>
     <p>Three rules hold however the underwriter behaves. A debt-to-income ratio over 50% is declined by rule, before any decider is asked. <code>approve</code> is offered only while it is enabled: ratio at most 43% and amount at most 50,000. An answer that was not offered is refused and the case goes to a person.</p>
@@ -241,7 +241,9 @@
                 AgentInput::Decision {
                     event, annotations, <span class="o">..</span>
                 } <span class="o">=&gt;</span> <span class="fm">format!</span>(
-                    <span class="s">"{event}, rationale {:?}"</span>,
+                    <span class="s">"{event} [{}, offered {:?}], rationale {:?}"</span>,
+                    entry.disposition_or_unknown(),
+                    entry.offered.clone().unwrap_or_default(),
                     annotations.rationale.as_deref().unwrap_or(<span class="s">""</span>)
                 ),
                 other <span class="o">=&gt;</span> <span class="fm">format!</span>(<span class="s">"{other:?}"</span>),
@@ -254,6 +256,41 @@
                 <span class="s">"  as of entry {position}: {:?}"</span>,
                 audit.state_at(id, position)<span class="o">?</span>.configuration
             );
+        }
+    }
+    <span class="c1">// ---- export what an auditor can verify on another machine ---------------------------------
+</span>    <span class="kd">let</span> referred <span class="o">=</span> APPLICATIONS[<span class="mi">1</span>].<span class="mi">0</span>;
+    <span class="kd">let</span> last <span class="o">=</span> audit.journal(referred).len() <span class="k">as</span> <span class="kt">u64</span>;
+    <span class="kd">let</span> bundle <span class="o">=</span> audit.export_bundle(referred, <span class="mi">1</span>, last)<span class="o">?</span>;
+    <span class="kd">let</span> text <span class="o">=</span> bundle.to_json();
+    <span class="kd">let</span> verified <span class="o">=</span> vertep::agent::bundle::Bundle::from_json(<span class="o">&amp;</span>text)<span class="o">?</span>.verify()<span class="o">?</span>;
+    <span class="fm">println!</span>(
+        <span class="s">"bundle of {referred}: {} entries; verified offline: {} explanations recomputed, {} decider calls"</span>,
+        bundle.entries.len(),
+        verified.explanations.len(),
+        verified.decider_calls
+    );
+    <span class="c1">// ---- what would next year's policy have done? ----------------------------------------------
+</span>    <span class="fm">println!</span>();
+    <span class="fm">println!</span>(<span class="s">"the approval ceiling is cut to 15 000; the recorded decisions replayed under it:"</span>);
+    <span class="kd">let</span> stricter <span class="o">=</span> vertep::scxml::read(
+        <span class="o">&amp;</span>LOAN.replace(<span class="s">"ctx.amount &amp;lt;= 50000"</span>, <span class="s">"ctx.amount &amp;lt;= 15000"</span>),
+        <span class="o">&amp;</span>vertep::scxml::ReadOptions::new().with_datamodels(<span class="o">&amp;</span>vertep::scxml::AnyDatamodel),
+    )<span class="o">?</span>
+    .chart;
+    <span class="k">for</span> (id, _, _) <span class="k">in</span> APPLICATIONS {
+        <span class="kd">let</span> r <span class="o">=</span> audit.counterfactual(
+            id,
+            stricter.clone(),
+            vertep::agent::counterfactual::DecisionSource::Recorded,
+        )<span class="o">?</span>;
+        <span class="kd">let</span> last <span class="o">=</span> r.steps.last().expect(<span class="s">"a journal has entries"</span>);
+        <span class="k">match</span> r.first_divergence {
+            <span class="nb">None</span> <span class="o">=&gt;</span> <span class="fm">println!</span>(<span class="s">"{id}  unchanged: {:?}"</span>, last.counterfactual_state),
+            <span class="nb">Some</span>(p) <span class="o">=&gt;</span> <span class="fm">println!</span>(
+                <span class="s">"{id}  differs from entry {p}: {:?} -&gt; {:?}; answers handled differently at {:?}"</span>,
+                last.original_state, last.counterfactual_state, r.changed_dispositions
+            ),
         }
     }
     <span class="fm">println!</span>(
@@ -295,14 +332,14 @@ an auditor opens the same journal; no decider is bound:
 https://example.org/loans/1001  final [&quot;approved&quot;]
   1 start
   2 event     apply
-  3 decision  approve, rationale &quot;stable income, low ratio, small amount&quot;
+  3 decision  approve [accepted, offered [&quot;approve&quot;, &quot;decline&quot;, &quot;refer&quot;]], rationale &quot;stable income, low ratio, small amount&quot;
   as of entry 2: [&quot;underwriting&quot;]
   as of entry 3: [&quot;approved&quot;]
 https://example.org/loans/1002  final [&quot;approved&quot;]
   1 start
   2 event     apply
-  3 decision  approve, rationale &quot;strong credit history&quot;
-  4 decision  approve, rationale &quot;verified employment by phone; collateral accepted&quot;
+  3 decision  approve [refused-not-offered, offered [&quot;decline&quot;, &quot;refer&quot;]], rationale &quot;strong credit history&quot;
+  4 decision  approve [accepted, offered [&quot;approve&quot;, &quot;decline&quot;]], rationale &quot;verified employment by phone; collateral accepted&quot;
   as of entry 2: [&quot;underwriting&quot;]
   as of entry 3: [&quot;officer_review&quot;]
   as of entry 4: [&quot;approved&quot;]
@@ -310,12 +347,20 @@ https://example.org/loans/1003  final [&quot;declined&quot;]
   1 start
   2 event     apply
   as of entry 2: [&quot;declined&quot;]
+bundle of https://example.org/loans/1002: 4 entries; verified offline: 4 explanations recomputed, 0 decider calls
+
+the approval ceiling is cut to 15 000; the recorded decisions replayed under it:
+https://example.org/loans/1001  differs from entry 3: [&quot;approved&quot;] -&gt; [&quot;officer_review&quot;]; answers handled differently at [3]
+https://example.org/loans/1002  unchanged: [&quot;approved&quot;]
+https://example.org/loans/1003  unchanged: [&quot;declined&quot;]
 entries replayed: 9, decider calls: 0</code></pre>
     <ul>
       <li>Loan 1001 was approved by the underwriter, who was offered all three moves.</li>
-      <li>On loan 1002 the amount is over the ceiling, so <code>approve</code> was never offered: the underwriter answered it anyway, the chart refused the answer, and an officer decided. The journal keeps the refused answer with its rationale.</li>
+      <li>On loan 1002 the amount is over the ceiling, so <code>approve</code> was never offered: the underwriter answered it anyway, the chart refused the answer, and an officer decided. The journal keeps the refused answer with its rationale and its disposition, <code>refused-not-offered</code>.</li>
       <li>Loan 1003 was declined by rule. The journal has no decision entry because nobody was asked.</li>
       <li>The audit replays nine entries with zero decider calls, and <code>state_at</code> shows the process as of every entry.</li>
+      <li><code>export_bundle</code> writes loan 1002's journal, its chart and a manifest of digests; <code>Bundle::verify</code> recomputes the four explanations from the JSON alone, with no decider call.</li>
+      <li><code>counterfactual</code> replays the recorded decisions under a chart with the approval ceiling cut to 15&nbsp;000, without touching the journal: loan 1001's approval is no longer offered at entry 3, so it would have gone to an officer.</li>
     </ul>
     <div class="callout"><p>This example shows how a record can explain a decision. It is not a compliance product: what a regulator requires of a lender is a legal question, and the articles <a href="../articles/explainable-by-construction.html">Explainable by construction</a> and <a href="../articles/regulated-decisions.html">Three regulated decisions</a> say what the record does and does not cover.</p></div>
     <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
