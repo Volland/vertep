@@ -33,6 +33,8 @@ pub enum Code {
     Delivery,
     /// The store failed.
     Store,
+    /// An explanation bundle did not verify: an altered entry, a missing chart or a wrong digest.
+    BundleInvalid,
 }
 
 impl Code {
@@ -50,6 +52,7 @@ impl Code {
             Code::Activation => "Activation",
             Code::Delivery => "Delivery",
             Code::Store => "Store",
+            Code::BundleInvalid => "BundleInvalid",
         }
     }
 }

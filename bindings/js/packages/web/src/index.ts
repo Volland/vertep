@@ -32,6 +32,16 @@ export type { ErrorCode, Violation } from "./errors.js";
 export type { BuildRef, EventData } from "./protocol.js";
 export type { JsonValue, Snapshot } from "./snapshot.js";
 export { lockName, takeStoreLock } from "./locks.js";
+export { counterfactualBundle, verifyBundle } from "./audit.js";
+export type {
+  BundleInput,
+  Claim,
+  CounterfactualReport,
+  CounterfactualStep,
+  DecisionRecord,
+  Explanation,
+  VerifiedBundle,
+} from "./audit.js";
 
 /** The version of the package, equal to the Rust crates it was built from. */
 export const VERSION = "0.1.12";

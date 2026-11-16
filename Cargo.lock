@@ -5802,6 +5802,7 @@ name = "vertep-wasm"
 version = "0.1.12"
 dependencies = [
  "futures",
+ "getrandom 0.2.17",
  "getrandom 0.3.4",
  "getrandom 0.4.3",
  "js-sys",
@@ -5813,6 +5814,7 @@ dependencies = [
  "tempfile",
  "tm-wasm",
  "tokio",
+ "vertep-agent",
  "vertep-conformance",
  "vertep-core",
  "vertep-dm-cel",

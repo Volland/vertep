@@ -17,6 +17,7 @@ __all__ = [
     "DeliveryError",
     "StoreError",
     "SystemClosed",
+    "BundleInvalid",
 ]
 
 
@@ -99,6 +100,13 @@ class SystemClosed(VertepError, RuntimeError):
     code = "SystemClosed"
 
 
+class BundleInvalid(VertepError):
+    """An explanation bundle did not verify; the message names the altered entry, the missing
+    chart or the wrong digest."""
+
+    code = "BundleInvalid"
+
+
 _BY_CODE: Dict[str, Type[VertepError]] = {
     cls.code: cls
     for cls in (
@@ -113,6 +121,7 @@ _BY_CODE: Dict[str, Type[VertepError]] = {
         DeliveryError,
         StoreError,
         SystemClosed,
+        BundleInvalid,
     )
 }
 

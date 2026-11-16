@@ -1,7 +1,7 @@
 ---
 type: View
 status: draft
-openspec: [wasm-bindings]
+openspec: [wasm-bindings, decision-records]
 ---
 # Browser
 
@@ -164,7 +164,7 @@ export function createOrderActor(system: ActorSystem, key: string): ActorRef<Ord
 }
 ```
 
-Every rejection is a `VertepError` with a `code` and, for `ChartInvalid`, `violations` with line and column. The eleven codes are in `bindings/js/packages/web/src/errors.ts`: `ChartInvalid`, `StorageUnavailable`, `StoreLocked`, `RequestTimeout`, `WorkerTerminated`, `TransportRefused`, `NotFound`, `InvalidArgument`, `Activation`, `Delivery` and `Store`.
+Every rejection is a `VertepError` with a `code` and, for `ChartInvalid`, `violations` with line and column. The twelve codes are in `bindings/js/packages/web/src/errors.ts`: `ChartInvalid`, `StorageUnavailable`, `StoreLocked`, `RequestTimeout`, `WorkerTerminated`, `TransportRefused`, `NotFound`, `InvalidArgument`, `Activation`, `Delivery`, `Store` and `BundleInvalid`.
 
 `actor.request(event, {timeoutMs})` is the external promise-based ask for callers outside the actor system: it resolves with the chart's `vt:reply` event or rejects with `RequestTimeout`. Charts themselves keep using the non-blocking `vt:request`.
 
@@ -245,4 +245,5 @@ How `vertep-wasm` and `bindings/js` resolved what the M6 spec leaves open, as bu
   - A JavaScript `send` to a server actor resolves on the `ack`, or rejects with `TransportRefused` when the credential is refused.
   - `request` to a server actor is not supported yet.
 - **Conformance.** The IRP suite runs in the test build from documents passed in as text, in Node.js and headless Chrome. The native helper provides the suite and the native verdicts, and the two verdict lists must be equal and pass the allow-list gate.
-- **Size.** The core build is 1,159.7 KB gzip within its 1.2 MB budget. The budget was 600 KB; the SPARQL engine that `GraphStore` needs is 637 KB on its own, so it was raised rather than changing the storage contract, see [[decisions#Separate packages keep the bundle budget]].
+- **Explanation bundles.** `verifyBundle` and `counterfactualBundle` check an agent's explanation bundle offline in the calling thread, with no worker, on the `journal` build (feature `agent`); the core build has no room for `vertep-agent`. Explanations keep `vertep-agent`'s canonical JSON, since the bundle's digests cover that text. A failed check rejects with the twelfth code, `BundleInvalid`. There is no agent host in the bindings, so `explain` on a live actor and exporting bundles stay in Rust.
+- **Size.** The core build is 1,177.7 KB gzip within its 1.2 MB budget and the journal build 2,338.3 KB within 2.5 MB (2026-11-16; about 124 KB of the journal build is the bundle verifier). The core budget was 600 KB; the SPARQL engine that `GraphStore` needs is 637 KB on its own, so it was raised rather than changing the storage contract, see [[decisions#Separate packages keep the bundle budget]].

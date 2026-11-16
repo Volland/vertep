@@ -366,8 +366,23 @@ const b = later.virtual(ORDER_TYPE, "p");   // same state, and it resumes</code>
         <tr><td><code>Activation</code></td><td>An actor could not be activated or replayed, for example an <code>ecmascript</code> chart in a build without boa.</td></tr>
         <tr><td><code>Delivery</code></td><td>A message could not be delivered.</td></tr>
         <tr><td><code>Store</code></td><td>The store failed.</td></tr>
+        <tr><td><code>BundleInvalid</code></td><td>An explanation bundle did not verify (<code>verifyBundle</code>, <code>counterfactualBundle</code>).</td></tr>
       </tbody>
     </table>
+
+    <h2 id="bundles">Auditing an agent's decisions</h2>
+    <p>An agent host (the Rust crate <code>vertep-agent</code>) exports an <em>explanation bundle</em>: one actor's journal up to a position, the chart versions it used addressed by hash, and a manifest of digests. <code>verifyBundle</code> checks one offline, in a page or in Node.js, with no actor system, worker, decider or network: it re-hashes every chart, checks every entry against the manifest, replays the journal and recomputes the explanation of each position, comparing it with its digest. It is the same check as <code>vt verify-bundle</code>.</p>
+    <pre data-lang="TypeScript"><code>import { verifyBundle, VertepError } from "@vertep/web";
+
+const v = await verifyBundle(await (await fetch("/review-bundle.json")).text()); // text, bytes or an object
+console.log(v.actor, v.from, v.to, v.deciderCalls);                              // deciderCalls is always 0
+for (const x of v.explanations) {
+  console.log(x.position, x.input, x.state_before, "->", x.state_after);
+  if (x.decision) console.log("  ", x.decision.disposition, "chose", x.decision.chosen, "of", x.decision.offered);
+}</code></pre>
+    <p>The explanations keep the canonical JSON of <code>vertep-agent</code> (snake_case fields), the text the bundle's digests cover and what <code>vt explain --json</code> prints; the types are <code>Explanation</code>, <code>DecisionRecord</code> and <code>Claim</code>. A decider's rationale is under <code>decision.claim</code>, labelled as an unverified claim. A bundle that does not verify rejects with <code>BundleInvalid</code>, naming the altered entry, the missing chart or the wrong digest. A bundle is self-consistent, not signed: whoever rewrites the entries and the manifest together produces a bundle that verifies.</p>
+    <p><code>counterfactualBundle(bundle, chart)</code> verifies the bundle, then replays its journal under another chart (a source string, or <code>{source, format}</code>) with the decisions the journal recorded, and resolves with where the states and the dispositions would have differed (<code>first_divergence</code>, <code>changed_dispositions</code>, <code>steps</code>). The bundle is only read.</p>
+    <p>Both run in the calling thread on the <code>journal</code> build, loaded on first use; the <code>core</code> build has no room for the agent code in its budget. There is no agent host in the browser yet, so <code>explain</code> on a live actor and exporting bundles are Rust-only.</p>
 
     <h2 id="websocket">Talking to server actors over WebSocket</h2>
     <p>Browser and Node.js actors reach server actors by IRI through a WebSocket transport. It is registered as an SCXML Event I/O Processor, so a chart sends with <code>type="websocket"</code>, and events from the server arrive with <code>_event.origintype</code> set to <code>https://w3id.org/vertep/vt#WebSocketEventProcessor</code>. The server end is in <code>vertep-runtime</code> behind the <code>websocket</code> feature (<code>crates/vertep-runtime/src/websocket/server.rs</code>).</p>
@@ -439,17 +454,17 @@ const system = await createActorSystem({ storage: "memory", datamodel: ecmascrip
 
     <h2 id="size">Bundle size</h2>
     <p>The main package has a size budget, measured with gzip level 9 over the WebAssembly, its glue and the client and worker JavaScript. <code>npm run check:size</code> fails when a build exceeds its budget. The core budget was 600 KB at first; the SPARQL engine that the graph store needs is 637 KB on its own, so the budget was raised to 1.2 MB rather than dropping SPARQL from the browser.</p>
-<pre class="output" data-lang="npm run check:size"><code>core: 1159.7 KB gzip (budget 1200 KB)
-journal: 2198.1 KB gzip (budget 2500 KB)</code></pre>
+<pre class="output" data-lang="npm run check:size"><code>core: 1177.7 KB gzip (budget 1200 KB)
+journal: 2338.3 KB gzip (budget 2500 KB)</code></pre>
     <table>
       <thead><tr><th>Build</th><th>Contents</th><th>Gzip</th><th>Budget</th></tr></thead>
       <tbody>
-        <tr><td><code>core</code></td><td>core, shell, <code>null</code>/CEL/<code>rust</code> datamodels, in-memory store, SPARQL</td><td>1,159.7 KB</td><td>1,200 KB</td></tr>
-        <tr><td><code>journal</code></td><td>the above plus tiramemsu on SQLite</td><td>2,198.1 KB</td><td>2,500 KB</td></tr>
+        <tr><td><code>core</code></td><td>core, shell, <code>null</code>/CEL/<code>rust</code> datamodels, in-memory store, SPARQL</td><td>1,177.7 KB</td><td>1,200 KB</td></tr>
+        <tr><td><code>journal</code></td><td>the above plus tiramemsu on SQLite and the <a href="#bundles">bundle verifier</a></td><td>2,338.3 KB</td><td>2,500 KB</td></tr>
         <tr><td><code>@vertep/dm-ecma</code></td><td>journal build plus boa (WebAssembly file alone)</td><td>3,182.2 KB</td><td>none</td></tr>
       </tbody>
     </table>
-    <p>The journal build is loaded only when a journaled store opens, so a page that uses volatile memory storage downloads the core build alone. The sizes above were measured on the builds in the repository on 2026-11-12; KB means 1,000 bytes.</p>
+    <p>The journal build is loaded only when a journaled store opens, so a page that uses volatile memory storage downloads the core build alone. The core and journal sizes above were measured on the builds in the repository on 2026-11-16, the ECMAScript one on 2026-11-12; KB means 1,000 bytes.</p>
 
     <h2 id="tests">How the bindings are tested</h2>
     <ul>
