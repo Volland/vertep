@@ -1729,6 +1729,17 @@ Each crate and package declares `stable`, `preview` or `experimental` in its man
 
 Rejected: a prose table, which is how the drift began.
 
+## Availability statements carry claims checked against the code
+
+A sentence on the site or in the roadmap that says something is built or not built yet carries a claim naming the code or the spec requirement it is about, and `scripts/docs-audit.py` checks every claim in CI and before each release.
+
+- motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: primary, since: "2026-11-16", note: "M13 Docs Match Behaviour"}
+- motivated_by:: [[decisions#Stability tiers are data in the manifests]] {weight: secondary, since: "2026-11-16", note: "the same generate-or-check pattern"}
+
+A claim is `data-claim="built"` or `data-claim="missing"` with a `data-ref` on any HTML element, or `<!-- claim: built REF -->` on a markdown line. A reference is a path, a `path#Symbol` declared there, or an OpenSpec requirement, which counts as built when some code carries a full `implements` annotation for it. A built claim holds when every reference resolves, a missing claim when none does, and claims that share a reference must agree. A sweep warns about unmarked sentences using phrases such as "not built yet"; reviewed ones that are not about the code go in `scripts/docs-audit-allow.txt`. The first run (2026-11-16) found the decision-records limits stale on five pages and the roadmap: the `@sensitive` marks, replay after erasure and retraction on erasure had shipped in 0.1.12.
+
+Rejected: a one-off manual audit before each release, which is what let those pages go stale a day after the last one, and parsing free prose for claims, which cannot tell a plan from a limit.
+
 ## The toolchain is a script and a container
 
 A pinned `scripts/build-wasm.sh` and a container definition encode the LLVM and `wasm-bindgen` versions and the workaround, and CI builds `@vertep/web` and the wheel from a clean checkout (M13 design D2).

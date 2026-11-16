@@ -34,6 +34,8 @@ jobs:
         with:
           tool: cargo-deny@0.21.0
       - run: scripts/check-supply-chain.sh
+      - name: What the site and the roadmap say is built agrees with the code
+        run: python3 scripts/docs-audit.py --check
       - name: The tag and the workspace carry one version
         if: github.event_name == 'release'
         run: |

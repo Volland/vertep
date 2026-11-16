@@ -99,6 +99,12 @@ jobs:
         run: python3 site/tools/tiers.py --check
       - name: The tier check fails on a missing tier and on a stale table
         run: python3 site/tools/tiers.py --self-test
+      # production-readiness: Docs Match Behaviour. What the site and the roadmap say is built or
+      # not yet built agrees with the code (claims checked by scripts/docs-audit.py).
+      - name: Availability statements agree with the code
+        run: python3 scripts/docs-audit.py --check
+      - name: The docs audit reports a stale claim with the page and the code location
+        run: python3 scripts/docs-audit.py --self-test
 
   differential:
     name: Nightly Rust vs Lean differential

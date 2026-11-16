@@ -172,7 +172,7 @@ EXAMPLES = [
                 "The replay reaches the same states with zero decider calls.",
             ]),
             ("nb", "For a language-model agent with tools and a fork from the journal, see <code>crates/vertep-agent/examples/react_support_agent.rs</code> and <code>fork_from_journal.rs</code>, and the article <a href=\"../articles/deterministic-agents.html\">The goat does not choose the play</a>."),
-            ("warn", "This example uses the in-memory <code>MemoryJournal</code>, the default for tests. For a durable agent journal, give the host a <code>StoreAgentJournal</code> over any <code>JournalStore</code>, such as a tiramemsu file."),
+            ("warn", "This example uses the in-memory <code>MemoryJournal</code>, the default for tests. <span data-claim=\"built\" data-ref=\"crates/vertep-agent/src/journal.rs#StoreAgentJournal; openspec:durable-objects#Durable Agent Journal\">For a durable agent journal, give the host a <code>StoreAgentJournal</code> over any <code>JournalStore</code>, such as a tiramemsu file.</span>"),
         ],
     },
     {

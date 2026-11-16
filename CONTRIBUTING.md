@@ -78,6 +78,30 @@ with the output the pages show (and with `examples/credit-decision/expected-outp
 it on a clean runner (job `ten-minute-path`). If you change a command's output, update the page:
 `python3 site/tools/sync-examples.py` regenerates the example pages from the recorded outputs.
 
+## Docs match behaviour
+
+```sh
+python3 scripts/docs-audit.py --check
+```
+
+checks every sentence on the site and in `tg.md/roadmap.md` that says something is built or not
+built yet against the code. Such a sentence carries a claim: in HTML any element with
+`data-claim="built"` or `data-claim="missing"` and a `data-ref`, in markdown a
+`<!-- claim: missing REF -->` comment on the line. A reference is a path, `path#Symbol` (declared
+in that file or under that directory) or `openspec:<capability>#<Requirement>` (built when code
+carries a full `@tg: implements::` for it); separate several with `;`:
+
+```html
+<span data-claim="built" data-ref="crates/vertep-agent/src/journal.rs#StoreAgentJournal">...</span>
+```
+
+The check fails on a claim the code contradicts and names the page line and the code location;
+it warns about unmarked sentences that use phrases such as "not built yet". Mark those, or, if a
+sentence is not about the code (a registry, a test setup), add it to
+[`scripts/docs-audit-allow.txt`](scripts/docs-audit-allow.txt) with the reason. When you deliver
+something a page calls missing, CI fails until the page says so. CI runs it in the
+`traceability` job, and `release.yml` runs it on the release commit.
+
 ## The supply chain
 
 - **Dependencies.** `cargo deny check` (configuration in [`deny.toml`](deny.toml)) fails on an
