@@ -275,6 +275,12 @@ impl Instance {
         self.applied.contains(hash)
     }
 
+    /// The applied message with this hash; `None` for a message known by its hash only.
+    #[must_use]
+    pub fn message(&self, hash: &str) -> Option<&Message> {
+        self.messages.get(hash)
+    }
+
     /// The hashes in `other_heads` this participant has not applied: what to ask for.
     // @tg: implements:: [[openspec:protocol-spaces#Hash-Linked History]]
     #[must_use]

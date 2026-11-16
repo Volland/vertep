@@ -37,6 +37,8 @@ ws = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures"]
 vertep-core = { workspace = true, features = ["std"] }
 vertep-runtime = { workspace = true }
 vertep-rdf = { workspace = true }
+# Kolyada protocol spaces: the protocol core this crate puts on the wire (`protocol`).
+vertep-kolyada = { workspace = true }
 oxrdf = { workspace = true }
 # The JSON-LD form of the relay envelope, read into RDF for the SHACL shape.
 oxjsonld = { version = "0.2.7", features = ["rdf-12"] }
@@ -67,8 +69,8 @@ tokio-tungstenite = { version = "0.30", default-features = false, features = ["c
 
 [dev-dependencies]
 # `didcomm` and `ws` so the workspace test run covers the DIDComm mailbox and its WebSocket
-# live delivery, not only builds them.
-vertep-federation = { path = ".", features = ["testkit", "didcomm", "ws"] }
+# live delivery, not only builds them; `tsp` so protocol spaces are tested over both relays.
+vertep-federation = { path = ".", features = ["testkit", "didcomm", "ws", "tsp"] }
 vertep-runtime = { workspace = true, features = ["tiramemsu"] }
 vertep-scxml = { workspace = true }
 vertep-dm-ecma = { workspace = true }

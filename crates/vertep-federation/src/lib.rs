@@ -29,6 +29,11 @@
 //!   client network and a server for in-process relays; [`pickup_loop`] keeps an inbox live
 //!   where it can and falls back to polling while a session is down.
 //!
+//! - **Protocol spaces** (M10, Kolyada): [`protocol`] puts `vertep-kolyada` on the wire: the
+//!   agent's join policy, refusing by default, pairwise sealed fan-out of signed protocol
+//!   messages through the relays above, and a participant that journals only what the policy
+//!   and the conformance check accept.
+//!
 //! Identity data is projected into RDF with [`ontology`] and validated by its SHACL shapes. See
 //! `tg.md/views/distribution.md` for the architecture.
 //!
@@ -58,6 +63,7 @@ pub mod outbox;
 #[cfg(feature = "didcomm")]
 pub mod pickup;
 pub mod pickup_loop;
+pub mod protocol;
 pub mod relay;
 pub mod resolver;
 #[cfg(all(feature = "testkit", any(feature = "didcomm", feature = "tsp")))]

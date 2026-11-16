@@ -135,6 +135,7 @@ durable.
 | `admit`, `InboundPolicy`, `AnonymousPolicy`, `VerifiedOrigin` | the inbound admission pipeline run before a journal append |
 | `RelayEnvelope`, `RelayProtocol`, `RelayOutbox`, `RelayInbox`, `RetryPolicy` | the protocol-neutral envelope, the protocol seam, outbound transport choice with fallback and retries, inbound relay mailboxes |
 | `ontology` | the `vt-id:` identity ontology module and its SHACL shapes |
+| `protocol::{JoinPolicy, JoinRule, SpaceTransport, SpaceMember, LocalChannel, ActorSigner, ResolverVerifier}` | Kolyada protocol spaces on the wire: the join policy (refuses every genesis by default), pairwise sealed fan-out through the relays, and a participant that journals only what the policy and the conformance check accept |
 
 ## Known gaps
 
@@ -145,6 +146,8 @@ durable.
   when `VERTEP_MEDIATOR_INTEROP=1` is set.
 - The `vertep` facade's `federation` feature does not enable `did:webvh`.
 - No Lean proofs cover federation; it is checked by interop and integration tests.
+- Protocol spaces are not yet bound to an actor's mailbox and send path: a `SpaceMember` keeps its
+  own journal, and fan-out sends at once without the outbox's retry queue.
 
 ## Documentation
 
