@@ -493,4 +493,6 @@ flowchart LR
     CH -- "accepts iff" --> S
 ```
 
+Record fields may carry data-protection marks (`@sensitive`, `@subject`, `@retain(P30D)`); JSON Schema carries them as `x-vt-*` annotations and SHACL as `vt:sensitive`, `vt:dataSubject` and `vt:retention` on the property shape, without changing either verdict (decision "Sensitive fields are marks on record fields").
+
 The agreement property for each projection P is `check(T, v) = P.accepts(P(T), encode(v))`, where `encode` is the canonical value encoding: tagged unions as `{"tag", "value"}`, decimals as strings, datetimes normalized to UTC and written with a `Z` suffix (`crates/vertep-core/src/types/prim.rs`). `Types Survive Every Surface` makes the round trip SCXML, YAML, IR and RDF type-preserving, with the same chart version IRI at the end.

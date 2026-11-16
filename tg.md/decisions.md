@@ -440,6 +440,16 @@ A named type's IRI is `urn:vertep:type:sha256:<hex>` over the RDFC-1.0 canonical
 
 Source order does not change a type's IRI, a type's IRI covers every type it uses, and mutually recursive types are hashed as a group. The name is part of the identity.
 
+## Sensitive fields are marks on record fields
+
+The type language marks personal data on record fields with `@sensitive`, `@subject` and `@retain(<ISO 8601 duration>)`; marks are annotations that never change which values a type accepts (M12 task 7.1).
+
+- motivated_by:: [[decisions#One IR type language]] {weight: primary, since: "2026-11-16"}
+- motivated_by:: [[decisions#Type IRIs hash the definition graph]] {weight: secondary, note: "marks are definition triples, so marking a field is a new type IRI and chart version; unmarked types keep theirs"}
+- motivated_by:: [[decisions#Type projections must agree with the checker]] {weight: secondary, note: "x-vt-* JSON Schema keywords and vt:sensitive, vt:dataSubject, vt:retention on property shapes are annotations"}
+
+The marks sit on `Field::marks` rather than as a type constructor, so assignability, checking and the Lean model are untouched. `@` was not a token before, so no existing chart changes meaning; a prefix keyword such as `sensitive string` would have collided with one-variant unions. `SealPolicy::from_chart` in `vertep-agent` derives the journal's seal policy from event payload marks and refuses marks a JSON pointer cannot reach (inside a list, a union variant or a recursive type) or a sensitive field with no subject in scope, so a host never journals in plaintext a field its chart marks sensitive.
+
 ## Type vocabulary is its own ontology module
 
 Type terms live in `vt-types.ttl` next to the chart module, so the chart module keeps exactly one class per IR node kind and a typed chart's projection adds type definitions and shapes under their type IRIs.

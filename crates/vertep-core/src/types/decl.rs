@@ -7,7 +7,7 @@ use core::fmt;
 
 use crate::ir::Span;
 use crate::types::syntax::{is_ident, is_reserved, write_declarations};
-use crate::types::ty::Type;
+use crate::types::ty::{Primitive, Type};
 
 /// A named type declaration: `type Order = { id: string };`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -71,6 +71,15 @@ pub enum DeclErrorKind {
     DuplicateTag(String),
     /// A union has no variants.
     EmptyUnion,
+    /// A field's data-protection marks do not fit together: `@retain` without `@sensitive`, a
+    /// field both `@subject` and `@sensitive`, two `@subject` fields in one record, or a
+    /// `@subject` field that is not a `string` or an `iri`.
+    BadMark {
+        /// The field.
+        field: String,
+        /// What is wrong.
+        problem: String,
+    },
     /// Named types refer to each other without a list or optional in between: the types
     /// would be infinitely large. The cycle is listed from its first declared member back to it.
     UnguardedCycle(Vec<String>),
@@ -128,6 +137,9 @@ impl fmt::Display for DeclError {
                 )
             }
             DeclErrorKind::EmptyUnion => write!(f, "in `{}`: a union needs a variant", self.decl),
+            DeclErrorKind::BadMark { field, problem } => {
+                write!(f, "in `{}`: field `{field}`: {problem}", self.decl)
+            }
             DeclErrorKind::UnguardedCycle(c) => write!(
                 f,
                 "type `{}` is infinitely large: cycle {} does not pass through a list or optional",
@@ -231,6 +243,12 @@ impl Declarations {
                     if fields[..i].iter().any(|g| g.name == f.name) {
                         push(DeclErrorKind::DuplicateField(f.name.clone()));
                     }
+                    if let Some(problem) = self.mark_problem(fields, i) {
+                        push(DeclErrorKind::BadMark {
+                            field: f.name.clone(),
+                            problem,
+                        });
+                    }
                 }
                 for f in fields {
                     self.structure(&f.ty, decl, span, out);
@@ -252,6 +270,41 @@ impl Declarations {
             Type::List(t) | Type::Optional(t) => self.structure(t, decl, span, out),
             Type::Primitive(_) | Type::Value | Type::Named(_) => {}
         }
+    }
+
+    /// What is wrong with the marks of `fields[i]`, if anything.
+    fn mark_problem(&self, fields: &[crate::types::ty::Field], i: usize) -> Option<String> {
+        let m = &fields[i].marks;
+        if m.retain_ms.is_some() && !m.sensitive {
+            return Some("`@retain` applies to a `@sensitive` field".to_string());
+        }
+        if !m.subject {
+            return None;
+        }
+        if m.sensitive {
+            return Some(
+                "a `@subject` field names the key that seals the others and cannot be `@sensitive`"
+                    .to_string(),
+            );
+        }
+        if fields[..i].iter().any(|g| g.marks.subject) {
+            return Some("a record has at most one `@subject` field".to_string());
+        }
+        let mut t = &fields[i].ty;
+        for _ in 0..=self.types.len() {
+            match t {
+                Type::Named(n) => match self.lookup(n) {
+                    Some(d) => t = d,
+                    None => return None,
+                },
+                Type::Primitive(Primitive::String | Primitive::Iri) => return None,
+                _ => break,
+            }
+        }
+        Some(format!(
+            "a `@subject` field is a `string` or an `iri`, not `{}`",
+            fields[i].ty
+        ))
     }
 
     /// Validate the block and report every error: duplicate or reserved type names, unknown

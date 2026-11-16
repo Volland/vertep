@@ -623,6 +623,184 @@ fn type_change_changes_the_chart_version() {
     assert!(declared(&untyped).is_empty());
 }
 
+// ------------------------------------------------------------- sensitive field marks
+
+/// The example of the type language docs: an event whose payload names its data subject and
+/// marks the e-mail sensitive with a 30-day horizon, plus a named type with a sensitive field.
+const MARKED: &str = "type Contact = { @sensitive phone: string }; \
+                      event applied: { @subject who: string, @sensitive @retain(P30D) email: string, \
+                      amount: decimal, contact: Contact };";
+
+// @tg: verifies:: [[openspec:journal-redaction#Sensitive Fields#Marking is projected]] {level: unit}
+#[test]
+fn marking_is_projected_to_json_schema() {
+    let d = decls(MARKED);
+    let payload = d.event("applied").and_then(|e| e.payload.clone()).unwrap();
+    let s = json_schema(&d, &payload).unwrap();
+    let props = &s["properties"];
+    assert_eq!(props["who"]["x-vt-subject"], json!(true));
+    assert_eq!(props["who"]["type"], json!("string"));
+    assert_eq!(props["email"]["x-vt-sensitive"], json!(true));
+    assert_eq!(props["email"]["x-vt-retention"], json!("P30D"));
+    assert!(props["amount"].get("x-vt-sensitive").is_none());
+    // A marked reference keeps its $ref inside allOf; the named type's own fields are marked.
+    assert!(props["contact"].get("x-vt-sensitive").is_none());
+    assert_eq!(
+        s["$defs"]["Contact"]["properties"]["phone"]["x-vt-sensitive"],
+        json!(true)
+    );
+    let r = decls("type C = { n: int }; event e: { @subject w: string, @sensitive c: C };");
+    let rs = json_schema(&r, &r.events[0].payload.clone().unwrap()).unwrap();
+    assert_eq!(
+        rs["properties"]["c"],
+        json!({ "allOf": [{ "$ref": "#/$defs/C" }], "x-vt-sensitive": true })
+    );
+    // The annotations accept what the unmarked schema accepts.
+    let plain = decls(
+        "type Contact = { phone: string }; \
+         event applied: { who: string, email: string, amount: decimal, contact: Contact };",
+    );
+    let unmarked = json_schema(&plain, &plain.events[0].payload.clone().unwrap()).unwrap();
+    for doc in [
+        json!({ "who": "u1", "email": "a@b.c", "amount": 3, "contact": { "phone": "1" } }),
+        json!({ "who": "u1", "email": 4, "amount": 3, "contact": { "phone": "1" } }),
+    ] {
+        assert_eq!(json_valid(&s, &doc), json_valid(&unmarked, &doc), "{doc}");
+    }
+}
+
+// @tg: verifies:: [[openspec:journal-redaction#Sensitive Fields#Marking is projected]] {level: unit}
+#[test]
+fn marking_is_projected_to_shacl() {
+    use vertep_rdf::types::TypeShapes;
+
+    let d = decls(MARKED);
+    let iris = TypeIris::of(&d);
+    let mut shapes = TypeShapes::new(&d, &iris);
+    shapes.named_types();
+    let payload = d.event("applied").and_then(|e| e.payload.clone()).unwrap();
+    shapes.shape_at("urn:example:chart", "event.applied", &payload);
+    let g = shapes.into_graph();
+    let path = NamedNodeRef::new_unchecked("http://www.w3.org/ns/shacl#path");
+    // The property shape whose sh:path is the field's predicate, and its marks.
+    let marks_of = |field: &str| -> Vec<(String, String)> {
+        let pred = NamedNode::new_unchecked(format!("{}{field}", vt::FIELD_NS));
+        let shape = g
+            .subjects_for_predicate_object(path, &pred)
+            .next()
+            .unwrap_or_else(|| panic!("no property shape for {field}"));
+        let mut out: Vec<(String, String)> = [vt::SENSITIVE, vt::DATA_SUBJECT, vt::RETENTION]
+            .into_iter()
+            .flat_map(|p| {
+                g.objects_for_subject_predicate(shape, p)
+                    .map(move |o| (p.as_str().to_owned(), o.to_string()))
+            })
+            .collect();
+        out.sort();
+        out
+    };
+    let sensitive = vt::SENSITIVE.as_str().to_owned();
+    let t = "\"true\"^^<http://www.w3.org/2001/XMLSchema#boolean>".to_owned();
+    assert_eq!(
+        marks_of("email"),
+        vec![
+            (
+                vt::RETENTION.as_str().to_owned(),
+                "\"P30D\"^^<http://www.w3.org/2001/XMLSchema#duration>".to_owned()
+            ),
+            (sensitive.clone(), t.clone()),
+        ]
+    );
+    assert_eq!(
+        marks_of("who"),
+        vec![(vt::DATA_SUBJECT.as_str().to_owned(), t.clone())]
+    );
+    assert_eq!(marks_of("phone"), vec![(sensitive, t)]);
+    assert!(marks_of("amount").is_empty());
+
+    // The marks are annotations: the shapes and the schema still give the checker's verdict,
+    // on valid values and on near misses.
+    for seed in 1..40u64 {
+        let mut r = Rng(seed * 7919);
+        let mut v = valid(&d, &payload, &mut r, 3);
+        let (c, j, sh) = verdicts(&d, &payload, &v);
+        assert!(c && j && sh, "valid value rejected: {v:?}");
+        mutate(&mut v, &mut r);
+        let (c, j, sh) = verdicts(&d, &payload, &v);
+        assert_eq!((c, c), (j, sh), "verdicts differ on {v:?}");
+    }
+}
+
+/// Datamodel fields are marked through the record type of a `<data>` item; the context schema
+/// and the context shape carry the marks.
+// @tg: verifies:: [[openspec:journal-redaction#Sensitive Fields#Marking is projected]] {level: unit}
+#[test]
+fn datamodel_marks_are_projected() {
+    use vertep_core::types::{BasicTyper, check_chart};
+    use vertep_rdf::types::{ChartSchemas, TypeShapes};
+
+    let c = chart(
+        "type Applicant = { @subject id: string, @sensitive email: string };",
+        r#"<datamodel><data id="applicant" vt:type="Applicant"/><data id="note" vt:type="{ @subject by: string, @sensitive text: string }"/></datamodel>"#,
+    );
+    let types = check_chart(&c, &BasicTyper::for_datamodel("null")).expect("typed chart");
+    let s = ChartSchemas::of(&types).unwrap().context;
+    assert_eq!(
+        s["properties"]["note"]["properties"]["text"]["x-vt-sensitive"],
+        json!(true)
+    );
+    assert_eq!(
+        s["$defs"]["Applicant"]["properties"]["email"]["x-vt-sensitive"],
+        json!(true)
+    );
+    let iris = TypeIris::of(&types.declarations);
+    let mut shapes = TypeShapes::new(&types.declarations, &iris);
+    shapes.named_types();
+    shapes.shape_at("urn:example:chart", "context", &types.context_type());
+    let g = shapes.into_graph();
+    let path = NamedNodeRef::new_unchecked("http://www.w3.org/ns/shacl#path");
+    for field in ["text", "email"] {
+        let pred = NamedNode::new_unchecked(format!("{}{field}", vt::FIELD_NS));
+        let shape = g.subjects_for_predicate_object(path, &pred).next().unwrap();
+        assert!(
+            g.object_for_subject_predicate(shape, vt::SENSITIVE)
+                .is_some(),
+            "{field}"
+        );
+    }
+}
+
+/// Marks are part of a named type's definition: marking a field changes its IRI and its
+/// published definition says so; an unmarked type keeps its IRI.
+#[test]
+fn marks_are_part_of_type_identity() {
+    let plain = iri_of("type C = { email: string, who: string };", "C");
+    let marked = iri_of(
+        "type C = { @sensitive email: string, @subject who: string };",
+        "C",
+    );
+    let longer = iri_of(
+        "type C = { @sensitive @retain(P30D) email: string, @subject who: string };",
+        "C",
+    );
+    assert_ne!(plain, marked);
+    assert_ne!(marked, longer);
+    let d = decls("type C = { @sensitive @retain(P30D) email: string, @subject who: string };");
+    let iris = TypeIris::of(&d);
+    let defs = iris.definitions(&d);
+    assert_eq!(defs.triples_for_predicate(vt::SENSITIVE).count(), 1);
+    assert_eq!(defs.triples_for_predicate(vt::DATA_SUBJECT).count(), 1);
+    assert_eq!(defs.triples_for_predicate(vt::RETENTION).count(), 1);
+    let u = decls("type C = { email: string, who: string };");
+    assert_eq!(
+        TypeIris::of(&u)
+            .definitions(&u)
+            .triples_for_predicate(vt::SENSITIVE)
+            .count(),
+        0
+    );
+}
+
 // ------------------------------------------------------------------------- ontology
 
 #[test]
@@ -630,7 +808,7 @@ fn type_terms_are_declared_in_the_type_module() {
     let onto = types_ontology();
     let label = NamedNodeRef::new_unchecked("http://www.w3.org/2000/01/rdf-schema#label");
     let c = chart(
-        "type A = { a: list<optional<int>>, b: B, v: value, d: datetime, i: iri, x: bool, s: string, n: decimal }; type B = X { y: A } | Z;",
+        "type A = { a: list<optional<int>>, b: B, v: value, d: datetime, i: iri, x: bool, @subject s: string, @sensitive @retain(P1D) n: decimal }; type B = X { y: A } | Z;",
         "",
     );
     let g: Graph = project(&c).graph;

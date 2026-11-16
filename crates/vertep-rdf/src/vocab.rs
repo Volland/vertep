@@ -467,6 +467,15 @@ vt_terms! {
     LIST_MEMBER = "listMember";
     /// `vt:Null`: the RDF encoding of an absent (`null`) value.
     NULL = "Null";
+    /// `vt:sensitive`: on a record field (and its SHACL property shape), `true` when the field
+    /// is marked `@sensitive`: personal data, sealed in journals.
+    SENSITIVE = "sensitive";
+    /// `vt:dataSubject`: on a record field (and its property shape), `true` when the field is
+    /// marked `@subject`: it names the data subject of the sensitive fields in scope.
+    DATA_SUBJECT = "dataSubject";
+    /// `vt:retention`: on a record field (and its property shape), the `xsd:duration` of a
+    /// sensitive field's retention horizon (`@retain(P30D)`).
+    RETENTION = "retention";
 }
 
 /// The namespace of record field predicates in the RDF encoding of values: field `name` is
@@ -476,6 +485,8 @@ pub const FIELD_NS: &str = "https://w3id.org/vertep/field#";
 pub const XSD_LONG: &str = "http://www.w3.org/2001/XMLSchema#long";
 /// `xsd:decimal`, the datatype of non-integral and out-of-range numbers.
 pub const XSD_DECIMAL: &str = "http://www.w3.org/2001/XMLSchema#decimal";
+/// `xsd:duration`, the datatype of retention horizons.
+pub const XSD_DURATION: &str = "http://www.w3.org/2001/XMLSchema#duration";
 /// `xsd:double`, the datatype of non-finite numbers.
 pub const XSD_DOUBLE: &str = "http://www.w3.org/2001/XMLSchema#double";
 /// `rdf:value`.

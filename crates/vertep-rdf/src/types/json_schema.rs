@@ -17,12 +17,16 @@
 //! | `optional<T>` | `anyOf` `{"type": "null"}` and `T` |
 //! | `list<T>` | `{"type": "array", "items": T}` |
 //! | record | a closed object: `properties`, `required` (fields that are not optional or `value`), `additionalProperties: false` |
+//! | marked field | the property schema also carries the annotations `x-vt-sensitive: true`, `x-vt-subject: true` and `x-vt-retention: "P30D"` (wrapped in `allOf` when the field's schema is a `$ref`) |
+//!
+//! The `x-vt-*` keywords are annotations: validators ignore unknown keywords, so a marked type
+//! accepts the same documents as the unmarked one.
 //! | union | `anyOf` one closed object per variant with `tag` `const` and its `value` |
 
 use std::collections::BTreeMap;
 
 use serde_json::{Map, Value as Json, json};
-use vertep_core::types::{ChartTypes, Declarations, Primitive, Type};
+use vertep_core::types::{ChartTypes, Declarations, FieldMarks, Primitive, Type};
 
 use super::shapes::{DATETIME_PATTERN, DECIMAL_PATTERN, IRI_PATTERN, may_be_absent};
 
@@ -102,7 +106,7 @@ pub fn schema(decls: &Declarations, ty: &Type) -> Json {
             let mut props = Map::new();
             let mut required = Vec::new();
             for f in fields {
-                props.insert(f.name.clone(), schema(decls, &f.ty));
+                props.insert(f.name.clone(), marked(schema(decls, &f.ty), &f.marks));
                 if !may_be_absent(decls, &f.ty) {
                     required.push(Json::String(f.name.clone()));
                 }
@@ -138,6 +142,40 @@ pub fn schema(decls: &Declarations, ty: &Type) -> Json {
             json!({ "anyOf": alts })
         }
     }
+}
+
+/// The annotation keyword for `@sensitive`.
+pub const X_SENSITIVE: &str = "x-vt-sensitive";
+/// The annotation keyword for `@subject`.
+pub const X_SUBJECT: &str = "x-vt-subject";
+/// The annotation keyword for `@retain(...)`, an ISO 8601 duration.
+pub const X_RETENTION: &str = "x-vt-retention";
+
+/// `schema` with the annotations of a field's marks. A `$ref` schema is wrapped in `allOf` so
+/// the annotations sit beside the reference without changing what it accepts.
+// @tg: implements:: [[openspec:journal-redaction#Sensitive Fields]] {confidence: partial}
+fn marked(schema: Json, marks: &FieldMarks) -> Json {
+    if marks.is_empty() {
+        return schema;
+    }
+    let mut m = match schema {
+        Json::Object(m) if !m.contains_key("$ref") => m,
+        other => {
+            let mut m = Map::new();
+            m.insert("allOf".into(), json!([other]));
+            m
+        }
+    };
+    if marks.sensitive {
+        m.insert(X_SENSITIVE.into(), Json::Bool(true));
+    }
+    if marks.subject {
+        m.insert(X_SUBJECT.into(), Json::Bool(true));
+    }
+    if let Some(r) = marks.retention() {
+        m.insert(X_RETENTION.into(), Json::String(r));
+    }
+    Json::Object(m)
 }
 
 /// The JSON Schema documents of a chart: one for the context record and one per declared

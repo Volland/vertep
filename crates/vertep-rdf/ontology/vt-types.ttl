@@ -168,6 +168,24 @@ vt:someType
     rdfs:comment "The type of the value of an optional type when it is present."@en ;
     rdfs:domain vt:OptionalType .
 
+vt:sensitive
+    a owl:DatatypeProperty ;
+    rdfs:label "sensitive"@en ;
+    rdfs:comment "True on a record field marked @sensitive, and on the SHACL property shape of that field: the field holds personal data, which a journal seals under the data key of its subject. Part of the type's identity; it does not change which values conform."@en ;
+    rdfs:range xsd:boolean .
+
+vt:dataSubject
+    a owl:DatatypeProperty ;
+    rdfs:label "data subject"@en ;
+    rdfs:comment "True on a record field marked @subject, and on its SHACL property shape: the string field naming the data subject whose key seals the sensitive fields of its record and of the records nested in it."@en ;
+    rdfs:range xsd:boolean .
+
+vt:retention
+    a owl:DatatypeProperty ;
+    rdfs:label "retention"@en ;
+    rdfs:comment "On a sensitive record field marked @retain, and on its SHACL property shape: how long after the journal entry the field may be kept, as an xsd:duration of days, hours, minutes and seconds. When it passes, the subject is erased with the reason retention."@en ;
+    rdfs:range xsd:duration .
+
 vt:listMember
     a rdf:Property ;
     rdfs:label "list member"@en ;

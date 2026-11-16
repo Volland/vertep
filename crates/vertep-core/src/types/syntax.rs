@@ -8,11 +8,19 @@
 //! variant   := tag atom?                           tag is an identifier or a "quoted string"
 //! atom      := bool | int | decimal | string | datetime | iri | value
 //!            | list '<' type '>' | optional '<' type '>'
-//!            | '{' (name ':' type (',' name ':' type)* ','?)? '}'
+//!            | '{' (field (',' field)* ','?)? '}'
 //!            | '(' type ')'
 //!            | Name                                a named type
+//! field     := mark* name ':' type
+//! mark      := '@sensitive' | '@subject' | '@retain' '(' duration ')'
 //! decls     := (('type' Name '=' type | 'event' event-name (':' type)?) ';')*
 //! ```
+//!
+//! Marks ([`crate::types::FieldMarks`]) annotate a record field for data protection: `@sensitive`
+//! (personal data, sealed in journals), `@subject` (the string field naming the data subject)
+//! and `@retain(P30D)` (the retention horizon of a sensitive field, an ISO 8601 duration of
+//! weeks, days, hours, minutes and seconds). Each mark is written at most once per field, in
+//! any order; the printer writes them in the order `@subject`, `@sensitive`, `@retain`.
 //!
 //! `#` starts a comment that runs to the end of the line. Identifiers are
 //! `[A-Za-z_][A-Za-z0-9_]*`; field names and tags that are not identifiers are written as
@@ -29,7 +37,7 @@ use core::fmt;
 
 use crate::ir::Span;
 use crate::types::decl::{Declarations, EventDecl, TypeDecl};
-use crate::types::ty::{Field, Primitive, Type, Variant};
+use crate::types::ty::{Field, FieldMarks, Primitive, Type, Variant, parse_duration};
 
 /// A syntax error in a type expression or declaration block.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -191,7 +199,7 @@ impl<'a> Parser<'a> {
             let s = self.string()?;
             return Ok((Tok::Str(s), start, self.pos));
         }
-        if "{}<>()|,:;=".contains(c) {
+        if "{}<>()|,:;=@".contains(c) {
             self.pos += 1;
             return Ok((Tok::Punct(c), start, self.pos));
         }
@@ -434,6 +442,7 @@ impl<'a> Parser<'a> {
             if self.eat('}')? {
                 return Ok(Type::Record(fields));
             }
+            let marks = self.marks()?;
             let at = self.offset();
             let name = match self.next()? {
                 Tok::Ident(n) | Tok::Str(n) => n,
@@ -441,12 +450,65 @@ impl<'a> Parser<'a> {
             };
             self.expect(':')?;
             let ty = self.ty()?;
-            fields.push(Field { name, ty });
+            fields.push(Field { name, ty, marks });
             if !self.eat(',')? {
                 self.expect('}')?;
                 return Ok(Type::Record(fields));
             }
         }
+    }
+}
+
+impl Parser<'_> {
+    /// The marks before a field name: `@sensitive`, `@subject`, `@retain(<duration>)`.
+    // @tg: implements:: [[openspec:journal-redaction#Sensitive Fields]] {confidence: partial}
+    fn marks(&mut self) -> Result<FieldMarks, SyntaxError> {
+        let mut marks = FieldMarks::default();
+        while self.peek()? == Tok::Punct('@') {
+            self.bump();
+            let at = self.offset();
+            let name = match self.next()? {
+                Tok::Ident(n) => n,
+                t => {
+                    return Err(self.err_at(
+                        at,
+                        alloc::format!("expected a mark after `@`, found {}", describe(&t)),
+                    ));
+                }
+            };
+            let dup = match name.as_str() {
+                "sensitive" => core::mem::replace(&mut marks.sensitive, true),
+                "subject" => core::mem::replace(&mut marks.subject, true),
+                "retain" => {
+                    self.expect('(')?;
+                    // The duration is read raw, up to the closing parenthesis.
+                    debug_assert!(self.peeked.is_none());
+                    self.skip_ws();
+                    let dat = self.pos;
+                    let rest = &self.src[self.pos..];
+                    let len = rest
+                        .find(|c: char| c.is_whitespace() || c == ')')
+                        .unwrap_or(rest.len());
+                    let text = &rest[..len];
+                    self.pos += len;
+                    let ms = parse_duration(text).map_err(|m| self.err_at(dat, m))?;
+                    self.expect(')')?;
+                    marks.retain_ms.replace(ms).is_some()
+                }
+                other => {
+                    return Err(self.err_at(
+                        at,
+                        alloc::format!(
+                            "unknown mark `@{other}`; the marks are @sensitive, @subject and @retain"
+                        ),
+                    ));
+                }
+            };
+            if dup {
+                return Err(self.err_at(at, alloc::format!("mark `@{name}` is written twice")));
+            }
+        }
+        Ok(marks)
     }
 }
 
@@ -483,6 +545,19 @@ fn write_field_name(name: &str, f: &mut dyn fmt::Write) -> fmt::Result {
     } else {
         write_quoted(name, f)
     }
+}
+
+fn write_marks(m: &FieldMarks, f: &mut dyn fmt::Write) -> fmt::Result {
+    if m.subject {
+        f.write_str("@subject ")?;
+    }
+    if m.sensitive {
+        f.write_str("@sensitive ")?;
+    }
+    if let Some(r) = m.retention() {
+        write!(f, "@retain({r}) ")?;
+    }
+    Ok(())
 }
 
 fn write_tag(tag: &str, f: &mut dyn fmt::Write) -> fmt::Result {
@@ -545,6 +620,7 @@ pub(crate) fn write_type(t: &Type, f: &mut dyn fmt::Write) -> fmt::Result {
                 if i > 0 {
                     f.write_str(", ")?;
                 }
+                write_marks(&fd.marks, f)?;
                 write_field_name(&fd.name, f)?;
                 f.write_str(": ")?;
                 write_type(&fd.ty, f)?;

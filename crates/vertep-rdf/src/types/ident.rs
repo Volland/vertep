@@ -9,10 +9,13 @@
 //! |---|---|
 //! | primitive, `value` | `vt:BoolType`, `vt:IntType`, ..., `vt:ValueType` |
 //! | named type `M` | the type IRI of `M` |
-//! | record | `<B#p>` `a vt:RecordType`, one `vt:typeField <B#p.f.name>` per field with `vt:fieldName` and `vt:fieldType` |
+//! | record | `<B#p>` `a vt:RecordType`, one `vt:typeField <B#p.f.name>` per field with `vt:fieldName` and `vt:fieldType`, and the field's marks: `vt:sensitive true`, `vt:dataSubject true`, `vt:retention "P30D"^^xsd:duration` |
 //! | union | `<B#p>` `a vt:UnionType`, one `vt:typeVariant <B#p.v.tag>` per variant with `vt:variantTag` and optional `vt:payloadType` |
 //! | list | `<B#p>` `a vt:ListType`, `vt:itemType` |
 //! | optional | `<B#p>` `a vt:OptionalType`, `vt:someType` |
+//!
+//! A field without marks has no mark triples, so marking a field changes the type's IRI and
+//! unmarked types keep theirs.
 //!
 //! where `p` is the path from the definition root (`t`), extended with `.f.<name>`,
 //! `.v.<tag>`, `.l` and `.o` (names percent-encoded). The graph has no blank nodes and fields
@@ -35,7 +38,7 @@ use std::fmt;
 
 use oxrdf::{Graph, Literal, NamedNode, NamedNodeRef, Term, TripleRef};
 use sha2::{Digest, Sha256};
-use vertep_core::types::{Declarations, Primitive, Type};
+use vertep_core::types::{Declarations, FieldMarks, Primitive, Type};
 
 use crate::canon;
 use crate::iri::{node_iri, percent_encode_into};
@@ -398,6 +401,9 @@ fn type_term(
                 ));
                 let t = type_term(g, base, &format!("{fpath}.t"), &f.ty, resolve);
                 g.insert(TripleRef::new(&fnode, vt::FIELD_TYPE, &t));
+                for (p, o) in mark_triples(&f.marks) {
+                    g.insert(TripleRef::new(&fnode, p, &o));
+                }
             }
             n.into()
         }
@@ -437,6 +443,26 @@ fn type_term(
             n.into()
         }
     }
+}
+
+/// The predicate-object pairs of a field's data-protection marks: `vt:sensitive true`,
+/// `vt:dataSubject true` and `vt:retention "<duration>"^^xsd:duration`, each only when set.
+// @tg: implements:: [[openspec:journal-redaction#Sensitive Fields]] {confidence: partial}
+pub fn mark_triples(m: &FieldMarks) -> Vec<(NamedNodeRef<'static>, Literal)> {
+    let mut out = Vec::new();
+    if m.sensitive {
+        out.push((vt::SENSITIVE, Literal::from(true)));
+    }
+    if m.subject {
+        out.push((vt::DATA_SUBJECT, Literal::from(true)));
+    }
+    if let Some(r) = m.retention() {
+        out.push((
+            vt::RETENTION,
+            Literal::new_typed_literal(r, NamedNodeRef::new_unchecked(vt::XSD_DURATION)),
+        ));
+    }
+    out
 }
 
 /// `<path>.<kind>.<percent-encoded name>`.

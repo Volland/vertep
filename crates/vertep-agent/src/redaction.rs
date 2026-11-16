@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value as Json, json};
 
 use vertep_core::datamodel::Value;
+use vertep_core::types::{Declarations, Type};
 
 use crate::journal::{AgentInput, AgentJournal, JournalEntry, JournalError};
 
@@ -111,6 +112,167 @@ pub struct SensitiveField {
 pub struct SealPolicy {
     /// The marked fields.
     pub fields: Vec<SensitiveField>,
+}
+
+impl SealPolicy {
+    /// The policy a chart's types declare: one [`SensitiveField`] per field marked `@sensitive`
+    /// in a declared event's payload, with the nearest `@subject` field of an enclosing record
+    /// as its subject and its `@retain` horizon as its retention.
+    ///
+    /// A chart without a `vt:types` block declares an empty policy. Fails, listing every
+    /// problem, when the block does not parse or validate, when a sensitive field has no subject
+    /// in scope, or when a mark sits where a JSON pointer cannot reach one field of every
+    /// value: inside a list, a union variant or a recursive type. Failing keeps a host from
+    /// journaling a field in plaintext that its chart marks sensitive.
+    // @tg: implements:: [[openspec:journal-redaction#Sensitive Fields]] {confidence: partial}
+    pub fn from_chart(chart: &vertep_core::ir::Chart) -> Result<SealPolicy, Vec<String>> {
+        match vertep_core::types::chart::declarations(chart) {
+            None => Ok(SealPolicy::default()),
+            Some(Err(e)) => Err(vec![format!("vt:types: {e}")]),
+            Some(Ok(d)) => SealPolicy::from_declarations(&d),
+        }
+    }
+
+    /// The policy of a declaration block; see [`SealPolicy::from_chart`].
+    // @tg: implements:: [[openspec:journal-redaction#Sensitive Fields]] {confidence: partial}
+    pub fn from_declarations(decls: &Declarations) -> Result<SealPolicy, Vec<String>> {
+        let mut errors: Vec<String> = decls.validate().iter().map(|e| e.to_string()).collect();
+        let mut fields = Vec::new();
+        let mut seen = BTreeSet::new();
+        for e in &decls.events {
+            let Some(payload) = &e.payload else { continue };
+            if !seen.insert(e.name.as_str()) {
+                continue;
+            }
+            let mut walk = MarkWalk {
+                decls,
+                event: &e.name,
+                fields: &mut fields,
+                errors: &mut errors,
+                named: Vec::new(),
+            };
+            walk.ty(payload, "", None);
+        }
+        if errors.is_empty() {
+            Ok(SealPolicy { fields })
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+/// Collects the sensitive fields of one event payload type.
+struct MarkWalk<'a> {
+    decls: &'a Declarations,
+    event: &'a str,
+    fields: &'a mut Vec<SensitiveField>,
+    errors: &'a mut Vec<String>,
+    /// The named types being walked, to stop at recursion.
+    named: Vec<String>,
+}
+
+impl MarkWalk<'_> {
+    /// Walk `ty` found at JSON pointer `at`, with `subject` the pointer of the subject in scope.
+    fn ty(&mut self, ty: &Type, at: &str, subject: Option<&str>) {
+        match ty {
+            Type::Named(n) => {
+                let Some(def) = self.decls.lookup(n) else {
+                    return;
+                };
+                if self.named.iter().any(|m| m == n) {
+                    if has_marks(self.decls, def, &mut Vec::new()) {
+                        self.unreachable(at, &format!("the recursive type `{n}`"));
+                    }
+                    return;
+                }
+                self.named.push(n.clone());
+                self.ty(def, at, subject);
+                self.named.pop();
+            }
+            Type::Optional(inner) => self.ty(inner, at, subject),
+            Type::Record(fs) => {
+                let local = fs
+                    .iter()
+                    .find(|f| f.marks.subject)
+                    .map(|f| pointer(at, &f.name));
+                let subject = local.as_deref().or(subject);
+                for f in fs {
+                    let here = pointer(at, &f.name);
+                    if !f.marks.sensitive {
+                        self.ty(&f.ty, &here, subject);
+                        continue;
+                    }
+                    match subject {
+                        Some(s) => self.fields.push(SensitiveField {
+                            event: self.event.to_owned(),
+                            field: here,
+                            subject: s.to_owned(),
+                            retention_ms: f
+                                .marks
+                                .retain_ms
+                                .map(|ms| i64::try_from(ms).unwrap_or(i64::MAX)),
+                        }),
+                        None => self.errors.push(format!(
+                            "event `{}`: sensitive field `{here}` has no `@subject` field in its \
+                             record or an enclosing one",
+                            self.event
+                        )),
+                    }
+                }
+            }
+            Type::List(item) => {
+                if has_marks(self.decls, item, &mut Vec::new()) {
+                    self.unreachable(at, "a list");
+                }
+            }
+            Type::Union(vs) => {
+                if vs
+                    .iter()
+                    .filter_map(|v| v.payload.as_ref())
+                    .any(|p| has_marks(self.decls, p, &mut Vec::new()))
+                {
+                    self.unreachable(at, "a union variant");
+                }
+            }
+            Type::Primitive(_) | Type::Value => {}
+        }
+    }
+
+    fn unreachable(&mut self, at: &str, inside: &str) {
+        let at = if at.is_empty() { "/" } else { at };
+        self.errors.push(format!(
+            "event `{}`: a marked field inside {inside} at `{at}` cannot be sealed by a JSON \
+             pointer; mark the enclosing field `@sensitive` instead",
+            self.event
+        ));
+    }
+}
+
+/// Whether `ty` has a sensitive or subject field anywhere, through named types.
+fn has_marks(decls: &Declarations, ty: &Type, named: &mut Vec<String>) -> bool {
+    match ty {
+        Type::Named(n) => {
+            if named.contains(n) {
+                return false;
+            }
+            named.push(n.clone());
+            decls.lookup(n).is_some_and(|d| has_marks(decls, d, named))
+        }
+        Type::Record(fs) => fs
+            .iter()
+            .any(|f| !f.marks.is_empty() || has_marks(decls, &f.ty, named)),
+        Type::Union(vs) => vs
+            .iter()
+            .filter_map(|v| v.payload.as_ref())
+            .any(|p| has_marks(decls, p, named)),
+        Type::List(t) | Type::Optional(t) => has_marks(decls, t, named),
+        Type::Primitive(_) | Type::Value => false,
+    }
+}
+
+/// `at` extended by the JSON pointer token of `name` (RFC 6901).
+fn pointer(at: &str, name: &str) -> String {
+    format!("{at}/{}", name.replace('~', "~0").replace('/', "~1"))
 }
 
 /// What a sealed or erased journal can say about itself.
