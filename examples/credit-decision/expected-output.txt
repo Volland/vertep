@@ -28,5 +28,5 @@ https://example.org/loans/1003  final ["declined"]
   1 start
   2 event     apply
   as of entry 2: ["declined"]
-bundle of https://example.org/loans/1002: 4 entries, 80668 bytes; verified offline: 4 explanations recomputed, 0 decider calls
+bundle of https://example.org/loans/1002: 4 entries; verified offline: 4 explanations recomputed, 0 decider calls
 entries replayed: 9, decider calls: 0

@@ -155,9 +155,8 @@ fn main() -> Result<(), Error> {
     let text = bundle.to_json();
     let verified = vertep::agent::bundle::Bundle::from_json(&text)?.verify()?;
     println!(
-        "bundle of {referred}: {} entries, {} bytes; verified offline: {} explanations recomputed, {} decider calls",
+        "bundle of {referred}: {} entries; verified offline: {} explanations recomputed, {} decider calls",
         bundle.entries.len(),
-        text.len(),
         verified.explanations.len(),
         verified.decider_calls
     );
