@@ -24,6 +24,7 @@ const TAG_MESSAGE: u8 = 1;
 const TAG_ACK: u8 = 2;
 const TAG_FORWARDED: u8 = 3;
 const TAG_ERROR: u8 = 4;
+const TAG_DATA: u8 = 5;
 
 /// A message between actors on different nodes.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -110,13 +111,25 @@ pub enum Reply {
         /// A description.
         message: String,
     },
+    /// The answer to a request frame that asks for data rather than delivering a message (a
+    /// journal shipping pull, `crate::shipping`): the requested bytes, in the requester's own
+    /// encoding.
+    Data {
+        /// The request's identifier.
+        id: String,
+        /// The answer.
+        data: Vec<u8>,
+    },
 }
 
 impl Reply {
     /// The message identifier the reply is for.
     pub fn id(&self) -> &str {
         match self {
-            Reply::Ack { id } | Reply::Forwarded { id, .. } | Reply::Rejected { id, .. } => id,
+            Reply::Ack { id }
+            | Reply::Forwarded { id, .. }
+            | Reply::Rejected { id, .. }
+            | Reply::Data { id, .. } => id,
         }
     }
 }
@@ -151,35 +164,35 @@ impl fmt::Display for FrameError {
 
 impl std::error::Error for FrameError {}
 
-struct Writer(Vec<u8>);
+pub(crate) struct Writer(pub(crate) Vec<u8>);
 
 impl Writer {
-    fn new(tag: u8) -> Self {
+    pub(crate) fn new(tag: u8) -> Self {
         Writer(vec![FORMAT_VERSION, tag])
     }
-    fn u8(&mut self, v: u8) {
+    pub(crate) fn u8(&mut self, v: u8) {
         self.0.push(v);
     }
-    fn u32(&mut self, v: u32) {
+    pub(crate) fn u32(&mut self, v: u32) {
         self.0.extend_from_slice(&v.to_be_bytes());
     }
-    fn u64(&mut self, v: u64) {
+    pub(crate) fn u64(&mut self, v: u64) {
         self.0.extend_from_slice(&v.to_be_bytes());
     }
-    fn bytes(&mut self, b: &[u8]) {
+    pub(crate) fn bytes(&mut self, b: &[u8]) {
         // a frame never reaches 4 GiB: the maximum frame size is checked before sending
         self.u32(u32::try_from(b.len()).unwrap_or(u32::MAX));
         self.0.extend_from_slice(b);
     }
-    fn str(&mut self, s: &str) {
+    pub(crate) fn str(&mut self, s: &str) {
         self.bytes(s.as_bytes());
     }
 }
 
-struct Reader<'a>(&'a [u8]);
+pub(crate) struct Reader<'a>(pub(crate) &'a [u8]);
 
 impl<'a> Reader<'a> {
-    fn take(&mut self, n: usize) -> Result<&'a [u8], FrameError> {
+    pub(crate) fn take(&mut self, n: usize) -> Result<&'a [u8], FrameError> {
         if self.0.len() < n {
             return Err(FrameError::Malformed("truncated".into()));
         }
@@ -187,35 +200,35 @@ impl<'a> Reader<'a> {
         self.0 = b;
         Ok(a)
     }
-    fn u8(&mut self) -> Result<u8, FrameError> {
+    pub(crate) fn u8(&mut self) -> Result<u8, FrameError> {
         Ok(self.take(1)?[0])
     }
-    fn u32(&mut self) -> Result<u32, FrameError> {
+    pub(crate) fn u32(&mut self) -> Result<u32, FrameError> {
         let b = self.take(4)?;
         Ok(u32::from_be_bytes([b[0], b[1], b[2], b[3]]))
     }
-    fn u64(&mut self) -> Result<u64, FrameError> {
+    pub(crate) fn u64(&mut self) -> Result<u64, FrameError> {
         let b = self.take(8)?;
         let mut a = [0u8; 8];
         a.copy_from_slice(b);
         Ok(u64::from_be_bytes(a))
     }
-    fn bytes(&mut self) -> Result<&'a [u8], FrameError> {
+    pub(crate) fn bytes(&mut self) -> Result<&'a [u8], FrameError> {
         let n = self.u32()? as usize;
         self.take(n)
     }
-    fn str(&mut self) -> Result<String, FrameError> {
+    pub(crate) fn str(&mut self) -> Result<String, FrameError> {
         String::from_utf8(self.bytes()?.to_vec())
             .map_err(|_| FrameError::Malformed("a string is not UTF-8".into()))
     }
-    fn header(&mut self) -> Result<u8, FrameError> {
+    pub(crate) fn header(&mut self) -> Result<u8, FrameError> {
         let v = self.u8()?;
         if v != FORMAT_VERSION {
             return Err(FrameError::Version(v));
         }
         self.u8()
     }
-    fn end(&self) -> Result<(), FrameError> {
+    pub(crate) fn end(&self) -> Result<(), FrameError> {
         if self.0.is_empty() {
             Ok(())
         } else {
@@ -306,6 +319,12 @@ impl Reply {
                 w.str(message);
                 w.0
             }
+            Reply::Data { id, data } => {
+                let mut w = Writer::new(TAG_DATA);
+                w.str(id);
+                w.bytes(data);
+                w.0
+            }
         }
     }
 
@@ -339,6 +358,10 @@ impl Reply {
                 let message = r.str()?;
                 Reply::Rejected { id, kind, message }
             }
+            TAG_DATA => Reply::Data {
+                id,
+                data: r.bytes()?.to_vec(),
+            },
             other => return Err(FrameError::Malformed(format!("reply tag {other}"))),
         };
         r.end()?;

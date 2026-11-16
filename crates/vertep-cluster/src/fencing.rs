@@ -154,6 +154,15 @@ impl<J: JournalStore, M: Membership + ?Sized> JournalStore for ShardJournal<J, M
         self.store.read(actor, from)
     }
 
+    fn read_range(
+        &self,
+        actor: &NamedNode,
+        from: Position,
+        limit: usize,
+    ) -> Result<Vec<JournalRecord>, StoreError> {
+        self.store.read_range(actor, from, limit)
+    }
+
     fn head(&self, actor: &NamedNode) -> Result<Position, StoreError> {
         self.store.head(actor)
     }

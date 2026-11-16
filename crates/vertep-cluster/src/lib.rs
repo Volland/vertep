@@ -17,6 +17,10 @@
 //! - [`rebalance`]: the rebalancer's plan, journal shipping, lease transfer and offline
 //!   resharding (`vt cluster reshard`).
 //! - [`replication`]: standby replication with quorum acknowledgement, and failover.
+//! - [`shipping`]: journal shipping, a pull protocol from a shard's leader to a follower:
+//!   ordered entries with digests, resumption from the follower's durable position, and a
+//!   window that bounds what the leader holds for a slow follower; over the QUIC transport
+//!   with feature `quic`.
 //! - [`workers`]: the stateless worker pool dispatcher (activations on demand, placement on
 //!   declaring members, balancing policies, limits, failure reporting).
 //! - [`history`]: fault-injection histories, their checker and their JSON-lines export.
@@ -60,6 +64,7 @@
 //! @tg: implements:: [[decisions#Gossip leader epochs carry a per-start tag]]
 //! @tg: implements:: [[decisions#A leaving node ships each shard before handing it over]]
 //! @tg: implements:: [[decisions#Frames to other nodes are kept until settled]]
+//! @tg: implements:: [[decisions#Journal shipping is a pull protocol]]
 
 pub mod authority;
 pub mod clock;
@@ -73,6 +78,7 @@ pub mod placement;
 pub mod rebalance;
 pub mod replication;
 pub mod routing;
+pub mod shipping;
 pub mod view;
 pub mod workers;
 
@@ -117,6 +123,10 @@ pub use replication::{
     StandbyLink, StandbyReplica, may_take, replica_set, ship_suffix, standbys_of,
 };
 pub use routing::{ActivationGate, DedupCache, Inbound, NotOwner, Redirect, RoutingTable};
+pub use shipping::{
+    Accepted, CatchUp, EntryVerdict, LocalShipLink, PullBatch, PullError, PullRequest, PullSource,
+    ShipFollower, ShipLeader, ShipLink, ShippedEntry, Verdict,
+};
 pub use view::{Member, MemberStatus, ShardOwner, Subscription, View, ViewTracker};
 pub use workers::{
     ActivationId, Assignment, Failure, Outcome, Policy, Refusal, Submit, WorkerPool, WorkerType,

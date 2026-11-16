@@ -35,7 +35,7 @@ pub use error::{AppendError, StoreError, Violation};
 pub use graph::{GraphCapabilities, GraphStore, QueryResults, RdfCapability, Solutions};
 pub use journal::{
     AppendMeta, Entry, FencingToken, JournalCapabilities, JournalRecord, JournalStore, Position,
-    StateDelta, prepare_append,
+    StateDelta, graph_digest, prepare_append,
 };
 pub use memory::MemoryStore;
 pub use projector::{ProjectionReport, Projector};

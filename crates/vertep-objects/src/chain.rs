@@ -17,10 +17,8 @@ use std::sync::Arc;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use oxrdf::dataset::CanonicalizationAlgorithm;
 use oxrdf::vocab::xsd;
 use oxrdf::{Graph, Literal, NamedNode, NamedOrBlankNode, Term, TermRef, Triple};
-use sha2::{Digest as _, Sha256};
 use vertep_federation::{KeyError, KeyManager, PublicKey};
 use vertep_store::{Entry, JournalRecord, Position, vocab as store_vocab};
 
@@ -202,23 +200,9 @@ pub fn content_hash(entry: &Entry) -> Digest {
             g.insert(&t);
         }
     }
-    let has_blank = g.iter().any(|t| {
-        matches!(t.subject, oxrdf::NamedOrBlankNodeRef::BlankNode(_))
-            || matches!(t.object, TermRef::BlankNode(_))
-    });
-    if has_blank {
-        g.canonicalize(CanonicalizationAlgorithm::default());
-    }
-    let mut lines: Vec<String> = g.iter().map(|t| format!("{t} .")).collect();
-    lines.sort_unstable();
-    let mut h = Sha256::new();
-    h.update(entry.name().as_str().as_bytes());
-    h.update(b"\n");
-    for l in &lines {
-        h.update(l.as_bytes());
-        h.update(b"\n");
-    }
-    Digest(h.finalize().into())
+    // the canonical form and hash every entry digest uses (journal shipping digests whole
+    // entries the same way)
+    Digest(vertep_store::graph_digest(entry.name(), &g))
 }
 
 fn int(n: u64) -> Literal {

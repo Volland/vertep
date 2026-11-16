@@ -49,6 +49,8 @@ required-features = ["fault-node"]
 
 [dependencies]
 vertep-store = { workspace = true }
+# Journal shipping carries entries as N-Quads, the wire form durable-object custody uses too.
+oxttl = { version = "0.2.5", features = ["rdf-12"] }
 vertep-runtime = { workspace = true, optional = true }
 vertep-tiramemsu = { workspace = true, optional = true }
 vertep-core = { workspace = true, optional = true, features = ["std", "serde"] }

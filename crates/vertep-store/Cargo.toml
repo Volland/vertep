@@ -28,6 +28,8 @@ testkit = []
 oxrdf = { workspace = true }
 spargebra = { workspace = true }
 spareval = { workspace = true }
+# Entry digests (`graph_digest`), shared by journal shipping and durable-object content hashes.
+sha2 = "0.10"
 
 [dev-dependencies]
 vertep-store = { path = ".", features = ["testkit"] }

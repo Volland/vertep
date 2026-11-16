@@ -219,6 +219,47 @@ impl Entry {
                 || matches!(t.object, oxrdf::TermRef::BlankNode(_))
         })
     }
+
+    /// The SHA-256 digest of the whole entry, stamps included: [`graph_digest`] of its IRI and
+    /// graph. Two entries are isomorphic exactly when their digests agree (up to SHA-256
+    /// collisions), so a store that renames blank nodes keeps an entry's digest.
+    pub fn digest(&self) -> [u8; 32] {
+        graph_digest(&self.name, &self.triples)
+    }
+}
+
+/// The SHA-256 digest of a named graph's canonical form: the graph's IRI and a newline, then
+/// every statement as an N-Triples line (`<s> <p> <o> .` and a newline), sorted. A graph with
+/// blank nodes is first relabelled with RDFC-1.0, so the digest does not depend on blank node
+/// labels; runtime entries have none, so the common path is a sort.
+///
+/// Journal shipping (`vertep-cluster`) digests whole entries with it, and the content hash of a
+/// durable object's entries (`vertep-objects`) is the same digest of the entry without its seal.
+pub fn graph_digest(name: &NamedNode, graph: &Graph) -> [u8; 32] {
+    use sha2::{Digest as _, Sha256};
+    let has_blank = graph.iter().any(|t| {
+        matches!(t.subject, oxrdf::NamedOrBlankNodeRef::BlankNode(_))
+            || matches!(t.object, oxrdf::TermRef::BlankNode(_))
+    });
+    let canonical;
+    let graph = if has_blank {
+        let mut g = graph.clone();
+        g.canonicalize(CanonicalizationAlgorithm::default());
+        canonical = g;
+        &canonical
+    } else {
+        graph
+    };
+    let mut lines: Vec<String> = graph.iter().map(|t| format!("{t} .")).collect();
+    lines.sort_unstable();
+    let mut h = Sha256::new();
+    h.update(name.as_str().as_bytes());
+    h.update(b"\n");
+    for l in &lines {
+        h.update(l.as_bytes());
+        h.update(b"\n");
+    }
+    h.finalize().into()
 }
 
 /// An entry read back from a journal, with its position.
@@ -349,6 +390,27 @@ pub trait JournalStore: Send + Sync {
     /// [`StoreError`] when the store fails.
     fn read(&self, actor: &NamedNode, from: Position) -> Result<Vec<JournalRecord>, StoreError>;
 
+    /// At most `limit` entries of `actor`'s journal from position `from` (inclusive; 0 reads
+    /// from the start), in order: a bounded [`JournalStore::read`], for readers that must not
+    /// hold a whole suffix at once (journal shipping to a follower far behind).
+    ///
+    /// The provided implementation reads the suffix and truncates it; backends that can stop
+    /// early override it.
+    ///
+    /// # Errors
+    ///
+    /// [`StoreError`] when the store fails.
+    fn read_range(
+        &self,
+        actor: &NamedNode,
+        from: Position,
+        limit: usize,
+    ) -> Result<Vec<JournalRecord>, StoreError> {
+        let mut out = self.read(actor, from)?;
+        out.truncate(limit);
+        Ok(out)
+    }
+
     /// The position of `actor`'s last entry, 0 for an empty journal.
     ///
     /// # Errors
@@ -379,6 +441,14 @@ impl<J: JournalStore + ?Sized> JournalStore for std::sync::Arc<J> {
     }
     fn read(&self, actor: &NamedNode, from: Position) -> Result<Vec<JournalRecord>, StoreError> {
         (**self).read(actor, from)
+    }
+    fn read_range(
+        &self,
+        actor: &NamedNode,
+        from: Position,
+        limit: usize,
+    ) -> Result<Vec<JournalRecord>, StoreError> {
+        (**self).read_range(actor, from, limit)
     }
     fn head(&self, actor: &NamedNode) -> Result<Position, StoreError> {
         (**self).head(actor)
