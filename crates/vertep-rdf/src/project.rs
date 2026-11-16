@@ -42,6 +42,9 @@
 //! state it materializes `vt:historyDefault` to the history states its default entry targets,
 //! so that the shapes can reject default-entry cycles.
 //!
+//! A chart that declares `vt:plays` also gets `vt:plays` from the chart node to the IRI
+//! `<protocol identity>#<role>` of each role it plays.
+//!
 //! # Types
 //!
 //! A typed chart's named types are projected too ([`crate::types::project_chart_types`]):
@@ -279,6 +282,15 @@ impl<'a> Projector<'a> {
             self.state(s, i, &c, &mut ancestors);
         }
         self.extensions(&c, frag, &chart.extensions);
+        // Derived: the protocol roles the chart plays, so a SPARQL query finds the charts that
+        // play a role. A malformed declaration derives nothing; the binding reports it.
+        if let Ok(plays) = vertep_core::plays::plays(chart) {
+            for p in plays {
+                if let Ok(role) = NamedNode::new(p.to_string()) {
+                    self.add(&c, vt::PLAYS, role);
+                }
+            }
+        }
     }
 
     /// Project a target list: one `vt:TargetRef` per member and the selection nodes.

@@ -336,6 +336,7 @@ fn main() -> std::io::Result<()> {
 | `vt cluster reshard <dir> <out>` | `commands::cluster_reshard` | double a stopped cluster's shard count |
 | `vt webvh create\|update\|rotate\|deactivate\|verify\|witness\|publish\|serve` | `webvh` | author, verify, witness, publish and serve `did:webvh` DIDs |
 | `vt webvh object create`, `vt webvh custody change` | `webvh::object_create`, `webvh::custody_change_cmd` | durable-object DIDs and custodian-set changes |
+| `vt kolyada validate\|hash\|project\|offer\|check\|vectors` | `kolyada` | agent protocol documents, offers, histories and test vectors |
 
 Library types: `Outcome` (stdout, stderr, exit code), `SchemaFormat`, `Surface` (surface
 detection, reading and writing), and `cel` (the CEL type environment projection of chart

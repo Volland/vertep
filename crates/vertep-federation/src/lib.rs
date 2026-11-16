@@ -21,6 +21,10 @@
 //!   [`inbox`] holds the relay mailboxes of local DID actors, fed by pickups from mediators,
 //!   intermediaries and the node's own inbound queue ([`net`]), acknowledged after the journal
 //!   append. `testkit` (feature `testkit`) has an in-process mediator and intermediary.
+//! - **Agent protocols** (M10): [`role_binding`] binds a DID actor to the Kolyada protocol roles
+//!   its chart declares with `vt:plays`: the conformance check at the grants slot of the inbox,
+//!   the outbound check in the send path of the outbox, and checker state derived from the
+//!   journal.
 //! - **Mailboxes at a TSP mediator** (M7): `tsp_mailbox` (feature `tsp`) is the versioned
 //!   mailbox protocol of `vt-mediator` (`vertep-tsp-mediator`) and its client, a pickup source
 //!   for the relay inbox; [`live`] is the seam of live sessions on which a relay pushes messages
@@ -66,6 +70,7 @@ pub mod pickup_loop;
 pub mod protocol;
 pub mod relay;
 pub mod resolver;
+pub mod role_binding;
 #[cfg(all(feature = "testkit", any(feature = "didcomm", feature = "tsp")))]
 pub mod testkit;
 pub mod time;
@@ -99,6 +104,7 @@ pub use relay::{LocalActor, RelayProtocol, SendContext, SendError};
 pub use resolver::{
     CachingResolver, DidResolver, HttpFetcher, Resolution, ResolutionError, ResolverRegistry,
 };
+pub use role_binding::{BindingError, KeySigner, ResolverVerifier, RoleBinding};
 pub use time::{Clock, ManualClock, SystemClock, Timestamp};
 
 #[cfg(doctest)]

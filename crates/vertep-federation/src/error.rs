@@ -23,6 +23,8 @@ pub enum CommunicationFailure {
     Refused(String),
     /// Every endpoint stayed unreachable.
     Unreachable(String),
+    /// The sender's protocol role may not send this message in its instance's current state.
+    ProtocolRefused(String),
 }
 
 impl fmt::Display for CommunicationFailure {
@@ -40,6 +42,7 @@ impl fmt::Display for CommunicationFailure {
             CommunicationFailure::SealFailed(m) => write!(f, "cannot seal message: {m}"),
             CommunicationFailure::Refused(m) => write!(f, "refused by recipient: {m}"),
             CommunicationFailure::Unreachable(m) => write!(f, "unreachable: {m}"),
+            CommunicationFailure::ProtocolRefused(m) => write!(f, "refused by the protocol: {m}"),
         }
     }
 }

@@ -30,6 +30,7 @@ pub mod ir;
 pub mod kernel;
 pub mod null;
 pub mod order;
+pub mod plays;
 pub mod session;
 pub mod tape;
 pub mod trace;

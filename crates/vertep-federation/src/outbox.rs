@@ -114,6 +114,8 @@ struct Attempts {
     next_at: i64,
     forced: Option<TransportKind>,
     system: bool,
+    /// A signed agent protocol message: the sender's role, not a grant, authorises it.
+    protocol: bool,
 }
 
 /// The shared state of the outbox, its mailboxes and its transports.
@@ -196,11 +198,50 @@ impl OutboxCore {
         .map(|_| ())
     }
 
-    /// Queues a send. An ungranted send fails here, before anything is sealed or queued.
-    pub(crate) fn enqueue(&self, env: Envelope, forced: Option<TransportKind>, system: bool) {
-        if !system && let Err(e) = self.check_grant(&env) {
-            self.fail(&env, e.failure);
-            return;
+    /// The outbound protocol check: `None` when `env` is not a send of an agent protocol the
+    /// sender plays; otherwise the signed message to send, or why the role may not send it.
+    fn protocol_send(
+        &self,
+        env: &Envelope,
+    ) -> Option<Result<crate::role_binding::Outbound, CommunicationError>> {
+        let entry = self.identities.entry(env.event.origin.as_deref()?)?;
+        let roles = entry.roles.as_ref()?;
+        if !roles.is_protocol_send(&env.event) {
+            return None;
+        }
+        Some(roles.outbound(
+            &crate::role_binding::KeySigner::new(entry.actor.clone()),
+            env,
+        ))
+    }
+
+    /// Queues a send. An ungranted send fails here, before anything is sealed or queued. A
+    /// protocol send is checked against the sender's role instead of grants, and signed.
+    pub(crate) fn enqueue(&self, mut env: Envelope, forced: Option<TransportKind>, system: bool) {
+        let mut protocol = false;
+        if !system {
+            match self.protocol_send(&env) {
+                Some(Ok(out)) => {
+                    protocol = true;
+                    // The sender journals what it signed, so its checker state is derived on
+                    // replay like a receiver's.
+                    let handle = self.handle.read().ok().and_then(|h| h.clone());
+                    if let Some(h) = handle {
+                        let _ = h.send_envelope(out.sent);
+                    }
+                    env = out.envelope;
+                }
+                Some(Err(e)) => {
+                    self.fail(&env, e.failure);
+                    return;
+                }
+                None => {
+                    if let Err(e) = self.check_grant(&env) {
+                        self.fail(&env, e.failure);
+                        return;
+                    }
+                }
+            }
         }
         lock(&self.attempts).insert(
             env.message_id.clone(),
@@ -209,6 +250,7 @@ impl OutboxCore {
                 next_at: i64::MIN,
                 forced,
                 system,
+                protocol,
             },
         );
         if let Err(e) = self.queue.enqueue(env.clone()) {
@@ -366,6 +408,7 @@ impl OutboxCore {
                 continue;
             }
             if !a.system
+                && !a.protocol
                 && let Err(e) = self.check_grant(&env)
             {
                 self.done(&env);

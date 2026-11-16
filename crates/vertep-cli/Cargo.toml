@@ -1,6 +1,6 @@
 [package]
 name = "vertep-cli"
-description = "The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles and rules"
+description = "The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles, rules and agent protocols"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -42,6 +42,9 @@ clap = { version = "4.6", features = ["derive"] }
 # vt webvh: did:webvh authoring, witnessing, publishing and serving.
 vertep-webvh = { workspace = true, features = ["custody", "server"] }
 vertep-federation = { workspace = true }
+# vt kolyada: agent protocol documents, offers, histories and vectors.
+vertep-kolyada = { workspace = true }
+base64 = "0.22"
 vertep-objects = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 vertep-rules = { workspace = true }

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The vt command — Vertep docs</title>
-<meta name="description" content="Every subcommand of vt, the Vertep command line: typecheck, schema, validate, hash, convert, gen ts, certify, cluster reshard, webvh, wallet, explain, verify-bundle and rules, with their flags, exit codes and real runs on real charts.">
+<meta name="description" content="Every subcommand of vt, the Vertep command line: typecheck, schema, validate, hash, convert, gen ts, certify, cluster reshard, webvh, wallet, explain, verify-bundle, rules and kolyada, with their flags, exit codes and real runs on real charts.">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/fonts.css">
 <link rel="stylesheet" href="../assets/css/vertep.css">
@@ -84,7 +84,7 @@
 
 <pre data-lang="Shell"><code>vt --help</code></pre>
 
-<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles and rules
+<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles, rules and agent protocols
 
 Usage: vt &lt;COMMAND&gt;
 
@@ -102,6 +102,7 @@ Commands:
   explain        Verify an explanation bundle offline and print what it explains
   verify-bundle  Verify an explanation bundle offline: no decider, no network, no runtime
   rules          Rule programs beside a shard's journal (needs a build with the `rules` feature)
+  kolyada        Agent protocols: validate, hash and project documents, sign offers, check histories
   help           Print this message or the help of the given subcommand(s)
 
 Options:
@@ -124,6 +125,7 @@ Options:
         <tr><td><code>vt explain &lt;bundle&gt;</code></td><td>Verifies an explanation bundle offline and prints what each journal position explains.</td><td><a href="#explain">explain</a></td></tr>
         <tr><td><code>vt verify-bundle &lt;bundle&gt;</code></td><td>Verifies an explanation bundle offline, with no decider, network or runtime.</td><td><a href="#explain">explain</a></td></tr>
         <tr><td><code>vt rules &lt;command&gt;</code></td><td>Stores, checks, proposes, promotes and certifies rule programs beside a shard's journal. Only in a build with the <code>rules</code> feature, which is off by default.</td><td><a href="rules-operating.html#commands">Operating rules</a></td></tr>
+        <tr><td><code>vt kolyada &lt;command&gt;</code></td><td>Validates, hashes and projects agent protocol documents, signs offers, checks offers and message histories, and checks the published test vectors.</td><td><a href="#kolyada">kolyada</a></td></tr>
       </tbody>
     </table>
 
@@ -865,8 +867,32 @@ entry 3 (decision) [review] -&gt; [rejected]
 
     <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
 
+    <h2 id="kolyada">vt kolyada</h2>
+    <p>Works on <a href="protocols.html">agent protocol</a> documents and signed artifacts, offline. <code>validate DOC</code> checks the profile, the payload shapes and well-formedness; <code>hash DOC</code> prints the identity; <code>project DOC [--role R] [--json]</code> prints each role's steps and what it accepts in each state. <code>offer DOC --role R --keys DIR [--key NAME]</code> signs an offer by the <code>did:key</code> of a key and prints it with its <code>VertepProtocol</code> service entry. <code>check DOC FILE</code> verifies a signed offer (<code>--now-ms</code> for expiry), or replays a JSON array of signed messages for one participant (<code>--as DID</code>) and prints each verdict; <code>did:key</code> and <code>did:peer</code> keys resolve offline and <code>--key DID=PUBLIC</code> adds any other. <code>vectors DIR</code> checks the published test vectors. Exit code 1 when the document, offer, history or a vector fails.</p>
+<pre data-lang="Shell"><code>vt kolyada project quote.json --role seller
+vt kolyada vectors crates/vertep-kolyada/vectors</code></pre>
+<pre class="output" data-lang="Output"><code>role seller
+  Decided -&gt; Cancelled: receive cancel from buyer
+  Decided -&gt; Ordered: receive order from buyer
+  Idle -&gt; Quoting: receive quote.request from buyer
+  Ordered -&gt; Done: send receipt to buyer
+  Quoting -&gt; Decided: send quote to auditor, buyer
+  accepts in Decided: cancel from buyer, order from buyer
+  accepts in Idle: quote.request from buyer
+ok   identity: quote
+ok   identity: quote, members reordered
+ok   identity: quote, one target changed
+ok   projection: buyer
+ok   projection: seller
+ok   projection: auditor
+ok   envelope: signature, signing bytes and hash
+ok   verdict: valid request
+ok   verdict: body changed after signing
+ok   verdict: payload misses a required field
+ok   verdict: message not enabled in the state</code></pre>
+
     <h2 id="library">vt as a library</h2>
-    <p>Every subcommand is also a function in the <code>vertep_cli</code> crate (the chart commands in <code>vertep_cli::commands</code>, the others in <code>webvh</code>, <code>wallet</code>, <code>explain</code> and <code>rules</code>), which returns an <code>Outcome</code> holding standard output, standard error and the exit code. The runnable examples use it to compare recorded command output with the real one, so documented output that drifts fails the build. See the <a href="../examples/index.html">examples</a>.</p>
+    <p>Every subcommand is also a function in the <code>vertep_cli</code> crate (the chart commands in <code>vertep_cli::commands</code>, the others in <code>webvh</code>, <code>wallet</code>, <code>explain</code>, <code>rules</code> and <code>kolyada</code>), which returns an <code>Outcome</code> holding standard output, standard error and the exit code. The runnable examples use it to compare recorded command output with the real one, so documented output that drifts fails the build. See the <a href="../examples/index.html">examples</a>.</p>
 
     <nav class="pager" aria-label="Pages">
       <a href="verification.html">← Verification</a>

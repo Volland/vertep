@@ -35,6 +35,7 @@ use crate::origin::{AnonymousPolicy, InboundPolicy, InboundRecord, PayloadTypes,
 use crate::outbox::{OutboundRecord, OutboxCore, RelayOutbox, RelayTransport, RetryPolicy};
 use crate::relay::{LocalActor, RelayProtocol};
 use crate::resolver::{CachingResolver, DidResolver};
+use crate::role_binding::{BindingError, RoleBinding};
 use crate::time::{Clock, SystemClock, Timestamp};
 
 /// A local DID actor with its inbound rules.
@@ -46,6 +47,8 @@ pub struct ActorEntry {
     pub policy: InboundPolicy,
     /// The receiving chart's declared payload types.
     pub types: Arc<dyn PayloadTypes + Send + Sync>,
+    /// The agent protocol roles the actor plays (`vt:plays`), when it plays any.
+    pub roles: Option<Arc<RoleBinding>>,
 }
 
 impl fmt::Debug for ActorEntry {
@@ -53,6 +56,7 @@ impl fmt::Debug for ActorEntry {
         f.debug_struct("ActorEntry")
             .field("actor", &self.actor)
             .field("policy", &self.policy)
+            .field("roles", &self.roles)
             .finish_non_exhaustive()
     }
 }
@@ -350,6 +354,7 @@ impl Federation {
                 grants: Default::default(),
             },
             types,
+            roles: None,
         });
     }
 
@@ -389,6 +394,26 @@ impl Federation {
     /// Sets the anonymous-sender policy of the local actor `did`.
     pub fn set_anonymous(&self, did: &str, policy: AnonymousPolicy) -> bool {
         self.identities.update(did, |e| e.policy.anonymous = policy)
+    }
+
+    /// Binds the local actor `did` to the agent protocol roles its chart plays: protocol
+    /// messages to it are checked at the grants slot and its protocol sends in the send path.
+    /// The binding's instances are first derived from the actor's journal in the node's
+    /// storage, so a restarted actor continues where it was without verifying anything again.
+    ///
+    /// # Errors
+    ///
+    /// [`BindingError`] when the journal does not apply; nothing is bound.
+    // @tg: implements:: [[openspec:protocol-spaces#Chart Role Binding]]
+    pub fn bind_roles(&self, binding: RoleBinding) -> Result<bool, BindingError> {
+        let did = binding.did().to_owned();
+        if let Some(storage) = &self.storage
+            && let Ok(a) = Address::parse(&did)
+        {
+            binding.recover(storage.as_ref(), &a)?;
+        }
+        let binding = Arc::new(binding);
+        Ok(self.identities.update(&did, |e| e.roles = Some(binding)))
     }
 
     /// Sets the declared payload types the local actor `did` checks received events against.
