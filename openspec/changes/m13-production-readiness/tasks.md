@@ -36,11 +36,11 @@
 
 ## 7. Journal shipping and WebSocket
 
-- [ ] 7.1 Pull protocol on `vertep-cluster`: ordered entries with digests, acknowledgements
-- [ ] 7.2 Resumption after a dropped connection and after a follower restart
-- [ ] 7.3 Back-pressure under a slow follower
-- [ ] 7.4 WebSocket transport for relay mailboxes with polling fallback in `vertep-federation`
-- [ ] 7.5 Fault histories for shipping replayed through the Lean lease model in strict mode
+- [x] 7.1 Pull protocol on `vertep-cluster`: ordered entries with digests, acknowledgements
+- [x] 7.2 Resumption after a dropped connection and after a follower restart
+- [x] 7.3 Back-pressure under a slow follower
+- [x] 7.4 WebSocket transport for relay mailboxes with polling fallback in `vertep-federation`
+- [x] 7.5 Fault histories for shipping replayed through the Lean lease model in strict mode
 
 ## 8. Dependencies closed elsewhere
 

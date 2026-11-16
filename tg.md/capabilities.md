@@ -309,7 +309,7 @@ A pull protocol that replicates a journal between cluster nodes in order with di
 
 - scheduled_in:: [[roadmap#M13 Production readiness]]
 
-Not implemented: the change is a draft; it closes the gap noted in [[roadmap#M4 Cluster]].
+Implemented in [[components#vertep-cluster]] (`shipping`): a follower pulls entries after its durable head; the leader answers in order with SHA-256 digests under its fencing token, over QUIC or in-process. Resumption after a dropped link or a restart and a byte window per pull are tested, and fault histories replay strictly through the Lean lease model. Not yet wired into `ClusterNode` standby replication or shard moves; it closes the gap noted in [[roadmap#M4 Cluster]].
 
 ## Rule programs
 

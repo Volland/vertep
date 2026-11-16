@@ -121,7 +121,7 @@
     <table>
       <thead><tr><th>Package</th><th>Where</th><th>Why this tier</th></tr></thead>
       <tbody>
-        <tr><td><code>vertep-cluster</code></td><td><a href="https://crates.io/crates/vertep-cluster">crates.io</a></td><td>Fault injection replayed through the Lean lease model, but no user outside the project and no journal shipping protocol yet</td></tr>
+        <tr><td><code>vertep-cluster</code></td><td><a href="https://crates.io/crates/vertep-cluster">crates.io</a></td><td>Fault injection and journal shipping replayed through the Lean lease model, but no user outside the project and shipping not yet wired into node replication</td></tr>
         <tr><td><code>vertep-federation</code></td><td><a href="https://crates.io/crates/vertep-federation">crates.io</a></td><td>No user outside the project; WebSocket live delivery not yet tried against a third-party mediator</td></tr>
         <tr><td><code>vertep-rules</code></td><td><a href="https://crates.io/crates/vertep-rules">crates.io</a></td><td>Native only (a 154 MB prebuilt engine for macOS and Linux), no wasm, Windows or Python; first published in 0.1.7</td></tr>
         <tr><td><code>vertep-objects</code></td><td><a href="https://crates.io/crates/vertep-objects">crates.io</a></td><td>No user outside the project; custody safety under custodian-set changes is checked by search, not proven (M7 task 10.4)</td></tr>
