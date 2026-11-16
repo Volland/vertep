@@ -160,6 +160,29 @@ fn main() -> Result<(), Error> {
         verified.explanations.len(),
         verified.decider_calls
     );
+    // ---- what would next year's policy have done? ----------------------------------------------
+    println!();
+    println!("the approval ceiling is cut to 15 000; the recorded decisions replayed under it:");
+    let stricter = vertep::scxml::read(
+        &LOAN.replace("ctx.amount &lt;= 50000", "ctx.amount &lt;= 15000"),
+        &vertep::scxml::ReadOptions::new().with_datamodels(&vertep::scxml::AnyDatamodel),
+    )?
+    .chart;
+    for (id, _, _) in APPLICATIONS {
+        let r = audit.counterfactual(
+            id,
+            stricter.clone(),
+            vertep::agent::counterfactual::DecisionSource::Recorded,
+        )?;
+        let last = r.steps.last().expect("a journal has entries");
+        match r.first_divergence {
+            None => println!("{id}  unchanged: {:?}", last.counterfactual_state),
+            Some(p) => println!(
+                "{id}  differs from entry {p}: {:?} -> {:?}; answers handled differently at {:?}",
+                last.original_state, last.counterfactual_state, r.changed_dispositions
+            ),
+        }
+    }
     println!(
         "entries replayed: {}, decider calls: {}",
         audit.stats().replayed,

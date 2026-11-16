@@ -29,13 +29,13 @@
 
 ## 5. Integrity
 
-- [ ] 5.1 Opt-in hash chain and signatures on agent journals, sharing the `vertep-objects` envelope
-- [ ] 5.2 Promote a plain actor to a durable object without rewriting history
+- [x] 5.1 Opt-in hash chain and signatures on agent journals, sharing the `vertep-objects` envelope (`StoreAgentJournal::with_sealer` with `EntrySealer`, implemented by `ChainedAgentSealer` in `vertep-objects`; `verify_agent_journal` and `verify_chain` check it)
+- [x] 5.2 Promote a plain actor to a durable object without rewriting history (shown for an opted-in journal: the object's writer continues the same chain in a later epoch and `verify_chain` accepts old and new entries; a journal that never opted in has no chain to promote)
 
 ## 6. Counterfactual replay
 
-- [ ] 6.1 Replay inputs under another chart version, report divergences, never write to the original journal
-- [ ] 6.2 Example `fork_under_new_policy` with recorded output
+- [x] 6.1 Replay inputs under another chart version, report divergences, never write to the original journal (`AgentHost::counterfactual` with `DecisionSource::Recorded` or `Supplied`; the report says which)
+- [x] 6.2 Example `fork_under_new_policy` with recorded output (as a section of `examples/credit-decision`: the approval ceiling cut to 15 000, and loan 1001's approval would go to the officer)
 
 ## 7. Redaction
 

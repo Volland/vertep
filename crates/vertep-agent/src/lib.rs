@@ -29,6 +29,7 @@
 #[cfg(feature = "anthropic")]
 pub mod anthropic;
 pub mod bundle;
+pub mod counterfactual;
 pub mod decide;
 pub mod decider;
 pub mod enabled;
@@ -54,7 +55,8 @@ pub use enabled::{Candidate, enabled_events};
 pub use grant::Grant;
 pub use host::{AgentHost, AgentHostBuilder, AgentState, HostError, InstantiateError};
 pub use journal::{
-    AgentInput, AgentJournal, Disposition, JournalEntry, MemoryJournal, StoreAgentJournal,
+    AgentInput, AgentJournal, Disposition, EntrySealer, JournalEntry, MemoryJournal,
+    StoreAgentJournal,
 };
 pub use llm::{
     ErrorClass, Provider, ProviderError, ProviderRegistry, ProviderRequest, ProviderResult,

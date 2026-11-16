@@ -28,6 +28,7 @@ vertep-federation = { workspace = true }
 vertep-core = { workspace = true, features = ["std"] }
 vertep-cluster = { workspace = true }
 vertep-runtime = { workspace = true }
+vertep-agent = { workspace = true }
 oxttl = { version = "0.2.5", features = ["rdf-12"] }
 oxrdf = { workspace = true }
 serde = { version = "1", features = ["derive"] }
@@ -45,7 +46,6 @@ vertep-store = { workspace = true, features = ["testkit"] }
 vertep-tiramemsu = { workspace = true }
 tempfile = "3"
 vertep-dm-ecma = { workspace = true }
-vertep-agent = { workspace = true }
 vertep-scxml = { workspace = true }
 vertep-core = { workspace = true, features = ["std"] }
 

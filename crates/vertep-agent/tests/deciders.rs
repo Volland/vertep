@@ -1465,3 +1465,101 @@ fn a_step_taken_by_rule_has_no_decision_and_says_no_decider_was_asked() {
         host.journal(AGENT)[1].offered.is_none() && host.journal(AGENT)[1].disposition.is_none()
     );
 }
+
+// ----- Decision records: counterfactual replay ----------------------------------------------
+
+/// The review chart with `ok` false from the start, so `approve` is no longer offered: the
+/// policy changed from "approvals allowed" to "approvals forbidden".
+fn stricter() -> Chart {
+    cel(
+        "idle",
+        &HEAD.replace(
+            r#"<data id="ok" expr="true"/>"#,
+            r#"<data id="ok" expr="false"/>"#,
+        ),
+        &review_body(""),
+    )
+}
+
+// @tg: verifies:: [[openspec:decision-records#Counterfactual Replay#A new ceiling changes an outcome]] {level: integration}
+// @tg: verifies:: [[openspec:decision-records#Counterfactual Replay#The original is untouched]] {level: integration}
+#[test]
+fn a_stricter_chart_would_have_refused_the_recorded_approval_and_the_journal_is_untouched() {
+    let (mut host, _, rec) = reviewing("");
+    decide(
+        &mut host,
+        &rec.requests()[0].correlation.clone(),
+        "approve",
+        Value::Undefined,
+    );
+    assert_eq!(config(&mut host), vec!["approved"]);
+    let before = host.journal(AGENT);
+    let at = before
+        .iter()
+        .position(|e| matches!(e.input, AgentInput::Decision { .. }))
+        .unwrap() as u64
+        + 1;
+
+    let report = host
+        .counterfactual(
+            AGENT,
+            stricter(),
+            vertep_agent::counterfactual::DecisionSource::Recorded,
+        )
+        .unwrap();
+    assert_eq!(report.decisions, "recorded");
+    assert_eq!(
+        report.first_divergence,
+        Some(at),
+        "the approval is where the charts part"
+    );
+    assert_eq!(report.changed_dispositions, vec![at]);
+    let step = report.steps.iter().find(|s| s.position == at).unwrap();
+    assert_eq!(step.original_state, vec!["approved"]);
+    assert_eq!(step.counterfactual_state, vec!["review"]);
+    assert_eq!(step.recorded_disposition.as_deref(), Some("accepted"));
+    assert_ne!(step.counterfactual_disposition.as_deref(), Some("accepted"));
+    assert!(report.to_json().contains("\"first_divergence\""));
+
+    // the original journal, and the live actor, are exactly as before
+    assert_eq!(host.journal(AGENT), before);
+    assert_eq!(config(&mut host), vec!["approved"]);
+}
+
+#[test]
+fn an_unchanged_chart_does_not_diverge_and_a_supplied_decider_replaces_the_record() {
+    let (mut host, _, rec) = reviewing("");
+    decide(
+        &mut host,
+        &rec.requests()[0].correlation.clone(),
+        "approve",
+        Value::Undefined,
+    );
+    let same = host
+        .counterfactual(
+            AGENT,
+            review(""),
+            vertep_agent::counterfactual::DecisionSource::Recorded,
+        )
+        .unwrap();
+    assert_eq!(same.first_divergence, None);
+    assert!(same.changed_dispositions.is_empty());
+    assert_eq!(same.original_version, same.counterfactual_version);
+
+    // asked instead of replaying the record, a supplied decider answers `reject`
+    let rejecting = |_: &vertep_agent::decider::DecisionRequest| {
+        DecisionOutcome::Decision(Decision::new("reject", Value::Undefined))
+    };
+    let r = host
+        .counterfactual(
+            AGENT,
+            review(""),
+            vertep_agent::counterfactual::DecisionSource::Supplied(&rejecting),
+        )
+        .unwrap();
+    assert_eq!(r.decisions, "supplied");
+    let last = r.steps.last().unwrap();
+    assert_eq!(last.original_state, vec!["approved"]);
+    assert_eq!(last.counterfactual_state, vec!["rejected"]);
+    assert!(r.first_divergence.is_some());
+}
