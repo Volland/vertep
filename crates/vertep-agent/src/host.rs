@@ -584,6 +584,15 @@ impl AgentHost {
             ts: entry.ts,
             input: entry.input.kind().to_owned(),
             chart_version: version.clone(),
+            replay: if entries
+                .iter()
+                .filter(|e| e.position <= position)
+                .any(|e| crate::redaction::has_erased(&e.input))
+            {
+                "recorded"
+            } else {
+                "verified"
+            },
             entered: after
                 .iter()
                 .filter(|s| !before.contains(s))
@@ -984,7 +993,7 @@ impl AgentHost {
             AgentInput::ToolResult { invokeid, .. } => {
                 !m.is_running(invokeid) && !invokeid.starts_with(&format!("{actor}/send/"))
             }
-            AgentInput::Start { .. } => true,
+            AgentInput::Start { .. } | AgentInput::Erasure { .. } => true,
         };
         if duplicate || m.is_terminated() {
             return Ok(());

@@ -57,6 +57,9 @@ fn line(x: &Explanation) -> String {
         render(&x.state_before),
         render(&x.state_after)
     );
+    if x.replay == "recorded" {
+        out.push_str("\n    replay: recorded (erased data; not a full verification)");
+    }
     if let Some(d) = &x.decision {
         out.push_str(&format!(
             "\n    {}: offered {}, chose {}",
