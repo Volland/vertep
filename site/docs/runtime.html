@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -258,7 +259,7 @@ as of entry 1: ["paid"]
     <table>
       <thead><tr><th>Piece</th><th>Implementations</th><th>Notes</th></tr></thead>
       <tbody>
-        <tr><td>Mailboxes</td><td><code>MemoryMailboxes</code>, <code>StoreMailboxes</code></td><td>Store-backed mailboxes live in the actor's storage and outlive the process. Set with <code>NodeBuilder::mailboxes</code>, or per IRI scheme with <code>mailboxes_for_scheme</code>.</td></tr>
+        <tr><td>Mailboxes</td><td><code>MemoryMailboxes</code>, <code>StoreMailboxes</code>; <code>RelayInbox</code> in <code>vertep-federation</code> for actors behind a DID relay</td><td>Store-backed mailboxes live in the actor's storage and outlive the process. Set with <code>NodeBuilder::mailboxes</code>, or per IRI scheme with <code>mailboxes_for_scheme</code>.</td></tr>
         <tr><td>Transports</td><td><code>LocalTransport</code> (the SCXML Event I/O Processor, alias <code>scxml</code>); the cluster, DIDComm, TSP and WebSocket processors</td><td>Each is an SCXML Event I/O Processor that <code>&lt;send type="…"&gt;</code> selects; <code>_event.origintype</code> names the one that delivered.</td></tr>
         <tr><td>Directory</td><td>a <code>Resolver</code> per IRI scheme</td><td>Resolution depends only on the address, so reactivation or relocation keeps it. <code>handle.register_resolver(scheme, resolver)</code>.</td></tr>
         <tr><td>Placement</td><td>none on a single node; <code>ClusterNode</code> in a cluster</td><td>Answers <code>Local</code>, <code>Remote(mailbox)</code> or <code>Hold</code> before a message is delivered or an actor activated.</td></tr>
@@ -309,7 +310,7 @@ as of entry 1: ["paid"]
     <span class="k">fn</span> <span class="nf">clear_graph</span>(<span class="o">&amp;</span><span class="bp">self</span>, graph: <span class="kp">&amp;</span><span class="nc">NamedNode</span>) -&gt; <span class="callout">Result</span><span class="o">&lt;</span>(), StoreError<span class="o">&gt;</span>;
     <span class="k">fn</span> <span class="nf">query</span>(<span class="o">&amp;</span><span class="bp">self</span>, sparql: <span class="kp">&amp;</span><span class="kt">str</span>) -&gt; <span class="callout">Result</span><span class="o">&lt;</span>QueryResults, StoreError<span class="o">&gt;</span>;
 }</code></pre>
-    <p><code>AppendError</code> is <code>Conflict</code>, <code>Fenced</code>, <code>Unsupported</code>, <code>Invalid</code> or <code>Storage</code>. <code>AppendMeta</code> carries an optional fencing token (a scope IRI and an epoch) and an optional state delta. A store that does not enforce fencing refuses a token rather than ignoring it. A node's <code>Storage</code> pairs one journal store with the graph stores that hold each actor's current state, snapshots, outbox marks, dead letters and store-backed mailbox.</p>
+    <p><code>AppendError</code> is <code>Conflict</code>, <code>Fenced</code>, <code>Unsupported</code>, <code>Invalid</code>, <code>Refused</code> (an enforced rule program would report a violation; see <a href="rules-operating.html#enforcement">Operating rules</a>) or <code>Storage</code>. <code>AppendMeta</code> carries an optional fencing token (a scope IRI and an epoch) and an optional state delta. A store that does not enforce fencing refuses a token rather than ignoring it. A node's <code>Storage</code> pairs one journal store with the graph stores that hold each actor's current state, snapshots, outbox marks, dead letters and store-backed mailbox.</p>
     <table>
       <thead><tr><th>Backend</th><th>Crate</th><th>Implements</th><th>Use</th></tr></thead>
       <tbody>

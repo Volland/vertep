@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-tsp-mediator"
 keywords = ["tsp", "mediator", "mailbox", "did", "trust-spanning"]
 categories = ["network-programming", "cryptography"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "experimental"
+tier-reason = "No user outside the project"
+
 [features]
 default = ["server"]
 # The HTTP and WebSocket server (axum on tokio), the HTTP relay network, the WebSocket live

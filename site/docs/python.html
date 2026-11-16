@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -275,7 +276,7 @@ with ActorSystem(
       <li><strong>One thread.</strong> Datamodels need not be <code>Send</code>, so a system belongs to the thread that created it; another thread touching it raises an error. Create it where you use it.</li>
       <li><strong>Synchronous.</strong> There is no <code>asyncio</code> API yet. Calls return when the macrostep is done; <code>wait</code> blocks the calling thread.</li>
       <li><strong>Numbers are floats.</strong> The CEL datamodel's integers arrive as Python <code>float</code>s, as they do as JavaScript numbers (<code>3.0 == 3</code> holds).</li>
-      <li><strong>Not yet bound:</strong> <code>request</code>/reply, the WebSocket transport, agents and deciders, federation and the cluster. Use the Rust crates or the JavaScript packages for those.</li>
+      <li><strong>Not yet bound:</strong> <code>request</code>/reply, the WebSocket transport, agents and deciders (with explanations and bundles), rules, federation and the cluster. The JavaScript packages have <code>request</code> and the WebSocket transport; the rest exists only in the Rust crates.</li>
       <li><strong>No ECMAScript datamodel in the default wheel.</strong> boa adds several megabytes; build with <code>maturin develop --features ecmascript</code> if you need it.</li>
     </ul>
 

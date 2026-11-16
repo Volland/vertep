@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -466,7 +467,7 @@ export function createCounterActor(system: ActorSystem, key: string): ActorRef&l
       <li><strong>SHACL:</strong> tested by the same property test, and proven in Lean (<code>Types.Shacl.shacl_agrees</code>) for the intended shapes. List members carry a <code>vt:listMember</code> predicate, so every shape path is a plain predicate path that standard SHACL engines check.</li>
       <li><strong>Type soundness of <code>step</code></strong> (a well-typed chart only ever writes well-typed values) is proven in Lean, relative to the checker's typing and a datamodel that answers each expression with a value of its static type. <code>vt certify</code> accepts typed charts, and the SHACL projection of types is proven to agree with the checker.</li>
     </ul>
-    <p>The open items are tracked in <code>openspec/changes/verification-backlog/tasks.md</code> and described on <a href="verification.html">Verification</a>.</p>
+    <p>These items closed with the verification backlog, archived in <code>openspec/changes/archive/2026-11-12-verification-backlog/tasks.md</code> and described on <a href="verification.html#open">Verification</a>.</p>
 
     <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
 

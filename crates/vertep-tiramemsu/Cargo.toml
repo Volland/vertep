@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-tiramemsu"
 keywords = ["vertep", "event-sourcing", "rdf", "bitemporal", "triple-store"]
 categories = ["database"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "stable"
+tier-reason = "Passes the store contract kit; the default durable backend of the facade and the durable-actor example"
+
 [dependencies]
 vertep-store = { workspace = true }
 oxrdf = { workspace = true }

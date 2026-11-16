@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-kolyada"
 keywords = ["protocol", "choreography", "agents", "json-ld", "did"]
 categories = ["network-programming", "cryptography", "data-structures"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "experimental"
+tier-reason = "Core only: join policy, sealed fan-out, chart role binding, vt kolyada and the Lean model are open (M10)"
+
 [features]
 default = []
 # An Ed25519 `Signer` and `Verifier` over in-memory keys, for tests, vectors and examples.

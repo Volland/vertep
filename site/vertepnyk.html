@@ -110,7 +110,7 @@ pnpm build
 pnpm dev                                        # the web shell in a browser
 pnpm --filter vertepnyk-vscode run package      # the VS Code extension
 pnpm --filter vertepnyk-electron run dist       # the desktop app for this OS</code></pre>
-        <p>Building needs Node.js 22 and pnpm. Until <code>@vertep/web</code> is on npm, the workspace links Vertep's JavaScript packages from a sibling checkout; the repository's README explains how.</p>
+        <p>Building needs Node.js 22 and pnpm. <code>@vertep/web</code> is on npm, but its <code>latest</code> tag is still 0.1.2 and Vertepnyk needs 0.1.4 or later, so the workspace links Vertep's JavaScript packages from a sibling checkout; the repository's README explains how.</p>
       </div>
     </div>
     <div class="callout warn">

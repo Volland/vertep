@@ -35,5 +35,9 @@
     "access": "public",
     "tag": "next"
   },
-  "homepage": "https://volland.github.io/vertep/"
+  "homepage": "https://volland.github.io/vertep/",
+  "vertep": {
+    "tier": "preview",
+    "tierReason": "Built and tested with @vertep/web in CI; same npm tags"
+  }
 }

@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -234,7 +235,7 @@
     <p>A <strong>chart version</strong> is an IRI of the form <code>urn:vertep:chart:sha256:&lt;hex&gt;</code>: the SHA-256 of the chart's RDF projection after RDFC-1.0 canonicalization. Two charts that differ only in layout, attribute order or surface have the same version; any change in behaviour gives a new one. Every journal segment records the version that wrote it, and an actor stays on its version until it reaches a final state. Moving a running actor to a new version is an explicit <strong>migration</strong>, itself written to the journal. Replaying an old journal against the latest chart would break determinism, so Vertep never does it. See <a href="rdf.html">RDF and versions</a> and <a href="runtime.html">The actor runtime</a>.</p>
 
     <h2 id="deciders">Deciders</h2>
-    <p>A state marked <code>vt:decide</code> is a choice point. On entry, the core computes which events would be enabled there and offers them to a <strong>decider</strong>: guards, an LLM, a person, or another actor. The answer comes back as an event, <code>vt.decision</code>, is journaled like any other input, and is accepted only if it names one of the events offered. <code>vt.decide.none</code> is always a legal answer. A decider can choose among the chart's transitions; it can never add one. Because the decision is in the journal, a replay reproduces the run without calling the decider again. See <a href="agents.html">Agents and deciders</a>.</p>
+    <p>A state marked <code>vt:decide</code> is a choice point. On entry, the agent host computes which events would be enabled there and offers them to a <strong>decider</strong>: guards, an LLM, a person, another actor or a rule program. The answer comes back as an event, <code>vt.decision</code>, is journaled like any other input, and is accepted only if it names one of the events offered. When no event is enabled, nobody is asked and the chart receives <code>vt.decide.none</code>. A decider can choose among the chart's transitions; it can never add one. Because the decision is in the journal, a replay reproduces the run without calling the decider again. See <a href="agents.html">Agents and deciders</a>.</p>
 
     <h2 id="determinism">The determinism rule</h2>
     <p>Everything above rests on one rule:</p>
@@ -271,7 +272,7 @@
         <tr><td>Outbox</td><td>The sends and timers of a journal entry, dispatched only after the entry commits.</td></tr>
         <tr><td>Chart version</td><td><code>urn:vertep:chart:sha256:&lt;hex&gt;</code>, the hash of the chart's canonical RDF.</td></tr>
         <tr><td>Migration</td><td>A journaled move of a running actor from one chart version to another.</td></tr>
-        <tr><td>Decider</td><td>The pluggable chooser behind a <code>vt:decide</code> state: guards, an LLM, a human or another actor, which may only pick one of the currently enabled events.</td></tr>
+        <tr><td>Decider</td><td>The pluggable chooser behind a <code>vt:decide</code> state: guards, an LLM, a human, another actor or a rule program, which may only pick one of the currently enabled events.</td></tr>
         <tr><td>Shard</td><td>The unit of placement in a cluster: the set of actors whose IRI hashes to it, leased to one node and stored in one journal file.</td></tr>
       </tbody>
     </table>

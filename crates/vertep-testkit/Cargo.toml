@@ -9,6 +9,12 @@ repository.workspace = true
 authors.workspace = true
 publish = false
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "preview"
+tier-reason = "Property-test generators used by the conformance differential; test-only, not published"
+
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
 # Without the default `fork` and `timeout` features (unused), so it also builds for

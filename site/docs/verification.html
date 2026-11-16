@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html" aria-current="page">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -130,7 +131,7 @@
 
     <h2 id="lean">The Lean package</h2>
     <p>The model lives in <code>lean/vertep-lean</code>, a Lake package pinned to <code>leanprover/lean4:v4.35.0</code> (in <code>lean-toolchain</code>). It depends on LeanRDF, pinned to commit <code>b407b97424150fec25a1ade514c71ea7abc61b42</code>, for the RDF 1.2 data model and its SHACL Core validator. The library is compiled with <code>warningAsError</code>, so a <code>sorry</code> fails the build.</p>
-    <p>It contains the chart IR, a <code>WellFormed</code> predicate with a decision procedure proven correct, the executable <code>step</code> of W3C SCXML Appendix D, the RDF projection and its decoder, the type language, and three protocol models (journal, agent, lease). Next to the library, <code>lakefile.lean</code> builds seven executables:</p>
+    <p>It contains the chart IR, a <code>WellFormed</code> predicate with a decision procedure proven correct, the executable <code>step</code> of W3C SCXML Appendix D, the RDF projection and its decoder, the type language, the protocol models (journal, agent, lease, object custody with custodian-set changes, and the wallet's credential exchange), and the checker of rule certificates. Next to the library, <code>lakefile.lean</code> builds nine executables:</p>
     <table>
       <thead><tr><th>Executable</th><th>Used for</th></tr></thead>
       <tbody>
@@ -139,6 +140,8 @@
         <tr><td><code>vertep-journal</code></td><td>Judges observations of the Rust journal protocol against the journal model</td></tr>
         <tr><td><code>vertep-decide</code></td><td>Judges decision outcomes of the Rust agent machine against the agent model</td></tr>
         <tr><td><code>vertep-lease</code></td><td>Replays cluster fault-injection histories against the lease model</td></tr>
+        <tr><td><code>vertep-custody</code></td><td>Replays durable-object custody fault histories against the custody model, in strict mode</td></tr>
+        <tr><td><code>vertep-wallet</code></td><td>Judges recorded credential exchanges of the Rust wallet against the exchange model</td></tr>
         <tr><td><code>vertep-types</code></td><td>Checks values against types, to compare with the Rust value checker</td></tr>
         <tr><td><code>vertep-shapes</code></td><td>Runs LeanRDF's SHACL validator with the chart shapes on N-Quads files, an empirical check of the shapes</td></tr>
       </tbody>
@@ -148,7 +151,7 @@
     <p>Lean cannot run ECMAScript. So during a Rust run every datamodel request (evaluate this condition, assign this location) and its answer is written to a tape. In the oracle the Lean <code>step</code> must issue exactly the same requests in the same order, and it takes the answers from the tape. A request that differs is a trace difference. For the <code>null</code> datamodel, Lean evaluates <code>In()</code> itself and needs no tape.</p>
 
     <h2 id="proven">What is proven</h2>
-    <p><code>lean/vertep-lean/VertepTests/Axioms.lean</code> pins the axioms of 78 main theorems. At build time it collects the axioms each one depends on and fails if anything other than <code>propext</code>, <code>Classical.choice</code> and <code>Quot.sound</code> appears. A <code>sorry</code> shows up as the axiom <code>sorryAx</code>, so it fails there too; the file even proves that the gate rejects a deliberate <code>sorry</code>. The main results, grouped:</p>
+    <p><code>lean/vertep-lean/VertepTests/Axioms.lean</code> pins the axioms of 147 main theorems. At build time it collects the axioms each one depends on and fails if anything other than <code>propext</code>, <code>Classical.choice</code> and <code>Quot.sound</code> appears. A <code>sorry</code> shows up as the axiom <code>sorryAx</code>, so it fails there too; the file even proves that the gate rejects a deliberate <code>sorry</code>. The main results, grouped:</p>
     <table>
       <thead><tr><th>Area</th><th>Theorems</th><th>In words</th></tr></thead>
       <tbody>
@@ -162,6 +165,9 @@
         <tr><td>Journal protocol</td><td><code>Journal.replay_determinism</code>, <code>replay_no_divergence</code>, <code>replay_equals_live</code>, <code>turn_idempotent</code>, <code>accepted_once</code>, <code>outbox_safe</code>, <code>outbox_complete</code>, <code>no_message_lost</code>, <code>cas_single</code>, <code>turn_cas_exclusive</code>, <code>accepts_iff</code>, <code>reachable_admissible</code></td><td>Over any interleaving of crashes, redeliveries and concurrent activations: replay reproduces each entry, a message id is processed once, every recorded send is dispatched and no unrecorded one is, and of two appends at one position at most one succeeds.</td></tr>
         <tr><td>Agents</td><td><code>Agent.decider_safety</code>, <code>stale_not_taken</code>, <code>unknown_not_taken</code>, <code>decision_dedup</code>, <code>decision_once</code>, <code>replay_live</code>, <code>chainGrant_mem</code>, <code>grants_do_not_escalate</code>, <code>grant_enforced</code>, <code>ungranted_not_delivered</code>, <code>granted_delivered</code></td><td>A transition taken because of a decision was enabled when it was offered; stale or unknown decisions are never taken; grants never widen down a chain of invocations, and a send outside the grants is not delivered.</td></tr>
         <tr><td>Leases</td><td><code>Lease.grant_unique</code>, <code>accepted_granted</code>, <code>one_writer_per_epoch</code>, <code>journal_epochs_ordered</code>, <code>shard_epochs_ordered</code>, <code>message_once</code>, <code>stale_append_fenced</code>, <code>frames_ordered</code>, <code>stale_frame_dropped</code></td><td>Per shard and epoch at most one writer's appends are accepted; a writer with a stale epoch is fenced off.</td></tr>
+        <tr><td>Object custody</td><td><code>Custody.one_writer_per_epoch</code>, <code>committed_survives_election</code>, <code>committed_survives_accept</code>, <code>committed_in_writer_log</code>, <code>Custody.Joint.rquorum_inter</code>, <code>one_writer_per_epoch_noChange</code>, <code>committed_survives_noChange</code>, <code>Custody.Unsafe.rust_switch_loses_committed</code>, <code>rust_pending_two_writers</code></td><td>For a fixed custodian set, and for runs that start no change of it: one writer per epoch, and an entry committed in one epoch is in the log of every later writer. The first rule for changing the set is shown unsafe by reachable counterexamples. Safety for runs that do change the set is not proven (see <a href="#open">below</a>).</td></tr>
+        <tr><td>Wallet exchange</td><td><code>Wallet.issue_needs_possession</code>, <code>issue_once_per_offer</code>, <code>present_needs_consent</code>, <code>disclosure_within_consent</code>, <code>accept_sound</code>, <code>accept_once_per_nonce</code>, <code>Wallet.Unsafe.audience_check_needed</code></td><td>Whatever the network does: an issuance follows a possession proof, a presentation discloses only consented claims, and a verifier accepts only a presentation made for it on a nonce it asked for, once. A verifier without the audience check is shown unsafe.</td></tr>
+        <tr><td>Rule certificates</td><td><code>RuleCert.check_sound</code>, <code>check_complete</code>, <code>triple_in_tape</code></td><td>The certificate check accepts an instance exactly when it is a derivation of the conclusion from the recorded statements; see <a href="rules-verification.html#certificate">Checking rules</a>.</td></tr>
         <tr><td>Types</td><td><code>Types.check_iff</code>, <code>check_sound</code>, <code>Chain.dedup</code>, <code>JsonSchema.validate_proj</code>, <code>JsonSchema.jsonSchema_agrees</code></td><td>The type checker decides the typing relation exactly, on every declaration block; the JSON Schema projection accepts a JSON value exactly when it has the type.</td></tr>
       </tbody>
     </table>
@@ -176,8 +182,7 @@ theorem configuration_wellformedness : ConfigurationWellFormedness :=
     <div class="callout"><p>Some limits are deliberate. The type theorems read a <code>pattern</code> as the lexical rule its regular expression encodes; the regular expressions themselves are not proven equal to those rules. Lean decides <code>int</code> on the exact decimal while Rust decides it on an <code>f64</code>, so differential cases stay away from the edges of the signed 64-bit range.</p></div>
 
     <h2 id="open">The verification backlog</h2>
-    <p>Every item below is done: the backlog change was archived on 2026-11-12 with all formal-model requirements implemented and verified.</p>
-    <p>The open items are tracked in <code>openspec/changes/verification-backlog/tasks.md</code>. As that file stands:</p>
+    <p>Every item below is done: the backlog change was archived on 2026-11-12 with all formal-model requirements implemented and verified. Its tasks are in <code>openspec/changes/archive/2026-11-12-verification-backlog/tasks.md</code>. The items that took most work:</p>
     <table>
       <thead><tr><th>Task</th><th>Statement</th><th>State</th></tr></thead>
       <tbody>
@@ -185,10 +190,16 @@ theorem configuration_wellformedness : ConfigurationWellFormedness :=
         <tr><td>4.2 SHACL projection of types</td><td>a value's RDF encoding conforms to its type's generated shape exactly when it has the type</td><td>Done. <code>Types.Shacl.shacl_agrees</code>: a value's encoding conforms to its type's shape (named types unfolded far enough) exactly when it has the type, also stated against LeanRDF's validator. It assumes distinct union tags and object keys, and that LeanRDF's regular expressions decide the decimal, datetime and IRI patterns as the type checker does (checked on samples, not proven). The shapes Rust publishes for lists use an IRI where SHACL needs a path, so a standard engine skips list members; fixed in task 4.7: list members now carry a <code>vt:listMember</code> predicate, so the shapes use plain predicate paths.</td></tr>
         <tr><td>4.4 Type soundness of <code>step</code></td><td>a well-typed chart, configuration and input give a well-typed datamodel and well-typed output events</td><td>Done. <code>Typed.typed_step_soundness</code> and <code>typed_start_soundness</code>: from a typed datamodel, session, input and answer tape, <code>step</code> and <code>start</code> write only typed values, emit typed sends and queue typed events. The theorems take the chart's static typing as given and state each check of <code>check_chart</code> as a property; the datamodel's evaluation enters as a typed answer tape. The proof found six checker bugs, now fixed: a bare <code>&lt;assign&gt;</code> to a required location, <code>idlocation</code> into a non-string location, <code>foreach</code> item and index types, <code>namelist</code> keys, and declared <code>error.*</code> and <code>done.state.*</code> payloads.</td></tr>
         <tr><td>4.5 <code>vt certify</code> for typed charts</td><td>certify charts with a <code>vt:types</code> block</td><td>Done. The checker reads the <code>vt:types</code> block, derives the type triples as Rust does and hashes them into the version; 1,000 generated typed charts certify under the Rust version.</td></tr>
-        <tr><td>2.4, 4.6 Annotations and axioms</td><td>every theorem traced and its axioms pinned</td><td>Partial; waits on the theorems above.</td></tr>
+        <tr><td>2.4, 4.6 Annotations and axioms</td><td>every theorem traced and its axioms pinned</td><td>Done. Every formal-model declaration and test is annotated, and the axioms of each theorem above are pinned in <code>VertepTests.Axioms</code>.</td></tr>
       </tbody>
     </table>
-    <p>Until 2.3 is proven, the Rust SHACL validator, the Rust IR validator and the Lean <code>WellFormed</code> agree because they are tested against each other, not because a theorem says so.</p>
+    <p>What is still open, outside that backlog:</p>
+    <ul>
+      <li><strong>Custody under custodian-set changes.</strong> One writer per epoch and the survival of committed entries are stated for runs that change the custodian set (<code>OneWriterPerEpoch</code>, <code>CommittedSurvives</code> in <code>CustodyJoint.lean</code>) but not proven. Until they are, a seeded random search at build time and the strict replay of every custody fault history check them (task 10.4 of <code>m7-durable-objects</code>).</li>
+      <li><strong>Agent protocols.</strong> Kolyada has no Lean model yet: no protocol theorems and no <code>vertep-kolyada</code> checker (group 8 of <code>m10-agent-protocols</code>).</li>
+      <li><strong>Decision dispositions.</strong> Conformance vectors for each disposition of a decision entry, replayed through the Lean oracle in strict mode, are not written (task 2.3 of <code>m12-decision-records</code>).</li>
+      <li><strong>Rule certificates beyond the fragment.</strong> A rule decision is certified only for clauses of statement lookups and integer comparisons; see <a href="rules-verification.html#certificate">Checking rules</a>.</li>
+    </ul>
 
     <h2 id="differential">Differential testing</h2>
     <p>Charts cross to Lean as N-Quads of their RDF projection, decoded by the same <code>fromRDF</code> that the round-trip theorem covers, so every differential run also exercises the projection. The Rust side records one JSON Lines record per macrostep: configuration, effects and datamodel requests. Sources of cases:</p>
@@ -196,7 +207,7 @@ theorem configuration_wellformedness : ConfigurationWellFormedness :=
       <li><strong>Generated charts.</strong> <code>vertep-testkit</code> generates well-formed charts and input sequences (<code>crates/vertep-conformance/src/differential.rs</code>). A disagreement is shrunk by proptest to a minimal chart and inputs and stored in <code>crates/vertep-conformance/regressions/</code>, which every run replays.</li>
       <li><strong>The IRP suite.</strong> Every runnable W3C test runs on Rust with its answer tape recorded; the oracle must give the same trace and verdict.</li>
       <li><strong>Validator against checker.</strong> Generated charts, and the same charts broken by one targeted mutation per validation rule, go to both the Rust validator and <code>vt-certify</code> (<code>tests/certify.rs</code>).</li>
-      <li><strong>Protocols.</strong> <code>tests/journal_protocol.rs</code> drives two nodes sharing one journal store through crashes, redeliveries and concurrent activations and hands the observation to <code>vertep-journal</code>. <code>tests/decide_differential.rs</code> feeds adversarial decisions (stale and forged correlation ids, unknown or unoffered events, bad payloads) to the agent machine and has <code>vertep-decide</code> judge the outcomes. The cluster fault-injection test in <code>crates/vertep-cluster/tests/faults.rs</code> replays its history through <code>vertep-lease</code>.</li>
+      <li><strong>Protocols.</strong> <code>tests/journal_protocol.rs</code> drives two nodes sharing one journal store through crashes, redeliveries and concurrent activations and hands the observation to <code>vertep-journal</code>. <code>tests/decide_differential.rs</code> feeds adversarial decisions (stale and forged correlation ids, unknown or unoffered events, bad payloads) to the agent machine and has <code>vertep-decide</code> judge the outcomes. The cluster fault-injection test in <code>crates/vertep-cluster/tests/faults.rs</code> replays its history through <code>vertep-lease</code>, the custody fault test in <code>crates/vertep-objects/tests/faults.rs</code> replays its histories through <code>vertep-custody</code>, and <code>crates/vertep-wallet/tests/conformance.rs</code> has <code>vertep-wallet</code> judge every recorded exchange.</li>
       <li><strong>Types.</strong> <code>tests/types_differential.rs</code> checks 4,000 generated declaration blocks, types and values with Rust and with <code>vertep-types</code>.</li>
     </ul>
     <p>The full differential runs are <code>#[ignore]</code>d in normal test runs and need the Lean executables built. Small smoke samples run with the ordinary tests and skip with a message when the Lean build is missing. Two excerpts from a run of the full set:</p>
@@ -305,12 +316,12 @@ No certificate was produced.</code></pre>
         <tr><td>Certify one chart</td><td><code>vt certify &lt;chart&gt;</code></td></tr>
       </tbody>
     </table>
-    <p><code>scripts/check.sh</code> is the Lean CI gate. It builds the library with warnings as errors, scans the sources for <code>sorry</code>, <code>admit</code>, <code>axiom</code>, <code>unsafe</code>, <code>implemented_by</code> and <code>extern</code>, builds the seven executables and the tests, and prints the axioms of every main theorem:</p>
+    <p><code>scripts/check.sh</code> is the Lean CI gate. It builds the library with warnings as errors, scans the sources for <code>sorry</code>, <code>admit</code>, <code>axiom</code>, <code>unsafe</code>, <code>implemented_by</code> and <code>extern</code>, builds the nine executables and the tests, and prints the axioms of every main theorem:</p>
 <pre data-lang="Shell"><code>lean/vertep-lean/scripts/check.sh</code></pre>
 <pre class="output" data-lang="Output (excerpt)"><code>== lake build VertepLean (warnings are errors)
 ...
 == source scan
-== lake build vertep-oracle vt-certify vertep-shapes vertep-journal vertep-lease vertep-decide vertep-types
+== lake build vertep-oracle vt-certify vertep-shapes vertep-journal vertep-lease vertep-custody vertep-wallet vertep-decide vertep-types
 ...
 == lake build VertepTests (axioms pinned)
 ...

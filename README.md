@@ -50,7 +50,7 @@ Three loan applications are decided by a scripted stand-in for a model. On the s
 
 ### Where it stands
 
-Version **0.1.x**, built in the open and quickly. The SCXML core, the journal, deciders and the Lean model are the strong parts; clusters, federation, durable objects, wallets and agent protocols are built and specified but younger, with open items on the [roadmap](tg.md/roadmap.md). It is not a compliance product: it gives you an honest record and structural limits, and [what it contributes to the rules you answer to](https://volland.github.io/vertep/regulated.html) is stated next to what it does not. Planned work on explanation export, personal-data redaction in journals and production readiness is drafted in [`openspec/changes/m12-decision-records`](openspec/changes/m12-decision-records) and [`m13-production-readiness`](openspec/changes/m13-production-readiness). Feedback and issues are the most useful contribution right now.
+Version **0.1.x**, built in the open and quickly. The SCXML core, the journal, deciders and the Lean model are the strong parts; clusters, federation, durable objects, wallets, agent protocols and rules are built and specified but younger, with open items on the [roadmap](tg.md/roadmap.md). Each package's [stability tier](#packages-and-stability-tiers) says which is which. It is not a compliance product: it gives you an honest record and structural limits, and [what it contributes to the rules you answer to](https://volland.github.io/vertep/regulated.html) is stated next to what it does not. Decision records (explanations, offline-verified bundles, signed agent journals, counterfactual replay and erasure by key destruction) are built in Rust and not yet exposed in JavaScript or Python; what remains of them is in [`openspec/changes/m12-decision-records`](openspec/changes/m12-decision-records). Benchmarks, a reproducible build, a supply-chain gate and journal shipping between nodes are in [`m13-production-readiness`](openspec/changes/m13-production-readiness). Feedback and issues are the most useful contribution right now.
 
 ---
 
@@ -113,8 +113,10 @@ Then run it as a durable actor, give it a decider, or load it in the browser: th
 In JavaScript:
 
 ```sh
-npm install @vertep/web @vertep/dm-ecma   # dm-ecma only for datamodel="ecmascript"; null and CEL are built in
+npm install @vertep/web@next @vertep/dm-ecma@next   # dm-ecma only for datamodel="ecmascript"; null and CEL are built in
 ```
+
+The npm `latest` tag still points at 0.1.2; `next` carries the current line.
 
 ```js
 import { createActorSystem } from "@vertep/web";
@@ -125,27 +127,44 @@ await order.send({ type: "start" });
 console.log((await order.getSnapshot()).configuration);
 ```
 
-## Packages
+In Python, `pip install vertep` (CPython 3.9 or later): the same actors, journals and time travel; see the [Python guide](https://volland.github.io/vertep/docs/python.html).
 
-| Crate | What it is |
-| --- | --- |
-| [`vertep`](https://crates.io/crates/vertep) | The facade: one dependency with features for every layer |
-| [`vertep-core`](https://crates.io/crates/vertep-core) | The `no_std` chart IR, type checker and pure `step` function |
-| [`vertep-scxml`](https://crates.io/crates/vertep-scxml) · [`vertep-yaml`](https://crates.io/crates/vertep-yaml) · [`vertep-macros`](https://crates.io/crates/vertep-macros) | The SCXML, YAML and `statechart!` surfaces |
-| [`vertep-dm-ecma`](https://crates.io/crates/vertep-dm-ecma) · [`vertep-dm-cel`](https://crates.io/crates/vertep-dm-cel) · [`vertep-dm-rust`](https://crates.io/crates/vertep-dm-rust) | The ECMAScript, CEL and Rust datamodels |
-| [`vertep-rdf`](https://crates.io/crates/vertep-rdf) | The RDF projection, the `vt:` ontology, SHACL shapes and chart versions |
-| [`vertep-store`](https://crates.io/crates/vertep-store) · [`vertep-tiramemsu`](https://crates.io/crates/vertep-tiramemsu) · [`vertep-oxigraph`](https://crates.io/crates/vertep-oxigraph) | Journal and graph storage traits and backends |
-| [`vertep-runtime`](https://crates.io/crates/vertep-runtime) | The actor runtime: mailboxes, transports, the journal driver, durable timers |
-| [`vertep-agent`](https://crates.io/crates/vertep-agent) | Deciders, LLM and tool actors, capability grants, plan charts |
-| [`vertep-cluster`](https://crates.io/crates/vertep-cluster) · [`vertep-federation`](https://crates.io/crates/vertep-federation) | Clusters with leased shards; DID identities and relay mailboxes |
-| [`vertep-objects`](https://crates.io/crates/vertep-objects) | Durable objects: verifiable journals and decentralised custody over TSP |
-| [`vertep-tsp-mediator`](https://crates.io/crates/vertep-tsp-mediator) | A TSP mailbox mediator and the `vt-mediator` binary |
-| [`vertep-cli`](https://crates.io/crates/vertep-cli) | The `vt` command |
+## Packages and stability tiers
 
-| npm package | What it is |
-| --- | --- |
-| [`@vertep/web`](https://www.npmjs.com/package/@vertep/web) | The actor system in a worker, compiled to WebAssembly, with a typed client for browsers and Node.js |
-| [`@vertep/dm-ecma`](https://www.npmjs.com/package/@vertep/dm-ecma) | The ECMAScript datamodel for `@vertep/web` |
+Every crate and package declares a tier in its manifest. **Stable**: checked against an outside reference (the W3C SCXML suite, the Lean model as an oracle, or the storage contract kit) and used by the tested examples; APIs may still change between 0.x minor versions, with a CHANGELOG entry. **Preview**: well tested and used by examples or bindings, but with no outside reference, recent changes or open tasks. **Experimental**: tested by its own suite only, with open items on the roadmap and no user outside the project yet.
+
+<!-- tiers:begin -->
+| Package | Tier | What it is |
+| --- | --- | --- |
+| [`vertep`](https://crates.io/crates/vertep) | stable | SCXML statecharts, virtual actors and AI agents with charts as RDF: the Vertep facade crate |
+| [`vertep-core`](https://crates.io/crates/vertep-core) | stable | Chart IR, validation and the pure SCXML step kernel for Vertep (no_std) |
+| [`vertep-scxml`](https://crates.io/crates/vertep-scxml) | stable | SCXML reader and writer for Vertep charts |
+| [`vertep-dm-ecma`](https://crates.io/crates/vertep-dm-ecma) | stable | ECMAScript datamodel for Vertep on the boa engine |
+| [`vertep-rdf`](https://crates.io/crates/vertep-rdf) | stable | RDF 1.2 projection, vt ontology, SHACL shapes and canonical hashing for Vertep charts |
+| [`vertep-dm-cel`](https://crates.io/crates/vertep-dm-cel) | stable | CEL datamodel for Vertep |
+| [`vertep-store`](https://crates.io/crates/vertep-store) | stable | Storage contracts for Vertep: JournalStore, GraphStore and their test kit |
+| [`vertep-tiramemsu`](https://crates.io/crates/vertep-tiramemsu) | stable | Tiramemsu backend for Vertep journals and graphs |
+| [`vertep-runtime`](https://crates.io/crates/vertep-runtime) | stable | Event-sourced actor runtime for Vertep: activations, mailboxes, journal, timers and versioning |
+| [`vertep-yaml`](https://crates.io/crates/vertep-yaml) | preview | YAML surface for Vertep charts |
+| [`vertep-oxigraph`](https://crates.io/crates/vertep-oxigraph) | preview | Oxigraph and SPARQL 1.1 graph store adapter for Vertep |
+| [`vertep-macros`](https://crates.io/crates/vertep-macros) | preview | The statechart! macro: Rust DSL for Vertep charts |
+| [`vertep-dm-rust`](https://crates.io/crates/vertep-dm-rust) | preview | Rust datamodel for Vertep charts written with the statechart! macro |
+| [`vertep-cli`](https://crates.io/crates/vertep-cli) | preview | The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles and rules |
+| [`vertep-agent`](https://crates.io/crates/vertep-agent) | preview | Deciders, LLM actors, tools with grants and sandboxed plan charts for Vertep agents |
+| [`@vertep/dm-ecma`](https://www.npmjs.com/package/@vertep/dm-ecma) | preview | The ECMAScript datamodel for @vertep/web: a build of the Vertep worker with the boa engine |
+| [`@vertep/web`](https://www.npmjs.com/package/@vertep/web) | preview | Vertep statecharts as durable actors in browsers and Node.js: SCXML semantics, typed events and a time-travelling journal, running in a worker |
+| [`vertep` (Python)](https://pypi.org/project/vertep/) | preview | W3C SCXML statecharts as durable, journaled actors, from Python: typed events, time travel, SPARQL over the state graph |
+| [`vertep-cluster`](https://crates.io/crates/vertep-cluster) | experimental | Cluster membership, shard leases, QUIC transport and worker pools for Vertep |
+| [`vertep-federation`](https://crates.io/crates/vertep-federation) | experimental | DID identity, grants and relay mailboxes (TSP, DIDComm v2) for Vertep |
+| [`vertep-rules`](https://crates.io/crates/vertep-rules) | experimental | Rule programs beside the journal: a rules decider whose rationale is a derivation, run by lean-elpi through tiramemsu |
+| [`vertep-objects`](https://crates.io/crates/vertep-objects) | experimental | Durable objects for Vertep: DID-addressed actors with verifiable journals and decentralised custody over TSP |
+| [`vertep-tsp-mediator`](https://crates.io/crates/vertep-tsp-mediator) | experimental | A TSP mailbox mediator: routed-mode intermediary with durable store-and-forward mailboxes and pickup |
+| [`vertep-webvh`](https://crates.io/crates/vertep-webvh) | experimental | did:webvh for Vertep: create, update, witness, publish and serve DID logs with key-manager keys |
+| [`vertep-wallet`](https://crates.io/crates/vertep-wallet) | experimental | Agent wallets for Vertep: sealed credentials, consent, pluggable exchange protocols and formats, and an exchange model checked in Lean |
+| [`vertep-kolyada`](https://crates.io/crates/vertep-kolyada) | experimental | Kolyada: verifiable role-based agent protocols for Vertep, with signed messages, projection and conformance checks |
+
+Generated by `python3 site/tools/tiers.py` from the manifests; the reasons for each tier are on [the tiers page](https://volland.github.io/vertep/docs/tiers.html).
+<!-- tiers:end -->
 
 ## Read more
 

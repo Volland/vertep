@@ -71,8 +71,8 @@
 https://example.org/loans/1002  final [&quot;approved&quot;]
   1 start
   2 event     apply
-  3 decision  approve, rationale &quot;strong credit history&quot;
-  4 decision  approve, rationale &quot;verified employment by phone; collateral accepted&quot;
+  3 decision  approve [refused-not-offered, offered [&quot;decline&quot;, &quot;refer&quot;]], rationale &quot;strong credit history&quot;
+  4 decision  approve [accepted, offered [&quot;approve&quot;, &quot;decline&quot;]], rationale &quot;verified employment by phone; collateral accepted&quot;
   as of entry 2: [&quot;underwriting&quot;]
   as of entry 3: [&quot;officer_review&quot;]
   as of entry 4: [&quot;approved&quot;]
@@ -80,7 +80,7 @@ https://example.org/loans/1003  final [&quot;declined&quot;]
   1 start
   2 event     apply</code></pre>
 
-  <p>Read it as an auditor would. The process was in <code>underwriting</code> after entry 2. The underwriter was offered <code>decline</code> and <code>refer</code>: the chart never offered <code>approve</code>, because the amount exceeds the ceiling. The underwriter answered <code>approve</code> anyway, with a rationale. That answer was refused, because it was not on the offer, and the chart sent the case to an officer, who approved it with their own recorded reason.</p>
+  <p>Read it as an auditor would. The process was in <code>underwriting</code> after entry 2. The underwriter was offered <code>decline</code> and <code>refer</code>: the chart never offered <code>approve</code>, because the amount exceeds the ceiling. The underwriter answered <code>approve</code> anyway, with a rationale. That answer was refused, because it was not on the offer, and the entry says so with its disposition, <code>refused-not-offered</code>, and the offer it answered. The chart sent the case to an officer, who approved it with their own recorded reason.</p>
 
   <p>Three things in this record would be hard to get from a log. First, the refused answer is there: the model's attempt to approve is part of the history and not erased by the rule that stopped it. Second, <em>approve</em> in entry 3 did not approve anything. The state as of entry 3 is <code>officer_review</code>, and the record says so. Third, the third application, at 62%, has no decision at all, because the chart declined it by rule and never asked anyone. An empty space where a decision would be is itself an answer.</p>
 
@@ -88,7 +88,7 @@ https://example.org/loans/1003  final [&quot;declined&quot;]
 
   <p>The auditor in the example opens the same journal in a second host with no decider bound, and the process replays: nine entries, zero decider calls, the same states. This matters in a way that is easy to miss. The thing being examined, the model, is not needed to examine its decision. The record is complete enough to stand without it, so it can be checked years later after the model has been retired, retrained or switched off.</p>
 
-  <p>Replay also gives time travel: <code>state_at</code> shows the process as of any entry. And because a chart is versioned by its hash, one can ask a question that logs cannot answer: <em>what would this applicant's journey have been under next quarter's policy?</em> Fork from the journal at the application, run it under a new chart version and compare. The original record is untouched. For a regulated lender changing a threshold, that is the difference between hoping the change is safe and having run it on last year's cases.</p>
+  <p>Replay also gives time travel: <code>state_at</code> shows the process as of any entry. And because a chart is versioned by its hash, one can ask a question that logs cannot answer: <em>what would this applicant's journey have been under next quarter's policy?</em> Replay the recorded inputs and decisions under a new chart version and compare (<code>AgentHost::counterfactual</code>). The original record is untouched. The example does it: with the approval ceiling cut to 15&nbsp;000, the recorded approval of the first loan is no longer on the offer, and the case would have gone to an officer. For a regulated lender changing a threshold, that is the difference between hoping the change is safe and having run it on last year's cases.</p>
 
   <h2>The model's reason is a claim</h2>
 
@@ -102,7 +102,7 @@ https://example.org/loans/1003  final [&quot;declined&quot;]
     <li><strong>It does not explain the model.</strong> If a regulator asks why a model scored an applicant at 0.72, the journal records the score and the move that followed, not what is in the weights.</li>
     <li><strong>It cannot make a bad policy good.</strong> A chart can encode an unfair threshold exactly and then record every use of it faithfully. What it adds is that the threshold is explicit, versioned, testable and replayable on past cases, which is where a fairness review can begin.</li>
     <li><strong>A plain journal is not tamper-evident on its own.</strong> Durable objects in Vertep have hash-chained, signed journals, and an agent journal in a store can opt in to the same chain and signature, so that one verifier checks both; an actor that does not opt in is unchanged. The exportable explanation bundle is built: it carries the journal, the chart by hash and a manifest of digests, and <code>vt verify-bundle</code> checks it with no decider, no network and no runtime, naming the entry that was altered or the chart that is missing. The bundle's own manifest is not signed, though, so it only shows that it is consistent: whoever rewrites the entries and the manifest together produces one that verifies. The signatures on a chained journal are what to check it against.</li>
-    <li><strong>Personal data and an append-only record pull against each other.</strong> Under rules like the GDPR's right to erasure, you cannot simply rewrite history. Until the specified per-subject encryption lands, the safe practice is to keep personal data out of events and journal references to it.</li>
+    <li><strong>Personal data and an append-only record pull against each other.</strong> Under rules like the GDPR's right to erasure, you cannot simply rewrite history. Vertep seals the fields a policy marks sensitive under a per-subject key and erases a subject by destroying the key, which leaves the entries and the chain intact and the sealed values unreadable. An explanation whose replay passed an erased value is marked <code>recorded</code> rather than <code>verified</code>. Two limits remain: the only key store shipped keeps keys in memory, and the replay still re-evaluates a guard that reads an erased value instead of following the recorded transition, so it can diverge. The marker for sensitive fields in the type language is not built either: the policy is given at run time.</li>
     <li><strong>It is 0.1.x software.</strong> The example above is a scripted decider on an in-memory journal. It shows the shape of the record, not a production deployment.</li>
   </ul>
 

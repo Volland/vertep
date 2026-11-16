@@ -33,6 +33,11 @@ Changelog = "https://github.com/Volland/vertep/blob/main/CHANGELOG.md"
 [project.optional-dependencies]
 test = ["pytest>=8"]
 
+[tool.vertep]
+# Stability tier, rendered into the README and the site by site/tools/tiers.py.
+tier = "preview"
+tier-reason = "pytest runs every scenario and example on CPython 3.9 and 3.13; on PyPI since 0.1.9; no agents, cluster or federation yet"
+
 [tool.maturin]
 manifest-path = "../../crates/vertep-py/Cargo.toml"
 python-source = "python"

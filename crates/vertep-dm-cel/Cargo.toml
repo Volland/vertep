@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-dm-cel"
 keywords = ["cel", "expression", "interpreter", "statechart", "no-std"]
 categories = ["compilers", "no-std"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "stable"
+tier-reason = "The CEL variant of the W3C SCXML suite in CI; the type checker's projections are proven in Lean"
+
 [features]
 default = ["std"]
 # Only forwards `std` to vertep-core; the CEL datamodel itself is `no_std` with `alloc`.

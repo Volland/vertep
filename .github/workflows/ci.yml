@@ -93,6 +93,10 @@ jobs:
           node-version: 22
       - run: npm install -g @fission-ai/openspec@1.9.0
       - run: openspec validate --all --strict
+      # production-readiness: Stability Tiers. Every crate and package declares a tier, and the
+      # README and site/docs/tiers.html tables are the ones its manifests render.
+      - name: Stability tier tables match the manifests
+        run: python3 site/tools/tiers.py --check
 
   differential:
     name: Nightly Rust vs Lean differential

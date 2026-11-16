@@ -1,6 +1,6 @@
 [package]
 name = "vertep-cli"
-description = "The vt command line: typecheck, schema, validate, hash, convert, certify and did:webvh"
+description = "The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles and rules"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,6 +12,12 @@ homepage = "https://volland.github.io/vertep/"
 documentation = "https://docs.rs/vertep-cli"
 keywords = ["scxml", "statecharts", "rdf", "cli", "lean"]
 categories = ["command-line-utilities", "development-tools"]
+
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "preview"
+tier-reason = "Commands held to recorded output by the examples tests; explain, verify-bundle and rules are new"
 
 [[bin]]
 name = "vt"

@@ -143,7 +143,7 @@
 
   <h2>The journal is the run</h2>
 
-  <p>Everything nondeterministic enters a Vertep actor as a journaled input: the decision with its annotations, the model's result with its prompt hash, usage and model name, the tool's reply, the timer that fired. The offers themselves are not stored: they follow from the chart and the journal, so replay computes them again. Large prompts and results are stored once by content hash.</p>
+  <p>Everything nondeterministic enters a Vertep actor as a journaled input: the decision with its annotations, the model's result with its prompt hash, usage and model name, the tool's reply, the timer that fired. An offer is not an input: it follows from the chart and the journal, so replay computes it again. A decision entry still notes the events that were offered and what the host made of the answer, accepted or refused and why, so a reader can see both without replaying. The rendered prompt is recorded by its content hash; the model's result is journaled in full, since replay needs it.</p>
 
   <p>So an agent run is not a log <em>about</em> the run. It <em>is</em> the run. Replay it with no model, no network and no API key, and the chart passes through exactly the same states. A bug report becomes a journal you can step through.</p>
 

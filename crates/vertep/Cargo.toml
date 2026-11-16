@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep"
 keywords = ["scxml", "statechart", "actor", "rdf", "state-machine"]
 categories = ["asynchronous", "concurrency", "data-structures"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "stable"
+tier-reason = "Default features (runtime, tiramemsu, scxml) are stable crates; each optional feature has the tier of the crate it enables"
+
 [features]
 default = ["runtime", "tiramemsu", "scxml"]
 # The actor runtime (vertep-runtime) on tokio.

@@ -61,6 +61,7 @@
       <li><a href="rdf.html" aria-current="page">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -84,6 +85,8 @@
         <tr><td>Agent</td><td><code>vt-agent:</code> <code>https://w3id.org/vertep/agent#</code></td><td><code>crates/vertep-rdf/ontology/vt-agent.ttl</code></td><td>Deciders, decisions, LLM calls, tools, tool calls, grants, plans</td></tr>
         <tr><td>Verification</td><td><code>vt:</code> (same namespace)</td><td><code>crates/vertep-rdf/ontology/vt-verification.ttl</code></td><td>Certificates issued by <code>vt certify</code></td></tr>
         <tr><td>Identity</td><td><code>vt-id:</code> <code>https://w3id.org/vertep/vt-id#</code></td><td><code>crates/vertep-federation/ontology/vt-id.ttl</code></td><td>DID actors, verification methods, services, DID-scoped grants, relay envelopes</td></tr>
+        <tr><td>Custody</td><td><code>vt:</code> (same namespace) and <code>cust:</code> <code>https://w3id.org/vertep/custody/1.0#</code></td><td><code>crates/vertep-objects/ontology/custody.ttl</code></td><td>Durable objects, custody epochs, equivocations, the hash chain and signature of an entry, and the custody protocol's messages</td></tr>
+        <tr><td>Wallet</td><td><code>wallet:</code> <code>https://w3id.org/vertep/wallet#</code></td><td><code>crates/vertep-wallet/ontology/wallet.ttl</code></td><td>Wallets, credential metadata (never claim values), exchanges, consent records</td></tr>
       </tbody>
     </table>
     <p>Shapes live next to them: <code>crates/vertep-rdf/shapes/vt-chart-shapes.ttl</code>, <code>crates/vertep-rdf/shapes/vt-agent-shapes.ttl</code>, <code>crates/vertep-runtime/shapes/vt-runtime-shapes.ttl</code> and <code>crates/vertep-federation/shapes/vt-id-shapes.ttl</code>. Shapes for a chart's own types are generated per type (see <a href="#types">typed charts</a> below).</p>

@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-cluster"
 keywords = ["cluster", "actors", "leases", "quic", "sharding"]
 categories = ["network-programming", "asynchronous", "concurrency"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "experimental"
+tier-reason = "Fault injection replayed through the Lean lease model, but no user outside the project and no journal shipping protocol yet"
+
 [features]
 default = ["gossip", "quic", "runtime"]
 # SWIM gossip membership, sans-IO, with an in-process simulated network.

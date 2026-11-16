@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -139,7 +140,7 @@ issuer: did:key:z6MktPXykAZNrjumiFLcDuJXd759osRJ6oUXE7ZJQ3DESwLS
 disclosed: {"nationality":"UA"}</code></pre>
     <p><code>vt wallet offer</code> serves an OpenID4VCI issuer and prints the offer URI; <code>accept</code> and <code>present</code> also take <code>openid-credential-offer://</code> and <code>openid4vp://</code> URIs; <code>revoke</code> sets a status entry and republishes the list under <code>public/</code>. Grant credentials are ordinary wallet credentials: presented over any protocol, they become grants the federation enforces before the journal.</p>
 
-    <p>The design notes are in <code>tg.md/views/wallet.md</code>; the requirements in <code>openspec/changes/m9-agent-wallet</code> (capabilities <code>agent-wallet</code>, <code>credential-exchange</code> and <code>oid4vc</code>); the history format in <code>crates/vertep-wallet/docs/exchange-history.md</code>.</p>
+    <p>The design notes are in <code>tg.md/views/wallet.md</code>; the requirements in <code>openspec/specs</code> (capabilities <code>agent-wallet</code>, <code>credential-exchange</code> and <code>oid4vc</code>; the change itself is archived as <code>openspec/changes/archive/2026-11-14-m9-agent-wallet</code>); the history format in <code>crates/vertep-wallet/docs/exchange-history.md</code>.</p>
 
     <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
 

@@ -13,6 +13,12 @@ documentation = "https://docs.rs/vertep-yaml"
 keywords = ["yaml", "statechart", "scxml", "state-machine", "parser"]
 categories = ["parser-implementations", "encoding"]
 
+[package.metadata.vertep]
+# Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
+# README and the site by site/tools/tiers.py; CI fails when they differ.
+tier = "preview"
+tier-reason = "Own round-trip and layout tests and the typed-order example; no external suite"
+
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
 # YAML 1.2 event parser with source spans; keeps mapping order because we build the tree.

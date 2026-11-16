@@ -40,5 +40,9 @@
     "access": "public",
     "tag": "next"
   },
-  "homepage": "https://volland.github.io/vertep/"
+  "homepage": "https://volland.github.io/vertep/",
+  "vertep": {
+    "tier": "preview",
+    "tierReason": "Tested in Node.js and headless Chrome with a size budget in CI; npm latest is still 0.1.2, next carries the current line"
+  }
 }

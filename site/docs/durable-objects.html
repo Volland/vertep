@@ -61,6 +61,7 @@
       <li><a href="rdf.html">RDF and versions</a></li>
       <li><a href="verification.html">Verification</a></li>
       <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
     </ul>
   </aside>
 
@@ -128,6 +129,7 @@ vt webvh custody change &lt;did&gt; --keys ./keys --custodian ... --quorum 2 --r
 
     <h2 id="verification">What is checked</h2>
     <p>Every entry carries its object, position, epoch, writer, the previous entry's hash, its own hash and the writer's signature, so any party verifies a replica from genesis without trusting whoever served it. Two validly signed entries of one epoch at one position are kept as equivocation evidence and reported to the controller. A randomised fault test drives partitions, colliding elections, crashes and late duplicate messages through many seeds, checks that one writer holds each epoch and that nothing committed is ever lost, and exports each history for the Lean custody model.</p>
+    <p>For a fixed custodian set, one writer per epoch and the survival of committed entries are proven in Lean (<code>lean/vertep-lean/VertepLean/CustodyTheorems.lean</code>). Under custodian-set changes they are not proven yet: both are conjectures in <code>CustodyJoint.lean</code>, checked by a build-time random search and by the strict replay of every fault history (task 10.4 of <code>openspec/changes/m7-durable-objects</code>).</p>
 
     <h2 id="example">The example</h2>
     <p><code>cargo run -p vertep-objects --example three_orgs --features testkit,tsp</code> runs a support agent kept by three organisations over TSP. Org 1 serves it until the agent waits for a person's approval; org 1 disappears; org 2 wins the next epoch from itself and org 3's keeper (reached through its mediator), replays the agent without calling the model again, and the person approves the very decision org 1 had opened.</p>
