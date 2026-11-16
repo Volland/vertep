@@ -13,6 +13,7 @@
 //! @tg: implements:: [[decisions#Journal entries are hash-chained and host-signed]]
 //! @tg: implements:: [[decisions#Custody epochs are won by quorum promises]]
 
+pub mod agent_chain;
 pub mod chain;
 pub mod custody;
 pub mod identity;
@@ -21,6 +22,7 @@ pub mod runtime;
 pub mod testkit;
 pub mod vocab;
 
+pub use agent_chain::{AgentWriter, ChainedAgentSealer, verify_agent_journal};
 pub use chain::{
     ChainError, ChainHead, ChainLink, Digest, EntrySigner, FailureReason, HostKeys,
     KeyManagerSigner, SealedLink, VerifyFailure, content_hash, read_link, seal, verify_chain,

@@ -315,6 +315,27 @@ pub const AGENT_INPUT: &str = "https://w3id.org/vertep/vt#agentInput";
 #[derive(Clone)]
 pub struct StoreAgentJournal {
     store: std::sync::Arc<dyn JournalStore>,
+    sealer: Option<std::sync::Arc<dyn EntrySealer>>,
+}
+
+/// Seals the store entry an agent journal is about to append: it may add statements to it (a
+/// custody link, a content hash and a signature) before the store sees it. The sealer lives
+/// outside this crate so that `vertep-objects`' envelope can be reused without a dependency
+/// from the agent crate on it ([[openspec:decision-records#Agent Journal Integrity]]).
+pub trait EntrySealer: Send + Sync {
+    /// The sealed form of `entry`, which will be appended at `position` of `actor`'s journal.
+    /// `previous` is the entry at `position - 1` as stored, `None` for the first.
+    ///
+    /// # Errors
+    ///
+    /// A description of why the entry cannot be sealed; the append then fails.
+    fn seal(
+        &self,
+        actor: &NamedNode,
+        position: Position,
+        entry: Entry,
+        previous: Option<&Entry>,
+    ) -> Result<Entry, String>;
 }
 
 impl core::fmt::Debug for StoreAgentJournal {
@@ -326,7 +347,24 @@ impl core::fmt::Debug for StoreAgentJournal {
 impl StoreAgentJournal {
     /// An agent journal in `store`.
     pub fn new(store: std::sync::Arc<dyn JournalStore>) -> Self {
-        StoreAgentJournal { store }
+        StoreAgentJournal {
+            store,
+            sealer: None,
+        }
+    }
+
+    /// An agent journal in `store` that seals every entry it appends: a hash-chained, signed
+    /// journal when the sealer is `vertep-objects`' `ChainedAgentSealer`. An actor type that
+    /// does not opt in keeps using [`StoreAgentJournal::new`] and behaves as before.
+    // @tg: implements:: [[openspec:decision-records#Agent Journal Integrity]]
+    pub fn with_sealer(
+        store: std::sync::Arc<dyn JournalStore>,
+        sealer: std::sync::Arc<dyn EntrySealer>,
+    ) -> Self {
+        StoreAgentJournal {
+            store,
+            sealer: Some(sealer),
+        }
     }
 
     fn address(actor: &str) -> Result<NamedNode, JournalError> {
@@ -380,6 +418,29 @@ impl AgentJournal for StoreAgentJournal {
             )],
         );
         let expected = Position::new(entry.position.saturating_sub(1));
+        let stored = match &self.sealer {
+            None => stored,
+            Some(sealer) => {
+                let previous = if entry.position > 1 {
+                    self.store
+                        .read(&address, expected)
+                        .map_err(|e| JournalError::Backend(e.to_string()))?
+                        .into_iter()
+                        .find(|r| r.position == expected)
+                        .map(|r| r.entry)
+                } else {
+                    None
+                };
+                sealer
+                    .seal(
+                        &address,
+                        Position::new(entry.position),
+                        stored,
+                        previous.as_ref(),
+                    )
+                    .map_err(JournalError::Backend)?
+            }
+        };
         match self
             .store
             .append(&address, expected, &[stored], &AppendMeta::none())
