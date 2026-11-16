@@ -60,6 +60,11 @@ lean_exe «vertep-custody» where
 lean_exe «vertep-wallet» where
   root := `VertepWalletMain
 
+/-- The Kolyada protocol model as the judge of recorded participant histories
+(m10-agent-protocols 8.4): `lake exe vertep-kolyada --history HISTORY.jsonl [HISTORY.jsonl …]`. -/
+lean_exe «vertep-kolyada» where
+  root := `VertepProtocolMain
+
 /-- Decision validation as a differential oracle for agent runs (m3-agents 8.5):
 `lake exe vertep-decide --obs DECISIONS.jsonl`. -/
 lean_exe «vertep-decide» where

@@ -17,7 +17,7 @@ categories = ["network-programming", "cryptography", "data-structures"]
 # Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
 # README and the site by site/tools/tiers.py; CI fails when they differ.
 tier = "experimental"
-tier-reason = "Core, chart role binding and vt kolyada built, join policy and sealed fan-out in vertep-federation; the Lean model is open (M10)"
+tier-reason = "Core, role binding, vt kolyada and a Lean model with history replay built; join policy and fan-out in vertep-federation; no user outside the project"
 
 [features]
 default = []
