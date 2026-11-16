@@ -1,7 +1,7 @@
 ---
 type: View
 status: draft
-openspec: [python-bindings]
+openspec: [python-bindings, decision-records]
 ---
 # Python
 
@@ -67,6 +67,15 @@ sequenceDiagram
 - describes:: [[decisions#Python callables are the implementations module]]
 
 A guard or action receives the context and the event as plain Python values and returns a bool or an outcome (`context`, `raise`, `send`). The step runs them under the GIL during a call. They must be pure, because the journal is replayed; `dev=True` checks that by replaying each macrostep.
+
+## Explanation bundles
+
+`vertep.verify_bundle` checks an agent's explanation bundle offline, with no actor system: an auditor reads a bundle exported by a Rust agent host in a notebook.
+
+- describes:: [[components#vertep-agent]] {note: "Bundle::verify and AgentHost::counterfactual, through vertep-wasm's agent feature"}
+- describes:: [[decisions#Python bindings wrap the command bridge]] {note: "module functions with the same ok/err JSON reply as Core.command"}
+
+`verify_bundle` returns a `VerifiedBundle` whose explanations are dicts in `vertep-agent`'s canonical JSON, the text the digests cover; a bundle that does not verify raises `BundleInvalid` naming the entry or chart. `counterfactual_bundle` replays a verified bundle under another chart source with the recorded decisions. There is no agent host in Python, so `explain` on a live actor and exporting bundles stay in Rust.
 
 ## Distribution
 

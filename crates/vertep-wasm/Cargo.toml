@@ -34,6 +34,10 @@ ecmascript = ["dep:vertep-dm-ecma", "dep:getrandom_04"]
 # (`traceCases`, `differentialRecords`) and the W3C IRP suite runner (`conformanceRun`).
 trace = []
 conformance = ["trace", "ecmascript", "dep:vertep-conformance"]
+# Decision records for auditors: offline verification of an agent's explanation bundle
+# (`verifyBundle`, `counterfactualBundle`). In the journal build only; the core build has no
+# room for it in its size budget.
+agent = ["dep:vertep-agent", "dep:getrandom_02"]
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std", "serde"] }
@@ -47,6 +51,7 @@ vertep-dm-rust = { workspace = true }
 vertep-tiramemsu = { workspace = true, optional = true }
 vertep-dm-ecma = { workspace = true, optional = true }
 vertep-conformance = { path = "../vertep-conformance", optional = true }
+vertep-agent = { workspace = true, optional = true }
 tm-wasm = { version = "0.12.0", optional = true }
 oxrdf = { workspace = true }
 serde = { version = "1", features = ["derive"] }
@@ -76,10 +81,13 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 oxsdatatypes = { version = "0.2.4", features = ["js"] }
 # boa (the `ecmascript` feature) seeds its random numbers through getrandom 0.4.
 getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"], optional = true }
+# vertep-agent's sealing of sensitive values (chacha20poly1305) draws keys through getrandom 0.2,
+# whose `js` feature uses `crypto.getRandomValues`. Bundle verification never draws one.
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"], optional = true }
 
 [dev-dependencies]
 # The tests open journal files, so they always build with the journal.
-vertep-wasm = { path = ".", features = ["journal"] }
+vertep-wasm = { path = ".", features = ["journal", "agent"] }
 # Checks that the WebAssembly differential records are the ones the Lean oracle is given.
 vertep-conformance = { path = "../vertep-conformance" }
 proptest = "1.12"

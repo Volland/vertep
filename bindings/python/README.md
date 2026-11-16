@@ -72,13 +72,22 @@ with ActorSystem(storage="file", path="orders.db") as system:
     system.wait(0.5)              # real time passes; the timer fires
 ```
 
+An auditor checks an agent's explanation bundle (exported by a Rust agent host) offline, with no actor system or decider:
+
+```python
+import vertep
+v = vertep.verify_bundle(open("review-bundle.json").read())  # raises BundleInvalid if tampered
+for x in v.explanations:
+    print(x["position"], x["state_before"], "->", x["state_after"])
+```
+
 More in the repository: [examples/python](https://github.com/Volland/vertep/tree/main/examples/python) (a quick start, a cart, a durable actor, Python guards and actions) and the [documentation](https://volland.github.io/vertep/docs/python.html).
 
 ## Things to know
 
 - A system belongs to the thread that created it, and the API is synchronous (no `asyncio` yet).
 - CEL integers arrive as Python floats, as they do in JavaScript.
-- Not yet bound: request/reply, the WebSocket transport, agents, federation and the cluster. Use the Rust crates for those.
+- Not yet bound: request/reply, the WebSocket transport, agent hosts (only bundle verification is), federation and the cluster. Use the Rust crates for those.
 
 ## License
 

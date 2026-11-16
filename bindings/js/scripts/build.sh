@@ -2,7 +2,8 @@
 # Builds the WebAssembly modules and the TypeScript of the npm workspace.
 #
 #   core     packages/web/wasm/core      core, shell, null/cel/rust datamodels, in-memory store
-#   journal  packages/web/wasm/journal   + tiramemsu on SQLite in WebAssembly (lazy-loaded)
+#   journal  packages/web/wasm/journal   + tiramemsu on SQLite in WebAssembly (lazy-loaded), and
+#                                          the offline verifier of agents' explanation bundles
 #   ecma     packages/dm-ecma/wasm       + the boa ECMAScript datamodel (separate package)
 #   test     .native/wasm-test           + the test-only exports (traces, differential records,
 #                                          the W3C IRP suite runner); never published
@@ -52,7 +53,7 @@ build() { # features out-dir
 }
 
 build "" "$here/packages/web/wasm/core"
-build journal "$here/packages/web/wasm/journal"
+build journal,agent "$here/packages/web/wasm/journal"
 artifacts_only="${VERTEP_ARTIFACTS_ONLY:-0}"
 if [ "${VERTEP_SKIP_ECMA:-0}" != 1 ]; then
   build "journal,ecmascript" "$here/packages/dm-ecma/wasm"

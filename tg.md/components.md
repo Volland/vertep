@@ -586,6 +586,7 @@ The WebAssembly build of the core and a browser shell with a TypeScript API and 
 - realizes:: [[decisions#WebSocket sends stay owed until the peer acknowledges them]]
 - realizes:: [[decisions#Test-only WebAssembly exports live in a test build]]
 - uses:: [[components#vertep-conformance]] {kind: optional, note: "feature conformance: the IRP suite runner of the test build"}
+- uses:: [[components#vertep-agent]] {kind: optional, note: "feature agent, in the journal build: offline verification and counterfactual replay of explanation bundles"}
 - realizes:: [[decisions#Hosts instantiate CEL charts typed]]
 - scheduled_in:: [[roadmap#M6 WASM and JS]]
 
@@ -603,7 +604,7 @@ Open: publishing. A smaller storage-free build (the original 600 KB target) need
 The PyO3 extension module of the Python package `vertep`: the actor system's command bridge, a system or virtual clock and Python guards and actions.
 
 - provides:: [[capabilities#Python bindings]] {confidence: full}
-- uses:: [[components#vertep-wasm]] {kind: required, note: "System and its command bridge, with the journal feature and tiramemsu's native host"}
+- uses:: [[components#vertep-wasm]] {kind: required, note: "System and its command bridge, with the journal and agent features and tiramemsu's native host"}
 - uses:: [[components#vertep-runtime]] {kind: required, note: "Shell::virtual_time and the clock trait"}
 - realizes:: [[decisions#Python bindings wrap the command bridge]]
 - realizes:: [[decisions#The Python clock moves only inside calls]]

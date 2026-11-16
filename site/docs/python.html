@@ -257,6 +257,23 @@ with ActorSystem(
         if issubclass(w.category, ImpurityWarning):
             print("dev mode:", str(w.message).split(":")[0])</code></pre>
 
+    <h2 id="bundles">Auditing an agent's decisions</h2>
+    <p>An agent host (the Rust crate <code>vertep-agent</code>) exports an <em>explanation bundle</em>: one actor's journal up to a position, the chart versions it used addressed by hash, and a manifest of digests. <code>vertep.verify_bundle</code> checks one offline, with no actor system, decider or network: it re-hashes every chart, checks every entry against the manifest, replays the journal and recomputes the explanation of each position, comparing it with its digest. It is the same check as <code>vt verify-bundle</code>.</p>
+    <pre data-lang="Python"><code>import vertep
+
+v = vertep.verify_bundle(open("review-bundle.json").read())   # str, bytes or the parsed dict
+print(v.actor, v.from_position, v.to_position, v.decider_calls)   # decider_calls is always 0
+for x in v.explanations:
+    print(x["position"], x["input"], x["state_before"], "->", x["state_after"])
+    if x["decision"]:
+        d = x["decision"]
+        print("   ", d["disposition"], "offered", d["offered"], "chose", d["chosen"])</code></pre>
+    <p>Each explanation is a dict in the canonical JSON of <code>vertep-agent</code>, the text the bundle's digests cover and what <code>vt explain --json</code> prints. A decider's rationale appears under <code>decision["claim"]</code>, labelled as an unverified claim. A bundle that does not verify raises <code>vertep.BundleInvalid</code>, whose message names the altered entry, the missing chart or the wrong digest. A bundle is self-consistent, not signed: whoever rewrites the entries and the manifest together produces a bundle that verifies.</p>
+    <p><code>vertep.counterfactual_bundle(bundle, chart)</code> verifies the bundle, then replays its journal under another chart source with the decisions the journal recorded, and returns where the states and the dispositions of the answers would have differed (<code>first_divergence</code>, <code>changed_dispositions</code>, and each step). The bundle is only read.</p>
+    <pre data-lang="Python"><code>report = vertep.counterfactual_bundle(bundle, open("review-v2.scxml").read())
+print(report["first_divergence"], report["changed_dispositions"])</code></pre>
+    <p>There is no agent host in Python yet, so a bundle comes from a Rust host; <code>explain</code> on a live actor and exporting bundles are Rust-only.</p>
+
     <h2 id="errors">Errors</h2>
     <p>Every error is a <code>vertep.VertepError</code> with a stable <code>code</code>, the same codes <code>@vertep/web</code> reports.</p>
     <table>
@@ -268,6 +285,7 @@ with ActorSystem(
         <tr><td><code>StoreLocked</code></td><td>Another system holds the file open.</td></tr>
         <tr><td><code>ActivationError</code>, <code>DeliveryError</code>, <code>StoreError</code></td><td>An actor cannot be activated or replayed; a message cannot be delivered; the store fails.</td></tr>
         <tr><td><code>SystemClosed</code></td><td>The system was closed. It is also a <code>RuntimeError</code>.</td></tr>
+        <tr><td><code>BundleInvalid</code></td><td>An explanation bundle did not verify; the message names the altered entry, the missing chart or the wrong digest.</td></tr>
       </tbody>
     </table>
 
@@ -276,7 +294,7 @@ with ActorSystem(
       <li><strong>One thread.</strong> Datamodels need not be <code>Send</code>, so a system belongs to the thread that created it; another thread touching it raises an error. Create it where you use it.</li>
       <li><strong>Synchronous.</strong> There is no <code>asyncio</code> API yet. Calls return when the macrostep is done; <code>wait</code> blocks the calling thread.</li>
       <li><strong>Numbers are floats.</strong> The CEL datamodel's integers arrive as Python <code>float</code>s, as they do as JavaScript numbers (<code>3.0 == 3</code> holds).</li>
-      <li><strong>Not yet bound:</strong> <code>request</code>/reply, the WebSocket transport, agents and deciders (with explanations and bundles), rules, federation and the cluster. The JavaScript packages have <code>request</code> and the WebSocket transport; the rest exists only in the Rust crates.</li>
+      <li><strong>Not yet bound:</strong> <code>request</code>/reply, the WebSocket transport, agents and deciders (only the offline check of their <a href="#bundles">explanation bundles</a> is bound), rules, federation and the cluster. The JavaScript packages have <code>request</code> and the WebSocket transport; the rest exists only in the Rust crates.</li>
       <li><strong>No ECMAScript datamodel in the default wheel.</strong> boa adds several megabytes; build with <code>maturin develop --features ecmascript</code> if you need it.</li>
     </ul>
 

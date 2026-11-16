@@ -338,10 +338,38 @@ fn bridge_error(e: ApiError) -> PyErr {
     PyValueError::new_err(e.to_json().to_string())
 }
 
+/// A bridge result as `{"ok": result}` or `{"err": {code, message}}` JSON.
+fn reply(r: Result<J, ApiError>) -> String {
+    match r {
+        Ok(v) => json!({ "ok": v }),
+        Err(e) => json!({ "err": e.to_json() }),
+    }
+    .to_string()
+}
+
+/// Verifies an explanation bundle (JSON text) offline, with no host, decider or network, and
+/// returns `{"ok": {actor, from, to, deciderCalls, explanations}}` or `{"err": ...}` as JSON.
+#[pyfunction]
+// @tg: implements:: [[openspec:decision-records#Explanation Bundle]] {note: "python binding"}
+fn verify_bundle(py: Python<'_>, bundle: &str) -> String {
+    py.detach(|| reply(vertep_wasm::audit::verify_bundle(bundle)))
+}
+
+/// Verifies an explanation bundle, then replays it under `chart` (`{source, format?}` as JSON)
+/// with the recorded decisions; returns `{"ok": report}` or `{"err": ...}` as JSON.
+#[pyfunction]
+// @tg: implements:: [[openspec:decision-records#Counterfactual Replay]] {confidence: partial, note: "python binding, from a bundle"}
+fn counterfactual_bundle(py: Python<'_>, bundle: &str, chart: &str) -> PyResult<String> {
+    let chart: J = serde_json::from_str(chart).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok(py.detach(|| reply(vertep_wasm::audit::counterfactual_bundle(bundle, &chart))))
+}
+
 /// The extension module `vertep._vertep`.
 #[pymodule]
 fn _vertep(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Core>()?;
+    m.add_function(wrap_pyfunction!(verify_bundle, m)?)?;
+    m.add_function(wrap_pyfunction!(counterfactual_bundle, m)?)?;
     m.add("__version__", VERSION)?;
     Ok(())
 }

@@ -15,6 +15,8 @@
 //! - [`trace`]: step traces for comparing the native and WebAssembly builds of the core.
 //! - `conformance` (feature `conformance`, test builds only): the W3C IRP suite run from
 //!   in-memory documents, for comparing WebAssembly verdicts with the native gate.
+//! - `audit` (feature `agent`): offline verification of an agent's explanation bundle, and its
+//!   counterfactual replay under another chart, for auditors in a browser or a notebook.
 //! - `shell` and `js` (WebAssembly only): the runtime shell on `spawn_local`, `setTimeout`
 //!   and `Date.now()`, and the wasm-bindgen surface the worker calls.
 //! - `ws` (WebAssembly only): the WebSocket Event I/O Processor's connection to a server on
@@ -28,6 +30,8 @@
 //! @tg: implements:: [[decisions#SCXML semantics are normative]]
 //! @tg: implements:: [[decisions#Event-sourced actors]] {confidence: partial, note: "journals written in WebAssembly replay natively"}
 
+#[cfg(feature = "agent")]
+pub mod audit;
 pub mod charts;
 #[cfg(feature = "conformance")]
 pub mod conformance;

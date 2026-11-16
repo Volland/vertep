@@ -13,8 +13,10 @@ See https://volland.github.io/vertep/docs/python.html
 """
 
 from . import _vertep
+from ._audit import Explanation, VerifiedBundle, counterfactual_bundle, verify_bundle
 from ._errors import (
     ActivationError,
+    BundleInvalid,
     ChartInvalid,
     DeliveryError,
     InvalidArgument,
@@ -60,5 +62,10 @@ __all__ = [
     "DeliveryError",
     "StoreError",
     "SystemClosed",
+    "BundleInvalid",
+    "verify_bundle",
+    "counterfactual_bundle",
+    "VerifiedBundle",
+    "Explanation",
     "__version__",
 ]

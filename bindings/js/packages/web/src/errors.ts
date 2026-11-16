@@ -10,7 +10,8 @@ export type ErrorCode =
   | "InvalidArgument"
   | "Activation"
   | "Delivery"
-  | "Store";
+  | "Store"
+  | "BundleInvalid";
 
 /** One problem of an invalid chart, with its location in the source. */
 export interface Violation {

@@ -349,6 +349,38 @@ pub fn conformance_run(input: String) -> Result<String, JsError> {
         .map_err(|e| thrown(&ApiError::arg(e.to_string())))
 }
 
+/// Verifies an explanation bundle (JSON text) offline and returns
+/// `{actor, from, to, deciderCalls, explanations}` as JSON text (feature `agent`).
+#[cfg(feature = "agent")]
+#[wasm_bindgen(js_name = verifyBundle)]
+// @tg: implements:: [[openspec:decision-records#Explanation Bundle]] {note: "wasm binding"}
+pub fn verify_bundle(bundle: String) -> Result<String, JsError> {
+    install_panic_hook();
+    crate::audit::verify_bundle(&bundle)
+        .map(|j| j.to_string())
+        .map_err(|e| thrown(&e))
+}
+
+/// Verifies an explanation bundle, then replays it under `chart` (`{source, format?}` as JSON
+/// text) with the recorded decisions and returns the counterfactual report as JSON text
+/// (feature `agent`).
+#[cfg(feature = "agent")]
+#[wasm_bindgen(js_name = counterfactualBundle)]
+// @tg: implements:: [[openspec:decision-records#Counterfactual Replay]] {confidence: partial, note: "wasm binding, from a bundle"}
+pub fn counterfactual_bundle(bundle: String, chart: String) -> Result<String, JsError> {
+    install_panic_hook();
+    let chart = parse(&chart, "the chart")?;
+    crate::audit::counterfactual_bundle(&bundle, &chart)
+        .map(|j| j.to_string())
+        .map_err(|e| thrown(&e))
+}
+
+/// Whether this build verifies explanation bundles (feature `agent`).
+#[wasm_bindgen(js_name = hasAgent)]
+pub fn has_agent() -> bool {
+    cfg!(feature = "agent")
+}
+
 /// The crate version the package was built from.
 #[wasm_bindgen]
 pub fn version() -> String {
