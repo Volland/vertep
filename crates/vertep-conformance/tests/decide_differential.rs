@@ -16,7 +16,10 @@
 //!   duplicate) and, for a taken decision, a transition Rust took that was a candidate of the
 //!   open offer, so enabled at offer time (`Vertep.Agent.decider_safety`). Each line carries the
 //!   candidate's schema and the payload, so whether the payload conforms (`payload-schema`
-//!   rejections) is decided by the oracle's own checker, not taken from the Rust run;
+//!   rejections) is decided by the oracle's own checker, not taken from the Rust run. Each line
+//!   also carries the disposition and offer `AgentMachine::disposition_of` gives before the
+//!   input is applied (what the host records on the entry), which the oracle checks in strict
+//!   mode against `Vertep.Agent.dispositionOf` (m12-decision-records 2.3);
 //! - the core macrosteps of the agent's session, recorded with their datamodel answer tape
 //!   (`AgentMachine::start_with`), are replayed through `vertep-oracle`, which must produce
 //!   the same macrostep traces.
@@ -360,6 +363,8 @@ fn run(chart: Chart, declared: &[(String, usize)], moves: &[Move]) -> Option<Run
             ),
             _ => (None, false),
         };
+        // what the host would record on the entry, asked before the input is applied
+        let disposition = m.disposition_of(&input);
         let Ok(a) = m.apply(&input, position, T0 + 1_000 * position as i64) else {
             break;
         };
@@ -388,12 +393,13 @@ fn run(chart: Chart, declared: &[(String, usize)], moves: &[Move]) -> Option<Run
             .as_ref()
             .and_then(|o| o.candidates.iter().find(|c| c.event == event))
             .map_or_else(|| chart.schemas.payload(&event), |c| c.schema.clone());
-        out.push(serde_json::json!({
+        let mut line = serde_json::json!({
             "open": open.map(|o| serde_json::json!({
                 "corr": o.correlation,
                 "cands": o.candidates.iter().map(|c| serde_json::json!({
                     "event": c.event, "source": c.source, "index": c.index,
                 })).collect::<Vec<_>>(),
+                "fallback": o.fallback,
             })),
             "answered": answered,
             "corr": corr,
@@ -403,7 +409,13 @@ fn run(chart: Chart, declared: &[(String, usize)], moves: &[Move]) -> Option<Run
             "taken": taken.iter().map(|(s, i)| serde_json::json!([s, i])).collect::<Vec<_>>(),
             "schema": schema,
             "payload": vertep_agent::json::to_json(&payload),
-        }));
+        });
+        // the host drops a duplicate before journaling it, so it has no disposition
+        if let (Some((d, offered)), false) = (disposition, a.duplicate) {
+            line["disposition"] = serde_json::json!(d.as_str());
+            line["offered"] = serde_json::json!(offered);
+        }
+        out.push(line);
     }
     let core = m.core_tape().cloned().unwrap_or_default();
     Some(Run {
@@ -414,7 +426,9 @@ fn run(chart: Chart, declared: &[(String, usize)], moves: &[Move]) -> Option<Run
     })
 }
 
-/// Ask `vertep-decide`; `Err` with its reason on a disagreement.
+/// Ask `vertep-decide` in strict mode (every decision but a duplicate carries the disposition
+/// and offer the host would record, m12-decision-records 2.3); `Err` with its reason on a
+/// disagreement.
 fn judge(tools: &LeanTools, lines: &[serde_json::Value]) -> Result<(), String> {
     let dir = std::env::temp_dir().join(format!(
         "vertep-decide-{}-{:?}",
@@ -428,6 +442,7 @@ fn judge(tools: &LeanTools, lines: &[serde_json::Value]) -> Result<(), String> {
     let out = std::process::Command::new(&tools.decide)
         .arg("--obs")
         .arg(&path)
+        .arg("--strict")
         .output()
         .map_err(|e| format!("{}: {e}", tools.decide.display()));
     let _ = std::fs::remove_dir_all(&dir);

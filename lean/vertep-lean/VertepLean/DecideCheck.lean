@@ -1,5 +1,5 @@
 import Lean.Data.Json
-import VertepLean.AgentTheorems
+import VertepLean.Disposition
 
 /-!
 # Decision validation as a differential oracle (m3-agents 8.5)
@@ -20,12 +20,23 @@ without them takes that answer from the Rust run too. Everything else is decided
 correlation matching, candidate membership, deduplication and the order of the checks.
 
 ```
-vertep-decide --obs DECISIONS.jsonl
+vertep-decide --obs DECISIONS.jsonl [--strict]
 ```
 
-One line per decision: `{"open": null | {"corr", "cands": [{"event", "source", "index"}]},
-"answered": bool, "corr", "event", "outcome": "taken" | "rejected" | "duplicate",
-"reason": string | null, "taken": [[source, index]], "schema"?: JSON Schema, "payload"?: JSON}`.
+One line per decision: `{"open": null | {"corr", "cands": [{"event", "source", "index"}],
+"fallback"?: bool}, "answered": bool, "corr", "event", "outcome": "taken" | "rejected" |
+"duplicate", "reason": string | null, "taken": [[source, index]], "schema"?: JSON Schema,
+"payload"?: JSON, "annotations"?: object, "disposition"?: string, "offered"?: [string]}`, or one
+per refusal: `{"kind": "refusal", "open", "corr", "disposition"?, "offered"?}`.
+
+**Dispositions (m12-decision-records 2.3).** A line that carries the disposition and the offer
+recorded on its journal entry is checked against the model (`Vertep.Agent.dispositionOf`,
+`refusalDisposition`, `offeredFor`): the disposition must be the one the model computes from the
+open offer (its candidates and whether it was made to the fallback decider), the annotations
+(`confidence` within [0, 1]), the payload's conformance and the guard answer above, and the offer
+must be the open offer's events. With `--strict` every line except a duplicate must carry both,
+so a journal entry without a disposition, or with one the model does not compute, fails.
+
 Exit codes: `0` all agree, `1` the first disagreement on standard error, `3` an input error
 (including a schema keyword the checker does not support).
 -/
@@ -149,9 +160,13 @@ def conformsAt (root : Json) : Nat → Json → Json → Except String Bool
 def conformsJson (schema payload : Json) : Except String Bool :=
   conformsAt schema 65 schema payload
 
-/-- One observed decision. -/
+/-- One observed decision or refusal. -/
 structure Obs where
+  /-- `true` for a refusal line. -/
+  refusal : Bool := false
   open_ : Option (String × List Cand)
+  /-- Whether the open offer was made to the fallback decider. -/
+  fallback : Bool := false
   answered : Bool
   corr : String
   event : String
@@ -160,30 +175,65 @@ structure Obs where
   taken : List TransRef
   /-- Whether the payload conforms to the candidate's schema, when the line carries both. -/
   conforms : Option Bool := none
+  /-- Whether the annotations validate (Rust `Annotations::validate`: a `confidence`, when
+  given, is within [0, 1]). -/
+  annOk : Bool := true
+  /-- The disposition recorded on the journal entry. -/
+  disposition : Option String := none
+  /-- The offer recorded on the journal entry. -/
+  offered : Option (List String) := none
 
 def candFromJson (j : Json) : Except String Cand := do
   pure ⟨← (← j.getObjVal? "event").getStr?,
     (← (← j.getObjVal? "source").getStr?, ← (← j.getObjVal? "index").getNat?)⟩
 
+/-- Rust `Annotations::validate` on the annotations' JSON. -/
+def annotationsOk (a : Json) : Bool :=
+  match key? a "confidence" with
+  | some (.num c) => numCmp c 0 != .lt && numCmp c 1 != .gt
+  | _ => true
+
+/-- An optional field: absent and `null` are `none`. -/
+def opt (j : Json) (k : String) : Option Json :=
+  match j.getObjVal? k with
+  | .ok .null | .error _ => none
+  | .ok v => some v
+
 def obsFromJson (j : Json) : Except String Obs := do
-  let open_ ← match j.getObjVal? "open" with
-    | .ok .null | .error _ => pure none
-    | .ok o => do
+  let refusal := (opt j "kind").bind (·.getStr?.toOption) == some "refusal"
+  let (open_, fallback) ← match opt j "open" with
+    | none => pure (none, false)
+    | some o => do
       let cands ← (← (← o.getObjVal? "cands").getArr?).toList.mapM candFromJson
-      pure (some (← (← o.getObjVal? "corr").getStr?, cands))
-  let reason ← match j.getObjVal? "reason" with
-    | .ok .null | .error _ => pure none
-    | .ok r => pure (some (← r.getStr?))
-  let taken ← (← (← j.getObjVal? "taken").getArr?).toList.mapM fun t => do
-    match (← t.getArr?).toList with
-    | [s, i] => pure ((← s.getStr?), (← i.getNat?))
-    | _ => throw s!"a taken transition is [source, index], got {t.compress}"
+      let fb ← match opt o "fallback" with
+        | some f => f.getBool?
+        | none => pure false
+      pure (some (← (← o.getObjVal? "corr").getStr?, cands), fb)
+  let reason ← match opt j "reason" with
+    | none => pure none
+    | some r => pure (some (← r.getStr?))
+  let taken ← match opt j "taken" with
+    | none => pure []
+    | some ts => (← ts.getArr?).toList.mapM fun t => do
+      match (← t.getArr?).toList with
+      | [s, i] => pure ((← s.getStr?), (← i.getNat?))
+      | _ => throw s!"a taken transition is [source, index], got {t.compress}"
   let conforms ← match j.getObjVal? "schema", j.getObjVal? "payload" with
     | .ok schema, .ok payload => pure (some (← conformsJson schema payload))
     | _, _ => pure none
-  pure { open_, answered := ← (← j.getObjVal? "answered").getBool?,
-         corr := ← (← j.getObjVal? "corr").getStr?, event := ← (← j.getObjVal? "event").getStr?,
-         outcome := ← (← j.getObjVal? "outcome").getStr?, reason, taken, conforms }
+  let disposition ← match opt j "disposition" with
+    | none => pure none
+    | some d => pure (some (← d.getStr?))
+  let offered ← match opt j "offered" with
+    | none => pure none
+    | some o => pure (some (← (← o.getArr?).toList.mapM (·.getStr?)))
+  let str (k : String) : Except String String := do
+    if refusal then pure ((opt j k).bind (·.getStr?.toOption) |>.getD "") else (← j.getObjVal? k).getStr?
+  pure { refusal, open_, fallback,
+         answered := ← (if refusal then pure false else do (← j.getObjVal? "answered").getBool?),
+         corr := ← (← j.getObjVal? "corr").getStr?, event := ← str "event",
+         outcome := ← str "outcome", reason, taken, conforms,
+         annOk := ((opt j "annotations").map annotationsOk).getD true, disposition, offered }
 
 /-- The core the model sees for one decision: the context is irrelevant to `decide`; whether
 selection takes the offered transition comes from the Rust run, conformance from `conformsJson`
@@ -205,9 +255,18 @@ def stateOf (o : Obs) : AState Unit :=
   { ctx := (), slot := o.open_.map fun (c, cs) => ⟨idx c, cs, ()⟩,
     answered := if o.answered then [idx o.corr] else [], next := 3, hist := [()] }
 
-/-- Compare the model's outcome with the recorded one. -/
+/-- The index of the line's correlation id in `stateOf`. -/
+def idxOf (o : Obs) : Nat := if (o.open_.map (·.1)) = some o.corr then 1 else 2
+
+/-- Compare the model's outcome with the recorded one. A decision whose annotations fail
+validation, answering the open offer, is rejected (`annotation`) before its event is looked at,
+as in Rust; the model's `decide` does not see annotations. -/
 def judge (o : Obs) : Except String Unit := do
-  let idx : Nat := if (o.open_.map (·.1)) = some o.corr then 1 else 2
+  if o.refusal then return
+  let idx := idxOf o
+  if !o.annOk && !o.answered && idx = 1 then
+    if o.outcome = "rejected" && o.reason = some "annotation" then return
+    else throw s!"decision {o.corr} {o.event}: invalid annotations, Rust outcome {o.outcome} ({o.reason})"
   match (decide (coreOf o) (stateOf o) idx o.event ()).2, o.outcome with
   | .none, "duplicate" => pure ()
   | .rejected r, "rejected" =>
@@ -218,20 +277,60 @@ def judge (o : Obs) : Except String Unit := do
     else throw s!"decision {o.corr} {o.event}: the model takes {c.trans}, Rust took {o.taken}"
   | m, r => throw s!"decision {o.corr} {o.event}: Rust outcome {r} ({o.reason}), the model {repr m}"
 
+/-- The model's disposition and offer for a line. -/
+def dispositionFor (o : Obs) : Disposition × List String :=
+  let s := stateOf o
+  let idx := idxOf o
+  let d := if o.refusal then refusalDisposition
+    else dispositionOf (coreOf o) s idx o.event () o.annOk o.fallback
+  (d, offeredFor s idx)
+
+/-- Compare the disposition and the offer recorded on the entry with the model's; in strict
+mode a line other than a duplicate must carry both. -/
+-- @tg: implements:: [[openspec:decision-records#Decision Disposition Is Recorded]] {note: "strict replay through the Lean model"}
+def judgeDisposition (strict : Bool) (o : Obs) : Except String Unit := do
+  let what := if o.refusal then s!"refusal {o.corr}" else s!"decision {o.corr} {o.event}"
+  match o.disposition, o.offered with
+  | some d, some off =>
+    let (md, moff) := dispositionFor o
+    if d != md.name then
+      throw s!"{what}: the entry records disposition {d}, the model computes {md.name}"
+    if off != moff then
+      throw s!"{what}: the entry records offer {off}, the model {moff}"
+  | none, none =>
+    if strict && o.outcome != "duplicate" then
+      throw s!"{what}: no disposition and offer on the entry (strict)"
+  | _, _ => throw s!"{what}: the entry records only one of disposition and offer"
+
+/-- Judge every line: its outcome and, when recorded (always in strict mode), its disposition.
+Returns the number of dispositions checked. -/
+def judgeAll (strict : Bool) (os : List Obs) : Except String Nat := do
+  for o in os do
+    judge o
+    judgeDisposition strict o
+  pure (os.filter (·.disposition.isSome)).length
+
+/-- Parse the lines of an observation file. -/
+def parse (src : String) : Except String (List Obs) :=
+  ((src.splitOn "\n").filter (fun l => !(l.all Char.isWhitespace))).mapM
+    (fun l => Json.parse l >>= obsFromJson)
+
 /-- The command line. -/
 -- @tg: implements:: [[openspec:deciders#Decider Safety]] {note: "differential oracle"}
 def run (args : List String) : IO UInt32 := do
-  let (some path) := (match args with
-    | ["--obs", p] => some p
+  let (some (path, strict)) := (match args with
+    | ["--obs", p] => some (p, false)
+    | ["--obs", p, "--strict"] | ["--strict", "--obs", p] => some (p, true)
     | _ => none)
-    | IO.eprintln "usage: vertep-decide --obs DECISIONS.jsonl"; return 3
+    | IO.eprintln "usage: vertep-decide --obs DECISIONS.jsonl [--strict]"; return 3
   let src ← IO.FS.readFile path
-  let os ← match ((src.splitOn "\n").filter (fun l => !(l.all Char.isWhitespace))).mapM
-      (fun l => Json.parse l >>= obsFromJson) with
+  let os ← match parse src with
     | .ok os => pure os
     | .error e => IO.eprintln s!"observations: {e}"; return 3
-  match os.mapM judge with
-  | .ok _ => IO.println s!"{os.length} decisions agree"; return 0
+  match judgeAll strict os with
+  | .ok n =>
+    IO.println s!"{os.length} decisions and refusals agree, {n} dispositions{if strict then " (strict)" else ""}"
+    return 0
   | .error e => IO.eprintln e; return 1
 
 end Vertep.Agent.Check
