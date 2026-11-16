@@ -108,7 +108,7 @@
       <div>
         <ul>
           <li><strong>It is 0.1.x software.</strong> It has not run a lender's production load. Use it first where a failure is cheap, and where its record is worth more than its maturity.</li>
-          <li><strong>A plain journal is not signed.</strong> Hash-chained, signed journals come with durable objects; extending that to every agent journal is in the draft <code>m12-decision-records</code>. An exportable explanation bundle exists and <code>vt verify-bundle</code> checks it offline, naming an altered entry or a missing chart, but a bundle is not signed: someone who rewrites the entries and the manifest together makes a bundle that verifies.</li>
+          <li><strong>A plain journal is not signed, but it can be.</strong> A durable object's journal is hash-chained and host-signed; an agent journal in a store can opt in to the same chain and signature (<code>ChainedAgentSealer</code>), and the object's own verifier accepts it. An exportable explanation bundle exists and <code>vt verify-bundle</code> checks it offline, naming an altered entry or a missing chart; the bundle's manifest is not itself signed, so someone who rewrites the entries and the manifest together makes a bundle that verifies, and the signature on a chained journal is what a bundle should be checked against.</li>
           <li><strong>It is not a compliance product.</strong> It gives you an honest record and structural limits. The programme around them is yours.</li>
         </ul>
       </div>

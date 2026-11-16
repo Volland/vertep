@@ -29,4 +29,9 @@ https://example.org/loans/1003  final ["declined"]
   2 event     apply
   as of entry 2: ["declined"]
 bundle of https://example.org/loans/1002: 4 entries; verified offline: 4 explanations recomputed, 0 decider calls
+
+the approval ceiling is cut to 15 000; the recorded decisions replayed under it:
+https://example.org/loans/1001  differs from entry 3: ["approved"] -> ["officer_review"]; answers handled differently at [3]
+https://example.org/loans/1002  unchanged: ["approved"]
+https://example.org/loans/1003  unchanged: ["declined"]
 entries replayed: 9, decider calls: 0

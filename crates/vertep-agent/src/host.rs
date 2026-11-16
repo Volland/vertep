@@ -604,6 +604,114 @@ impl AgentHost {
         })
     }
 
+    /// Replays `actor`'s journal under `chart`, a different version of the chart it ran under,
+    /// into a scratch machine, and reports every position where the configuration or the
+    /// handling of an answer differs. The original journal is only read: nothing is appended and
+    /// no decider is called unless the caller supplies one.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`] when the journal cannot be read or the chart cannot run as an agent chart.
+    // @tg: implements:: [[openspec:decision-records#Counterfactual Replay]]
+    pub fn counterfactual(
+        &self,
+        actor: &str,
+        chart: Chart,
+        source: crate::counterfactual::DecisionSource<'_>,
+    ) -> Result<crate::counterfactual::CounterfactualReport, HostError> {
+        use crate::counterfactual::{CounterfactualReport, CounterfactualStep, DecisionSource};
+        let entries = self.journal.try_read(actor).map_err(HostError::Journal)?;
+        let first = entries
+            .first()
+            .ok_or_else(|| HostError::Unknown(actor.to_owned()))?;
+        let AgentInput::Start { version } = &first.input else {
+            return Err(HostError::Unknown(actor.to_owned()));
+        };
+        let original = self
+            .charts
+            .get(version)
+            .cloned()
+            .ok_or_else(|| HostError::MissingVersion(version.clone()))?;
+        let tried = Arc::new(
+            AgentChart::new(chart).map_err(|e| HostError::Unknown(format!("the chart: {e}")))?,
+        );
+        let (mut om, _) = AgentMachine::start(actor, original, self.registry.clone(), first.ts)
+            .map_err(HostError::Machine)?;
+        let (mut cm, _) =
+            AgentMachine::start(actor, tried.clone(), self.registry.clone(), first.ts)
+                .map_err(HostError::Machine)?;
+        let mut steps = vec![CounterfactualStep {
+            position: 1,
+            input: first.input.kind().to_owned(),
+            original_state: om.configuration(),
+            counterfactual_state: cm.configuration(),
+            recorded_disposition: None,
+            counterfactual_disposition: None,
+            state_diverged: om.configuration() != cm.configuration(),
+            disposition_changed: false,
+        }];
+        for e in &entries[1..] {
+            match om.apply(&e.input, e.position, e.ts) {
+                Ok(_) | Err(MachineError::Terminated) => {}
+                Err(err) => return Err(HostError::Machine(err)),
+            }
+            // under a supplied source, a decision input is answered by the caller for the offer
+            // the new chart makes at this point
+            let input = match (&e.input, &source) {
+                (
+                    AgentInput::Decision { correlation, .. }
+                    | AgentInput::Refusal { correlation, .. },
+                    DecisionSource::Supplied(f),
+                ) => match cm
+                    .open_offers()
+                    .into_iter()
+                    .find(|r| r.correlation == *correlation)
+                {
+                    Some(request) => {
+                        outcome_input(correlation, f(&request), Annotations::default())
+                    }
+                    None => e.input.clone(),
+                },
+                _ => e.input.clone(),
+            };
+            let cf_disposition = cm
+                .disposition_of(&input)
+                .map(|(d, _)| d.as_str().to_owned());
+            match cm.apply(&input, e.position, e.ts) {
+                Ok(_) | Err(MachineError::Terminated) => {}
+                Err(err) => return Err(HostError::Machine(err)),
+            }
+            let recorded = e.disposition.map(|d| d.as_str().to_owned());
+            let (os, cs) = (om.configuration(), cm.configuration());
+            steps.push(CounterfactualStep {
+                position: e.position,
+                input: e.input.kind().to_owned(),
+                state_diverged: os != cs,
+                disposition_changed: matches!((&recorded, &cf_disposition), (Some(a), Some(b)) if a != b),
+                original_state: os,
+                counterfactual_state: cs,
+                recorded_disposition: recorded,
+                counterfactual_disposition: cf_disposition,
+            });
+        }
+        Ok(CounterfactualReport {
+            actor: actor.to_owned(),
+            original_version: version.clone(),
+            counterfactual_version: tried.version.as_str().to_owned(),
+            decisions: match source {
+                DecisionSource::Recorded => "recorded",
+                DecisionSource::Supplied(_) => "supplied",
+            },
+            first_divergence: steps.iter().find(|s| s.state_diverged).map(|s| s.position),
+            changed_dispositions: steps
+                .iter()
+                .filter(|s| s.disposition_changed)
+                .map(|s| s.position)
+                .collect(),
+            steps,
+        })
+    }
+
     /// The chart as written (the IR) of a registered version.
     pub(crate) fn chart_ir(&self, version: &str) -> Option<Chart> {
         self.charts.get(version).map(|c| c.ir.clone())
