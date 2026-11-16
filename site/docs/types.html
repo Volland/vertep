@@ -161,9 +161,11 @@
 //! variant   := tag atom?                           tag is an identifier or a "quoted string"
 //! atom      := bool | int | decimal | string | datetime | iri | value
 //!            | list '&lt;' type '&gt;' | optional '&lt;' type '&gt;'
-//!            | '{' (name ':' type (',' name ':' type)* ','?)? '}'
+//!            | '{' (field (',' field)* ','?)? '}'
 //!            | '(' type ')'
 //!            | Name                                a named type
+//! field     := mark* name ':' type
+//! mark      := '@sensitive' | '@subject' | '@retain' '(' duration ')'
 //! decls     := (('type' Name '=' type | 'event' event-name (':' type)?) ';')*</code></pre>
     <p>A few rules worth knowing:</p>
     <ul>
@@ -173,6 +175,21 @@
       <li><strong>The dynamic boundary.</strong> A typed value can always go where <code>value</code> is expected. A <code>value</code> goes where a static type is expected only through a checked conversion, which raises <code>error.execution</code> on a mismatch.</li>
       <li><strong>System events are typed.</strong> <code>error.*</code> carries <code>{ kind: string, message: string }</code>; <code>done.state.*</code> and <code>done.invoke.*</code> carry <code>value</code>. A descriptor that matches several typed events sees the union of their payload types.</li>
     </ul>
+
+    <h3 id="sensitive">Sensitive fields</h3>
+    <p>A record field can carry marks for personal data, written before its name. <code>@sensitive</code> marks the field as personal data. <code>@subject</code> marks the <code>string</code> or <code>iri</code> field that names whose data it is, and it covers the sensitive fields of its own record and of the records nested inside it. <code>@retain(P30D)</code> gives a sensitive field a retention horizon. The horizon is an ISO 8601 duration in weeks, days, hours, minutes and seconds, such as <code>P30D</code>, <code>PT12H</code> or <code>P1DT6H</code>. Years and months are refused because their length varies.</p>
+<pre data-lang="vt:types"><code>type Contact = { @sensitive phone: string };
+event applied: { @subject who: string, @sensitive @retain(P30D) email: string,
+                 amount: decimal, contact: Contact };</code></pre>
+    <p>Marks are annotations, so a value is accepted or rejected exactly as it would be without them. They work wherever a record type is written, including a <code>&lt;data&gt;</code> item's <code>vt:type</code>, YAML strings and the <code>statechart!</code> macro. They are part of a named type's definition: marking a field gives the type a new IRI and the chart a new version. The checker rejects:</p>
+    <ul>
+      <li><code>@retain</code> without <code>@sensitive</code>;</li>
+      <li>a field that is both <code>@subject</code> and <code>@sensitive</code>;</li>
+      <li>two <code>@subject</code> fields in one record;</li>
+      <li>a <code>@subject</code> that is not a <code>string</code> or an <code>iri</code>.</li>
+    </ul>
+    <p>Both projections carry the marks. In JSON Schema they become the annotations <code>"x-vt-sensitive": true</code>, <code>"x-vt-subject": true</code> and <code>"x-vt-retention": "P30D"</code> on the field's property schema. In SHACL they become <code>vt:sensitive true</code>, <code>vt:dataSubject true</code> and <code>vt:retention "P30D"^^xsd:duration</code> on the field's property shape. An agent host reads them back with <code>SealPolicy::from_chart(&amp;chart)</code> and gets the policy a <code>SealingJournal</code> (in <code>vertep-agent</code>) needs to seal those fields under the subject's key.</p>
+    <p><code>SealPolicy::from_chart</code> refuses a chart whose marks it cannot turn into sealing rules. That happens when a sensitive field has no subject in scope, or when a mark sits inside a list, a union variant or a recursive type, where no single JSON pointer reaches the field. In those cases, mark the enclosing field <code>@sensitive</code> instead.</p>
 
     <h2 id="writing-types">Writing types in a chart</h2>
     <p>Here is one small typed chart, a counter, on CEL in YAML. <code>types</code> names record and union types, <code>events</code> gives each event its payload type (<code>null</code> for none), and <code>context</code> gives each data item a type and an initial value:</p>

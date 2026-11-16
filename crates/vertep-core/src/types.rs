@@ -5,7 +5,9 @@
 //!   `datetime` and `iri`, records, tagged unions, lists, optional values, references to named
 //!   types and the dynamic type `value`.
 //! - [`syntax`] reads and prints the textual form used in `vt:type` attributes, the `vt:types`
-//!   block and the YAML surface (`list<Order>`, `{ id: string }`, `Card { last4: string } | Cash`).
+//!   block and the YAML surface (`list<Order>`, `{ id: string }`, `Card { last4: string } | Cash`),
+//!   including the data-protection marks of record fields (`{ @subject who: string,
+//!   @sensitive @retain(P30D) email: string }`, [`FieldMarks`]).
 //! - [`check`] checks a runtime [`crate::datamodel::Value`] against a type, reporting every
 //!   error with its path, and implements the canonical value encoding and the checked
 //!   conversion from `value` to a static type.
@@ -47,4 +49,4 @@ pub use check::{PathSeg, TypeError, TypeErrorKind, ValuePath, check_value, conve
 pub use decl::{DeclError, DeclErrorKind, Declarations, EventDecl, TypeDecl};
 pub use events::EventTable;
 pub use syntax::{SyntaxError, parse_declarations, parse_type};
-pub use ty::{Field, Primitive, Type, Variant};
+pub use ty::{Field, FieldMarks, Primitive, Type, Variant, format_duration, parse_duration};

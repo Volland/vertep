@@ -383,6 +383,96 @@ fn type_syntax_prints_and_parses_back() {
 }
 
 #[test]
+fn field_marks_parse_print_and_leave_checking_alone() {
+    let src = "{ @subject who: string, @sensitive @retain(P30D) email: string, amount: decimal }";
+    let t = parse_type(src).unwrap_or_else(|e| panic!("{e}"));
+    let Type::Record(fields) = &t else {
+        panic!("{t:?}")
+    };
+    assert!(fields[0].marks.subject && !fields[0].marks.sensitive);
+    assert!(fields[1].marks.sensitive);
+    assert_eq!(fields[1].marks.retain_ms, Some(30 * 86_400_000));
+    assert!(fields[2].marks.is_empty());
+    assert_eq!(t.to_string(), src, "canonical print");
+    // Any order and spacing; the printer orders the marks.
+    let loose = parse_type("{ @retain(PT36H)@sensitive  e: string, @ subject w: iri }").unwrap();
+    assert_eq!(
+        loose.to_string(),
+        "{ @sensitive @retain(P1DT12H) e: string, @subject w: iri }"
+    );
+    assert_eq!(parse_type(&loose.to_string()), Ok(loose));
+    // Marks nest with the records they annotate, in declarations too.
+    let d = decls(
+        "type Contact = { @sensitive email: string }; \
+         event applied: { @subject who: string, contact: Contact, @sensitive note: optional<string> };",
+    );
+    assert!(d.validate().is_empty(), "{:?}", d.validate());
+    assert_eq!(parse_declarations(&d.to_text()), Ok(d.clone()));
+    // Marks do not change what a value must be.
+    let plain = parse_type("{ who: string, email: string }").unwrap();
+    let marked = parse_type("{ @subject who: string, @sensitive email: string }").unwrap();
+    assert_ne!(plain, marked);
+    let v = obj(&[("who", s("u1")), ("email", s("a@b.c"))]);
+    let none = Declarations::default();
+    assert_eq!(none.check(&plain, &v), Ok(()));
+    assert_eq!(none.check(&marked, &v), Ok(()));
+    assert!(is_assignable(&none, &plain, &marked) && is_assignable(&none, &marked, &plain));
+    // Durations.
+    assert_eq!(parse_duration("P1W"), Ok(7 * 86_400_000));
+    assert_eq!(parse_duration("PT90M"), Ok(5_400_000));
+    assert_eq!(format_duration(5_400_000), "PT1H30M");
+    assert_eq!(format_duration(0), "PT0S");
+}
+
+#[test]
+fn bad_field_marks_are_rejected() {
+    for (src, needle) in [
+        ("{ @secret a: string }", "unknown mark"),
+        ("{ @sensitive @sensitive a: string }", "twice"),
+        ("{ @retain(P1M) @sensitive a: string }", "no fixed length"),
+        ("{ @retain(P1Y) @sensitive a: string }", "no fixed length"),
+        ("{ @retain(30d) @sensitive a: string }", "duration"),
+        ("{ @retain(PT) @sensitive a: string }", "not a duration"),
+        ("{ @retain @sensitive a: string }", "expected `(`"),
+        ("{ @ a: string }", "unknown mark `@a`"),
+        ("{ @: string }", "expected a mark"),
+        ("@sensitive string", "expected a type"),
+    ] {
+        let e = parse_type(src).expect_err(src);
+        assert!(e.message.contains(needle), "{src}: {}", e.message);
+    }
+    for (src, needle) in [
+        (
+            "{ @retain(P1D) a: string }",
+            "applies to a `@sensitive` field",
+        ),
+        (
+            "{ @subject @sensitive a: string }",
+            "cannot be `@sensitive`",
+        ),
+        ("{ @subject a: string, @subject b: string }", "at most one"),
+        ("{ @subject a: int }", "a `string` or an `iri`"),
+        ("{ @subject a: optional<string> }", "a `string` or an `iri`"),
+    ] {
+        let d = decls(&alloc::format!("event e: {src};"));
+        let errs = d.validate();
+        assert_eq!(errs.len(), 1, "{src}: {errs:?}");
+        assert!(
+            matches!(errs[0].kind, DeclErrorKind::BadMark { .. })
+                && errs[0].to_string().contains(needle),
+            "{src}: {}",
+            errs[0]
+        );
+    }
+    // A subject through a named type is fine.
+    assert!(
+        decls("type Id = iri; event e: { @subject a: Id, @sensitive b: string };")
+            .validate()
+            .is_empty()
+    );
+}
+
+#[test]
 fn declaration_blocks_round_trip_through_the_types_element() {
     let d = decls(
         "# order types\n type Pay = { amount: decimal };\n type Approval = { by: iri };\n\

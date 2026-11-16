@@ -129,6 +129,51 @@ fn lowering_covers_states_transitions_and_actions() {
     assert!(matches!(h.element, StateElement::History(_)));
 }
 
+/// The Rust DSL carries the type language's data-protection marks as written: the type text
+/// is the token stream, which the core parser reads with spaces between `@` and the mark.
+#[test]
+fn sensitive_field_marks_ride_through_the_dsl() {
+    let (chart, _) = lowered(quote! {
+        name: intake,
+        types { Contact = { @sensitive phone: string } }
+        events { applied: { @subject who: string, @sensitive @retain(P30D) email: string, contact: Contact } }
+        initial a;
+        state a { on applied => b; }
+        final b;
+    });
+    let d = vertep_core::types::chart::declarations(&chart)
+        .expect("a types block")
+        .expect("it parses");
+    let vertep_core::types::Type::Record(fs) = d.event("applied").unwrap().payload.clone().unwrap()
+    else {
+        panic!("a record payload")
+    };
+    assert!(fs[0].marks.subject);
+    assert!(fs[1].marks.sensitive && fs[1].marks.retain_ms == Some(30 * 86_400_000));
+    let vertep_core::types::Type::Record(c) = d.lookup("Contact").unwrap().clone() else {
+        panic!("a record type")
+    };
+    assert!(c[0].marks.sensitive);
+    // The whole macro expands without errors, and a misplaced mark is a compile error.
+    let out = expand_statechart(quote! {
+        name: intake,
+        events { applied: { @subject who: string, @sensitive email: string } }
+        initial a;
+        state a { on applied => b; }
+        final b;
+    })
+    .to_string();
+    assert!(!out.contains("compile_error"), "{out}");
+    let out = expand_statechart(quote! {
+        name: intake,
+        events { applied: { @retain(P1D) email: string } }
+        initial a;
+        state a;
+    })
+    .to_string();
+    assert!(out.contains("applies to a `@sensitive` field"), "{out}");
+}
+
 #[test]
 fn spans_map_back_to_tokens_and_then_to_lines() {
     let (chart, table) = lowered(quote! {

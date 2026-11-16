@@ -17,14 +17,14 @@
 //! | named type | `sh:node` its type IRI |
 //! | `optional<T>` | `sh:or` of `sh:hasValue vt:Null` and the shape of `T` |
 //! | `list<T>` | `rdf:nil`, or a closed collection cell with one `rdf:first`, one `rdf:rest`, and every `vt:listMember` conforming to `T` |
-//! | record | a closed blank node: one property shape per field with `sh:maxCount 1`, `sh:minCount 1` unless the field is optional or `value`, and `sh:node` the field type |
+//! | record | a closed blank node: one property shape per field with `sh:maxCount 1`, `sh:minCount 1` unless the field is optional or `value`, and `sh:node` the field type; a marked field's property shape also carries `vt:sensitive true`, `vt:dataSubject true` or `vt:retention` (annotations, not constraints) |
 //! | union | a closed blank node with exactly one string `tag`, at most one `value`, and `sh:or` of one shape per variant fixing the tag and the payload |
 
 use oxrdf::{Graph, Literal, NamedNode, NamedNodeRef, Term, TripleRef};
 use vertep_core::datamodel::Value;
 use vertep_core::types::{Declarations, Primitive, Type};
 
-use super::ident::{TypeIris, segment};
+use super::ident::{TypeIris, mark_triples, segment};
 use super::value::{VALUE_ROOT, field_predicate, value_graph};
 use crate::iri::node_iri;
 use crate::shacl::{Shapes, ShapesError, ValidationReport};
@@ -320,6 +320,10 @@ impl<'a> TypeShapes<'a> {
                     );
                     let s = self.shape_ref(base, &format!("{fpath}.t"), &f.ty);
                     self.add(&p, sh("node"), s);
+                    // @tg: implements:: [[openspec:journal-redaction#Sensitive Fields]] {confidence: partial}
+                    for (pred, o) in mark_triples(&f.marks) {
+                        self.add(&p, pred.into_owned(), o);
+                    }
                 }
             }
             Type::Union(variants) => {
