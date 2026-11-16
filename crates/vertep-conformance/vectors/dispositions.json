@@ -1,0 +1,217 @@
+{
+  "about": "Conformance vectors for decision dispositions (openspec m12-decision-records, task 2.3; requirement decision-records#Decision Disposition Is Recorded). Each vector runs a chart on the agent host with a recording decider bound to `d` (answers come from the steps) and, when `fallback` is given, a guard decider bound to `g` that picks the first enabled of those events. `expect` lists the decision and refusal entries of the journal in order, with the disposition and the offer the shell recorded on each, and the configuration at the end. The test (crates/vertep-conformance/tests/disposition_vectors.rs) checks the Rust shell against `expect`, then replays each journal into a fresh machine and writes one observation line per entry to lean/vertep-lean/VertepTests/data/dispositions.jsonl, which `vertep-decide --strict` (and the Lean test VertepTests.Disposition at build time) checks against the Lean model.",
+  "steps": {
+    "send": "an external event to the actor",
+    "answer": "a decision: `offer` is the index of the request the recording decider received (0 is the first), or `correlation` names one outright; `payload` and `annotations` default to none",
+    "refuse": "a refusal of request `offer`",
+    "advance_ms": "advance the virtual clock (due timers fire)"
+  },
+  "not_produced": [
+    {
+      "disposition": "fallback-on-refusal",
+      "reason": "Reserved for a chart path that consults the fallback decider after the first decider refuses; no such path exists, so the shell never records it. The vector `refusal-does-not-consult-the-fallback` shows a refusal with a fallback and a deadline configured: the entry is `refused-by-decider` and no fallback entry follows. The Lean theorem Vertep.Agent.fallback_on_refusal_not_produced states that the model never computes it."
+    }
+  ],
+  "charts": {
+    "review": {
+      "about": "`start` enters the decide state `review`, whose candidates are `approve` (guarded by `ctx.ok` and by the payload: `ev.data.amount < 100`, so it is offered while the payload is unknown), `reject`, and `escalate` (guarded by `ctx.level > 3`, false). `approve` carries `{ amount: int }`. An invalid decision and a refusal go to `referred`, a timeout to `timedout`. `{extra}` takes attributes of the decide state.",
+      "initial": "idle",
+      "head": "<vt:types><![CDATA[event approve: { amount: int };\nevent reject;\nevent escalate;]]></vt:types><datamodel><data id=\"ok\" vt:type=\"bool\" expr=\"true\"/><data id=\"level\" vt:type=\"int\" expr=\"1\"/></datamodel>",
+      "body": "<state id=\"idle\"><transition event=\"start\" target=\"review\"/></state><state id=\"review\" vt:decide=\"d\" vt:candidates=\"approve reject escalate\" {extra}><transition event=\"approve\" cond=\"ctx.ok &amp;&amp; ev.data.amount &lt; 100\" target=\"approved\"/><transition event=\"reject\" target=\"rejected\"/><transition event=\"escalate\" cond=\"ctx.level &gt; 3\" target=\"escalated\"/><transition event=\"flag\"><assign location=\"ok\" expr=\"false\"/></transition><transition event=\"leave\" target=\"idle\"/><transition event=\"error.decide.invalid\" target=\"referred\"/><transition event=\"vt.decide.refused\" target=\"referred\"/><transition event=\"error.decide.timeout\" target=\"timedout\"/></state><state id=\"approved\"/><state id=\"rejected\"/><state id=\"escalated\"/><state id=\"referred\"/><state id=\"timedout\"/>"
+    }
+  },
+  "vectors": [
+    {
+      "name": "accepted",
+      "about": "An offered, enabled event with a conforming payload is taken.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "answer": { "offer": 0, "event": "approve", "payload": { "amount": 50 } } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "accepted", "offered": ["approve", "reject"] }],
+        "configuration": ["approved"]
+      }
+    },
+    {
+      "name": "refused-not-offered",
+      "about": "`escalate` is a candidate of the chart but its guard is false, so it was not offered; the chart's invalid-decision path sends the case to `referred`.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "answer": { "offer": 0, "event": "escalate" } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "refused-not-offered", "offered": ["approve", "reject"] }],
+        "configuration": ["referred"]
+      }
+    },
+    {
+      "name": "refused-not-offered-unknown-event",
+      "about": "An event the chart does not know at all.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "answer": { "offer": 0, "event": "delete_all" } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "refused-not-offered", "offered": ["approve", "reject"] }],
+        "configuration": ["referred"]
+      }
+    },
+    {
+      "name": "refused-guard",
+      "about": "`approve` was offered (its guard reads the payload, unknown at offer time) and the payload conforms, but with it the guard is false: selection no longer takes the offered transition.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "answer": { "offer": 0, "event": "approve", "payload": { "amount": 500 } } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "refused-guard", "offered": ["approve", "reject"] }],
+        "configuration": ["referred"]
+      }
+    },
+    {
+      "name": "refused-invalid-payload",
+      "about": "The payload does not conform to `approve`'s declared type.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "answer": { "offer": 0, "event": "approve", "payload": { "amount": "lots" } } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "refused-invalid", "offered": ["approve", "reject"] }],
+        "configuration": ["referred"]
+      }
+    },
+    {
+      "name": "refused-invalid-annotations",
+      "about": "The annotations fail validation (a confidence outside [0, 1]); they are checked before the event.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "answer": { "offer": 0, "event": "reject", "annotations": { "confidence": 1.5 } } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "refused-invalid", "offered": ["approve", "reject"] }],
+        "configuration": ["referred"]
+      }
+    },
+    {
+      "name": "stale-forged",
+      "about": "A correlation id no offer ever had: stale, with an empty offer; the machine raises error.decide.invalid (reason stale), which the chart sends to `referred`.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "answer": { "correlation": "urn:vertep:test:forged", "event": "reject" } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "stale", "offered": [] }],
+        "configuration": ["referred"]
+      }
+    },
+    {
+      "name": "stale-superseded",
+      "about": "`flag` makes `ctx.ok` false while the offer is open: the candidate set shrinks and the offer is re-issued under a new correlation, so the late answer to the first offer is stale, not refused-guard (design finding 1).",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "send": "flag" },
+        { "answer": { "offer": 0, "event": "approve", "payload": { "amount": 50 } } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "stale", "offered": [] }],
+        "configuration": ["referred"]
+      }
+    },
+    {
+      "name": "stale-after-leaving",
+      "about": "A late answer after the decide state was left and the offer cancelled.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "send": "leave" },
+        { "answer": { "offer": 0, "event": "reject" } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "stale", "offered": [] }],
+        "configuration": ["idle"]
+      }
+    },
+    {
+      "name": "duplicate-not-journaled",
+      "about": "The same answer delivered twice: the host drops the redelivery as a duplicate before journaling, so there is one entry.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "answer": { "offer": 0, "event": "reject" } },
+        { "answer": { "offer": 0, "event": "reject" } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "accepted", "offered": ["approve", "reject"] }],
+        "configuration": ["rejected"]
+      }
+    },
+    {
+      "name": "refused-by-decider",
+      "about": "The decider declines to answer; the entry carries the offer it declined.",
+      "chart": "review",
+      "steps": [
+        { "send": "start" },
+        { "refuse": { "offer": 0, "reason": "not my call" } }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "refused-by-decider", "offered": ["approve", "reject"] }],
+        "configuration": ["referred"]
+      }
+    },
+    {
+      "name": "fallback-on-deadline",
+      "about": "No answer before the 30 s deadline: the offer goes to the fallback decider `g`, whose answer is taken.",
+      "chart": "review",
+      "extra": "vt:deadline=\"30s\" vt:fallback=\"g\"",
+      "fallback": ["reject"],
+      "steps": [
+        { "send": "start" },
+        { "advance_ms": 30000 }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "fallback-on-deadline", "offered": ["approve", "reject"] }],
+        "configuration": ["rejected"]
+      }
+    },
+    {
+      "name": "fallback-refuses",
+      "about": "After the deadline the fallback decider `g` has no enabled event of its own (`escalate` is not enabled) and refuses: its entry is refused-by-decider, carrying the offer it was asked, not a fallback disposition.",
+      "chart": "review",
+      "extra": "vt:deadline=\"30s\" vt:fallback=\"g\"",
+      "fallback": ["escalate"],
+      "steps": [
+        { "send": "start" },
+        { "advance_ms": 30000 }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "refused-by-decider", "offered": ["approve", "reject"] }],
+        "configuration": ["referred"]
+      }
+    },
+    {
+      "name": "refusal-does-not-consult-the-fallback",
+      "about": "A refusal with a deadline and a fallback configured: the entry is refused-by-decider, the deadline is cancelled and the fallback is never asked, so no fallback-on-refusal entry exists (design finding 2).",
+      "chart": "review",
+      "extra": "vt:deadline=\"30s\" vt:fallback=\"g\"",
+      "fallback": ["reject"],
+      "steps": [
+        { "send": "start" },
+        { "refuse": { "offer": 0, "reason": "not my call" } },
+        { "advance_ms": 60000 }
+      ],
+      "expect": {
+        "entries": [{ "disposition": "refused-by-decider", "offered": ["approve", "reject"] }],
+        "configuration": ["referred"]
+      }
+    }
+  ]
+}
