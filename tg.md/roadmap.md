@@ -180,7 +180,7 @@ In progress (2026-11-16): stability tiers, a reproducible toolchain, a benchmark
 
 Specified by the OpenSpec change `m13-production-readiness` (capabilities `production-readiness` and `journal-shipping`, and an addition to `relay-mailboxes`). It also tracks the open Lean custody proof (M7 task 10.4) and the open M10 items. New milestones wait for it, see [[decisions#New milestones wait for production readiness]].
 
-Stability tiers are declared in every crate, npm and Python manifest and rendered into the README and `site/docs/tiers.html` by `site/tools/tiers.py`, which CI runs in check mode. The first docs-versus-behaviour audit (2026-11-16, release 0.1.11) corrected the site pages and this roadmap; the rest of the change is not built yet.
+Stability tiers are declared in every crate, npm and Python manifest and rendered into the README and `site/docs/tiers.html` by `site/tools/tiers.py`, which CI runs in check mode. The first docs-versus-behaviour audit (2026-11-16, release 0.1.11) corrected the site pages and this roadmap. In 0.1.12: the pinned toolchain and container build, `cargo-deny`, SBOMs and signed provenance at release, and the ten-minute-path CI job. After 0.1.12: journal shipping as a pull protocol in `vertep-cluster` with fault histories replayed through the Lean lease model, and WebSocket live delivery for relay mailboxes with polling fallback in `vertep-federation`. Open: the benchmark suite (carried by `m18-runtime-performance`), a repeatable docs audit, and the M7 and M10 dependencies.
 
 ## M14 Rules decider
 

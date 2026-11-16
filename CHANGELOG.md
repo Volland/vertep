@@ -8,6 +8,27 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+### Added
+
+- **Journal shipping** (`vertep-cluster`, M13): a pull protocol over the cluster transport. A
+  follower pulls entries after its durable head; the leader answers in order with SHA-256
+  digests under its fencing token (`ShipLeader`, `ShipFollower`, `QuicShipLink`). Resumes after a
+  dropped link or a restart, bounds memory by a byte window, and its fault histories replay
+  through the Lean lease model. `JournalStore::read_range` and `Entry::digest` in `vertep-store`.
+- **WebSocket live delivery** (`vertep-federation`, feature `ws`): `WsLiveNetwork`,
+  `WsLiveServer` and `PickupLoop` deliver relay mailbox messages over a socket with the same
+  envelope and acknowledgement, falling back to polling when the socket is refused or drops.
+- **Bundle verification in the bindings** (M12): `verifyBundle` and `counterfactualBundle` in
+  `@vertep/web` (journal build) and `vertep.verify_bundle`, `vertep.counterfactual_bundle` in
+  Python; error `BundleInvalid`.
+- **Dispositions in Lean** (M12): 14 disposition vectors replay strictly through
+  `vertep-decide --strict`; `VertepLean/Disposition.lean` proves an accepted answer was offered.
+- The M12 decision-records View, and M12 archived (12 requirements in `openspec/specs/`).
+
+### Fixed
+
+- The DIDComm relay tests are now compiled and run in CI (the `didcomm` feature was never on).
+
 ## [0.1.12] - 2026-11-16
 
 Milestone M12 (decision records): redaction completed. Milestone M13 (production readiness):

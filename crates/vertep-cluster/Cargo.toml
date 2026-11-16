@@ -17,7 +17,7 @@ categories = ["network-programming", "asynchronous", "concurrency"]
 # Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
 # README and the site by site/tools/tiers.py; CI fails when they differ.
 tier = "experimental"
-tier-reason = "Fault injection replayed through the Lean lease model, but no user outside the project and no journal shipping protocol yet"
+tier-reason = "Fault injection and journal shipping replayed through the Lean lease model, but no user outside the project and shipping not yet wired into node replication"
 
 [features]
 default = ["gossip", "quic", "runtime"]
