@@ -1350,3 +1350,118 @@ fn explain_reports_an_old_entry_as_unknown_and_a_missing_entry_as_an_error() {
     assert!(!x.chart_version.is_empty());
     assert!(host.explain(AGENT, 999).is_err());
 }
+
+// ----- Decision records: the explanation bundle ---------------------------------------------
+
+fn bundle_of_a_decision() -> (vertep_agent::bundle::Bundle, u64) {
+    let (mut host, _, rec) = reviewing("");
+    decide(
+        &mut host,
+        &rec.requests()[0].correlation.clone(),
+        "reject",
+        Value::Undefined,
+    );
+    let n = host.journal(AGENT).len() as u64;
+    (host.export_bundle(AGENT, 1, n).unwrap(), n)
+}
+
+// @tg: verifies:: [[openspec:decision-records#Explanation Bundle#A bundle verifies offline]] {level: integration}
+#[test]
+fn a_bundle_verifies_offline_with_no_decider() {
+    let (bundle, n) = bundle_of_a_decision();
+    // through JSON, as a file would travel
+    let text = bundle.to_json();
+    let back = vertep_agent::bundle::Bundle::from_json(&text).unwrap();
+    assert_eq!(back, bundle);
+    let verified = back.verify().unwrap();
+    assert_eq!(verified.decider_calls, 0);
+    assert_eq!(verified.explanations.len() as u64, n);
+    let last = verified.explanations.last().unwrap();
+    assert_eq!(last.decision.as_ref().unwrap().disposition, "accepted");
+    assert_eq!(last.state_after, vec!["rejected"]);
+}
+
+// @tg: verifies:: [[openspec:decision-records#Explanation Bundle#An altered entry is detected]] {level: integration}
+#[test]
+fn an_altered_entry_is_detected_and_named() {
+    let (mut bundle, _) = bundle_of_a_decision();
+    let at = bundle
+        .entries
+        .iter()
+        .position(|e| matches!(e.input, AgentInput::Decision { .. }))
+        .unwrap();
+    if let AgentInput::Decision { event, .. } = &mut bundle.entries[at].input {
+        *event = "approve".to_owned();
+    }
+    assert_eq!(
+        bundle.verify().unwrap_err(),
+        vertep_agent::bundle::BundleError::AlteredEntry(at as u64 + 1)
+    );
+}
+
+// @tg: verifies:: [[openspec:decision-records#Explanation Bundle#A missing chart is detected]] {level: integration}
+#[test]
+fn a_missing_chart_is_detected_and_named() {
+    let (mut bundle, _) = bundle_of_a_decision();
+    let version = bundle.charts.keys().next().unwrap().clone();
+    bundle.charts.clear();
+    assert_eq!(
+        bundle.verify().unwrap_err(),
+        vertep_agent::bundle::BundleError::MissingChart(version)
+    );
+}
+
+#[test]
+fn a_wrong_digest_or_an_altered_chart_or_explanation_is_detected() {
+    use vertep_agent::bundle::BundleError;
+    // the manifest's chart digest is wrong
+    let (mut b, _) = bundle_of_a_decision();
+    let v = b.charts.keys().next().unwrap().clone();
+    b.manifest.charts.insert(v.clone(), "00".repeat(32));
+    assert_eq!(b.verify().unwrap_err(), BundleError::ChartDigest(v.clone()));
+    // the chart text was altered and its digest made to match: its hash no longer names it
+    let (mut b, _) = bundle_of_a_decision();
+    let text = b.charts.get_mut(&v).unwrap();
+    *text = text.replace("review", "reviewed");
+    let digest = {
+        use sha2::{Digest, Sha256};
+        Sha256::digest(text.as_bytes())
+            .iter()
+            .map(|x| format!("{x:02x}"))
+            .collect::<String>()
+    };
+    b.manifest.charts.insert(v.clone(), digest);
+    assert!(
+        matches!(
+            b.verify().unwrap_err(),
+            BundleError::ChartHash { .. } | BundleError::Replay(_)
+        ),
+        "an altered chart is refused"
+    );
+    // an explanation digest in the manifest was changed
+    let (mut b, _) = bundle_of_a_decision();
+    let last = b.manifest.explanations.last_mut().unwrap();
+    let position = last.position;
+    last.sha256 = "ff".repeat(32);
+    assert_eq!(
+        b.verify().unwrap_err(),
+        BundleError::ExplanationMismatch(position)
+    );
+    // a reordered journal is refused as out of order
+    let (mut b, _) = bundle_of_a_decision();
+    b.entries.swap(1, 2);
+    assert!(matches!(b.verify().unwrap_err(), BundleError::Entries(_)));
+}
+
+// @tg: verifies:: [[openspec:decision-records#Offer Is Part Of The Record#No decision, no offer]] {level: integration}
+#[test]
+fn a_step_taken_by_rule_has_no_decision_and_says_no_decider_was_asked() {
+    let (host, _, _rec) = reviewing("");
+    // entry 2 is the `start` event: the chart moved to the decide state by a plain transition
+    let x = host.explain(AGENT, 2).unwrap();
+    assert_eq!(x.input, "event");
+    assert!(x.decision.is_none(), "no decider was asked for this step");
+    assert!(
+        host.journal(AGENT)[1].offered.is_none() && host.journal(AGENT)[1].disposition.is_none()
+    );
+}

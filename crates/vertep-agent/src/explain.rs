@@ -45,6 +45,9 @@ pub struct DecisionRecord {
     pub taken: Vec<(String, usize)>,
     /// The decider's account.
     pub claim: Option<Claim>,
+    /// The derivation the decision rests on, when the decider's reason is a derivation over
+    /// recorded statements (a rule decider). Not a claim: it can be re-run.
+    pub derivation: Option<serde_json::Value>,
 }
 
 /// The explanation of one journal entry.

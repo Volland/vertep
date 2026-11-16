@@ -285,7 +285,7 @@ The journal alone explains every decision: disposition and offer on each decisio
 
 - scheduled_in:: [[roadmap#M12 Decision records]]
 
-Partly implemented in [[components#vertep-agent]]: every decision and refusal entry carries a disposition and the offer, set by the shell before it journals the input; old entries read as unknown. `AgentHost::explain` derives an explanation view by replay, with the rationale kept as a labelled claim. The bundle, chained agent journals, redaction and counterfactual replay are open. The behaviour it fixes is visible in `examples/credit-decision`.
+Partly implemented in [[components#vertep-agent]]: every decision and refusal entry carries a disposition and the offer; `AgentHost::explain` derives an explanation by replay with the rationale kept as a labelled claim and a rule decision's derivation shown as a derivation; `AgentHost::export_bundle`, `Bundle::verify`, `vt explain` and `vt verify-bundle` export and check a bundle offline. Chained, signed agent journals, counterfactual replay of charts and redaction are open.
 
 ## Journal redaction
 

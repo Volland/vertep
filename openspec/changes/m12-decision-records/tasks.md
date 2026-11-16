@@ -15,15 +15,15 @@
 
 - [x] 3.1 `explain(actor, position)` in `vertep-agent`, derived by replay (`AgentHost::explain` returning `explain::Explanation`: state before and after, entered and exited states, effects, and for a decision the offer, the choice, the disposition, the decider, the transitions taken and the claim; `to_json` for tools)
 - [x] 3.2 Label rationale as a claim in the view and the JSON schema (the claim is its own record with `claimed_by` and the label `unverified claim by the decider`; there is no JSON schema of the view yet)
-- [ ] 3.2a Carry the rule decider's `Derivation` (support statements, closure digest, engine) on the decision entry with rationale kind `derivation`, and report the offer in the explanation view from the same statements the rule read (`rule-decider#Offer And State Are Statements#One record`, carried from `m14-rules-decider`)
+- [x] 3.2a Carry the rule decider's `Derivation` on the decision entry (as `Annotations.derivation`, with no rationale text) and show it in the explanation view as a derivation, not a claim; the offer the explanation reports is the offer the rule read, both coming from the same request (`rule-decider#Offer And State Are Statements#One record`, carried from `m14-rules-decider`)
 - [ ] 3.3 Expose through `vertep-wasm` and `vertep-py`
-- [ ] 3.4 Update `examples/credit-decision` to print the disposition and the offer for each decision, and re-record its output
+- [x] 3.4 Update `examples/credit-decision` to print the disposition and the offer for each decision, and re-record its output (it also exports and verifies the bundle of the referred loan)
 
 ## 4. Bundles
 
-- [ ] 4.1 Bundle format: manifest, journal slice, chart versions by hash, digests
-- [ ] 4.2 `vt explain` and `vt verify-bundle`, verifying offline
-- [ ] 4.3 Tamper vectors: altered entry, missing chart, wrong digest
+- [x] 4.1 Bundle format: manifest, journal slice, chart versions by hash, digests (`vertep_agent::bundle::Bundle`; the chart travels as canonical N-Quads and is checked against its version hash)
+- [x] 4.2 `vt explain BUNDLE` and `vt verify-bundle BUNDLE`, verifying offline (the bundle is exported by `AgentHost::export_bundle`; the CLI reads a file)
+- [x] 4.3 Tamper vectors: altered entry, missing chart, wrong digest
 
 - [ ] 4.4 Retract the derived facts of `vertep-rules` that rest on an erased subject's sealed statements, and journal the retraction with the erasure (`journal-redaction#Erasure Retracts Derived Facts`, carried from `m15-rule-invariants` 3.3)
 

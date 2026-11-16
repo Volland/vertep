@@ -131,7 +131,9 @@ fn main() -> Result<(), Error> {
                 AgentInput::Decision {
                     event, annotations, ..
                 } => format!(
-                    "{event}, rationale {:?}",
+                    "{event} [{}, offered {:?}], rationale {:?}",
+                    entry.disposition_or_unknown(),
+                    entry.offered.clone().unwrap_or_default(),
                     annotations.rationale.as_deref().unwrap_or("")
                 ),
                 other => format!("{other:?}"),
@@ -146,6 +148,18 @@ fn main() -> Result<(), Error> {
             );
         }
     }
+    // ---- export what an auditor can verify on another machine ---------------------------------
+    let referred = APPLICATIONS[1].0;
+    let last = audit.journal(referred).len() as u64;
+    let bundle = audit.export_bundle(referred, 1, last)?;
+    let text = bundle.to_json();
+    let verified = vertep::agent::bundle::Bundle::from_json(&text)?.verify()?;
+    println!(
+        "bundle of {referred}: {} entries; verified offline: {} explanations recomputed, {} decider calls",
+        bundle.entries.len(),
+        verified.explanations.len(),
+        verified.decider_calls
+    );
     println!(
         "entries replayed: {}, decider calls: {}",
         audit.stats().replayed,

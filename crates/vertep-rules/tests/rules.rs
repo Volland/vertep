@@ -114,12 +114,11 @@ mod with_engine {
         ) {
             DecisionOutcome::Decision(dec) => {
                 assert_eq!(dec.event, "approve");
-                assert!(
-                    dec.annotations
-                        .rationale
-                        .unwrap()
-                        .starts_with("derivation: approve")
-                );
+                // the reason is a derivation, not a claim: no rationale text
+                assert!(dec.annotations.rationale.is_none());
+                let d = *dec.annotations.derivation.expect("a derivation");
+                assert_eq!(d["event"], "approve");
+                assert_eq!(d["support"].as_array().unwrap().len(), 4);
                 assert_eq!(dec.annotations.decider_kind.as_deref(), Some("rules"));
             }
             o => panic!("{o:?}"),
