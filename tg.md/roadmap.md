@@ -172,7 +172,7 @@ Specified by the OpenSpec change `m12-decision-records` (capabilities `decision-
 
 ## M13 Production readiness
 
-Drafted, not started: stability tiers, a reproducible toolchain, a benchmark suite with a regression gate, a supply-chain gate, a docs-versus-behaviour audit, a tested ten-minute path, journal shipping between nodes and WebSocket live delivery.
+In progress (2026-11-16): stability tiers, a reproducible toolchain, a benchmark suite with a regression gate, a supply-chain gate, a docs-versus-behaviour audit, a tested ten-minute path, journal shipping between nodes and WebSocket live delivery.
 
 - precedes:: [[roadmap#M14 Rules decider]] {note: "rules start only after production readiness"}
 
