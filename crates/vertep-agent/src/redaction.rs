@@ -7,6 +7,8 @@
 //! read it opens what the key store can open and puts an erased marker where it cannot. Erasure
 //! destroys the subject's key through the [`KeyStore`] and appends an `erasure` entry to every
 //! journal that held the subject's data; no entry is rewritten, so the chain still verifies.
+//! An [`ErasureHook`] lets a store that derives facts from the subject's data retract them in
+//! the same erasure, and the `erasure` entry lists what it retracted.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
@@ -125,17 +127,33 @@ impl Erasures {
     }
 }
 
+/// Runs when a subject is erased, after their key is destroyed and before the `erasure` entries
+/// are appended. A store that keeps facts derived from the subject's data retracts them here and
+/// returns their identifiers, which every `erasure` entry then lists in `retracted`
+/// ([[openspec:journal-redaction#Erasure Retracts Derived Facts]]).
+///
+/// The hook is defined here so this crate needs no rules engine; `vertep-rules` implements it
+/// over a tiramemsu shard.
+pub trait ErasureHook: Send + Sync {
+    /// Retracts what rests on `subject`'s data and returns the identifiers of the derived facts
+    /// retracted. An error stops the erasure before any entry is appended; the key is already
+    /// destroyed, so the call can be repeated.
+    fn on_erase(&self, subject: &str) -> Result<Vec<String>, String>;
+}
+
 /// An agent journal that seals sensitive fields and can erase subjects.
 pub struct SealingJournal {
     inner: Arc<dyn AgentJournal>,
     keys: Arc<dyn KeyStore>,
     policy: SealPolicy,
+    hook: Option<Arc<dyn ErasureHook>>,
 }
 
 impl core::fmt::Debug for SealingJournal {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SealingJournal")
             .field("fields", &self.policy.fields.len())
+            .field("hook", &self.hook.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -190,7 +208,15 @@ impl SealingJournal {
             inner,
             keys,
             policy,
+            hook: None,
         })
+    }
+
+    /// Runs `hook` on every erasure, so that derived facts resting on the subject's data are
+    /// retracted with it and listed on the `erasure` entries.
+    pub fn with_erasure_hook(mut self, hook: Arc<dyn ErasureHook>) -> Self {
+        self.hook = Some(hook);
+        self
     }
 
     fn seal(&self, actor: &str, entry: &mut JournalEntry) -> Result<(), JournalError> {
@@ -297,8 +323,11 @@ impl SealingJournal {
     /// journal that holds the subject's sealed data. Returns the actors it appended to.
     ///
     /// The key is destroyed first: if an append then fails the data is already gone and the
-    /// call can be repeated to record it.
+    /// call can be repeated to record it. With an [`ErasureHook`] the hook runs next, and each
+    /// entry lists the derived facts it retracted; a repeated call finds them already retracted
+    /// and lists none.
     // @tg: implements:: [[openspec:journal-redaction#Erasure By Key Destruction]]
+    // @tg: implements:: [[openspec:journal-redaction#Erasure Retracts Derived Facts]] {confidence: partial, note: "the retraction itself is the hook's; vertep-rules provides it"}
     pub fn erase(&self, subject: &str, reason: &str, ts: i64) -> Result<Vec<String>, JournalError> {
         let holders: Vec<String> = self
             .inner
@@ -312,6 +341,10 @@ impl SealingJournal {
             })
             .collect();
         self.keys.destroy(subject).map_err(JournalError::Backend)?;
+        let retracted = match &self.hook {
+            Some(h) => h.on_erase(subject).map_err(JournalError::Backend)?,
+            None => Vec::new(),
+        };
         for actor in &holders {
             let head = self.inner.read(actor).last().map_or(0, |e| e.position);
             if self
@@ -330,7 +363,7 @@ impl SealingJournal {
                     input: AgentInput::Erasure {
                         subject: subject.to_owned(),
                         reason: reason.to_owned(),
-                        retracted: Vec::new(),
+                        retracted: retracted.clone(),
                     },
                     disposition: None,
                     offered: None,
@@ -444,5 +477,113 @@ impl AgentJournal for SealingJournal {
 
     fn actors(&self) -> Vec<String> {
         self.inner.actors()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::journal::MemoryJournal;
+    use vertep_core::datamodel::Event;
+
+    struct Fixed(Vec<String>, Mutex<Vec<String>>);
+
+    impl ErasureHook for Fixed {
+        fn on_erase(&self, subject: &str) -> Result<Vec<String>, String> {
+            self.1.lock().unwrap().push(subject.to_owned());
+            Ok(self.0.clone())
+        }
+    }
+
+    struct Failing;
+
+    impl ErasureHook for Failing {
+        fn on_erase(&self, _: &str) -> Result<Vec<String>, String> {
+            Err("store down".into())
+        }
+    }
+
+    fn applied(who: &str) -> JournalEntry {
+        let data = crate::json::obj([
+            ("who", crate::json::s(who)),
+            ("email", crate::json::s(format!("{who}@example.org"))),
+        ]);
+        JournalEntry {
+            position: 1,
+            ts: 1_000,
+            input: AgentInput::Event {
+                event: Event {
+                    name: "applied".into(),
+                    data,
+                    ..Event::default()
+                },
+                message_id: "m1".into(),
+            },
+            disposition: None,
+            offered: None,
+        }
+    }
+
+    fn journal() -> (Arc<MemoryJournal>, SealingJournal) {
+        let raw = Arc::new(MemoryJournal::new());
+        let policy = SealPolicy {
+            fields: vec![SensitiveField {
+                event: "applied".into(),
+                field: "/email".into(),
+                subject: "/who".into(),
+                retention_ms: None,
+            }],
+        };
+        let j = SealingJournal::new(raw.clone(), Arc::new(MemoryKeyStore::new()), policy).unwrap();
+        (raw, j)
+    }
+
+    fn retracted_of(raw: &MemoryJournal, actor: &str) -> Vec<String> {
+        match &raw.read(actor).last().unwrap().input {
+            AgentInput::Erasure { retracted, .. } => retracted.clone(),
+            other => panic!("not an erasure: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_hook_fills_the_retracted_list_of_every_erasure_entry() {
+        let (raw, j) = journal();
+        let hook = Arc::new(Fixed(vec!["e7".into(), "e9".into()], Mutex::default()));
+        let j = j.with_erasure_hook(hook.clone());
+        j.append("urn:a", applied("ann")).unwrap();
+        j.append("urn:b", applied("ann")).unwrap();
+        j.append("urn:c", applied("bob")).unwrap();
+        let holders = j.erase("ann", "request", 2_000).unwrap();
+        assert_eq!(holders, vec!["urn:a".to_owned(), "urn:b".to_owned()]);
+        assert_eq!(*hook.1.lock().unwrap(), vec!["ann".to_owned()]);
+        for a in ["urn:a", "urn:b"] {
+            assert_eq!(
+                retracted_of(&raw, a),
+                vec!["e7".to_owned(), "e9".to_owned()]
+            );
+        }
+        assert_eq!(
+            raw.read("urn:c").len(),
+            1,
+            "another subject's journal is untouched"
+        );
+    }
+
+    #[test]
+    fn without_a_hook_the_retracted_list_stays_empty() {
+        let (raw, j) = journal();
+        j.append("urn:a", applied("ann")).unwrap();
+        j.erase("ann", "request", 2_000).unwrap();
+        assert!(retracted_of(&raw, "urn:a").is_empty());
+    }
+
+    #[test]
+    fn a_failing_hook_appends_nothing_and_the_key_is_gone() {
+        let (raw, j) = journal();
+        let j = j.with_erasure_hook(Arc::new(Failing));
+        j.append("urn:a", applied("ann")).unwrap();
+        assert!(j.erase("ann", "request", 2_000).is_err());
+        assert_eq!(raw.read("urn:a").len(), 1, "no erasure entry was appended");
+        assert!(j.erasures("urn:a").subjects.contains("ann"));
     }
 }
