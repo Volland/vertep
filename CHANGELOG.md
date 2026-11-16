@@ -8,6 +8,33 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-11-16
+
+Milestone M12 (decision records), the rest of the first part: bundles, signed journals,
+counterfactual replay and redaction.
+
+### Added
+
+- **`vertep-agent`**: `Bundle` and `AgentHost::export_bundle`: a journal, the chart versions it ran
+  under (canonical N-Quads keyed by version hash) and a manifest of SHA-256 digests;
+  `Bundle::verify` recomputes every explanation offline with no decider call. `EntrySealer`
+  hook and `StoreAgentJournal::with_sealer`. `AgentHost::counterfactual` replays a journal under
+  another chart version into scratch machines and reports where decisions diverge.
+- **`vertep-objects`**: `ChainedAgentSealer` gives an agent journal the durable-object hash chain
+  and signatures; `verify_agent_journal`.
+- **`vertep-cli`**: `vt explain BUNDLE [--position N] [--json]` and `vt verify-bundle`.
+- **Redaction** (`vertep-agent::redaction`): `SealingJournal` seals the fields a `SealPolicy` marks
+  sensitive under per-subject ChaCha20-Poly1305 keys behind a `KeyStore`; `erase` destroys the key
+  and appends an `erasure` entry (the chain and signatures still verify); `expire` erases
+  subjects past their retention horizon. `Explanation.replay` is `recorded` once an erased value
+  is in the journal.
+
+### Not yet
+
+- The `sensitive` marker in the type language, replay that follows recorded transitions after an
+  erasure (a guard reading an erased value is re-evaluated and may diverge), retraction of
+  rule-derived facts on erasure, and the snapshot policy.
+
 ## [0.1.10] - 2026-11-15
 
 Milestone M12 (decision records), second slice: the explanation view.
