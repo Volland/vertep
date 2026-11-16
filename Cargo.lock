@@ -5547,6 +5547,7 @@ dependencies = [
  "sha2 0.10.9",
  "tempfile",
  "tokio",
+ "tokio-tungstenite 0.30.0",
  "tsp_sdk",
  "url",
  "vertep-core",

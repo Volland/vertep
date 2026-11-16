@@ -557,20 +557,46 @@ impl RelayInbox {
     /// Opens a live session on every binding whose relay offers one: messages arriving later are
     /// picked up and delivered at once. Returns the names of the bindings now live.
     pub fn go_live(&self) -> Vec<String> {
-        let mut live = Vec::new();
-        for (i, b) in self.core.bindings.iter().enumerate() {
-            let weak = Arc::downgrade(&self.core);
-            let wake: Arc<dyn Fn(&str) + Send + Sync> = Arc::new(move |_recipient: &str| {
-                if let Some(core) = weak.upgrade() {
-                    let mut r = PickupReport::default();
-                    core.pickup_binding(i, &mut r);
-                }
-            });
-            if b.source.live(&self.core.recipients(b), wake) {
-                live.push(b.name.clone());
+        (0..self.core.bindings.len())
+            .filter(|&i| self.go_live_at(i))
+            .map(|i| self.core.bindings[i].name.clone())
+            .collect()
+    }
+
+    /// The names of the pickup bindings, in order (the index the `*_at` methods take).
+    pub fn binding_names(&self) -> Vec<String> {
+        self.core.bindings.iter().map(|b| b.name.clone()).collect()
+    }
+
+    /// Polls the binding at `index` once.
+    pub fn pickup_at(&self, index: usize) -> PickupReport {
+        let mut r = PickupReport::default();
+        self.core.pickup_binding(index, &mut r);
+        r
+    }
+
+    /// Opens (or keeps) a live session on the binding at `index`: true when one is open.
+    pub fn go_live_at(&self, index: usize) -> bool {
+        let Some(b) = self.core.bindings.get(index) else {
+            return false;
+        };
+        let weak = Arc::downgrade(&self.core);
+        let wake: Arc<dyn Fn(&str) + Send + Sync> = Arc::new(move |_recipient: &str| {
+            if let Some(core) = weak.upgrade() {
+                let mut r = PickupReport::default();
+                core.pickup_binding(index, &mut r);
             }
-        }
-        live
+        });
+        b.source.live(&self.core.recipients(b), wake)
+    }
+
+    /// True while the live session of the binding at `index` is still open
+    /// ([`PickupSource::live_open`]).
+    pub fn live_open_at(&self, index: usize) -> bool {
+        self.core
+            .bindings
+            .get(index)
+            .is_some_and(|b| b.source.live_open(&self.core.recipients(b)))
     }
 
     /// The mailbox of the local DID actor `address`.

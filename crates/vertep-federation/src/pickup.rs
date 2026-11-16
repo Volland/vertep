@@ -644,9 +644,28 @@ impl PickupSource for MediatorClient {
         Ok(out)
     }
 
+    /// `messages-received` on the live session when one is open (Pickup 3.0 live mode), else
+    /// posted. A frame lost with a dropping socket only means the copies are delivered again
+    /// and recognised by their message ids.
     fn ack(&self, ids: &[String]) -> Result<(), NetError> {
         if !ids.is_empty() {
-            self.messages_received(ids)?;
+            let up = self.live.as_ref().and_then(|l| lock(&l.up).clone());
+            let sent_live = up.is_some_and(|up| {
+                let msg = protocol_message(
+                    &new_id(),
+                    MESSAGES_RECEIVED,
+                    &self.agent.identity().did,
+                    &self.mediator.id,
+                    json!({ "message_id_list": ids }),
+                );
+                self.agent
+                    .seal_message(&msg, &self.mediator)
+                    .ok()
+                    .is_some_and(|jwe| up.send(jwe.as_bytes()).is_ok())
+            });
+            if !sent_live {
+                self.messages_received(ids)?;
+            }
         }
         if let Some(l) = &self.live {
             lock(&l.pushed).retain(|p| !ids.contains(&p.id));
@@ -656,5 +675,10 @@ impl PickupSource for MediatorClient {
 
     fn live(&self, _recipients: &[String], wake: Arc<dyn Fn(&str) + Send + Sync>) -> bool {
         self.live.is_some() && (self.is_live() || self.go_live(wake).is_ok())
+    }
+
+    // @tg: implements:: [[openspec:relay-mailboxes#WebSocket Live Delivery]] {note: "a dropped DIDComm session is seen, so pickup falls back to polling"}
+    fn live_open(&self, _recipients: &[String]) -> bool {
+        self.is_live()
     }
 }

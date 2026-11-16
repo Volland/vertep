@@ -1025,6 +1025,14 @@ impl PickupSource for TspMailboxClient {
         }
         any
     }
+
+    fn live_open(&self, recipients: &[String]) -> bool {
+        let registered: Vec<String> = lock(&self.state).actors.keys().cloned().collect();
+        recipients
+            .iter()
+            .filter(|r| registered.contains(r))
+            .all(|r| self.is_live(r))
+    }
 }
 
 #[cfg(test)]

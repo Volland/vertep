@@ -180,6 +180,13 @@ pub trait PickupSource: Send + Sync {
     fn live(&self, _recipients: &[String], _wake: Arc<dyn Fn(&str) + Send + Sync>) -> bool {
         false
     }
+
+    /// True while the live session [`PickupSource::live`] opened for `recipients` is still open.
+    /// A pickup loop falls back to polling when it turns false. Sources whose sessions cannot
+    /// drop (in-process registrations) keep the default.
+    fn live_open(&self, _recipients: &[String]) -> bool {
+        true
+    }
 }
 
 type Waker = Arc<dyn Fn(&str) + Send + Sync>;

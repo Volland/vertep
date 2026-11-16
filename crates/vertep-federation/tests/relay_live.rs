@@ -128,9 +128,9 @@ fn didcomm_live_delivery_reaches_the_journal_without_a_poll() {
         l.m.store().held().is_empty(),
         "acknowledged after the append"
     );
-    // Over HTTP only A's forward and B's `messages-received` reached the mediator: no
-    // `delivery-request` poll.
-    assert_eq!(l.w.net.posts_to(MEDIATOR), before + 2);
+    // Over HTTP only A's forward reached the mediator: no `delivery-request` poll, and B's
+    // `messages-received` went on the live session.
+    assert_eq!(l.w.net.posts_to(MEDIATOR), before + 1);
 }
 
 // @tg: verifies:: [[openspec:relay-mailboxes#Live Delivery Over WebSocket#Session reconnects]] {level: e2e}

@@ -25,6 +25,9 @@
 //!   mailbox protocol of `vt-mediator` (`vertep-tsp-mediator`) and its client, a pickup source
 //!   for the relay inbox; [`live`] is the seam of live sessions on which a relay pushes messages
 //!   (TSP mailboxes, and DIDComm Pickup 3.0 live mode in `pickup::MediatorClient::with_live`).
+//! - **WebSocket live delivery** (M13): `ws` (feature `ws`) binds live sessions to a socket, a
+//!   client network and a server for in-process relays; [`pickup_loop`] keeps an inbox live
+//!   where it can and falls back to polling while a session is down.
 //!
 //! Identity data is projected into RDF with [`ontology`] and validated by its SHACL shapes. See
 //! `tg.md/views/distribution.md` for the architecture.
@@ -54,6 +57,7 @@ pub mod origin;
 pub mod outbox;
 #[cfg(feature = "didcomm")]
 pub mod pickup;
+pub mod pickup_loop;
 pub mod relay;
 pub mod resolver;
 #[cfg(all(feature = "testkit", any(feature = "didcomm", feature = "tsp")))]
@@ -64,6 +68,8 @@ pub mod tsp;
 #[cfg(feature = "tsp")]
 pub mod tsp_mailbox;
 pub mod vocab;
+#[cfg(feature = "ws")]
+pub mod ws;
 
 pub use credential::{CredentialError, issue_grant_credential, verify_grant_credential};
 pub use did::{Did, DidDocument, Service, ServiceEndpoint, VerificationMethod, is_did_address};
@@ -82,6 +88,7 @@ pub use origin::{
     VerifiedOrigin, admit,
 };
 pub use outbox::{OutboundOutcome, OutboundRecord, RelayOutbox, RetryPolicy};
+pub use pickup_loop::{BindingStatus, PickupLoop, PickupLoopConfig, PickupMode};
 pub use relay::{LocalActor, RelayProtocol, SendContext, SendError};
 pub use resolver::{
     CachingResolver, DidResolver, HttpFetcher, Resolution, ResolutionError, ResolverRegistry,
