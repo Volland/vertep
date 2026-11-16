@@ -8,13 +8,16 @@
 //!
 //! Everything that needs the engine is behind the `native` feature (off by default, because the
 //! native library is large and exists for four platforms). Without it every constructor fails
-//! with [`RulesError::Unavailable`] and nothing is linked.
+//! with [`RulesError::Unavailable`] and nothing is linked. [`retract_erased`] and
+//! [`RetractOnErasure`] need only the store, so they work either way.
 //!
 //! @tg: implements:: [[decisions#Rules live per shard, in the journal's file]] {confidence: partial}
 //! @tg: implements:: [[decisions#The native rules engine is optional behind a feature]]
+//! @tg: implements:: [[decisions#Erasure retracts what depends on the erased]]
 
 mod bundle;
 mod certificate;
+mod erasure;
 mod error;
 mod profile;
 mod types;
@@ -85,6 +88,7 @@ pub use bundle::{
     BUNDLE_FORMAT, CounterfactualReport, Divergence, ProgramSource, RuleBundle, Stmt, Term,
 };
 pub use certificate::{CertReport, check_certificate, lean_certificate};
+pub use erasure::{ErasureRetraction, RetractOnErasure, retract_erased};
 pub use error::RulesError;
 pub use profile::{HOST_BUILTINS, ProfileViolation, check_profile, clauses};
 pub use types::{DERIVED_GRAPH_SUFFIX, Derivation, ENGINE, RulePolicy, Totality};
