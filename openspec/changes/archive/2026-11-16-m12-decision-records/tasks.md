@@ -8,15 +8,15 @@
 ## 2. Entry format
 
 - [x] 2.1 Add `disposition` and `offered` to decision entries, versioned, with old entries read as `unknown` (`JournalEntry.disposition` and `.offered`, optional fields with serde defaults; set by `AgentHost::turn` from `AgentMachine::disposition_of` before the append; the same fields flow through the memory and store journals)
-- [x] 2.2 Record `refused-not-offered`, `refused-guard`, `fallback-on-deadline` and `fallback-on-refusal` where the shell decides them (also `refused-invalid`, `stale` and `refused-by-decider`; `refused-guard` and `fallback-on-refusal` are defined but no chart path produces them today: a lost guard re-issues the offer so the late answer is `stale`, and no path consults a fallback after a refusal)
-- [ ] 2.3 Conformance vectors for each disposition, replayed through the Lean oracle in strict mode
+- [x] 2.2 Record `refused-not-offered`, `refused-guard`, `fallback-on-deadline` and `fallback-on-refusal` where the shell decides them (also `refused-invalid`, `stale` and `refused-by-decider`; `refused-guard` is produced only by a guard that reads the payload, because a guard on the context alone re-issues the offer so the late answer is `stale`; `fallback-on-refusal` is defined but never produced, since no path consults a fallback after a refusal)
+- [x] 2.3 Conformance vectors for each disposition, replayed through the Lean oracle in strict mode (14 vectors in `vertep-conformance/vectors/dispositions.json`; `VertepLean/Disposition.lean`, `vertep-decide --strict`)
 
 ## 3. Explanation
 
 - [x] 3.1 `explain(actor, position)` in `vertep-agent`, derived by replay (`AgentHost::explain` returning `explain::Explanation`: state before and after, entered and exited states, effects, and for a decision the offer, the choice, the disposition, the decider, the transitions taken and the claim; `to_json` for tools)
 - [x] 3.2 Label rationale as a claim in the view and the JSON schema (the claim is its own record with `claimed_by` and the label `unverified claim by the decider`; there is no JSON schema of the view yet)
 - [x] 3.2a Carry the rule decider's `Derivation` on the decision entry (as `Annotations.derivation`, with no rationale text) and show it in the explanation view as a derivation, not a claim; the offer the explanation reports is the offer the rule read, both coming from the same request (`rule-decider#Offer And State Are Statements#One record`, carried from `m14-rules-decider`)
-- [ ] 3.3 Expose through `vertep-wasm` and `vertep-py`
+- [x] 3.3 Expose through `vertep-wasm` and `vertep-py` (offline `verifyBundle`/`verify_bundle` and `counterfactualBundle`; live-host `explain` and `exportBundle` wait for an agent host in the bindings)
 - [x] 3.4 Update `examples/credit-decision` to print the disposition and the offer for each decision, and re-record its output (it also exports and verifies the bundle of the referred loan)
 
 ## 4. Bundles
