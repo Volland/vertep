@@ -163,14 +163,14 @@ Implemented 2026-11-14: the crate and the package `vertep` in `bindings/python` 
 
 ## M12 Decision records
 
-In progress, most of it built: a journal that alone explains each decision, exports as a bundle verified offline, can be chained and signed, replays counterfactually, and lets personal data be erased by key destruction.
+Delivered: a journal that alone explains each decision, exports as a bundle verified offline, can be chained and signed, replays counterfactually, and lets personal data be erased by key destruction.
 
 - precedes:: [[roadmap#M13 Production readiness]] {note: "benchmarks track the cost of offers and sealing"}
 - precedes:: [[roadmap#M14 Rules decider]] {note: "a derivation is a rationale kind beside a claim; the offer is recorded as statements"}
 
 Specified by the OpenSpec change `m12-decision-records` (capabilities `decision-records` and `journal-redaction`), motivated by the credit-decision example, in which a refused answer reads as an accepted one. The positioning it serves is [[decisions#Explanation is the process record, not a story about it]].
 
-Built in `vertep-agent`, `vertep-objects` and `vertep-cli`: the disposition and offer on decision entries (0.1.9), `AgentHost::explain` (0.1.10), and in 0.1.11 the bundle with `vt explain` and `vt verify-bundle`, the rule derivation on the decision entry, signed chained agent journals (`ChainedAgentSealer`), `AgentHost::counterfactual`, and redaction (`SealingJournal`, `erase`, `expire`, `replay: recorded`). In 0.1.12: the `@sensitive`, `@subject` and `@retain` marks with `SealPolicy::from_chart`, entries that record their outcome so replay after an erasure follows it, retraction of rule-derived facts on erasure, and the snapshot policy ([[decisions#Snapshots never hold opened sealed values]]). Open: exposure through `vertep-wasm` and `vertep-py`, disposition vectors through the Lean oracle in strict mode, and the decision-records View.
+Built in `vertep-agent`, `vertep-objects` and `vertep-cli`: the disposition and offer on decision entries (0.1.9), `AgentHost::explain` (0.1.10), and in 0.1.11 the bundle with `vt explain` and `vt verify-bundle`, the rule derivation on the decision entry, signed chained agent journals (`ChainedAgentSealer`), `AgentHost::counterfactual`, and redaction (`SealingJournal`, `erase`, `expire`, `replay: recorded`). In 0.1.12: the `@sensitive`, `@subject` and `@retain` marks with `SealPolicy::from_chart`, entries that record their outcome so replay after an erasure follows it, retraction of rule-derived facts on erasure, and the snapshot policy ([[decisions#Snapshots never hold opened sealed values]]). After 0.1.12: disposition vectors replayed strictly through the Lean model, offline bundle verification in `@vertep/web` and the Python package, and [[views/decision-records|the decision-records View]]. Archived 2026-11-16 as `openspec/changes/archive/2026-11-16-m12-decision-records` with 12 requirements in `openspec/specs/` (`decision-records` and `journal-redaction`). Not bound yet: `explain` and `export_bundle` on a live host in the bindings, which host no agents.
 
 ## M13 Production readiness
 

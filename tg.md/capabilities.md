@@ -285,7 +285,7 @@ The journal alone explains every decision: disposition and offer on each decisio
 
 - scheduled_in:: [[roadmap#M12 Decision records]]
 
-Partly implemented in [[components#vertep-agent]]: every decision and refusal entry carries a disposition and the offer; `AgentHost::explain` derives an explanation by replay with the rationale kept as a labelled claim and a rule decision's derivation shown as a derivation; `AgentHost::export_bundle`, `Bundle::verify`, `vt explain` and `vt verify-bundle` export and check a bundle offline. Agent journals in a store can opt in to the durable-object chain and signature (`ChainedAgentSealer`), and `AgentHost::counterfactual` replays a journal under another chart version into scratch machines. Redaction by key destruction is open.
+Implemented in [[components#vertep-agent]], [[components#vertep-objects]] and [[components#vertep-cli]]: every decision and refusal entry carries a disposition, the offer and its outcome; `AgentHost::explain` derives an explanation by replay with the rationale kept as a labelled claim and a rule derivation shown as a derivation; `AgentHost::export_bundle`, `Bundle::verify`, `vt explain` and `vt verify-bundle` export and check a bundle offline, and `@vertep/web` and the Python package verify bundles too; `ChainedAgentSealer` chains and signs agent journals; `AgentHost::counterfactual` replays under another chart version. Dispositions replay strictly through the Lean model. See [[views/decision-records]].
 
 ## Journal redaction
 
