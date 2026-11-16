@@ -681,13 +681,23 @@ impl CustodyHost {
                 }
             }
             st.highest_seen = st.highest_seen.max(highest).max(epoch);
-            // A newer configuration record reported by a custodian: prepare again with it.
+            // A newer configuration record reported by a custodian: prepare again with it. An
+            // election must count only promises made under the record it elects with, so after
+            // the last round it fails rather than elect under a record a promise has superseded
+            // (a stale-record election can give an epoch two writers; see
+            // `VertepLean/CustodyJointStale.lean`). The caller retries above `highest`.
             if let Some(p) = promises
                 .iter()
                 .max_by_key(|p| record_rank(&p.config, p.next.as_ref()))
                 && record_rank(&p.config, p.next.as_ref()) > record_rank(&config, next.as_ref())
-                && rounds < 4
             {
+                if rounds >= 4 {
+                    return Err(CustodyError::NoQuorum {
+                        promised: promises.len(),
+                        needed: config.quorum,
+                        highest: st.highest_seen,
+                    });
+                }
                 config = p.config.clone();
                 next = p.next.clone();
                 epoch = st.highest_seen + 1;
