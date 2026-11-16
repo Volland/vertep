@@ -1,0 +1,16 @@
+{
+  "name": "Vertep (pinned build toolchain)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "../scripts"
+  },
+  "workspaceFolder": "/work",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/work,type=bind",
+  "remoteUser": "root",
+  "postCreateCommand": "scripts/check-toolchain.sh --cli",
+  "customizations": {
+    "vscode": {
+      "extensions": ["rust-lang.rust-analyzer", "ms-python.python"]
+    }
+  }
+}

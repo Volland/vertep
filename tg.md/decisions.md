@@ -1916,3 +1916,20 @@ A rule program that would govern an actor's decisions or appends cannot be propo
 - motivated_by:: [[constraints#An actor that governs its own rules defeats review]] {weight: primary, since: "2026-11-14"}
 
 Rejected: relying on grants alone, because a broad grant could still include self-governance.
+
+## Dependencies pass cargo-deny, with exceptions recorded
+
+CI and the release workflow run `cargo deny` over advisories, licences, bans and sources; an exception names its advisory, why it is not exploitable here and what removes it.
+
+- motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: primary, since: "2026-11-16", note: "M13 Supply Chain Gate"}
+
+The first exceptions (2026-11-16) are two quick-xml 0.37 advisories reached only through oxigraph 0.5.13 and a bundled-SQLite advisory reached through tiramemsu 0.12; neither upstream has a fixed release yet.
+
+## Release artifacts carry signed build provenance
+
+npm tarballs, wheels, the sdist and the SBOMs get GitHub build-provenance attestations (Sigstore) in the job that built them, and are attached to the GitHub release with CycloneDX SBOMs for every crate and package.
+
+- motivated_by:: [[constraints#crates.io has no signed provenance]] {weight: primary, since: "2026-11-16"}
+- motivated_by:: [[constraints#PyPI releases are immutable]] {weight: secondary, since: "2026-11-16"}
+
+Crates get SBOMs but no attestation of the uploaded file, because crates.io offers none. npm publishing stays manual; publishing the attested tarballs with `npm publish --provenance` from CI is documented in CONTRIBUTING.md.

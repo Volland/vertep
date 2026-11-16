@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# Builds @vertep/web and @vertep/dm-ecma from a clean checkout with the pinned toolchain, packs
+# them into dist/npm/ and smoke-tests the packed tarballs in a fresh Node.js project.
+#
+#   scripts/build-wasm.sh              release build (what npm ships)
+#   VERTEP_PROFILE=dev scripts/build-wasm.sh   fast unoptimised build
+#
+# What it pins and checks (versions in scripts/toolchain.env):
+#   - rustc: rustup installs the channel of rust-toolchain.toml; the script checks it is the pin.
+#   - wasm-bindgen CLI: must equal the library in Cargo.lock. If the CLI on PATH differs or is
+#     missing, the pinned version is installed into target/tools/ with `cargo install --locked`.
+#   - Node.js: at least NODE_MIN_MAJOR; the build image has exactly NODE_VERSION.
+#   - clang and llvm-ar for wasm32 (sqlite-wasm-rs compiles SQLite's C sources): on Linux the
+#     distribution's LLVM; on macOS Homebrew LLVM, because Apple's clang has no wasm32 backend.
+#
+# The macOS workaround: Homebrew LLVM links libz3 by its versioned name, and a later `brew upgrade
+# z3` removes that file, so clang aborts with "dyld: Library not loaded: .../libz3.4.15.dylib".
+# The script detects that, links the missing name to the installed libz3 under target/toolchain/,
+# and points CC_wasm32_unknown_unknown and AR_wasm32_unknown_unknown at wrappers that set
+# DYLD_LIBRARY_PATH themselves (exporting DYLD_* does not work: npm runs /bin/sh, and SIP strips
+# DYLD_* from protected binaries). `brew reinstall llvm` is the lasting fix.
+set -euo pipefail
+# @tg: implements:: [[openspec:production-readiness#Reproducible Toolchain]] {confidence: partial, note: "the npm half; scripts/build.sh is the one command"}
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+# shellcheck disable=SC1091
+. "$root/scripts/toolchain.env"
+dist="${VERTEP_DIST:-$root/dist}"
+tools="$root/target/tools"
+say() { echo "build-wasm: $*" >&2; }
+die() {
+  echo "build-wasm: $*" >&2
+  exit 1
+}
+
+"$root/scripts/check-toolchain.sh"
+
+# --- Rust -------------------------------------------------------------------------------------
+cd "$root"
+rustc_version=$(rustc --version | awk '{print $2}')
+[ "$rustc_version" = "$RUST_VERSION" ] ||
+  die "rustc is $rustc_version, the pin is $RUST_VERSION (install rustup so rust-toolchain.toml takes effect)"
+rustup target list --installed 2>/dev/null | grep -qx wasm32-unknown-unknown ||
+  rustup target add wasm32-unknown-unknown
+
+# --- wasm-bindgen CLI -------------------------------------------------------------------------
+cli_version() { wasm-bindgen --version 2>/dev/null | awk '{print $2}'; }
+if [ "$(cli_version || true)" != "$WASM_BINDGEN_VERSION" ]; then
+  export PATH="$tools/bin:$PATH"
+  if [ "$(cli_version || true)" != "$WASM_BINDGEN_VERSION" ]; then
+    say "installing wasm-bindgen-cli $WASM_BINDGEN_VERSION into target/tools"
+    cargo install wasm-bindgen-cli --locked --version "$WASM_BINDGEN_VERSION" --root "$tools"
+  fi
+fi
+"$root/scripts/check-toolchain.sh" --cli
+
+# --- Node.js ----------------------------------------------------------------------------------
+command -v node >/dev/null || die "Node.js $NODE_VERSION (>= $NODE_MIN_MAJOR) is needed"
+node_version=$(node --version | sed 's/^v//')
+[ "${node_version%%.*}" -ge "$NODE_MIN_MAJOR" ] || die "Node.js $node_version is older than $NODE_MIN_MAJOR"
+[ "$node_version" = "$NODE_VERSION" ] || say "note: Node.js $node_version, the build image pins $NODE_VERSION"
+
+# --- clang and llvm-ar for wasm32 -------------------------------------------------------------
+probe_wasm_cc() { # cc
+  local dir
+  dir=$(mktemp -d)
+  echo 'int vertep_probe(void) { return 1; }' >"$dir/p.c"
+  "$1" --target=wasm32-unknown-unknown -c "$dir/p.c" -o "$dir/p.o" 2>"$dir/err"
+  local ok=$?
+  [ $ok -eq 0 ] || cat "$dir/err" >&2
+  rm -rf "$dir"
+  return $ok
+}
+
+# On macOS: Homebrew LLVM, with the libz3 shim if its clang no longer starts.
+macos_llvm() {
+  local prefix err missing z3 shim
+  prefix=$(brew --prefix llvm 2>/dev/null || true)
+  [ -n "$prefix" ] && [ -x "$prefix/bin/clang" ] ||
+    die "Apple clang cannot compile for wasm32; install LLVM with 'brew install llvm'"
+  if err=$("$prefix/bin/clang" --version 2>&1 >/dev/null) && [ -z "$err" ]; then
+    CC_WASM="$prefix/bin/clang"
+    AR_WASM="$prefix/bin/llvm-ar"
+    return
+  fi
+  missing=$(printf '%s\n' "$err" | sed -n 's/.*Library not loaded: .*\/\(libz3\.[0-9.]*dylib\).*/\1/p' | head -n1)
+  [ -n "$missing" ] || die "Homebrew clang does not start:
+$err
+Try 'brew reinstall llvm'."
+  z3=$(brew --prefix z3 2>/dev/null)/lib/libz3.dylib
+  [ -e "$z3" ] || die "Homebrew clang needs $missing and no libz3 is installed ('brew install z3')"
+  say "Homebrew LLVM needs $missing, which brew upgraded away: using $z3 through a wrapper"
+  shim="$root/target/toolchain/llvm-shim"
+  mkdir -p "$shim/lib" "$shim/bin"
+  ln -sf "$z3" "$shim/lib/$missing"
+  for tool in clang llvm-ar; do
+    cat >"$shim/bin/$tool" <<EOF
+#!/bin/sh
+# Generated by scripts/build-wasm.sh: Homebrew LLVM with $missing resolved to the installed libz3.
+DYLD_LIBRARY_PATH="$shim/lib"
+export DYLD_LIBRARY_PATH
+exec "$prefix/bin/$tool" "\$@"
+EOF
+    chmod +x "$shim/bin/$tool"
+  done
+  CC_WASM="$shim/bin/clang"
+  AR_WASM="$shim/bin/llvm-ar"
+}
+
+if [ -z "${CC_wasm32_unknown_unknown:-}" ]; then
+  case "$(uname -s)" in
+    Darwin) macos_llvm ;;
+    *)
+      CC_WASM=$(command -v "clang-$LLVM_MAJOR" || command -v clang || true)
+      AR_WASM=$(command -v "llvm-ar-$LLVM_MAJOR" || command -v llvm-ar || true)
+      [ -n "$CC_WASM" ] && [ -n "$AR_WASM" ] ||
+        die "clang and llvm-ar are needed for wasm32 (Debian/Ubuntu: apt install clang-$LLVM_MAJOR llvm-$LLVM_MAJOR)"
+      ;;
+  esac
+  export CC_wasm32_unknown_unknown="$CC_WASM"
+  export AR_wasm32_unknown_unknown="$AR_WASM"
+fi
+probe_wasm_cc "$CC_wasm32_unknown_unknown" ||
+  die "$CC_wasm32_unknown_unknown cannot compile C for wasm32-unknown-unknown"
+say "wasm32 C compiler: $CC_wasm32_unknown_unknown"
+
+# --- build, check, pack -----------------------------------------------------------------------
+cd "$root/bindings/js"
+npm ci --no-audit --no-fund
+VERTEP_ARTIFACTS_ONLY=1 sh scripts/build.sh
+npm run --silent check:version
+if [ "${VERTEP_PROFILE:-release}" = release ]; then npm run --silent check:size; fi
+
+mkdir -p "$dist/npm"
+rm -f "$dist"/npm/*.tgz
+npm pack --silent --pack-destination "$dist/npm" -w @vertep/web -w @vertep/dm-ecma >/dev/null
+web=$(ls "$dist"/npm/vertep-web-*.tgz)
+ecma=$(ls "$dist"/npm/vertep-dm-ecma-*.tgz)
+
+# --- smoke test: the tarballs in a fresh project, nothing from the checkout --------------------
+app=$(mktemp -d)
+trap 'rm -rf "$app"' EXIT
+cat >"$app/package.json" <<'EOF'
+{ "name": "vertep-smoke", "private": true, "type": "module" }
+EOF
+(cd "$app" && npm install --offline --no-audit --no-fund --no-save "$web" "$ecma" >/dev/null)
+cat >"$app/smoke.mjs" <<'EOF'
+import { createActorSystem } from "@vertep/web";
+import { ecmascript } from "@vertep/dm-ecma";
+
+const ORDER = `<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="open">
+  <state id="open"><transition event="pay" target="paid"/></state>
+  <state id="paid"/>
+</scxml>`;
+const COUNT = `<scxml xmlns="http://www.w3.org/2005/07/scxml" version="1.0" initial="a" datamodel="ecmascript">
+  <datamodel><data id="n" expr="1"/></datamodel>
+  <state id="a"><transition event="go" cond="n === 1" target="b"><assign location="n" expr="n + 41"/></transition></state>
+  <state id="b"/>
+</scxml>`;
+
+async function run(chart, event, options) {
+  const system = await createActorSystem({ storage: "memory", ...options });
+  try {
+    const actor = await system.spawn(chart);
+    await actor.send({ type: event });
+    return JSON.stringify((await actor.getSnapshot()).configuration);
+  } finally {
+    await system.terminate();
+  }
+}
+
+const plain = await run(ORDER, "pay");
+const ecma = await run(COUNT, "go", { datamodel: ecmascript });
+if (plain !== '["paid"]' || ecma !== '["b"]') {
+  console.error(`smoke test failed: ${plain} ${ecma}`);
+  process.exit(1);
+}
+console.log("@vertep/web and @vertep/dm-ecma ok");
+EOF
+(cd "$app" && node smoke.mjs)
+say "packed $(basename "$web") and $(basename "$ecma") into $dist/npm"

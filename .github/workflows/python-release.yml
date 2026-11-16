@@ -7,6 +7,12 @@
 #
 # Uploads use PyPI Trusted Publishing (OpenID Connect): no API token is stored anywhere. The
 # setup is in bindings/python/RELEASING.md.
+#
+# Provenance (M13 production-readiness, "Supply Chain Gate"): every wheel and the sdist get a
+# signed GitHub build-provenance attestation in the job that built them (check one with
+# `gh attestation verify vertep-0.1.11-cp39-abi3-manylinux_2_17_x86_64.whl --repo Volland/vertep`),
+# PyPI receives PEP 740 attestations from the publish action, and a published release gets the
+# files attached.
 name: Python release
 
 on:
@@ -43,6 +49,10 @@ jobs:
     name: Wheels for ${{ matrix.target }}
     needs: check
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -71,6 +81,15 @@ jobs:
           if [ -d smoke/Scripts ]; then . smoke/Scripts/activate; else . smoke/bin/activate; fi
           pip install --no-index --find-links bindings/python/dist vertep
           python -I bindings/python/scripts/smoke.py
+      - name: Build provenance of the wheel
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: bindings/python/dist/*.whl
+      - name: The attestation verifies as a consumer would check it
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-attestations.sh bindings/python/dist/*.whl
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}-${{ matrix.target }}
@@ -80,6 +99,10 @@ jobs:
     name: Source distribution
     needs: check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
       - uses: PyO3/maturin-action@v1
@@ -87,6 +110,14 @@ jobs:
           working-directory: bindings/python
           command: sdist
           args: --out dist
+      - name: Build provenance of the sdist
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: bindings/python/dist/*.tar.gz
+      - name: The attestation verifies as a consumer would check it
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/verify-attestations.sh bindings/python/dist/*.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: sdist
@@ -127,3 +158,19 @@ jobs:
           path: dist
           merge-multiple: true
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  attach:
+    name: Attach the wheels and the sdist to the GitHub release
+    if: github.event_name == 'release'
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber

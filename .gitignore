@@ -16,3 +16,6 @@ __pycache__/
 bindings/python/dist/
 bindings/python/python/vertep/*.dylib
 .gstack/
+
+# Artifacts of scripts/build.sh and the release workflow
+/dist/

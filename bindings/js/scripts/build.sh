@@ -10,7 +10,9 @@
 # and the native helper `vertep-wasm-native` the native-versus-WebAssembly tests compare with
 # (it also hosts the WebSocket server of the end-to-end tests).
 # Needs the wasm32-unknown-unknown target and the wasm-bindgen CLI at the version pinned in
-# crates/vertep-wasm/Cargo.toml. Set VERTEP_PROFILE=dev for a fast unoptimised build.
+# crates/vertep-wasm/Cargo.toml. Set VERTEP_PROFILE=dev for a fast unoptimised build, and
+# VERTEP_ARTIFACTS_ONLY=1 to build only what the packages ship (no test module, no native helper):
+# scripts/build-wasm.sh at the repository root does that, with the toolchain pinned.
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -51,17 +53,22 @@ build() { # features out-dir
 
 build "" "$here/packages/web/wasm/core"
 build journal "$here/packages/web/wasm/journal"
+artifacts_only="${VERTEP_ARTIFACTS_ONLY:-0}"
 if [ "${VERTEP_SKIP_ECMA:-0}" != 1 ]; then
   build "journal,ecmascript" "$here/packages/dm-ecma/wasm"
-  build "journal,ecmascript,conformance" "$here/.native/wasm-test"
+  if [ "$artifacts_only" != 1 ]; then
+    build "journal,ecmascript,conformance" "$here/.native/wasm-test"
+  fi
 fi
 
-echo "building the native helper and vt" >&2
-cargo build -p vertep-wasm --features journal,ecmascript,conformance --bin vertep-wasm-native
-cargo build -p vertep-cli --bin vt
-mkdir -p "$here/.native"
-cp "$CARGO_TARGET_DIR/debug/vertep-wasm-native" "$here/.native/vertep-wasm-native"
-cp "$CARGO_TARGET_DIR/debug/vt" "$here/.native/vt"
+if [ "$artifacts_only" != 1 ]; then
+  echo "building the native helper and vt" >&2
+  cargo build -p vertep-wasm --features journal,ecmascript,conformance --bin vertep-wasm-native
+  cargo build -p vertep-cli --bin vt
+  mkdir -p "$here/.native"
+  cp "$CARGO_TARGET_DIR/debug/vertep-wasm-native" "$here/.native/vertep-wasm-native"
+  cp "$CARGO_TARGET_DIR/debug/vt" "$here/.native/vt"
+fi
 
 cd "$here"
 npx tsc -p packages/web

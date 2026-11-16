@@ -1,0 +1,91 @@
+# cargo-deny: the supply-chain gate of the Rust workspace (M13 production-readiness,
+# "Supply Chain Gate"). CI runs `cargo deny --locked check` on every push and pull request, and the
+# release workflow runs it again before it builds anything, so a dependency with an open advisory,
+# a licence outside the list below, a yanked version or a crate from an unknown registry or git
+# repository stops the change before a release can be tagged.
+#
+#   cargo install cargo-deny --locked     # the version CI uses is pinned in .github/workflows/ci.yml
+#   cargo deny check                      # all four checks
+#   cargo deny check advisories           # one of advisories, bans, licenses, sources
+#
+# Every exception below names the crate and the reason, and is removed when the reason goes away.
+#
+# @tg: implements:: [[openspec:production-readiness#Supply Chain Gate]] {confidence: partial, note: "the policy cargo deny enforces"}
+# @tg: implements:: [[decisions#Dependencies pass cargo-deny, with exceptions recorded]]
+
+[graph]
+# Check the dependency graph for every target the crates are built for, not only the host's.
+all-features = true
+# `vertep-rules/native` links libleanelpi, which is a C library outside Cargo and needs no
+# exception here: it is fetched with a pinned checksum in CI (`rules` job).
+
+[advisories]
+# RustSec advisory database. Vulnerabilities, unsound crates and yanked versions are errors.
+# Unmaintained notices are errors for direct dependencies of the workspace and are reported but
+# not fatal for transitive ones, which this project cannot replace by itself.
+version = 2
+yanked = "deny"
+unmaintained = "workspace"
+unsound = "all"
+ignore = [
+  # quick-xml 0.37: quadratic duplicate-attribute check and unbounded namespace declarations
+  # (fixed in 0.41). Vertep's own XML (SCXML) goes through quick-xml 0.42; 0.37 comes only from
+  # oxigraph 0.5.13 (oxrdfxml, sparesults), whose latest release still requires ^0.37. Reachable
+  # through vertep-oxigraph's remote SPARQL client when the endpoint an operator configured
+  # answers in SPARQL-XML or RDF/XML, i.e. from a trusted endpoint, not from actor input.
+  # Remove when oxigraph moves to quick-xml >= 0.41 (or when the client stops accepting XML).
+  { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.37 only via oxigraph 0.5.13; no fixed oxigraph release; reachable only from an operator-configured SPARQL endpoint" },
+  { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.37 only via oxigraph 0.5.13; no fixed oxigraph release; reachable only from an operator-configured SPARQL endpoint" },
+  # Bundled SQLite < 3.54 returns uninitialised page-cache memory for a crafted database/-wal pair.
+  # libsqlite3-sys 0.38 comes from rusqlite 0.40 through tm-rusqlite 0.12 (tiramemsu, the default
+  # store), whose latest release pins ^0.40. Local vector only: the process must open a database
+  # and -wal file that a less trusted party wrote, and tiramemsu opens only its own store files.
+  # Remove when tiramemsu releases on rusqlite >= 0.41 (libsqlite3-sys >= 0.39).
+  { id = "RUSTSEC-2026-0459", reason = "bundled SQLite via tiramemsu 0.12 -> rusqlite 0.40; no fixed tiramemsu release; local-file vector only" },
+]
+
+[licenses]
+version = 2
+# MIT OR Apache-2.0 is the workspace licence; everything here is compatible with shipping under it.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-1-Clause",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "0BSD",
+  "BSL-1.0",
+  "ISC",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+confidence-threshold = 0.9
+# The workspace's own unpublished crates (conformance, testkit, wasm, py) carry the workspace
+# licence too; no exception is needed for them.
+exceptions = [
+]
+
+[licenses.private]
+ignore = false
+
+[bans]
+# Duplicate versions are common in a graph this size (the RustCrypto 0.10 -> 0.11 migration, rand
+# 0.8/0.9/0.10) and are not a supply-chain risk by themselves: report them, do not fail.
+multiple-versions = "warn"
+wildcards = "deny"
+# Path dependencies inside the workspace are not wildcards.
+allow-wildcard-paths = true
+highlight = "all"
+deny = [
+  # OpenSSL is replaced by rustls everywhere; a new link to it should be a decision, not an accident.
+  { crate = "openssl-sys", reason = "TLS goes through rustls" },
+]
+
+[sources]
+# Only crates.io. A git dependency or another registry fails the check until it is listed here.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
