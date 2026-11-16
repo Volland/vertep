@@ -215,3 +215,83 @@ impl IntoKeys for AgentWriter {
         StaticHostKeys::new().with(host, 1)
     }
 }
+
+// @tg: verifies:: [[openspec:journal-redaction#Erasure By Key Destruction#Erased data is unreadable]] {level: integration}
+// @tg: verifies:: [[openspec:journal-redaction#Sensitive Fields#A marked field is sealed]] {level: integration}
+#[test]
+fn erasing_a_subject_keeps_the_signed_chain_valid() {
+    use vertep_agent::journal::{AgentInput, AgentJournal, JournalEntry};
+    use vertep_agent::redaction::{MemoryKeyStore, SealPolicy, SealingJournal, SensitiveField};
+
+    let host = TestHost::new("did:key:z6MkAgentHost");
+    let store = Arc::new(MemoryStore::new());
+    let chained = Arc::new(StoreAgentJournal::with_sealer(
+        store.clone(),
+        Arc::new(ChainedAgentSealer::new(Arc::new(host.signer.clone()))),
+    ));
+    let journal = SealingJournal::new(
+        chained,
+        Arc::new(MemoryKeyStore::new()),
+        SealPolicy {
+            fields: vec![SensitiveField {
+                event: "applied".into(),
+                field: "/email".into(),
+                subject: "/who".into(),
+                retention_ms: None,
+            }],
+        },
+    )
+    .unwrap();
+    let entry = |position, input| JournalEntry {
+        position,
+        ts: 1_794_355_200_000,
+        input,
+        disposition: None,
+        offered: None,
+    };
+    journal
+        .append(
+            ACTOR,
+            entry(
+                1,
+                AgentInput::Start {
+                    version: "urn:v".into(),
+                },
+            ),
+        )
+        .unwrap();
+    let mut applied = Event::named("applied", EventType::External);
+    applied.data = vertep_agent::json::obj([
+        ("who", vertep_agent::json::s("ann")),
+        ("email", vertep_agent::json::s("ann@example.org")),
+    ]);
+    journal
+        .append(
+            ACTOR,
+            entry(
+                2,
+                AgentInput::Event {
+                    event: applied,
+                    message_id: "m1".into(),
+                },
+            ),
+        )
+        .unwrap();
+
+    let before = verify_agent_journal(&*store, &actor(), &keys(&host)).unwrap();
+    assert_eq!(before.position, Position::new(2));
+    let stored = format!("{:?}", store.read(&actor(), Position::ZERO).unwrap());
+    assert!(
+        !stored.contains("ann@example.org"),
+        "only ciphertext is stored"
+    );
+
+    journal.erase("ann", "request", 1_794_355_300_000).unwrap();
+
+    // the erasure is one more link; every hash and signature still checks
+    let after = verify_agent_journal(&*store, &actor(), &keys(&host)).unwrap();
+    assert_eq!(after.position, Position::new(3));
+    let read = journal.read(ACTOR);
+    assert!(matches!(read[2].input, AgentInput::Erasure { .. }));
+    assert!(journal.erasures(ACTOR).subjects.contains("ann"));
+}

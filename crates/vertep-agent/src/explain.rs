@@ -50,6 +50,10 @@ pub struct DecisionRecord {
     pub derivation: Option<serde_json::Value>,
 }
 
+fn is_verified(s: &&str) -> bool {
+    *s == "verified"
+}
+
 /// The explanation of one journal entry.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Explanation {
@@ -63,6 +67,11 @@ pub struct Explanation {
     pub input: String,
     /// The chart version in force (from the first entry).
     pub chart_version: String,
+    /// `verified` when the replay behind this view read every recorded value, `recorded` when
+    /// some value was erased: the replay then went on from the recorded inputs and is not a
+    /// full verification ([[openspec:journal-redaction#Replay After Erasure]]).
+    #[serde(skip_serializing_if = "is_verified")]
+    pub replay: &'static str,
     /// The state configuration before the entry.
     pub state_before: Vec<String>,
     /// The state configuration after the entry.

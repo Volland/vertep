@@ -1,8 +1,8 @@
 ## 1. Graph first
 
-- [ ] 1.1 Add milestone `M12 Decision records` to `tg.md/roadmap.md`, `precedes::` from M3 Agents and M7 Durable objects
-- [ ] 1.2 Add Capabilities `Decision records` and `Journal redaction` to `tg.md/capabilities.md` and list both in its `openspec:` frontmatter
-- [ ] 1.3 Record D1-D6 as `Decision` sections and a `Constraint` `Erasure rules` with `constrains::` edges
+- [x] 1.1 Add milestone `M12 Decision records` to `tg.md/roadmap.md`, `precedes::` from M3 Agents and M7 Durable objects
+- [x] 1.2 Add Capabilities `Decision records` and `Journal redaction` to `tg.md/capabilities.md` and list both in its `openspec:` frontmatter
+- [x] 1.3 Record D1-D6 as `Decision` sections and a `Constraint` `Erasure rules` with `constrains::` edges
 - [ ] 1.4 Add a View `views/decision-records.md` with `describes::` edges and a Mermaid diagram of bundle verification
 
 ## 2. Entry format
@@ -39,11 +39,11 @@
 
 ## 7. Redaction
 
-- [ ] 7.1 `sensitive` marker in the type language, with SHACL and JSON Schema projections
-- [ ] 7.2 Sealing of sensitive fields with a per-subject key behind a `KeyStore` trait
-- [ ] 7.3 Erasure entry and key destruction
-- [ ] 7.4 Replay in recorded mode after erasure, with the result marked
-- [ ] 7.5 Retention policy and expiry as erasure
+- [ ] 7.1 `sensitive` marker in the type language, with SHACL and JSON Schema projections (the runtime `SealPolicy` exists; the type-language marker does not)
+- [x] 7.2 Sealing of sensitive fields with a per-subject key behind a `KeyStore` trait
+- [x] 7.3 Erasure entry and key destruction
+- [ ] 7.4 Replay in recorded mode after erasure, with the result marked (the marker is built, `Explanation.replay`; following recorded transitions instead of re-evaluating the guard is not: entries do not record transitions yet)
+- [x] 7.5 Retention policy and expiry as erasure
 - [ ] 7.6 Decide the snapshot policy (open question in D6) and record it
 
 ## 8. Annotations and docs

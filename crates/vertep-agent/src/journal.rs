@@ -96,6 +96,18 @@ pub enum AgentInput {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         retry_after_ms: Option<i64>,
     },
+    /// A subject's sealed data was erased by destroying their key
+    /// ([[openspec:journal-redaction#Erasure By Key Destruction]]). The machine ignores it; it
+    /// is in the chain so the erasure itself is recorded and verifiable.
+    Erasure {
+        /// The data subject.
+        subject: String,
+        /// Why: `request`, `retention` or another reason the operator names.
+        reason: String,
+        /// Derived facts retracted with the erasure.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        retracted: Vec<String>,
+    },
     /// A tool's result.
     ToolResult {
         /// The invoke id, or the correlation of a `<send>` to the tool.
@@ -119,6 +131,7 @@ impl AgentInput {
             AgentInput::LlmResult { .. } => crate::vocab::LLM_RESULT,
             AgentInput::LlmError { .. } => "llm.error",
             AgentInput::ToolResult { .. } => "tool.result",
+            AgentInput::Erasure { .. } => "erasure",
         }
     }
 }

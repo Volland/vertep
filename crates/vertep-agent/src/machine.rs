@@ -1060,7 +1060,7 @@ impl AgentMachine {
             dropped: false,
         };
         match input {
-            AgentInput::Start { .. } => {}
+            AgentInput::Start { .. } | AgentInput::Erasure { .. } => {}
             AgentInput::Event { event, message_id } => {
                 if !self.seen.insert(message_id.clone()) {
                     return Ok(Applied {

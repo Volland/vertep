@@ -42,6 +42,7 @@ pub mod llm;
 pub mod machine;
 pub mod ontology;
 pub mod plan;
+pub mod redaction;
 pub mod schema;
 pub mod tool;
 pub mod vocab;

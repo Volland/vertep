@@ -293,7 +293,7 @@ Sensitive fields sealed under per-subject keys, erasure by key destruction that 
 
 - scheduled_in:: [[roadmap#M12 Decision records]]
 
-Not implemented: the change is a draft. Until it lands, personal data stays out of events. See [[constraints#Erasure rules]].
+Partly implemented in [[components#vertep-agent]] (`redaction`): `SealingJournal` wraps any agent journal and seals the fields a `SealPolicy` marks sensitive under a per-subject ChaCha20-Poly1305 key held behind a `KeyStore` (a store that cannot guarantee destruction is refused); `erase` destroys the key and appends an `erasure` entry to every journal holding the subject's data, and `expire` does the same with the reason `retention`; the chain and signatures still verify because nothing is rewritten. `Explanation.replay` is `recorded` once an erased value is in the journal. Not built: the `sensitive` marker in the type language and its schema projections, following the recorded transitions in place of re-evaluating a guard (replay still re-evaluates and may diverge on an erased value), retraction of rule-derived facts, and the snapshot policy. Until those land, keep personal data out of events a guard reads. See [[constraints#Erasure rules]].
 
 ## Production readiness
 
