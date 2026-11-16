@@ -564,11 +564,57 @@ impl JournalStore for TiramemsuShard {
     }
 
     fn read(&self, actor: &NamedNode, from: Position) -> Result<Vec<JournalRecord>, StoreError> {
+        self.read_between(actor, from, None)
+    }
+
+    fn read_range(
+        &self,
+        actor: &NamedNode,
+        from: Position,
+        limit: usize,
+    ) -> Result<Vec<JournalRecord>, StoreError> {
+        let end = from.get().max(1).saturating_add(limit as u64);
+        self.read_between(actor, from, Some(end))
+    }
+
+    fn head(&self, actor: &NamedNode) -> Result<Position, StoreError> {
+        view_int(&self.db.now(), &iri(actor.as_str()), &iri(vocab::HEAD))
+            .map(|h| Position::new(h.unwrap_or(0)))
+            .map_err(store_error)
+    }
+
+    fn actors(&self) -> Result<Vec<NamedNode>, StoreError> {
+        let view = self.db.now();
+        let Some(head) = view.encode(&iri(vocab::HEAD)).map_err(store_error)? else {
+            return Ok(Vec::new());
+        };
+        let mut out = Vec::new();
+        for t in view.triples(None, Some(head), None).map_err(store_error)? {
+            if let Value::Iri(s) = view.decode(t.s).map_err(store_error)? {
+                out.push(NamedNode::new(s).map_err(StoreError::backend)?);
+            }
+        }
+        out.sort();
+        out.dedup();
+        Ok(out)
+    }
+}
+
+impl TiramemsuShard {
+    /// The entries of `actor` from position `from` (inclusive) to `end` (exclusive), or to the
+    /// head.
+    fn read_between(
+        &self,
+        actor: &NamedNode,
+        from: Position,
+        end: Option<u64>,
+    ) -> Result<Vec<JournalRecord>, StoreError> {
+        let upper = end.map_or_else(String::new, |e| format!(" && ?n < {e}"));
         let q = format!(
             // Only journal entries: the stamps live inside the entry's own graph, so other
             // records that happen to carry vt:actor and vt:position are never read as entries.
             "SELECT ?e ?n ?s ?p ?o WHERE {{ GRAPH ?e {{ ?e <{ty}> <{entry}> ; <{a}> {actor} ; \
-             <{pos}> ?n . ?s ?p ?o }} FILTER(?n >= {from}) }}",
+             <{pos}> ?n . ?s ?p ?o }} FILTER(?n >= {from}{upper}) }}",
             ty = vocab::RDF_TYPE,
             entry = vocab::JOURNAL_ENTRY,
             a = vocab::ACTOR,
@@ -616,28 +662,6 @@ impl JournalStore for TiramemsuShard {
                 entry: Entry::new(name, triples),
             })
             .collect())
-    }
-
-    fn head(&self, actor: &NamedNode) -> Result<Position, StoreError> {
-        view_int(&self.db.now(), &iri(actor.as_str()), &iri(vocab::HEAD))
-            .map(|h| Position::new(h.unwrap_or(0)))
-            .map_err(store_error)
-    }
-
-    fn actors(&self) -> Result<Vec<NamedNode>, StoreError> {
-        let view = self.db.now();
-        let Some(head) = view.encode(&iri(vocab::HEAD)).map_err(store_error)? else {
-            return Ok(Vec::new());
-        };
-        let mut out = Vec::new();
-        for t in view.triples(None, Some(head), None).map_err(store_error)? {
-            if let Value::Iri(s) = view.decode(t.s).map_err(store_error)? {
-                out.push(NamedNode::new(s).map_err(StoreError::backend)?);
-            }
-        }
-        out.sort();
-        out.dedup();
-        Ok(out)
     }
 }
 

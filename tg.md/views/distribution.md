@@ -1,7 +1,7 @@
 ---
 type: View
 status: draft
-openspec: [cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, tsp-mediator]
+openspec: [cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, tsp-mediator, journal-shipping]
 ---
 # Distribution
 
@@ -239,6 +239,40 @@ pub struct Frame {
     pub data: Bytes,                        // typed payload, encoded once
 }
 ```
+
+## Journal shipping
+
+A follower pulls a shard's journal from its leader over the cluster transport: entries after its durable position, in order with digests, at most a window of bytes per pull; it verifies, appends and acknowledges with its next pull.
+
+- describes:: [[capabilities#Journal shipping]]
+- describes:: [[decisions#Journal shipping is a pull protocol]]
+- describes:: [[components#vertep-cluster]] {note: "module shipping"}
+
+`Ordered Shipping`: a `PullRequest` names the shard, the actor, the follower's last durable position `after` and its window; the leader's `PullBatch` carries its node, its `(shard, epoch)` fence, the digest of its entry at `after`, its head and the entries with their positions and SHA-256 digests (`Entry::digest`, the canonical digest durable-object content hashes use too). The follower refuses, in this order, a bad digest, a batch whose `prev` digest is not its own last entry (diverged), a leader epoch below one it stored (fenced) and an entry that is not its next (a gap or a repeat), appends the verified prefix under the leader's fencing epoch and stops at the first refusal; the next pull starts again from its head.
+
+`Resumption`: the follower's position is its store's head, so a dropped connection or a restart of the follower resumes from the last entry it stored durably; a store that enforces fencing keeps the highest leader epoch across the restart too. `Back Pressure`: the leader answers with at most the follower's window, reads its journal in bounded ranges (`JournalStore::read_range`) and holds for each follower only the batch it has not acknowledged, so a follower that falls behind costs the leader one window, not its lag. On QUIC a pull is a request frame (event `vertep.journal.pull`) on the stream of the follower and the actor, answered by `Reply::Data`; the leader's `ShipService` wraps the node's frame handler.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant F as Follower f (store head 10)
+    participant L as Leader n1 (shard 3, epoch 4, head 25)
+    F->>L: pull shard 3, actor A, after 10, window 8 KiB
+    L->>L: read 11 to 14 (bounded), hold 1 batch for f
+    L-->>F: batch: epoch 4, prev digest of 10, entries 11 to 14 with digests
+    F->>F: check digests, epoch, positions, prev
+    F->>F: append 11 to 14 under fence (shard 3, epoch 4)
+    F->>L: pull after 14 (acknowledges 11 to 14)
+    L-->>F: entries 15 to 18
+    Note over F,L: the connection drops after 17 reached the follower
+    F->>F: restart, head 17 from its store
+    F->>L: pull after 17
+    L-->>F: entries 18 to 21
+    F->>L: pull after 25 (caught up)
+    L-->>F: empty batch, head 25
+```
+
+Fault injection (`tests/shipping.rs`) drops connections, loses, tampers with and replays batches, restarts the follower and hands the lease to a second leader while the first keeps serving as a stale one. Every round is recorded as a history: each entry offered to the follower's store is an append by the serving leader under its epoch (version = position, message = entry IRI) with the follower's decision, each stored entry an acknowledgement. `History::check` and the Lean lease model (`vertep-lease`, strict mode) must agree on every decision. The model checks the store-level decisions (accept, fenced, conflict for a gap, a repeat or a taken entry IRI), that every epoch was granted to its leader, one writer per `(shard, epoch)`, non-decreasing epochs and once-only acknowledged entries; it does not see digest or divergence refusals (they never reach the store), the byte window, or durability, which the unit and integration tests check directly.
 
 ## Rebalancing and resharding
 

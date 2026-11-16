@@ -201,6 +201,29 @@ impl JournalStore for MemoryStore {
             .collect())
     }
 
+    fn read_range(
+        &self,
+        actor: &NamedNode,
+        from: Position,
+        limit: usize,
+    ) -> Result<Vec<JournalRecord>, StoreError> {
+        let inner = self.lock();
+        let Some(journal) = inner.journals.get(actor) else {
+            return Ok(Vec::new());
+        };
+        let start = from.get().max(1);
+        Ok(journal
+            .iter()
+            .enumerate()
+            .skip((start - 1) as usize)
+            .take(limit)
+            .map(|(i, e)| JournalRecord {
+                position: Position::new(i as u64 + 1),
+                entry: e.clone(),
+            })
+            .collect())
+    }
+
     fn head(&self, actor: &NamedNode) -> Result<Position, StoreError> {
         Ok(Position::new(
             self.lock()

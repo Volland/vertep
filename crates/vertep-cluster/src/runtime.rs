@@ -535,6 +535,12 @@ impl ClusterNode {
                         me.settled(&node, &frame.id);
                         return;
                     }
+                    // a data answer is for a request frame (journal shipping), never a message
+                    Ok(Reply::Data { .. }) => {
+                        me.report(&env, "the receiver answered a message with data");
+                        me.settled(&node, &frame.id);
+                        return;
+                    }
                     Err(e) => e,
                 };
                 if start.elapsed() + me.config.retry_backoff > me.config.delivery_deadline {
@@ -679,6 +685,11 @@ impl ClusterNode {
                     Ok(Reply::Rejected { kind, message, .. }) => {
                         Reply::Rejected { id, kind, message }
                     }
+                    Ok(Reply::Data { .. }) => Reply::Rejected {
+                        id,
+                        kind: RejectKind::Malformed,
+                        message: "the owner answered a forwarded message with data".into(),
+                    },
                     Err(message) => Reply::Rejected {
                         id,
                         kind: RejectKind::Unavailable,

@@ -147,7 +147,9 @@ jobs:
       # The fault matrix: static, external stand-in, gossip, etcd and Kubernetes membership, each
       # with a shared journal and replication factors 1 and 3; etcd and k3s run in containers,
       # and `containers` runs every node as a container process (m4-cluster 6.1, 6.3).
-      - run: cargo test -p vertep-cluster --release --features differential,etcd,kubernetes --test faults --test simulation --test runtime --test external --test containers -- --test-threads 2
+      # `shipping`: journal shipping fault histories (drops, gaps, tampering, replays, a stale
+      # leader after a handover, follower restarts) replay through the same model (M13 7.5).
+      - run: cargo test -p vertep-cluster --release --features differential,etcd,kubernetes --test faults --test simulation --test runtime --test external --test containers --test shipping -- --test-threads 2
         env:
           VERTEP_CONTAINER_TESTS: require
       - uses: actions/upload-artifact@v4

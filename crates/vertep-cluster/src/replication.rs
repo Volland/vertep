@@ -598,6 +598,16 @@ impl<J: JournalStore, M: Membership + ?Sized> JournalStore for ReplicatedJournal
         self.inner.read(actor, from)
     }
 
+    fn read_range(
+        &self,
+        actor: &NamedNode,
+        from: Position,
+        limit: usize,
+    ) -> Result<Vec<JournalRecord>, StoreError> {
+        self.usable(actor)?;
+        self.inner.read_range(actor, from, limit)
+    }
+
     fn head(&self, actor: &NamedNode) -> Result<Position, StoreError> {
         self.usable(actor)?;
         self.inner.head(actor)

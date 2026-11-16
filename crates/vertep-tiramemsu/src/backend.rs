@@ -120,6 +120,15 @@ impl JournalStore for TiramemsuBackend {
         self.shard_for(actor).read(actor, from)
     }
 
+    fn read_range(
+        &self,
+        actor: &NamedNode,
+        from: Position,
+        limit: usize,
+    ) -> Result<Vec<JournalRecord>, StoreError> {
+        self.shard_for(actor).read_range(actor, from, limit)
+    }
+
     fn head(&self, actor: &NamedNode) -> Result<Position, StoreError> {
         self.shard_for(actor).head(actor)
     }
