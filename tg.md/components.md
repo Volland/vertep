@@ -160,7 +160,8 @@ The custody model landed 2026-11-12 (M7).
   - Proven: one writer per epoch, and a committed log is a prefix of every later adoption and every later accepted log.
 - **Custodian-set changes by joint consensus** (`CustodyJoint`):
   - Proven: quorums of consecutive ranks intersect, and runs that start no change keep both safety properties.
-  - Not proven: the same two properties for runs that change the set. They are the open conjectures `OneWriterPerEpoch` and `CommittedSurvives`. For now they are checked by a build-time random search (400 runs) and by strict replay of every Rust fault history.
+  - Refuted: the same two properties over every run of the model (`OneWriterPerEpoch`, `CommittedSurvives`). `CustodyJointStale` gives a run, with majority quorums, where a candidate counts promises gathered before it knew of the record it is elected under.
+  - Not proven: the corrected properties `OneWriterPerEpochR` and `CommittedSurvivesR`, over runs that fix each election's record before its promises (`RecordFixed`, as Rust's `CustodyHost::elect` does) with majority quorums. For now they are checked by build-time random searches, one of which gathers promises long before it elects, and by strict replay of every Rust fault history, which also checks `RecordFixed`.
 - **Old rule** (`CustodyReconfigUnsafe`): Lean-checked counterexamples show that switching on a quorum of the old set plus every newcomer loses committed entries and can elect two writers in one epoch. That is why the Rust protocol changed to joint consensus.
 - **Oracle:** `vertep-custody --history` replays fault histories in strict mode, with the joint model for histories that carry configuration records.
 - **Axioms:** pinned to `propext`, `Classical.choice` and `Quot.sound`.

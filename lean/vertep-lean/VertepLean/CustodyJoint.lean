@@ -38,10 +38,20 @@ The custody model (`VertepLean.Custody`) extended with configuration changes as
   carries the fixed-set theorems to reconfiguration-free runs:
   `one_writer_per_epoch_noChange`, `committed_survives_noChange`.
 
-The safety of runs that do change the custodian set (`OneWriterPerEpoch`,
-`CommittedSurvives` below) is **stated, not proven**: `VertepTests.CustodyJoint` checks both
-on many seeded random runs (and the same search finds the counterexamples of the earlier rule),
-and the oracle checks them along every recorded history.
+## What is refuted, and what is open
+
+Over every run of this model, the safety of runs that change the custodian set
+(`OneWriterPerEpoch`, `CommittedSurvives`) is **false**, even when every quorum is a majority:
+a candidate can count promises it gathered before it knew of the record it is elected under
+(`VertepLean.CustodyJointStale` proves both failures on one run). Rust fixes the record before
+it prepares; the model records, with each promise, how much of the system had happened
+(`JPromise.seenP`, `seenF`), and `RecordFixed` asks an election's record to be known to each of
+its promises. Over the runs that keep it (`ReachableR`), the corrected statements
+(`OneWriterPerEpochR`, `CommittedSurvivesR`, which also assume majority quorums) are **stated,
+not proven**: `VertepTests.CustodyJoint` checks them on many seeded random runs, including runs
+that gather promises long before they elect (the same search breaks the uncorrected model and
+the earlier rule), and the oracle checks `RecordFixed` and both properties along every recorded
+history.
 -/
 
 namespace Vertep.Custody.Joint
@@ -131,6 +141,10 @@ structure JPromise where
   acc : Nat
   log : Log
   rank : Nat
+  /-- Ghost: how many promises had been made before this one. -/
+  seenP : Nat
+  /-- Ghost: how many records had been put in force at writers before this promise. -/
+  seenF : Nat
   deriving DecidableEq, Repr
 
 def JPromise.base (p : JPromise) : Promise := ⟨p.cust, p.epoch, p.host, p.acc, p.log⟩
@@ -235,7 +249,8 @@ def exec (conf : Confs) (g : Nat) (s : JSys) : Action → Option JSys
       some { s with
         cust := upd s.cust c ⟨{ (s.cust c).core with promised := e }, (s.cust c).rank⟩
         promises := s.promises ++
-          [⟨c, e, h, (s.cust c).core.acc, (s.cust c).core.log, (s.cust c).rank⟩] }
+          [⟨c, e, h, (s.cust c).core.acc, (s.cust c).core.log, (s.cust c).rank,
+            s.promises.length, s.inForce.length⟩] }
     else none
   | .elect h e r qs A =>
     if electOk conf g s h e r qs A then
@@ -281,14 +296,58 @@ def Committed (conf : Confs) (s : JSys) (L : Log) (e : Nat) : Prop :=
   ∃ r, (e, r) ∈ s.inForce ∧ ∃ Q, RQuorum conf r Q ∧
     ∀ c ∈ Q, ∃ l, (c, e, r, l) ∈ s.accepted ∧ L <+: l
 
-/-- **Conjecture (not proven here)**: one writer per epoch, with custodian-set changes. -/
+/-- One writer per epoch, with custodian-set changes, over every run of the model. **False**,
+even when every quorum is a majority: `Stale.stale_record_two_writers`. -/
 def OneWriterPerEpoch (conf : Confs) (g : Nat) : Prop :=
   ∀ s, Reachable conf g s → ∀ e h₁ h₂ r₁ r₂ A₁ A₂, (e, h₁, r₁, A₁) ∈ s.elections →
     (e, h₂, r₂, A₂) ∈ s.elections → h₁ = h₂
 
-/-- **Conjecture (not proven here)**: committed logs survive, with custodian-set changes. -/
+/-- Committed logs survive, with custodian-set changes, over every run of the model. **False**,
+even when every quorum is a majority: `Stale.stale_record_loses_committed`. -/
 def CommittedSurvives (conf : Confs) (g : Nat) : Prop :=
   ∀ s, Reachable conf g s → ∀ L e₀, Committed conf s L e₀ →
+    (∀ e h r A, (e, h, r, A) ∈ s.elections → e₀ < e → L <+: A) ∧
+    (∀ c e r l, (c, e, r, l) ∈ s.accepted → e₀ < e → L <+: l)
+
+/-! ## The record is fixed before the promises
+
+Rust's `CustodyHost::elect` chooses the record it prepares with before it sends
+`custody.prepare`, counts only the promises of that round, and starts a new round, at a higher
+epoch, when a promise reports a newer record. So the record an election is held under was
+known when each of its promises was made. The model above does not ask for this, and the
+conjectures fail without it (`VertepLean.CustodyJointStale`). -/
+
+/-- The system as it was when `p` was promised, as far as `known` looks at it. -/
+def JSys.before (s : JSys) (p : JPromise) : JSys :=
+  { s with promises := s.promises.take p.seenP, inForce := s.inForce.take p.seenF }
+
+/-- Record `r` was known when `p` was promised. -/
+def knownWhen (g : Nat) (s : JSys) (p : JPromise) (r : Nat) : Bool := known g (s.before p) r
+
+/-- An election's record was known when each of its promises was made. -/
+def RecordFixed (g : Nat) (s : JSys) : Action → Prop
+  | .elect h e r qs _ => ∀ p ∈ promisesOf s e h qs, knownWhen g s p r = true
+  | _ => True
+
+instance (g : Nat) (s : JSys) (a : Action) : Decidable (RecordFixed g s a) := by
+  cases a <;> unfold RecordFixed <;> exact inferInstance
+
+/-- The states reachable by runs that fix each election's record before its promises. -/
+inductive ReachableR (conf : Confs) (g : Nat) : JSys → Prop
+  | empty : ReachableR conf g (JSys.empty g)
+  | step {s t : JSys} (a : Action) (hf : RecordFixed g s a) :
+      ReachableR conf g s → exec conf g s a = some t → ReachableR conf g t
+
+/-- **Conjecture (open, m7 10.4)**: one writer per epoch, with custodian-set changes, when every
+quorum is a majority and every election's record was fixed before its promises. -/
+def OneWriterPerEpochR (conf : Confs) (g : Nat) : Prop :=
+  Majorities conf → ∀ s, ReachableR conf g s → ∀ e h₁ h₂ r₁ r₂ A₁ A₂,
+    (e, h₁, r₁, A₁) ∈ s.elections → (e, h₂, r₂, A₂) ∈ s.elections → h₁ = h₂
+
+/-- **Conjecture (open, m7 10.4)**: committed logs survive, with custodian-set changes, under the
+same conditions. -/
+def CommittedSurvivesR (conf : Confs) (g : Nat) : Prop :=
+  Majorities conf → ∀ s, ReachableR conf g s → ∀ L e₀, Committed conf s L e₀ →
     (∀ e h r A, (e, h, r, A) ∈ s.elections → e₀ < e → L <+: A) ∧
     (∀ c e r l, (c, e, r, l) ∈ s.accepted → e₀ < e → L <+: l)
 
@@ -406,7 +465,8 @@ theorem exec_noChange_project (conf : Confs) (g : Nat) {s t : JSys} (hs : NoChan
       · have heq : project { s with
             cust := upd s.cust c ⟨{ (s.cust c).core with promised := e }, (s.cust c).rank⟩
             promises := s.promises ++
-              [⟨c, e, h, (s.cust c).core.acc, (s.cust c).core.log, (s.cust c).rank⟩] } =
+              [⟨c, e, h, (s.cust c).core.acc, (s.cust c).core.log, (s.cust c).rank,
+                s.promises.length, s.inForce.length⟩] } =
             Custody.prepare (project s) c e h := by
           simp only [project, Custody.prepare, List.map_append, List.map_cons, List.map_nil,
             JPromise.base]

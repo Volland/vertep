@@ -22,7 +22,8 @@ In strict mode, beyond the fixed-set checks:
 * a writer's batches move its record one step at a time: to the joint record at will, and out
   of it (`switchReady`) only once quorums of both sets hold its whole log with the joint record;
 * an election is backed by promises of a quorum of its record (both sets when joint), none of
-  which reports a higher record, under a record some custodian or writer had;
+  which reports a higher record, under a record some custodian or writer had already when each
+  of those promises was made (`RecordFixed`: Rust fixes the record before it prepares);
 * a commit is backed, at that moment, by quorums of its record (both sets when joint) of
   custodians that accepted in its epoch a log extending it, under a record its writer held.
 -/
@@ -211,6 +212,9 @@ def replayOne (cx : Ctx) (st : St) (i : Nat) : JEvent → Except String St
       throw s!"line {i}: {h} elected in epoch {e} without a recorded promise from each of {qs}"
     if let some p := ps.find? (fun p => r < p.rank) then
       throw s!"line {i}: {h} elected in epoch {e} under {showRank r}, but {p.cust} promised with {showRank p.rank}"
+    -- the record was fixed before the promises (`RecordFixed`)
+    if let some p := ps.find? (fun p => !knownWhen cx.g st.sys p r) then
+      throw s!"line {i}: {h} elected in epoch {e} under {showRank r}, a record not known when {p.cust} promised"
     unless Check.adoptsB (ps.map JPromise.base) A do
       throw s!"line {i}: {h} elected in epoch {e} adopted {A}, the max rule picks {(Check.best (ps.map JPromise.base)).map (·.log)}"
     if let some (_, h', _, _) := st.sys.elections.find? (fun (e', _, _, _) => e' = e) then
