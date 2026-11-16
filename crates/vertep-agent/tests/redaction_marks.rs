@@ -121,6 +121,7 @@ fn applied(position: u64) -> JournalEntry {
         },
         disposition: None,
         offered: None,
+        outcome: None,
     }
 }
 
