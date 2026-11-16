@@ -248,6 +248,7 @@ fn erasing_a_subject_keeps_the_signed_chain_valid() {
         input,
         disposition: None,
         offered: None,
+        outcome: None,
     };
     journal
         .append(

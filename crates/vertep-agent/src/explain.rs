@@ -67,9 +67,11 @@ pub struct Explanation {
     pub input: String,
     /// The chart version in force (from the first entry).
     pub chart_version: String,
-    /// `verified` when the replay behind this view read every recorded value, `recorded` when
-    /// some value was erased: the replay then went on from the recorded inputs and is not a
-    /// full verification ([[openspec:journal-redaction#Replay After Erasure]]).
+    /// `recorded` when an erased value was replayed and a condition was evaluated from then on
+    /// (or a configuration had to be taken from the record): the replay followed the outcomes
+    /// recorded with the entries and is not a full verification. `verified` otherwise, including
+    /// after an erasure that no condition could have read
+    /// ([[openspec:journal-redaction#Replay After Erasure]], [`crate::host::ReplayReport`]).
     #[serde(skip_serializing_if = "is_verified")]
     pub replay: &'static str,
     /// The state configuration before the entry.

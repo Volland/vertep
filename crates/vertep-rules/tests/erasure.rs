@@ -110,6 +110,7 @@ fn applied(who: &str) -> JournalEntry {
             message_id: "m1".into(),
         },
         disposition: None,
+        outcome: None,
         offered: None,
     }
 }

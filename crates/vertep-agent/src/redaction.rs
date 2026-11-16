@@ -367,6 +367,7 @@ impl SealingJournal {
                     },
                     disposition: None,
                     offered: None,
+                    outcome: None,
                 },
             )?;
         }
@@ -521,6 +522,7 @@ mod tests {
             },
             disposition: None,
             offered: None,
+            outcome: None,
         }
     }
 
