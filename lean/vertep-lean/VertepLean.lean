@@ -50,6 +50,10 @@ import VertepLean.WalletUnsafe
 import VertepLean.WalletCheck
 import VertepLean.Disposition
 import VertepLean.DecideCheck
+import VertepLean.Protocol
+import VertepLean.ProtocolTheorems
+import VertepLean.ProtocolUnsafe
+import VertepLean.ProtocolCheck
 import VertepLean.Types.Basic
 import VertepLean.Types.Check
 import VertepLean.Types.JsonSchema

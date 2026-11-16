@@ -196,6 +196,8 @@ The journal protocol, decide states with grants, and shard leases are modelled a
 - describes:: [[decisions#The exchange model is symbolic over a network adversary]] {note: "M9 wallet model"}
 - describes:: [[components#vertep-objects]] {note: "custody model and history replay"}
 - describes:: [[decisions#Custodian set changes use joint consensus]] {note: "joint conjectures refuted as first stated; corrected ones open"}
+- describes:: [[capabilities#Protocol conformance]] {note: "M10 protocol model and history replay"}
+- describes:: [[components#vertep-kolyada]] {note: "recorded participant histories"}
 
 | Model (`VertepLean/`) | Proven, in every reachable state | Oracle and Rust test |
 |---|---|---|
@@ -205,6 +207,7 @@ The journal protocol, decide states with grants, and shard leases are modelled a
 | `Lease`, `LeaseTheorems` | `grant_unique`, `one_writer_per_epoch`, `journal_epochs_ordered`, `shard_epochs_ordered`, `message_once`, `stale_append_fenced`, `frames_ordered`, `stale_frame_dropped` | `vertep-lease` replays `History::to_jsonl` of the cluster fault-injection test |
 | `Custody`, `CustodyTheorems`, `CustodyJoint`, `CustodyJointStale`, `CustodyReconfigUnsafe` | for a fixed custodian set: `one_writer_per_epoch`, `committed_survives_election`, `committed_survives_accept`; with set changes: `rquorum_inter`, and both properties for runs that start no change (`one_writer_per_epoch_noChange`, `committed_survives_noChange`); refuted: the first change rule (`rust_switch_loses_committed`, `rust_pending_two_writers`) and the joint conjectures as first stated (`stale_record_loses_committed`, `stale_record_two_writers`); open: `OneWriterPerEpochR`, `CommittedSurvivesR` | `vertep-custody` replays the histories of `tests/faults.rs` (M7) |
 | `Wallet`, `WalletTheorems`, `WalletUnsafe` | `issue_needs_possession`, `issue_once_per_offer`, `present_needs_consent`, `disclosure_within_consent`, `accept_sound`, `accept_once_per_nonce`; `presentation_within_request`; the audience check is necessary (`audience_check_needed`, `no_foreign_acceptance`) | `vertep-wallet` replays exchange histories of the conformance kit (`vertep_wallet::testkit`): every protocol plugin under seeded adversarial schedules (M9) |
+| `Protocol`, `ProtocolTheorems`, `ProtocolUnsafe`, `ProtocolCheck` | an accepted protocol message is enabled by the participant's projection (`accept_enabled`, `accepted_enabled_by_projection`, `log_enabled`); a sender not bound to its role is refused and never in the history (`unbound_refused`, `log_bound`); runs that put the protocol steps in one order converge and then judge alike (`causal_orders_converge`, `converged_accept`, `run_causal`); the role binding is necessary (`role_check_needed`, `no_unbound_applied`); `replay_sound` | `vertep-kolyada --history` replays six participant histories recorded by `crates/vertep-kolyada/tests/histories.rs` (golden files in `VertepTests/data/kolyada`, also replayed when `VertepTests` builds) and rejects doctored copies at the doctored line (M10) |
 
 ```mermaid
 flowchart LR
@@ -213,12 +216,14 @@ flowchart LR
         A["Agent: offers, decide, grants"]
         L["Lease: authorities, fenced store, receivers"]
         W["Wallet: credential exchange, network adversary"]
+        K["Protocol: projection, accept, causal delivery"]
     end
     subgraph rust["Rust under test"]
         RT["vertep-runtime Node"]
         AG["vertep-agent AgentMachine"]
         CL["vertep-cluster fault injection"]
         WK["vertep-wallet conformance kit"]
+        KO["vertep-kolyada Instance"]
     end
     RT -- "observation JSON" --> OJ["vertep-journal"]
     AG -- "decision outcomes and dispositions JSONL" --> OD["vertep-decide --strict"]
@@ -228,6 +233,8 @@ flowchart LR
     L --> OL
     WK -- "exchange history JSONL" --> OW["vertep-wallet"]
     W --> OW
+    KO -- "participant history JSONL" --> OK["vertep-kolyada"]
+    K --> OK
 ```
 
 What the models abstract, and what the oracles found:
@@ -239,6 +246,7 @@ What the models abstract, and what the oracles found:
 - The lease oracle needs every grant in the history. The fault-injection harness now records the grants `Membership::tick` makes as well as its own, and its histories replay in strict mode (11,241 decisions agree on five seeds) from the fault-injection test itself.
 - The configuration proof found three Rust runtime bugs in the W3C Appendix D entry algorithm itself, each giving an illegal configuration on a valid chart; all fixed 2026-11-11/12 in both cores with Rust and Lean regressions (see [[decisions#Appendix D readings in the Rust core]]): the domain recomputed on entry from the history just recorded (`deep_history_of_single_region_parallel_reenters_the_parallel`), and entry climbing above a domain that lies below a history's parent (`history_entry_stops_at_the_transition_domain`, `history_default_through_a_history_stops_at_the_domain`). `reachable_configurations_are_legal` in `vertep-conformance` checks legality on generated charts; its generator never builds these shapes, which is why the proof, not the property test, found them.
 - The custody proof attempt (M7 task 10.4, 2026-11-16) found the joint-consensus conjectures false as stated. The model let a candidate count promises gathered before it knew of the record it was elected under, so promises made to epoch 3 before epoch 5 changed the set elected a second writer in epoch 3 under the new set, adopting an empty log. Rust fixes the record before it prepares, so the corrected conjectures range over runs that do the same (`RecordFixed`), and strict replay now checks that Rust's histories do. The proof itself is still open: elections, proposals and switches add records in force at an epoch, so the fixed-set argument that choosable logs only shrink does not carry over.
+- Kolyada protocols (M10 tasks 8.1-8.6, 2026-11-16): the model takes two facts per message from the Rust side, whether the signature verifies and whether the payload matches its shape, and models everything else `Instance::check` reads. Every part of the participant's state except its knowledge only grows, with the status, last sequence numbers and heads derived from it; the checker compares those with the Rust fields on every line. Convergence assumes the two orders put the protocol steps in one order: a hash-linked history chains them, but a participant that sees two concurrent protocol messages (possible with a dishonest silent role) may reach different knowledge. Sub-protocol geneses (`parent`) are not modelled.
 - The protocol-model review also found that the Rust type checker did not terminate on `type A = optional<A>` against a non-null value; see [[decisions#Type checking stops on non-contractive recursion]], which the Lean type language mirrors (see the type language section below).
 
 ## Type language

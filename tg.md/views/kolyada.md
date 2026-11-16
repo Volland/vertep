@@ -24,8 +24,9 @@ How agents say, in a form a stranger can verify, how to talk to them: a hash-ide
 - describes:: [[decisions#Charts declare roles and the mailbox checks before the journal]]
 - describes:: [[constraints#Choreography projection needs one deciding role]]
 - describes:: [[constraints#Authcrypt is not verifiable by a third party]]
+- describes:: [[components#vertep-lean]] {note: "the Kolyada protocol model"}
 
-This view explains milestone M10 and the crate `vertep-kolyada`, whose core is built, with its binding to charts and mailboxes and the `vt kolyada` command; the join policy and sealed fan-out are built in `vertep-federation`, and the Lean model is not. Requirement names in backticks are from the OpenSpec change `m10-agent-protocols`. The relays that carry the messages are in [[views/distribution#Distribution#Relay mailboxes]], and the grants this replaces inside a protocol are in [[views/distribution#Distribution#Authenticated origin and grants]].
+This view explains milestone M10 and the crate `vertep-kolyada`, whose core is built, with its binding to charts and mailboxes and the `vt kolyada` command; the join policy and sealed fan-out are built in `vertep-federation`, and the Lean model in `lean/vertep-lean`. Requirement names in backticks are from the OpenSpec change `m10-agent-protocols`. The relays that carry the messages are in [[views/distribution#Distribution#Relay mailboxes]], and the grants this replaces inside a protocol are in [[views/distribution#Distribution#Authenticated origin and grants]].
 
 ## The idea
 
@@ -202,6 +203,25 @@ The crate publishes `Test Vectors` (identities, projections, envelope hashes, ve
 
 `Lean Protocol Model` is the second stage: it proves that accepted messages are enabled by the projection, that unbound roles are never accepted and that causally consistent orders converge, with a checker that replays recorded histories and an unsafe variant that has a counterexample.
 
+### The Lean model
+
+`lean/vertep-lean/VertepLean/Protocol*.lean` models one participant: the projection, `accept` in the order of `Instance::judge`, causal delivery with the bounded buffer and timeout, hidden messages, and the states `Reachable` from a genesis.
+
+- **Abstract facts.** A message carries two facts the Rust side decides: whether its signature verifies and whether its payload matches its shape. The model checks everything else.
+- **Theorems.** An accepted protocol message is enabled by a step of the participant's projection from a state it may be in (`accepted_enabled_by_projection`, `log_enabled`). A sender not bound to its role is refused and never appears in the history (`unbound_refused`, `log_bound`). Two runs over the same inputs that put the protocol steps in one order reach the same state and then judge every message alike (`causal_orders_converge`, `converged_accept`).
+- **Why convergence holds.** Every part of the state but the knowledge only grows, and the status, last sequence numbers and heads are derived from it. The knowledge moves only on protocol steps, which the hash chain orders.
+- **Unsafe variant.** Without the role binding, a DID bound to nothing sends a request in the buyer's name and the seller applies it (`role_check_needed`).
+- **Replay.** `crates/vertep-kolyada/tests/histories.rs` records six participant histories (a full run seen by each of the three roles, one refusal per reason, a decline, and buffer eviction with stalls) as golden files in `VertepTests/data/kolyada`. `lake exe vertep-kolyada --history` replays them in strict mode: events, status, knowledge and heads must match on every line. The Lean build replays them with doctored copies that must fail at the doctored line, and the Rust test runs the executable when it is built.
+
+```mermaid
+flowchart LR
+    RT["Rust Instance in tests/histories.rs"] -- "participant history JSONL" --> GF["VertepTests/data/kolyada"]
+    GF --> CK["vertep-kolyada --history"]
+    GF --> VT["VertepTests.Protocol at build time"]
+    M["Protocol model and theorems"] --> CK
+    M --> VT
+```
+
 ## Open questions
 
 Five questions are undecided; the design of `m10-agent-protocols` lists them.
@@ -228,4 +248,4 @@ The core crate follows the design with a few choices the design left open.
 - **The participant.** `SpaceMember` holds the documents an agent knows, its policy, its instances and a journal of admitted genesis messages and accepted messages. It acknowledges a relay copy once the message is journaled, a duplicate, or refused and recorded; a copy held for dependencies, or naming an instance whose genesis has not arrived, stays at the relay. `ActorSigner` and `ResolverVerifier` are the key-manager and DID-resolver adapters.
 - **Shape semantics.** To match SHACL, the checker counts distinct values (an RDF graph holds a literal once, while each object is its own node), and an `in` list holds only strings, numbers and booleans.
 - **Binding and CLI.** The chart role binding and `vt kolyada` are described in their own sections above.
-- **Not yet built.** The Lean model. Fan-out sends at once and has no retry queue of its own, and the `SpaceMember` journal still stands beside the actor's journal rather than inside it.
+- **Not yet built.** Fan-out sends at once and has no retry queue of its own, and the `SpaceMember` journal still stands beside the actor's journal rather than inside it.
