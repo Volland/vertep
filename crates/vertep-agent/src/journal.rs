@@ -194,9 +194,45 @@ pub struct JournalEntry {
     /// offer ([[openspec:decision-records#Offer Is Part Of The Record]]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offered: Option<Vec<String>>,
+    /// What applying the input did, recorded by the host when it journaled the entry, so that a
+    /// replay that cannot re-evaluate a guard (it reads an erased value) can follow what
+    /// happened ([[openspec:journal-redaction#Replay After Erasure]]). Absent on the start
+    /// entry, on entries written by other writers and on entries that predate it; such entries
+    /// replay by re-evaluation, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<EntryOutcome>,
+}
+
+/// What applying one journaled input did. It holds state ids, transition indices and the truth
+/// values of conditions, never a datamodel value, so it reveals no sealed field's plaintext (a
+/// branch taken says no more than the configuration it led to).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EntryOutcome {
+    /// The answer of every condition the machine evaluated while it applied the input (transition
+    /// guards, `<if>` conditions and the guards behind decide-state offers), in order: `t`, `f`,
+    /// or `e` when the evaluation failed.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub guards: String,
+    /// The transitions taken, one list per microstep, as (source state, transition index).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub transitions: Vec<Vec<(String, usize)>>,
+    /// The active state ids after the input, in document order.
+    pub configuration: Vec<String>,
 }
 
 impl JournalEntry {
+    /// An entry with only the input: no disposition, offer or outcome.
+    pub fn new(position: u64, ts: i64, input: AgentInput) -> Self {
+        JournalEntry {
+            position,
+            ts,
+            input,
+            disposition: None,
+            offered: None,
+            outcome: None,
+        }
+    }
+
     /// The disposition as a name, or `unknown` for an entry that predates dispositions.
     pub fn disposition_or_unknown(&self) -> &'static str {
         self.disposition.map_or("unknown", Disposition::as_str)

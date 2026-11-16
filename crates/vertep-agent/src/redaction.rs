@@ -367,6 +367,7 @@ impl SealingJournal {
                     },
                     disposition: None,
                     offered: None,
+                    outcome: None,
                 },
             )?;
         }

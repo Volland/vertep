@@ -42,7 +42,7 @@ use crate::decide::{DecideError, DecideSpec, decide_specs};
 use crate::decider::{Annotations, ContextView, DecisionRequest};
 use crate::enabled::{Candidate, enabled_events, fingerprint, selected_transition};
 use crate::grant::{self, Grant};
-use crate::journal::AgentInput;
+use crate::journal::{AgentInput, EntryOutcome};
 use crate::json::{field, obj, s, sha256, to_json};
 use crate::llm::{Cost, ErrorClass, GenerationParams, LlmSpec, RenderedPrompt, Usage, render};
 use crate::plan::{AcceptedPlan, PlanBounds, PlanError, PlanErrorClass, PlanFormat, submit};
@@ -300,6 +300,19 @@ pub struct AcceptedDecision {
     pub taken: Vec<(String, usize)>,
 }
 
+/// What [`AgentMachine::apply_following`] found when it replayed an input against its record.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Following {
+    /// Conditions evaluated while the input was applied.
+    pub evaluated: u64,
+    /// Whether a recorded answer was used in place of a different re-evaluated one, or the
+    /// record and the evaluation did not line up (different count, transitions or end state).
+    pub disagreed: bool,
+    /// Whether the configuration was set to the recorded one because the replay still ended
+    /// elsewhere.
+    pub forced: bool,
+}
+
 /// What applying one input produced.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Applied {
@@ -552,9 +565,83 @@ struct PlanRun {
     seq: u64,
 }
 
-/// The datamodel wrapper that makes `vt_usage` read-only.
+/// How conditions are answered while the machine applies an input.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum GuardMode {
+    /// Evaluate (normal running and replay).
+    #[default]
+    Evaluate,
+    /// Evaluate and record each answer (the host journaling an input).
+    Record,
+    /// Evaluate, but answer from the record where the two differ (replay after erasure).
+    Follow,
+}
+
+/// The condition answers of one input: recorded while it is applied live, followed when it is
+/// replayed after erasure. Shared by the session's datamodel and the probes behind decide-state
+/// offers and decision validation, so every condition of the input goes through it in order.
+#[derive(Debug, Default)]
+struct Guards {
+    mode: GuardMode,
+    /// `t`, `f` or `e` per condition: appended under `Record`, read from `next` under `Follow`.
+    answers: Vec<u8>,
+    next: usize,
+    /// Conditions evaluated since the mode was set.
+    evaluated: u64,
+    /// Under `Follow`: a recorded answer differed from the re-evaluated one, or the record ran
+    /// out before the conditions did.
+    disagreed: bool,
+}
+
+impl Guards {
+    fn set(&mut self, mode: GuardMode, answers: Vec<u8>) {
+        *self = Guards {
+            mode,
+            answers,
+            ..Guards::default()
+        };
+    }
+
+    fn answer(&mut self, r: Result<bool, EvalError>) -> Result<bool, EvalError> {
+        self.evaluated += 1;
+        let code = match &r {
+            Ok(true) => b't',
+            Ok(false) => b'f',
+            Err(_) => b'e',
+        };
+        match self.mode {
+            GuardMode::Evaluate => r,
+            GuardMode::Record => {
+                self.answers.push(code);
+                r
+            }
+            GuardMode::Follow => {
+                let Some(&recorded) = self.answers.get(self.next) else {
+                    self.disagreed = true;
+                    return r;
+                };
+                self.next += 1;
+                if recorded == code {
+                    return r;
+                }
+                self.disagreed = true;
+                match recorded {
+                    b't' => Ok(true),
+                    b'f' => Ok(false),
+                    _ => Err(EvalError::new(
+                        "the condition failed when the entry was journaled",
+                    )),
+                }
+            }
+        }
+    }
+}
+
+/// The datamodel wrapper that makes `vt_usage` read-only and passes every condition through the
+/// machine's [`Guards`].
 struct AgentDm {
     inner: Box<dyn Datamodel>,
+    guards: Arc<std::sync::Mutex<Guards>>,
 }
 
 fn is_usage(location: &str) -> bool {
@@ -590,7 +677,11 @@ impl Datamodel for AgentDm {
         self.inner.set_event(event);
     }
     fn eval_cond(&mut self, expr: &str, states: &dyn StateQuery) -> Result<bool, EvalError> {
-        self.inner.eval_cond(expr, states)
+        let r = self.inner.eval_cond(expr, states);
+        match self.guards.lock() {
+            Ok(mut g) => g.answer(r),
+            Err(_) => r,
+        }
     }
     fn eval_value(&mut self, expr: &str, states: &dyn StateQuery) -> Result<Value, EvalError> {
         self.inner.eval_value(expr, states)
@@ -673,6 +764,9 @@ impl std::fmt::Debug for AgentMachine {
     }
 }
 
+/// The transitions taken by one input, one list per microstep: (source state, index).
+type Microsteps = Vec<Vec<(String, usize)>>;
+
 /// An accepted decision waiting for its macrostep: correlation, event, transitions offered.
 type PendingDecision = (String, String, Vec<(String, usize)>);
 
@@ -689,6 +783,8 @@ struct Cx {
     accepted: Vec<AcceptedDecision>,
     pending_decision: Option<PendingDecision>,
     dropped: bool,
+    /// The transitions taken, one list per microstep.
+    transitions: Microsteps,
 }
 
 fn seed(actor: &str, position: u64) -> u64 {
@@ -763,7 +859,10 @@ impl AgentMachine {
         let inner =
             vertep_core::null::create_datamodel_for(registry.as_ref(), chart.compiled.chart())
                 .map_err(|e| MachineError::Datamodel(format!("{e:?}")))?;
-        let mut dm = AgentDm { inner };
+        let mut dm = AgentDm {
+            inner,
+            guards: Arc::default(),
+        };
         let env = Environment {
             now_ms: ts,
             seed: seed(actor, 1),
@@ -846,6 +945,7 @@ impl AgentMachine {
             accepted: Vec::new(),
             pending_decision: None,
             dropped: false,
+            transitions: Vec::new(),
         };
         m.after_macrostep(o.effects, &o.trace, &mut cx);
         m.flush_raised(&mut cx);
@@ -1040,6 +1140,121 @@ impl AgentMachine {
         position: u64,
         ts: i64,
     ) -> Result<Applied, MachineError> {
+        self.apply_inner(input, position, ts).map(|(a, _)| a)
+    }
+
+    fn set_guards(&self, mode: GuardMode, answers: Vec<u8>) {
+        if let Ok(mut g) = self.dm.guards.lock() {
+            g.set(mode, answers);
+        }
+    }
+
+    /// Takes the guard state and goes back to plain evaluation.
+    fn take_guards(&self) -> Guards {
+        self.dm
+            .guards
+            .lock()
+            .map(|mut g| std::mem::take(&mut *g))
+            .unwrap_or_default()
+    }
+
+    /// Applies an input like [`AgentMachine::apply`] and records what it did: every condition's
+    /// answer, the transitions taken and the configuration after. The host journals the record
+    /// with the entry ([`crate::journal::JournalEntry::outcome`]).
+    ///
+    /// # Errors
+    ///
+    /// As [`AgentMachine::apply`].
+    // @tg: implements:: [[openspec:journal-redaction#Replay After Erasure]]
+    pub fn apply_recording(
+        &mut self,
+        input: &AgentInput,
+        position: u64,
+        ts: i64,
+    ) -> Result<(Applied, EntryOutcome), MachineError> {
+        self.set_guards(GuardMode::Record, Vec::new());
+        let r = self.apply_inner(input, position, ts);
+        let guards = self.take_guards();
+        let (applied, transitions) = r?;
+        Ok((
+            applied,
+            EntryOutcome {
+                guards: guards.answers.into_iter().map(char::from).collect(),
+                transitions,
+                configuration: self.configuration(),
+            },
+        ))
+    }
+
+    /// Applies an input that is replayed after erasure: every condition is still evaluated, but
+    /// where its answer differs from the one `recorded` (the evaluation read a value that is now
+    /// erased) the recorded answer is used, so the input takes the transitions it took when it
+    /// was journaled and their executable content runs. If the configuration still differs
+    /// from the recorded one afterwards (the record and the evaluation did not line up), the
+    /// configuration is set to the recorded one, without running entry or exit content. With
+    /// no record (an entry that predates it) the input is re-evaluated, and the returned
+    /// [`Following`] says how many conditions that touched.
+    ///
+    /// # Errors
+    ///
+    /// As [`AgentMachine::apply`].
+    // @tg: implements:: [[openspec:journal-redaction#Replay After Erasure]]
+    pub fn apply_following(
+        &mut self,
+        input: &AgentInput,
+        position: u64,
+        ts: i64,
+        recorded: Option<&EntryOutcome>,
+    ) -> Result<(Applied, Following), MachineError> {
+        let mode = if recorded.is_some() {
+            GuardMode::Follow
+        } else {
+            GuardMode::Evaluate
+        };
+        let answers = recorded
+            .map(|o| o.guards.bytes().collect())
+            .unwrap_or_default();
+        self.set_guards(mode, answers);
+        let r = self.apply_inner(input, position, ts);
+        let guards = self.take_guards();
+        let (applied, transitions) = r?;
+        let mut following = Following {
+            evaluated: guards.evaluated,
+            disagreed: guards.disagreed,
+            forced: false,
+        };
+        if let Some(o) = recorded {
+            // the record has answers the replay never asked for
+            following.disagreed |= guards.next < guards.answers.len();
+            following.disagreed |= transitions != o.transitions;
+            if !self.session.is_terminated() && self.configuration() != o.configuration {
+                following.disagreed = true;
+                following.forced = self.force_configuration(&o.configuration);
+            }
+        }
+        Ok((applied, following))
+    }
+
+    /// Sets the active states to `ids` (all of which must name states of the chart).
+    fn force_configuration(&mut self, ids: &[String]) -> bool {
+        let c = &self.chart.compiled;
+        let mut set = c.empty_set();
+        for id in ids {
+            match c.index_of(id) {
+                Some(i) => set.insert(i),
+                None => return false,
+            }
+        }
+        self.session.configuration = set;
+        true
+    }
+
+    fn apply_inner(
+        &mut self,
+        input: &AgentInput,
+        position: u64,
+        ts: i64,
+    ) -> Result<(Applied, Microsteps), MachineError> {
         if self.session.is_terminated() {
             return Err(MachineError::Terminated);
         }
@@ -1058,15 +1273,19 @@ impl AgentMachine {
             accepted: Vec::new(),
             pending_decision: None,
             dropped: false,
+            transitions: Vec::new(),
         };
         match input {
             AgentInput::Start { .. } | AgentInput::Erasure { .. } => {}
             AgentInput::Event { event, message_id } => {
                 if !self.seen.insert(message_id.clone()) {
-                    return Ok(Applied {
-                        duplicate: true,
-                        ..Applied::default()
-                    });
+                    return Ok((
+                        Applied {
+                            duplicate: true,
+                            ..Applied::default()
+                        },
+                        Vec::new(),
+                    ));
                 }
                 cx.queue.push_back(event.clone());
             }
@@ -1077,10 +1296,13 @@ impl AgentMachine {
                 annotations,
             } => {
                 if self.answered.contains(correlation) {
-                    return Ok(Applied {
-                        duplicate: true,
-                        ..Applied::default()
-                    });
+                    return Ok((
+                        Applied {
+                            duplicate: true,
+                            ..Applied::default()
+                        },
+                        Vec::new(),
+                    ));
                 }
                 self.on_decision(correlation, event, payload, annotations, &mut cx);
             }
@@ -1089,10 +1311,13 @@ impl AgentMachine {
                 reason,
             } => {
                 if self.answered.contains(correlation) {
-                    return Ok(Applied {
-                        duplicate: true,
-                        ..Applied::default()
-                    });
+                    return Ok((
+                        Applied {
+                            duplicate: true,
+                            ..Applied::default()
+                        },
+                        Vec::new(),
+                    ));
                 }
                 self.on_refusal(correlation, reason, &mut cx);
             }
@@ -1145,7 +1370,8 @@ impl AgentMachine {
         }
         self.flush_raised(&mut cx);
         self.drain(&mut cx)?;
-        Ok(cx.into_applied())
+        let transitions = std::mem::take(&mut cx.transitions);
+        Ok((cx.into_applied(), transitions))
     }
 
     /// Processes an event that is not journaled (a streamed partial): one macrostep.
@@ -1172,6 +1398,7 @@ impl AgentMachine {
             accepted: Vec::new(),
             pending_decision: None,
             dropped: false,
+            transitions: Vec::new(),
         };
         self.drain(&mut cx)?;
         Ok(cx.into_applied())
@@ -1244,6 +1471,12 @@ impl AgentMachine {
                 }
             };
             let o = r.map_err(|e| MachineError::Step(format!("{e:?}")))?;
+            cx.transitions.extend(o.trace.microsteps.iter().map(|m| {
+                m.transitions
+                    .iter()
+                    .map(|t| (t.source.clone(), t.index))
+                    .collect::<Vec<_>>()
+            }));
             if let Some((corr, event, offered)) = cx.pending_decision.take() {
                 let taken = o
                     .trace
@@ -1333,7 +1566,10 @@ impl AgentMachine {
         })
         .ok()?;
         p.restore(&self.dm.snapshot()).ok()?;
-        Some(p)
+        Some(Box::new(AgentDm {
+            inner: p,
+            guards: self.dm.guards.clone(),
+        }))
     }
 
     fn candidates(&self, spec: &DecideSpec) -> Vec<Candidate> {

@@ -7,10 +7,10 @@
 //! synchronous and deterministic; [`AgentHost::settle`] also lets other tasks run.
 //!
 //! An actor's turn: take the oldest input from its mailbox; drop it when it is a duplicate
-//! (message id or decision correlation id already processed); append it to the journal; apply
-//! it; perform the effects. Deactivating an actor drops only its in-memory machine: its journal,
-//! timers and running calls stay, and the next input or due timer reactivates it by replay,
-//! which consults no decider, provider or tool.
+//! (message id or decision correlation id already processed); apply it, recording what it did;
+//! append it with that record to the journal; perform the effects. Deactivating an actor drops
+//! only its in-memory machine: its journal, timers and running calls stay, and the next input
+//! or due timer reactivates it by replay, which consults no decider, provider or tool.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::Arc;
@@ -107,6 +107,45 @@ pub struct AgentState {
     pub terminated: bool,
     /// The done data.
     pub done: Option<Value>,
+}
+
+/// What a replay could verify, after erasure ([[openspec:journal-redaction#Replay After Erasure]]).
+///
+/// From the first replayed entry that carries an erased value on, every entry follows its
+/// recorded outcome: its conditions are re-evaluated, and where an answer differs from the
+/// recorded one the recorded answer is taken. The replay is `recorded` rather than `verified`
+/// when an erased value was replayed and at least one condition was evaluated from then on
+/// (any of them may have read the erased value, in the input or in the datamodel), or when the
+/// configuration had to be set from the record. An erased value that no condition could have
+/// read (no condition was evaluated after it) leaves the replay `verified`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReplayReport {
+    /// Whether a replayed entry carried an erased value.
+    pub erased: bool,
+    /// Conditions evaluated from the first erased value on.
+    pub guards_after_erasure: u64,
+    /// Entries from the first erased value on that had a recorded outcome to follow.
+    pub followed: u64,
+    /// Entries from the first erased value on that evaluated conditions and had no recorded
+    /// outcome (written before outcomes were recorded): they were re-evaluated, unchecked.
+    pub unrecorded: u64,
+    /// Whether some recorded answer was used in place of a different re-evaluated one, or a
+    /// record did not line up with the replay.
+    pub disagreed: bool,
+    /// Whether some entry's configuration was set from its record because the replay ended
+    /// elsewhere.
+    pub forced: bool,
+}
+
+impl ReplayReport {
+    /// `recorded` or `verified`, as the explanation view shows it.
+    pub fn marker(&self) -> &'static str {
+        if self.erased && (self.guards_after_erasure > 0 || self.forced) {
+            "recorded"
+        } else {
+            "verified"
+        }
+    }
 }
 
 /// An event the host sent to a target outside it.
@@ -345,6 +384,7 @@ impl AgentHost {
                     },
                     disposition: None,
                     offered: None,
+                    outcome: None,
                 },
             )
             .map_err(|e| InstantiateError::Start(e.to_string()))?;
@@ -477,6 +517,41 @@ impl AgentHost {
         entries: &[JournalEntry],
         upto: Option<u64>,
     ) -> Result<(AgentMachine, Vec<AgentEffect>), HostError> {
+        self.replay_reporting(actor, entries, upto)
+            .map(|(m, e, _)| (m, e))
+    }
+
+    /// Applies one replayed entry. From the first entry that carries an erased value on
+    /// (`tainted`), an erased value may sit in the input or in the datamodel, so the entry
+    /// follows its recorded outcome instead of trusting re-evaluation alone.
+    fn replay_entry(
+        m: &mut AgentMachine,
+        e: &JournalEntry,
+        tainted: &mut bool,
+        report: &mut ReplayReport,
+    ) -> Result<crate::machine::Applied, MachineError> {
+        *tainted |= crate::redaction::has_erased(&e.input);
+        if !*tainted {
+            return m.apply(&e.input, e.position, e.ts);
+        }
+        report.erased = true;
+        let (applied, f) = m.apply_following(&e.input, e.position, e.ts, e.outcome.as_ref())?;
+        report.guards_after_erasure += f.evaluated;
+        report.followed += u64::from(e.outcome.is_some());
+        report.unrecorded += u64::from(e.outcome.is_none() && f.evaluated > 0);
+        report.disagreed |= f.disagreed;
+        report.forced |= f.forced;
+        Ok(applied)
+    }
+
+    /// [`AgentHost::replay`], with what the replay could and could not verify.
+    // @tg: implements:: [[openspec:journal-redaction#Replay After Erasure]]
+    fn replay_reporting(
+        &self,
+        actor: &str,
+        entries: &[JournalEntry],
+        upto: Option<u64>,
+    ) -> Result<(AgentMachine, Vec<AgentEffect>, ReplayReport), HostError> {
         let Some(first) = entries.first() else {
             return Err(HostError::Unknown(actor.to_owned()));
         };
@@ -491,17 +566,18 @@ impl AgentHost {
         let (mut m, applied) = AgentMachine::start(actor, chart, self.registry.clone(), first.ts)
             .map_err(HostError::Machine)?;
         let mut effects = applied.effects;
+        let (mut tainted, mut report) = (false, ReplayReport::default());
         for e in &entries[1..] {
             if upto.is_some_and(|u| e.position > u) {
                 break;
             }
-            match m.apply(&e.input, e.position, e.ts) {
+            match Self::replay_entry(&mut m, e, &mut tainted, &mut report) {
                 Ok(a) => effects.extend(a.effects),
                 Err(MachineError::Terminated) => {}
                 Err(err) => return Err(HostError::Machine(err)),
             }
         }
-        Ok((m, effects))
+        Ok((m, effects, report))
     }
 
     /// Explains the entry of `actor` at `position`: derived by replay from the journal and the
@@ -534,17 +610,25 @@ impl AgentHost {
         } else {
             (Vec::new(), 0)
         };
-        let (m, effects) = self.replay(actor, &entries, Some(position))?;
+        let (m, effects, report) = self.replay_reporting(actor, &entries, Some(position))?;
         let after = m.configuration();
         // The transitions a decision took come from applying its entry on the state before it.
         let taken = if matches!(entry.input, AgentInput::Decision { .. }) && position > 1 {
             let (mut prior, _) = self.replay(actor, &entries, Some(position - 1))?;
-            prior
-                .apply(&entry.input, entry.position, entry.ts)
-                .ok()
-                .and_then(|a| a.accepted.into_iter().next())
-                .map(|d| d.taken)
-                .unwrap_or_default()
+            let mut tainted = entries
+                .iter()
+                .take_while(|e| e.position < position)
+                .any(|e| crate::redaction::has_erased(&e.input));
+            Self::replay_entry(
+                &mut prior,
+                entry,
+                &mut tainted,
+                &mut ReplayReport::default(),
+            )
+            .ok()
+            .and_then(|a| a.accepted.into_iter().next())
+            .map(|d| d.taken)
+            .unwrap_or_default()
         } else {
             Vec::new()
         };
@@ -584,15 +668,7 @@ impl AgentHost {
             ts: entry.ts,
             input: entry.input.kind().to_owned(),
             chart_version: version.clone(),
-            replay: if entries
-                .iter()
-                .filter(|e| e.position <= position)
-                .any(|e| crate::redaction::has_erased(&e.input))
-            {
-                "recorded"
-            } else {
-                "verified"
-            },
+            replay: report.marker(),
             entered: after
                 .iter()
                 .filter(|s| !before.contains(s))
@@ -659,8 +735,11 @@ impl AgentHost {
             state_diverged: om.configuration() != cm.configuration(),
             disposition_changed: false,
         }];
+        // the recorded chart follows its recorded outcomes after erasure, as any replay does; the
+        // chart being tried has no record to follow
+        let (mut tainted, mut report) = (false, ReplayReport::default());
         for e in &entries[1..] {
-            match om.apply(&e.input, e.position, e.ts) {
+            match Self::replay_entry(&mut om, e, &mut tainted, &mut report) {
                 Ok(_) | Err(MachineError::Terminated) => {}
                 Err(err) => return Err(HostError::Machine(err)),
             }
@@ -755,6 +834,22 @@ impl AgentHost {
         let entries = self.journal.try_read(actor).map_err(HostError::Journal)?;
         let (m, _) = self.replay(actor, &entries, Some(position))?;
         Ok(snapshot(&m, position.min(entries.len() as u64)))
+    }
+
+    /// What a replay of `actor`'s journal up to `position` (the whole journal with `None`)
+    /// could verify, and how much of it followed recorded outcomes after erasure.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`].
+    pub fn replay_report(
+        &self,
+        actor: &str,
+        position: Option<u64>,
+    ) -> Result<ReplayReport, HostError> {
+        let entries = self.journal.try_read(actor).map_err(HostError::Journal)?;
+        let (_, _, report) = self.replay_reporting(actor, &entries, position)?;
+        Ok(report)
     }
 
     /// The `vt-agent:` provenance graph of `actor`: decisions with their annotations, model
@@ -1006,24 +1101,32 @@ impl AgentHost {
             Some((d, o)) => (Some(d), Some(o)),
             None => (None, None),
         };
-        self.journal
-            .append(
-                actor,
-                JournalEntry {
-                    position,
-                    ts,
-                    input: input.clone(),
-                    disposition,
-                    offered,
-                },
-            )
-            .map_err(HostError::Journal)?;
-        self.heads.insert(actor.to_owned(), position);
+        // The input is applied before it is appended so that the entry can record what it did
+        // (the answer of every condition, the transitions, the configuration); a replay after
+        // erasure follows that record. Nothing is performed until the append succeeded, and an
+        // activation that ran ahead of a failed append is dropped and rebuilt by replay.
         let Some(m) = self.actors.get_mut(actor) else {
             return Err(HostError::Unknown(actor.to_owned()));
         };
-        let applied: Applied = match m.apply(&input, position, ts) {
-            Ok(a) => a,
+        let result = m.apply_recording(&input, position, ts);
+        let outcome = result.as_ref().ok().map(|(_, o)| o.clone());
+        if let Err(e) = self.journal.append(
+            actor,
+            JournalEntry {
+                position,
+                ts,
+                input,
+                disposition,
+                offered,
+                outcome,
+            },
+        ) {
+            self.actors.remove(actor);
+            return Err(HostError::Journal(e));
+        }
+        self.heads.insert(actor.to_owned(), position);
+        let applied: Applied = match result {
+            Ok((a, _)) => a,
             Err(MachineError::Terminated) => return Ok(()),
             Err(e) => return Err(HostError::Machine(e)),
         };
