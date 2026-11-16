@@ -28,6 +28,7 @@
 
 #[cfg(feature = "anthropic")]
 pub mod anthropic;
+pub mod bundle;
 pub mod decide;
 pub mod decider;
 pub mod enabled;

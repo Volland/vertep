@@ -30,6 +30,12 @@ pub struct Annotations {
     /// Why the decider chose.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
+    /// The derivation behind the choice, for a decider whose reason is a derivation over
+    /// recorded statements and not its own account (a rule decider): the supporting statements,
+    /// the program closure, the engine and the step budget, as JSON. The explanation view shows
+    /// it as a derivation, not as a claim ([[openspec:rule-decider#Derivation Is The Rationale]]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derivation: Option<Box<serde_json::Value>>,
     /// Confidence in `[0, 1]`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidence: Option<f64>,
@@ -209,6 +215,9 @@ pub struct Refusal {
 }
 
 /// What a decider yields.
+// A decision is moved once, from the decider to the host; boxing it would change every
+// decider's signature for no gain.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum DecisionOutcome {
     /// A chosen event.

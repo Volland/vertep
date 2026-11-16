@@ -105,3 +105,60 @@ fn a_refused_append_is_dead_lettered_and_the_actor_is_unchanged() {
     node.run_until_idle();
     assert!(shard.read(actor.node(), Position::ZERO).unwrap().len() > before);
 }
+
+// @tg: verifies:: [[openspec:rule-decider#Offer And State Are Statements#One record]] {level: integration}
+#[test]
+fn the_explanation_shows_the_derivation_and_the_offer_the_rule_read() {
+    use vertep_agent::host::AgentHost;
+    use vertep_core::datamodel::{Event, EventType};
+    use vertep_rules::{RuleDecider, RulePolicy};
+
+    let dir = tempfile::tempdir().unwrap();
+    let shard = Arc::new(TiramemsuShard::open(dir.path().join("s.db")).unwrap());
+    put_program(
+        &shard,
+        "urn:vt:program:p",
+        r#"
+tm.conclude (triple C (iri "urn:vt:decision") (iri "urn:vt:event:reject")) [X, Eo] :-
+  tm.triple (iri "urn:vt:ctx") (iri "urn:vt:deciding") C X,
+  tm.triple C (iri "urn:vt:offered") (iri "urn:vt:event:reject") Eo.
+"#,
+    )
+    .unwrap();
+    let decider = Arc::new(
+        RuleDecider::new(shard.clone(), "urn:vt:program:p", RulePolicy::default()).unwrap(),
+    );
+    let mut host = AgentHost::builder(Arc::new(VirtualClock::new(T0)))
+        .decider("d", decider.clone())
+        .build();
+    let opts = vertep_scxml::ReadOptions::new().with_datamodels(&vertep_scxml::AnyDatamodel);
+    let chart = vertep_scxml::read(
+        r#"<scxml xmlns="http://www.w3.org/2005/07/scxml" xmlns:vt="https://w3id.org/vertep/vt#" version="1.0" datamodel="cel" initial="idle">
+             <state id="idle"><transition event="start" target="review"/></state>
+             <state id="review" vt:decide="d" vt:candidates="approve reject">
+               <transition event="approve" cond="false" target="approved"/>
+               <transition event="reject" target="rejected"/>
+             </state>
+             <state id="approved"/><state id="rejected"/>
+           </scxml>"#,
+        &opts,
+    )
+    .unwrap()
+    .chart;
+    let v = host.register(chart).unwrap();
+    let actor = "https://example.org/agents/r1";
+    host.spawn(actor, &v).unwrap();
+    host.send(actor, Event::named("start", EventType::External));
+    host.run_until_idle();
+    let n = host.journal(actor).len() as u64;
+    let x = host.explain(actor, n).unwrap();
+    let d = x.decision.unwrap();
+    assert_eq!(d.chosen.as_deref(), Some("reject"));
+    assert!(d.claim.is_none(), "a rule's reason is not a claim");
+    let derivation = d.derivation.expect("the derivation is on the entry");
+    assert_eq!(derivation["event"], "reject");
+    // the offer the explanation reports is the offer the rule read: both come from the request
+    assert_eq!(d.offered, vec!["reject"]);
+    assert_eq!(decider.derivations()[0].support.len(), 2);
+    assert_eq!(derivation["support"].as_array().unwrap().len(), 2);
+}

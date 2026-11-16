@@ -39,6 +39,7 @@ vertep-federation = { workspace = true }
 vertep-objects = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 vertep-rules = { workspace = true }
+vertep-agent = { workspace = true }
 vertep-tiramemsu = { workspace = true }
 # vt wallet: agent wallets, OpenID4VCI offers and the conformance kit.
 vertep-wallet = { workspace = true, features = ["sd-jwt", "oid4vc", "testkit"] }

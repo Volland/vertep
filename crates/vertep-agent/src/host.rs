@@ -568,6 +568,7 @@ impl AgentHost {
             decider_kind: annotations.and_then(|a| a.decider_kind.clone()),
             fallback: annotations.is_some_and(|a| a.fallback),
             taken,
+            derivation: annotations.and_then(|a| a.derivation.as_deref().cloned()),
             claim: annotations
                 .filter(|a| a.rationale.is_some() || a.confidence.is_some())
                 .map(|a| Claim {
@@ -601,6 +602,11 @@ impl AgentHost {
                 .collect(),
             decision,
         })
+    }
+
+    /// The chart as written (the IR) of a registered version.
+    pub(crate) fn chart_ir(&self, version: &str) -> Option<Chart> {
+        self.charts.get(version).map(|c| c.ir.clone())
     }
 
     /// The journal of `actor`.

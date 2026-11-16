@@ -486,7 +486,7 @@ impl RuleDecider {
         };
         let mut decision = Decision::new(event.clone(), Value::Undefined);
         decision.annotations = Annotations {
-            rationale: Some(d.summary()),
+            derivation: serde_json::to_value(&d).ok().map(Box::new),
             decider_kind: Some(DeciderKind::Rules.as_str().to_owned()),
             decider: Some(request.binding.clone()),
             ..Annotations::default()

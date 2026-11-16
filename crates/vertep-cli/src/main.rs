@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use vertep_cli::{Outcome, SchemaFormat, Surface, commands, rules, wallet, webvh};
+use vertep_cli::{Outcome, SchemaFormat, Surface, commands, explain, rules, wallet, webvh};
 
 /// Tools for Vertep charts in SCXML, YAML and RDF.
 #[derive(Parser)]
@@ -74,6 +74,22 @@ enum Cmd {
     Wallet {
         #[command(subcommand)]
         command: WalletCmd,
+    },
+    /// Verify an explanation bundle offline and print what it explains.
+    Explain {
+        /// The bundle file.
+        file: PathBuf,
+        /// Only this journal position.
+        #[arg(long)]
+        position: Option<u64>,
+        /// Print the explanations as JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Verify an explanation bundle offline: no decider, no network, no runtime.
+    VerifyBundle {
+        /// The bundle file.
+        file: PathBuf,
     },
     /// Rule programs beside a shard's journal (needs a build with the `rules` feature).
     Rules {
@@ -681,6 +697,12 @@ fn main() -> ExitCode {
         } => commands::cluster_reshard(&dir, &out),
         Cmd::Webvh { command } => run_webvh(command),
         Cmd::Wallet { command } => run_wallet(command),
+        Cmd::Explain {
+            file,
+            position,
+            json,
+        } => explain::explain(&file, position, json),
+        Cmd::VerifyBundle { file } => explain::verify_bundle(&file),
         Cmd::Rules { command } => run_rules(command),
     };
     print!("{}", out.stdout);

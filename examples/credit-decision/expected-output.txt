@@ -13,14 +13,14 @@ an auditor opens the same journal; no decider is bound:
 https://example.org/loans/1001  final ["approved"]
   1 start
   2 event     apply
-  3 decision  approve, rationale "stable income, low ratio, small amount"
+  3 decision  approve [accepted, offered ["approve", "decline", "refer"]], rationale "stable income, low ratio, small amount"
   as of entry 2: ["underwriting"]
   as of entry 3: ["approved"]
 https://example.org/loans/1002  final ["approved"]
   1 start
   2 event     apply
-  3 decision  approve, rationale "strong credit history"
-  4 decision  approve, rationale "verified employment by phone; collateral accepted"
+  3 decision  approve [refused-not-offered, offered ["decline", "refer"]], rationale "strong credit history"
+  4 decision  approve [accepted, offered ["approve", "decline"]], rationale "verified employment by phone; collateral accepted"
   as of entry 2: ["underwriting"]
   as of entry 3: ["officer_review"]
   as of entry 4: ["approved"]
@@ -28,4 +28,5 @@ https://example.org/loans/1003  final ["declined"]
   1 start
   2 event     apply
   as of entry 2: ["declined"]
+bundle of https://example.org/loans/1002: 4 entries, 80668 bytes; verified offline: 4 explanations recomputed, 0 decider calls
 entries replayed: 9, decider calls: 0

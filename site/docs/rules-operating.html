@@ -94,7 +94,7 @@ let host = AgentHost::builder(clock)
     .build();
 // after the run:
 let derivations = decider.derivations();       // the record of each decision</code></pre>
-    <p>A <code>Derivation</code> holds the decision node, the event, the supporting statement ids, the digest of the program closure, the engine version, the step budget and the steps used, the transaction in which the offer was written, and whether the closure was inside the rules profile. In this release the derivation is returned by the decider; carrying it on the journal's decision entry belongs to the decision-records work.</p>
+    <p>A <code>Derivation</code> holds the decision node, the event, the supporting statement ids, the digest of the program closure, the engine version, the step budget and the steps used, the transaction in which the offer was written, and whether the closure was inside the rules profile. The derivation is returned by the decider and is also carried on the journal's decision entry (as the annotation <code>derivation</code>, with no rationale text), so <code>AgentHost::explain</code> shows it as a derivation and not as an unverified claim.</p>
 
     <h2 id="versions">Versions</h2>
     <p>A program is a node in the shard's file, edited by superseding its source statement. The earlier text is not lost: read it as of any transaction.</p>

@@ -57,6 +57,10 @@ Entries already record the transitions they took. When a sealed field a guard re
 
 `AgentHost::explain` replays the journal into a fresh machine up to the entry before and up to the entry, so the view is a difference of two replays, never stored. Findings: (1) it reports entered and exited states and the effects of the entry, not the individual transitions of every microstep: only a decision exposes the transitions it took (`AcceptedDecision.taken`), so for other inputs the state difference stands in; (2) a cold host with no decider bound gives the same explanation as the host that ran the decision, and altering the journal changes it (both tested); (3) for an entry that predates dispositions the view says `unknown` and `offered_known: false` instead of recomputing, which keeps D2 (derived, but never a guess about what the shell saw).
 
+### Built (2026-11-16): the bundle
+
+A `Bundle` holds the journal entries 1 to `to`, each chart version the journal uses as canonical N-Quads keyed by its version IRI, and a manifest of SHA-256 digests (per entry, per chart, per explained position). `verify` re-hashes each chart's text and checks it against the manifest and against the version it names, checks each entry's digest, replays the entries into a fresh host with no decider, recomputes the explanation of every position in the range and compares its digest. Errors name the entry or the chart. Findings: (1) the chart travels as RDF N-Quads and is rebuilt by `read_chart`, so its identity is the same hash the runtime already uses; (2) the manifest is not signed, so a party who rewrites entries and manifest together makes a consistent bundle: the integrity requirement (hash-chained, signed agent journals) is what binds a bundle to a signer, and is not built; (3) a decision made by the rule decider carries its derivation in `Annotations.derivation` and has no rationale text, so the explanation shows a derivation and no claim.
+
 ## Risks / Trade-offs
 
 - **Entry size and write cost grow** with the offer and with sealing. Mitigation: the offer is a list of short event names; benchmarks in `m13-production-readiness` track the cost.
