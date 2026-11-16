@@ -520,6 +520,26 @@ sequenceDiagram
 
 `Transport Selection From The DID Document` tries services in a configured preference order (TSP first by default, then DIDComm) with fallback. `Undeliverable Message Reporting` raises `error.communication` with the send id once the retry policy is exhausted, without blocking the chart. `Mailbox Ordering` promises order only within one mailbox; across relays or senders, charts use `vt:request` correlation ids.
 
+### WebSocket live delivery
+
+WebSocket is a transport of relay mailboxes, not a second protocol: the socket carries the same sealed pickup messages and acknowledgements, removes polling latency, and falls back to polling whenever it is down (M13).
+
+- describes:: [[decisions#WebSocket is a mailbox transport]]
+- describes:: [[decisions#Live delivery is a WebSocket binding of pickup]]
+
+`WebSocket Live Delivery` (M13 change) binds the live-session seam of `vertep-federation` to a socket with feature `ws`: `WsLiveNetwork` is the client, and `WsLiveServer` puts any live endpoint (the test mediator, a relay running in one process) on a socket at the live URI of its HTTP endpoint. A frame is a DIDComm Pickup 3.0 `delivery` pushed by the mediator, or the `messages-received` the mailbox sends after the journal append; with no socket, the same `messages-received` is posted over HTTP.
+
+`PickupLoop` drives a relay inbox in the background. Per binding it opens the live session, polls once on every (re)connect to resume, and while the session is open does not poll. When the session cannot be opened or drops, it polls every `poll_interval` and reconnects with exponential backoff. Nothing in the loop acknowledges or deduplicates: a copy fetched twice joins the mailbox row that already holds it, and a copy redelivered after its acknowledgement is dropped by the journal by message id.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Polling
+    Polling --> Live: session opened, poll once to resume
+    Polling --> Polling: connect failed, poll every interval, back off
+    Live --> Polling: socket dropped, poll at once
+    Live --> Live: delivery pushed, journal append, messages-received
+```
+
 ## TSP mediator
 
 `vt-mediator` is a TSP 1.0 routed-mode intermediary with durable mailboxes. It keeps messages for registered VIDs until they pick them up, and it never opens an event.

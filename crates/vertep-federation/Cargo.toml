@@ -17,7 +17,7 @@ categories = ["cryptography", "network-programming"]
 # Stability tier: stable, preview or experimental (site/docs/tiers.html). Rendered into the
 # README and the site by site/tools/tiers.py; CI fails when they differ.
 tier = "experimental"
-tier-reason = "No user outside the project; WebSocket live delivery is not bound"
+tier-reason = "No user outside the project; WebSocket live delivery not yet tried against a third-party mediator"
 
 [features]
 default = []
@@ -29,6 +29,9 @@ tsp = ["dep:tsp_sdk", "dep:url"]
 didcomm = ["dep:affinidi-messaging-didcomm", "dep:affinidi-crypto"]
 # In-process test relays: a DIDComm mediator and a TSP intermediary, for CI and examples.
 testkit = []
+# Live delivery over WebSocket (tokio-tungstenite): a client `LiveNetwork` for relay mailboxes and
+# a server that puts any `LiveEndpoint` (the test mediator, a single-process relay) on a socket.
+ws = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures"]
 
 [dependencies]
 vertep-core = { workspace = true, features = ["std"] }
@@ -58,9 +61,14 @@ tsp_sdk = { version = "0.16.0", default-features = false, features = ["nacl"], o
 url = { version = "2", optional = true }
 affinidi-messaging-didcomm = { version = "0.15.11", optional = true }
 affinidi-crypto = { version = "0.2.11", optional = true }
+# The same pinned tokio-tungstenite as vertep-tsp-mediator; plain `ws://` (TLS is a proxy's job).
+tokio = { workspace = true, optional = true, features = ["rt", "net", "sync", "time", "macros"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "handshake"], optional = true }
 
 [dev-dependencies]
-vertep-federation = { path = ".", features = ["testkit"] }
+# `didcomm` and `ws` so the workspace test run covers the DIDComm mailbox and its WebSocket
+# live delivery, not only builds them.
+vertep-federation = { path = ".", features = ["testkit", "didcomm", "ws"] }
 vertep-runtime = { workspace = true, features = ["tiramemsu"] }
 vertep-scxml = { workspace = true }
 vertep-dm-ecma = { workspace = true }

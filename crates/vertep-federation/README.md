@@ -43,6 +43,7 @@ vertep-federation = { version = "0.1", features = ["didcomm", "tsp"] }
 | `tsp` | `tsp`: TSP direct and routed mode and relationship setup (OpenWallet Foundation `tsp_sdk`) |
 | `webvh` | `resolver::webvh::WebVhResolver`: the `did:webvh` method with log verification |
 | `testkit` | `testkit` (with `didcomm` or `tsp`): an in-process DIDComm mediator and TSP intermediary for tests and examples |
+| `ws` | `ws`: live delivery over WebSocket (`WsLiveNetwork` client, `WsLiveServer` for in-process relays); with `PickupLoop`, an inbox stays live and falls back to polling while the socket is down |
 
 With no features you get identities, `did:key`, `did:peer` and `did:web` resolution, key
 management, grants, grant credentials, the relay envelope and the identity ontology, but no

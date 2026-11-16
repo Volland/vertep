@@ -407,7 +407,28 @@ impl crate::live::FrameSink for MediatorSession {
             .pointer("/body/live_delivery")
             .and_then(serde_json::Value::as_bool)
             == Some(true);
-        if !(is_change && on) {
+        if !is_change {
+            // Any other pickup request on the session (`messages-received`, `status-request`)
+            // is answered as over HTTP, with the reply on the session (`return_route: all`).
+            let pickup = plain
+                .message
+                .get("type")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|t| t.starts_with("https://didcomm.org/messagepickup/3.0/"));
+            if pickup {
+                let reply = m.answer(&from, &plain.message);
+                let doc = crate::Did::parse(&from)
+                    .ok()
+                    .and_then(|d| m.resolver.resolve(&d).ok());
+                if let Some(doc) = doc
+                    && let Ok(sealed) = m.agent.seal_message(&reply, &doc.document)
+                {
+                    let _ = self.to_client.send(sealed.as_bytes());
+                }
+            }
+            return Ok(());
+        }
+        if !on {
             return Ok(());
         }
         let recipients = m.recipients_of(&from);
