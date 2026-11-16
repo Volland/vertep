@@ -522,6 +522,7 @@ mod tests {
             },
             disposition: None,
             offered: None,
+            outcome: None,
         }
     }
 
