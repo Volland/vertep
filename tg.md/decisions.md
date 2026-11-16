@@ -1709,7 +1709,48 @@ After M10 and M11 are finished, no new milestone starts until `m13-production-re
 
 - motivated_by:: [[decisions#Full SCXML first]] {weight: secondary, since: "2026-11-14", note: "depth in the strongest layers before breadth"}
 
-Rejected: continuing at the same pace, because adoption comes from depth in the layers people use first.
+Rejected: continuing at the same pace, because adoption comes from depth in the layers people use first. This is M13 design D6, the scope freeze.
+
+## Stability tiers are data in the manifests
+
+Each crate and package declares `stable`, `preview` or `experimental` in its manifest, and the README and site tables are generated from it by a script CI checks, so a table cannot drift (M13 design D1).
+
+- motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: primary, since: "2026-11-16"}
+
+Rejected: a prose table, which is how the drift began.
+
+## The toolchain is a script and a container
+
+A pinned `scripts/build-wasm.sh` and a container definition encode the LLVM and `wasm-bindgen` versions and the workaround, and CI builds `@vertep/web` and the wheel from a clean checkout (M13 design D2).
+
+- motivated_by:: [[constraints#Toolchain pins]] {weight: primary, since: "2026-11-16"}
+- motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: secondary, since: "2026-11-16", note: "bus factor"}
+
+Rejected: documenting the workaround (decays) and vendoring LLVM (heavy).
+
+## Benchmarks measure the claims
+
+A suite measures step throughput, journal append and replay per backend, the decider round trip, package size and browser cold start, with a CI gate against the last release's recorded results (M13 design D3).
+
+- motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: primary, since: "2026-11-16"}
+
+Results are published with the machine and commit; shared CI is noisy, so the threshold is relative and runs are repeated.
+
+## Journal shipping is a pull protocol
+
+A follower pulls entries after its last position over the cluster transport, receives them in order with their digests and acknowledges, which gives back-pressure and resumption for free (M13 design D4).
+
+- motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: secondary, since: "2026-11-16"}
+
+Rejected: push with windowing (more state on the leader) and shipping snapshots only (loses the entry-level audit trail).
+
+## WebSocket is a mailbox transport
+
+Live delivery reuses the relay mailbox envelope and acknowledgement; the socket only removes polling latency and always falls back to polling (M13 design D5).
+
+- motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: secondary, since: "2026-11-16"}
+
+Rejected: a second, socket-specific protocol.
 
 ## Rules live per shard, in the journal's file
 

@@ -310,3 +310,9 @@ The engine library `libleanelpi` carries the Lean runtime and is built for darwi
 If an actor could propose, edit or promote the rules that bind it, review would bind nobody; the limit has to be structural, not only a permission.
 
 - constrains:: [[decisions#An actor cannot govern itself]] {strength: must, source: "design of m17-agent-rules"}
+
+## Toolchain pins
+
+The browser build depends on exact LLVM and `wasm-bindgen` versions: `wasm-bindgen` must match the version in `Cargo.lock`, and a Homebrew LLVM can break when a dependency such as z3 is upgraded under it.
+
+- constrains:: [[decisions#The toolchain is a script and a container]] {strength: must, source: "M13 review; maintainer build of @vertep/web 0.1.10"}

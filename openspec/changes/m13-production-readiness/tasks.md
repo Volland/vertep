@@ -1,8 +1,8 @@
 ## 1. Graph first
 
-- [ ] 1.1 Add milestone `M13 Production readiness` to `tg.md/roadmap.md`, `precedes::` from M11, with a note that new milestones wait for it
-- [ ] 1.2 Add Capabilities `Production readiness` and `Journal shipping` to `tg.md/capabilities.md` and list both in its `openspec:` frontmatter
-- [ ] 1.3 Record D1-D6 as `Decision` sections and `Toolchain pins` as a `Constraint`
+- [x] 1.1 Add milestone `M13 Production readiness` to `tg.md/roadmap.md`, `precedes::` from M11, with a note that new milestones wait for it
+- [x] 1.2 Add Capabilities `Production readiness` and `Journal shipping` to `tg.md/capabilities.md` and list both in its `openspec:` frontmatter
+- [x] 1.3 Record D1-D6 as `Decision` sections and `Toolchain pins` as a `Constraint`
 
 ## 2. Tiers and docs honesty
 
