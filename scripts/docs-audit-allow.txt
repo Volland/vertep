@@ -22,3 +22,6 @@ site/docs/tiers.html | WebSocket live delivery not yet tried against a third-par
 # Plans with no requirement or symbol to anchor a claim yet; re-read by hand before a release.
 site/docs/browser.html | DID-authenticated envelopes from the federation layer are planned
 site/docs/rules.html | the federation layer's grant credentials are not wired in
+
+# Tier reasons are generated from the manifests by site/tools/tiers.py and describe maturity, not a feature claim.
+site/docs/tiers.html | shipping not yet wired into node replication
