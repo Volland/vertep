@@ -104,7 +104,7 @@ Actors across trust boundaries: DID identities, authenticated senders, capabilit
 
 Delivered by the OpenSpec change `m5-federation`.
 
-Archived 2026-11-11 with 27 requirements. Interop with a third-party mediator (Hyperledger Identus) runs against Docker when `VERTEP_MEDIATOR_INTEROP=1`; live delivery over WebSocket is not bound yet.
+Archived 2026-11-11 with 27 requirements. Interop with a third-party mediator (Hyperledger Identus) runs against Docker when `VERTEP_MEDIATOR_INTEROP=1`; live delivery over WebSocket followed in [[roadmap#M13 Production readiness]], with polling as the fallback. <!-- claim: built openspec:relay-mailboxes#WebSocket Live Delivery; crates/vertep-federation/src/ws.rs -->
 
 ## M6 WASM and JS
 
@@ -123,7 +123,7 @@ DID-addressed durable objects with verifiable journals, decentralised custody ov
 - precedes:: [[roadmap#M8 did:webvh hosting]] {note: "custodian-set changes publish witnessed DID log entries"}
 - precedes:: [[roadmap#M12 Decision records]] {note: "the hash-chained journal envelope is reused for agent journals"}
 
-Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. Creating and hosting `did:webvh` logs followed in [[roadmap#M8 did:webvh hosting]].
+Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. The durable agent journal is `StoreAgentJournal` in `vertep-agent`, over any `JournalStore` such as a tiramemsu file. <!-- claim: built crates/vertep-agent/src/journal.rs#StoreAgentJournal; openspec:durable-objects#Durable Agent Journal --> Creating and hosting `did:webvh` logs followed in [[roadmap#M8 did:webvh hosting]].
 
 ## M8 did:webvh hosting
 
@@ -170,7 +170,7 @@ Delivered: a journal that alone explains each decision, exports as a bundle veri
 
 Specified by the OpenSpec change `m12-decision-records` (capabilities `decision-records` and `journal-redaction`), motivated by the credit-decision example, in which a refused answer reads as an accepted one. The positioning it serves is [[decisions#Explanation is the process record, not a story about it]].
 
-Built in `vertep-agent`, `vertep-objects` and `vertep-cli`: the disposition and offer on decision entries (0.1.9), `AgentHost::explain` (0.1.10), and in 0.1.11 the bundle with `vt explain` and `vt verify-bundle`, the rule derivation on the decision entry, signed chained agent journals (`ChainedAgentSealer`), `AgentHost::counterfactual`, and redaction (`SealingJournal`, `erase`, `expire`, `replay: recorded`). In 0.1.12: the `@sensitive`, `@subject` and `@retain` marks with `SealPolicy::from_chart`, entries that record their outcome so replay after an erasure follows it, retraction of rule-derived facts on erasure, and the snapshot policy ([[decisions#Snapshots never hold opened sealed values]]). After 0.1.12: disposition vectors replayed strictly through the Lean model, offline bundle verification in `@vertep/web` and the Python package, and [[views/decision-records|the decision-records View]]. Archived 2026-11-16 as `openspec/changes/archive/2026-11-16-m12-decision-records` with 12 requirements in `openspec/specs/` (`decision-records` and `journal-redaction`). Not bound yet: `explain` and `export_bundle` on a live host in the bindings, which host no agents.
+Built in `vertep-agent`, `vertep-objects` and `vertep-cli`: the disposition and offer on decision entries (0.1.9), `AgentHost::explain` (0.1.10), and in 0.1.11 the bundle with `vt explain` and `vt verify-bundle`, the rule derivation on the decision entry, signed chained agent journals (`ChainedAgentSealer`), `AgentHost::counterfactual`, and redaction (`SealingJournal`, `erase`, `expire`, `replay: recorded`). In 0.1.12: the `@sensitive`, `@subject` and `@retain` marks with `SealPolicy::from_chart`, entries that record their outcome so replay after an erasure follows it, retraction of rule-derived facts on erasure, and the snapshot policy ([[decisions#Snapshots never hold opened sealed values]]). After 0.1.12: disposition vectors replayed strictly through the Lean model, offline bundle verification in `@vertep/web` and the Python package, and [[views/decision-records|the decision-records View]]. Archived 2026-11-16 as `openspec/changes/archive/2026-11-16-m12-decision-records` with 12 requirements in `openspec/specs/` (`decision-records` and `journal-redaction`). Not bound yet: `explain` and `export_bundle` on a live host in the bindings, which host no agents. <!-- claim: missing bindings/python/python/vertep#export_bundle; bindings/python/python/vertep#explain; bindings/js/packages/web/src#exportBundle; bindings/js/packages/web/src#explain -->
 
 ## M13 Production readiness
 
@@ -180,7 +180,7 @@ In progress (2026-11-16): stability tiers, a reproducible toolchain, a benchmark
 
 Specified by the OpenSpec change `m13-production-readiness` (capabilities `production-readiness` and `journal-shipping`, and an addition to `relay-mailboxes`). It also tracks the open Lean custody proof (M7 task 10.4) and the open M10 items. New milestones wait for it, see [[decisions#New milestones wait for production readiness]].
 
-Stability tiers are declared in every crate, npm and Python manifest and rendered into the README and `site/docs/tiers.html` by `site/tools/tiers.py`, which CI runs in check mode. The first docs-versus-behaviour audit (2026-11-16, release 0.1.11) corrected the site pages and this roadmap. In 0.1.12: the pinned toolchain and container build, `cargo-deny`, SBOMs and signed provenance at release, and the ten-minute-path CI job. After 0.1.12: journal shipping as a pull protocol in `vertep-cluster` with fault histories replayed through the Lean lease model, and WebSocket live delivery for relay mailboxes with polling fallback in `vertep-federation`. Open: the benchmark suite (carried by `m18-runtime-performance`), a repeatable docs audit, and the M7 and M10 dependencies.
+Stability tiers are declared in every crate, npm and Python manifest and rendered into the README and `site/docs/tiers.html` by `site/tools/tiers.py`, which CI runs in check mode. The first docs-versus-behaviour audit (2026-11-16, release 0.1.11) corrected the site pages and this roadmap by hand; `scripts/docs-audit.py` now repeats it in CI and before each release, against claims marked on the statements themselves. In 0.1.12: the pinned toolchain and container build, `cargo-deny`, SBOMs and signed provenance at release, and the ten-minute-path CI job. After 0.1.12: journal shipping as a pull protocol in `vertep-cluster` with fault histories replayed through the Lean lease model, WebSocket live delivery for relay mailboxes with polling fallback in `vertep-federation`, and the repeatable docs audit. Not built yet: the benchmark suite and its regression gate, carried by `m18-runtime-performance`. <!-- claim: missing openspec:production-readiness#Benchmark Suite --> Open besides: the M7 and M10 dependencies.
 
 ## M14 Rules decider
 
@@ -195,11 +195,11 @@ Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m14-rules-decider` w
 
 ## M15 Rule invariants
 
-Delivered: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause; retraction on erasure moved to M12 and is not built.
+Delivered: enforced rule programs that refuse a violating journal append at commit, and derived facts with stated support that retract with their cause; retraction on erasure moved to M12, where it is built.
 
 - precedes:: [[roadmap#M17 Agent rules]]
 
-Delivered by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invariants` and `derived-facts`), in [[components#vertep-rules]]. Enforcement, the runtime refusal path, the full check on enabling, the delta-versus-full property test, materialization with support into the graph `<subject>/derived` and `vt rules enforce|unenforce|materialize` are built. Retraction of derived facts on erasure moved to [[roadmap#M12 Decision records]] (task 4.4, requirement `journal-redaction#Erasure Retracts Derived Facts`), because it needs the key destruction M12 builds. Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m15-rule-invariants` with 6 requirements in `openspec/specs/`. Merged in pull requests 13 and 16.
+Delivered by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invariants` and `derived-facts`), in [[components#vertep-rules]]. Enforcement, the runtime refusal path, the full check on enabling, the delta-versus-full property test, materialization with support into the graph `<subject>/derived` and `vt rules enforce|unenforce|materialize` are built. Retraction of derived facts on erasure moved to [[roadmap#M12 Decision records]] (task 4.4, requirement `journal-redaction#Erasure Retracts Derived Facts`), because it needs the key destruction M12 builds; it is built there, as `RetractOnErasure` in this crate. <!-- claim: built crates/vertep-rules/src/erasure.rs#RetractOnErasure; openspec:journal-redaction#Erasure Retracts Derived Facts --> Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m15-rule-invariants` with 6 requirements in `openspec/specs/`. Merged in pull requests 13 and 16.
 
 ## M16 Verified rules
 

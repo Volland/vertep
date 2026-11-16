@@ -134,7 +134,6 @@ the next policy (ceiling 30 000) tried on the recorded decisions:
     <h2 id="limits">What is not there</h2>
     <ul>
       <li>A rule bundle (<code>vt rules bundle</code>) is separate from the explanation bundle of the decision-records work (<code>vt verify-bundle</code>): the first re-runs the rule from its program and statements, the second replays one actor's journal up to a position and re-derives the explanation of each position in its range. Neither bundle is signed; a signer is bound by the hash-chained, signed agent journal (<code>ChainedAgentSealer</code> in <code>vertep-objects</code>), not by the bundle.</li>
-      <li>Erasing a data subject's key does not yet retract the derived facts that rest on their statements.</li>
       <li>Grants for proposing and promoting come from a function the host supplies (a JSON file in the CLI); the federation layer's grant credentials are not wired in.</li>
       <li>No rules in the browser, Python or Windows builds.</li>
     </ul>
