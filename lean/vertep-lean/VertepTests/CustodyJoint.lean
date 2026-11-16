@@ -1,5 +1,6 @@
 import VertepLean.CustodyJointCheck
 import VertepLean.CustodyReconfigUnsafe
+import VertepLean.CustodyJointStale
 
 /-!
 # Custodian-set changes
@@ -8,7 +9,10 @@ The joint-consensus append decision, a reconfiguration history
 (`data/custody-joint.jsonl`) replayed through the oracle and histories it must reject, and a
 seeded random search of both reconfiguration models: no violation of one writer per epoch or of
 committed-log survival in the joint-consensus model, and violations found in the earlier rule's
-model (which `VertepLean.CustodyReconfigUnsafe` also proves outright).
+model (which `VertepLean.CustodyReconfigUnsafe` also proves outright). A second search gathers
+promises long before it elects: it breaks the joint model as first stated (which
+`VertepLean.CustodyJointStale` proves outright) and finds nothing over the runs that fix each
+election's record before its promises.
 -/
 
 namespace Vertep.Custody.JointTest
@@ -306,6 +310,130 @@ def jointSafe : Bool := (search jointSim 400 120).isNone
 /-- The same search breaks the earlier rule. -/
 def unsafeFound : Bool := (search unsafeSim 400 120).isSome
 #guard unsafeFound
+
+/-! ## Promises gathered long before the election
+
+The search above elects as soon as it has prepared, so every election's record was known when
+its promises were made. This one also lets hosts gather promises from any custodian at any epoch
+and elect from them later, under any record known by then: that breaks the joint-consensus model
+as first stated (`VertepLean.CustodyJointStale`), and nothing breaks over the runs that fix each
+election's record before its promises (`RecordFixed`), the runs of the corrected conjectures
+`OneWriterPerEpochR` and `CommittedSurvivesR`. -/
+
+/-- Version 0: `{a,b,c}`; version 1: `{d,f}`, disjoint from it; then back and over. -/
+def disj : Confs := fun v => match v with
+  | 0 => ⟨["a", "b", "c"], 2⟩
+  | 1 => ⟨["d", "f"], 2⟩
+  | 2 => ⟨["a", "b", "c"], 2⟩
+  | _ => ⟨["c", "d", "f"], 2⟩
+
+/-- The records known now, up to `top`. -/
+def knownRanks (s : JSys) (top : Nat) : List Nat :=
+  (List.range (top + 1)).filter (fun r => known 0 s r)
+
+/-- The joint model over `cf`; with `fixed`, an election must keep `RecordFixed`. -/
+def staleSim (cf : Confs) (top : Nat) (fixed : Bool) : Sim JSys :=
+  { jointSim with
+    exec := fun s m => match m with
+      | .prepare c e h => exec cf 0 s (.prepare c e h)
+      | .elect h e x qs A =>
+        if fixed && !decide (RecordFixed 0 s (.elect h e x qs A)) then none
+        else exec cf 0 s (.elect h e x qs A)
+      | .write h e xs => exec cf 0 s (.write h e xs)
+      | .propose h e => if verOf (s.wrank e h) < top / 2 then exec cf 0 s (.propose h e) else none
+      | .append c h e after x w => exec cf 0 s (.append c h e after x w)
+      | .switch h e => exec cf 0 s (.switch h e)
+    members := fun x => ((cf (verOf x)).custodians ++
+      (if isJoint x then (cf (verOf x + 1)).custodians else [])).eraseDups
+    quorum := fun x Q => decide (RQuorum cf x Q)
+    top := top }
+
+/-- One random run with early promises: the first violation found. -/
+def runStale (cf : Confs) (top : Nat) (fixed : Bool) (seed0 n : Nat) : Option String := Id.run do
+  let m := staleSim cf top fixed
+  let mut s := m.init
+  let mut seed := next (seed0 + 1)
+  let mut fresh := 0
+  for _ in [0:n] do
+    seed := next seed
+    let els := s.elections
+    let maxE := els.foldl (fun a (e, _, _, _) => max a e) 0
+    let maxP := s.promises.foldl (fun a p => max a p.epoch) maxE
+    let k := seed % 12
+    if k < 2 then
+      -- a host gathers promises at some epoch, from any custodian, and does not elect yet
+      seed := next seed
+      let h := pick seed ["a", "b", "c", "g", "i"] "a"
+      seed := next seed
+      let e := 1 + seed % (maxP + 3)
+      for c in all do
+        seed := next seed
+        if seed % 3 ≠ 0 then
+          if let some t := m.exec s (.prepare c e h) then s := t
+    else if k < 4 then
+      -- a host elects from promises it gathered earlier, under a record known now
+      seed := next seed
+      let p := pick seed s.promises ⟨"", 0, "", 0, [], 0, 0, 0⟩
+      seed := next seed
+      let x := pick seed (knownRanks s top) 0
+      let ps := s.promises.filter (fun q => q.epoch = p.epoch ∧ q.host = p.host ∧
+        (!fixed || knownWhen 0 s q x))
+      let A := bestLog (ps.map (fun q => (q.acc, q.log)))
+      if let some t := m.exec s (.elect p.host p.epoch x (ps.map (·.cust)).eraseDups A) then
+        s := t
+    else if k < 5 then
+      seed := next seed
+      let h := pick seed hosts "a"
+      seed := next seed
+      let x := pick seed (knownRanks s top) 0
+      let r := campaign m s seed h (maxP + 1 + seed % 2) x 2
+      s := r.1; seed := r.2
+    else if els.isEmpty then pure ()
+    else
+      seed := next seed
+      let (e, h, _, _) := pick seed els (0, "a", 0, [])
+      if k < 6 then
+        fresh := fresh + 1
+        if let some t := m.exec s (.write h e [s!"x{fresh}"]) then s := t
+      else if k < 8 then
+        seed := next seed
+        let c := pick seed all "a"
+        seed := next seed
+        let w := s.wlog e h
+        let w := if seed % 4 = 0 then w.take (w.length - 1) else w
+        seed := next seed
+        let after := if seed % 3 = 0 then 0 else min (s.cust c).core.log.length w.length
+        seed := next seed
+        let x := s.wrank e h
+        let x := if seed % 3 = 0 && x > 0 then x - 1 - seed / 7 % 2 else x
+        if let some t := m.exec s (.append c h e after x w) then s := t
+      else if k < 10 then
+        let w := s.wlog e h
+        let x := s.wrank e h
+        for c in m.members x do
+          seed := next seed
+          if seed % 5 ≠ 0 then
+            let after := min (s.cust c).core.log.length w.length
+            if let some t := m.exec s (.append c h e after x w) then s := t
+      else if k < 11 then
+        if let some t := m.exec s (.propose h e) then s := t
+      else
+        if let some t := m.exec s (.switch h e) then s := t
+    if let some v := violation m s then return some v
+  return none
+
+/-- The first seed below `runs` whose run with early promises violates safety. -/
+def searchStale (cf : Confs) (top : Nat) (fixed : Bool) (runs n : Nat) : Option (Nat × String) :=
+  (List.range runs).findSome? (fun i => (runStale cf top fixed (i * 7919) n).map (fun v => (i, v)))
+
+/-- Early promises break the model as first stated (seed 1748 of the search). -/
+def staleFound : Bool := (runStale disj 6 false (1748 * 7919) 150).isSome
+#guard staleFound
+
+/-- …and nothing breaks when each election's record was fixed before its promises. -/
+def recordFixedSafe : Bool :=
+  (searchStale disj 6 true 200 150).isNone && (searchStale Stale.stale 4 true 100 150).isNone
+#guard recordFixedSafe
 
 /-! ## The theorems, instantiated -/
 
