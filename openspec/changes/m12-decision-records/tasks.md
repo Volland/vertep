@@ -3,7 +3,7 @@
 - [x] 1.1 Add milestone `M12 Decision records` to `tg.md/roadmap.md`, `precedes::` from M3 Agents and M7 Durable objects
 - [x] 1.2 Add Capabilities `Decision records` and `Journal redaction` to `tg.md/capabilities.md` and list both in its `openspec:` frontmatter
 - [x] 1.3 Record D1-D6 as `Decision` sections and a `Constraint` `Erasure rules` with `constrains::` edges
-- [ ] 1.4 Add a View `views/decision-records.md` with `describes::` edges and a Mermaid diagram of bundle verification
+- [x] 1.4 Add a View `views/decision-records.md` with `describes::` edges and a Mermaid diagram of bundle verification
 
 ## 2. Entry format
 
