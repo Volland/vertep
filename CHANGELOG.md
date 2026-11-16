@@ -25,8 +25,29 @@ All crates of the workspace and both npm packages share one version.
   `vertep-decide --strict`; `VertepLean/Disposition.lean` proves an accepted answer was offered.
 - The M12 decision-records View, and M12 archived (12 requirements in `openspec/specs/`).
 
+- **Kolyada spaces on the wire** (`vertep-federation`, M10): `JoinPolicy` (refuses by default),
+  `SpaceTransport::fan_out` (one sealed copy per recipient over the relays), `SpaceMember`.
+- **Chart role binding** (M10): `vt:plays` on `<scxml>`; the inbox checks protocol messages where
+  grants run and the outbox checks sends; `RoleBinding`, `Federation::bind_roles`.
+- **`vt kolyada`**: `validate`, `hash`, `project`, `offer`, `check`, `vectors`.
+- **Lean protocol model** (M10): `Protocol*.lean` and the `vertep-kolyada` checker, with recorded
+  Rust histories replayed strictly in CI. M10 archived.
+- **Docs audit** (M13): `scripts/docs-audit.py` checks availability claims on the site and roadmap
+  against the code in CI and before each release.
+- **Custody model** (M7): `CustodyJointStale.lean` refutes the joint-consensus conjectures as first
+  stated; corrected statements (`OneWriterPerEpochR`, `CommittedSurvivesR`) are checked by search
+  and strict replay, not yet proven. The custody oracle now rejects stale-record elections.
+
+### Changed
+
+- The Kolyada payload checker counts distinct values and accepts only scalars in `in` lists, to
+  agree with SHACL.
+
 ### Fixed
 
+- **Custody elections** (`vertep-objects`): after four prepare rounds `CustodyHost::elect` could
+  elect under a configuration record a promise had superseded, which can give an epoch two
+  writers. It now fails with `NoQuorum` and `activate` retries above the highest epoch seen.
 - The DIDComm relay tests are now compiled and run in CI (the `didcomm` feature was never on).
 
 ## [0.1.12] - 2026-11-16
