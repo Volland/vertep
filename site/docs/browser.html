@@ -79,7 +79,7 @@
         <tr><td><code>@vertep/dm-ecma</code></td><td>A third WebAssembly build with the boa ECMAScript engine, exported as <code>ecmascript</code>. It is separate because boa does not fit the main package's size budget.</td></tr>
       </tbody>
     </table>
-    <p>Both packages are ES modules, both carry the Rust workspace version (<code>0.1.11</code> in the repository), and both need Node.js 22 or later. A release script, <code>bindings/js/scripts/check-version.mjs</code>, fails when a package version differs from the Rust workspace version.</p>
+    <p>Both packages are ES modules, both carry the Rust workspace version (<code>0.1.12</code> in the repository), and both need Node.js 22 or later. A release script, <code>bindings/js/scripts/check-version.mjs</code>, fails when a package version differs from the Rust workspace version.</p>
 
     <div class="callout"><p>Install both from npm: <code>npm install @vertep/web@next</code>, plus <code>@vertep/dm-ecma@next</code> for charts on the ECMAScript datamodel. On npm the <code>next</code> tag is <code>0.1.10</code>, while <code>latest</code> still points at the older <code>0.1.2</code>, so a plain <code>npm install @vertep/web</code> gets the old build; <code>0.1.11</code> is not on npm yet. Build them from source, as below, only to work on the bindings themselves.</p></div>
 
@@ -92,7 +92,7 @@ npm run build          # scripts/build.sh: the WebAssembly builds, the native he
 npm test               # node --test over packages/web/test/
 npm run check:size     # the bundle size budget</code></pre>
     <p><code>scripts/build.sh</code> builds <code>vertep-wasm</code> four times with different features: <code>core</code> and <code>journal</code> into <code>packages/web/wasm/</code>, <code>journal,ecmascript</code> into <code>packages/dm-ecma/wasm/</code>, and a test-only build with the conformance runner into <code>.native/wasm-test</code>, which is never published. It also builds the native helper <code>vertep-wasm-native</code> and <code>vt</code> into <code>bindings/js/.native/</code>, because the tests compare WebAssembly results with native ones. Set <code>VERTEP_PROFILE=dev</code> for a fast unoptimised build, and <code>VERTEP_SKIP_ECMA=1</code> to skip the ECMAScript and test builds.</p>
-    <p>To use the packages in another project before they are published, pack them and install the tarball: <code>npm pack -w @vertep/web</code>, then <code>npm install ./vertep-web-0.1.11.tgz</code>. The package test <code>packages/web/test/package.test.mjs</code> does exactly this and runs a small program from the installed copy.</p>
+    <p>To use the packages in another project before they are published, pack them and install the tarball: <code>npm pack -w @vertep/web</code>, then <code>npm install ./vertep-web-0.1.12.tgz</code>. The package test <code>packages/web/test/package.test.mjs</code> does exactly this and runs a small program from the installed copy.</p>
 
     <h2 id="shape">One worker holds everything</h2>
     <p>The whole actor system runs in one dedicated worker: a Web Worker in a browser, a <code>worker_threads</code> worker in Node.js. The page keeps only a thin client. Every client call returns a Promise or delivers results through a subscription, so nothing blocks the main thread.</p>

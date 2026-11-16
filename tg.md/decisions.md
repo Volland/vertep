@@ -1850,6 +1850,15 @@ When a subject's key is destroyed, derived facts resting on their sealed stateme
 Rejected: keeping derived facts that quote erased values, which would defeat erasure.
 
 
+## Snapshots never hold opened sealed values
+
+A snapshot never stores an opened sealed value: agent actors are rebuilt by replay through the sealing journal, and a later snapshot store keeps sealed fields sealed under the subject's key. Decided 2026-11-16 (M12 D6).
+
+- motivated_by:: [[constraints#Erasure rules]] {weight: primary, since: "2026-11-16"}
+- motivated_by:: [[decisions#Erasure retracts what depends on the erased]] {weight: secondary, since: "2026-11-16", note: "the same erasure must reach every copy"}
+
+A snapshot taken before an erasure is not used after it. Rejected: purging snapshots on erasure, which needs every copy found and deleted and fails silently when one is missed.
+
 ## A rules profile defines what can be checked
 
 A documented subset of the rule language (typed, stratified, no findall, cut, I/O or time) is the one part for which totality, support necessity and certificates are defined; other programs run and are marked unchecked. Proposed 2026-11-14 (M16 R11).

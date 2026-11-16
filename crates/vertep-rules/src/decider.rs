@@ -335,14 +335,14 @@ impl RuleDecider {
             .unwrap_or_else(|| self.program.clone())
     }
 
-    /// The derivations of the decisions made so far, oldest first. The caller records them on
-    /// the decision entries (milestone M12 gives them a field).
+    /// The derivations of the decisions made so far, oldest first. Each is also carried on its
+    /// decision entry, in `Annotations.derivation`.
     pub fn derivations(&self) -> Vec<Derivation> {
         self.log.lock().expect("derivation log").clone()
     }
 
     // @tg: implements:: [[openspec:rule-decider#Offer And State Are Statements]]
-    // @tg: implements:: [[openspec:rule-decider#Derivation Is The Rationale]] {confidence: partial, note: "the decision entry field is M12"}
+    // @tg: implements:: [[openspec:rule-decider#Derivation Is The Rationale]]
     // @tg: implements:: [[openspec:rule-decider#No Applicable Rule Is A Refusal]]
     // @tg: implements:: [[openspec:rule-programs#Evaluation Is Bounded]]
     fn run(

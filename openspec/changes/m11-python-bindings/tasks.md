@@ -32,8 +32,8 @@
 - [x] 5.3 The release workflow: wheels for five platforms, sdist, smoke test, TestPyPI dry run, PyPI Trusted Publishing
 - [x] 5.4 `bindings/python/RELEASING.md`
 - [x] 5.5 Reserve `vertep` on PyPI and TestPyPI with pending publishers and create the `pypi` and `testpypi` environments (the maintainer's, see RELEASING.md)
-- [ ] 5.6 Dry-run the release workflow to TestPyPI and confirm the wheels of every platform
-- [ ] 5.7 Publish `0.1.6`, or the next release, to PyPI
+- [x] 5.6 Dry-run the release workflow to TestPyPI and confirm the wheels of every platform (superseded: the release workflow publishes to PyPI on a GitHub release; 0.1.9, 0.1.10 and 0.1.11 shipped 6 files each)
+- [x] 5.7 Publish `0.1.6`, or the next release, to PyPI
 
 ## 6. Close
 
