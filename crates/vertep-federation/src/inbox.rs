@@ -31,6 +31,7 @@ use crate::origin::{InboundRecord, OpenedMessage, Refusal, admit};
 use crate::outbox::OutboxCore;
 use crate::relay::RelayProtocol;
 use crate::resolver::DidResolver;
+use crate::role_binding::{PROTOCOL_EVENT, ResolverVerifier};
 use crate::time::Clock;
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -437,16 +438,31 @@ impl InboxCore {
             let admitted = if self.is_reply(&stored.recipient, &opened) {
                 let mut ev = opened.envelope.to_event();
                 opened.origin.apply(&mut ev);
-                Ok(crate::origin::Admitted {
+                Ok(vec![crate::origin::Admitted {
                     message_id: opened.envelope.message_id.clone(),
                     event: ev,
                     origin: opened.origin.clone(),
-                })
+                }])
+            } else if let Some(roles) = entry
+                .roles
+                .as_ref()
+                .filter(|_| opened.envelope.name == PROTOCOL_EVENT)
+            {
+                // The grants slot for agent protocols: the role is the authority.
+                roles.admit(&opened, &ResolverVerifier::new(self.resolver.as_ref()), now)
             } else {
-                admit(&entry.policy, &opened, entry.types.as_ref(), now)
+                admit(&entry.policy, &opened, entry.types.as_ref(), now).map(|a| vec![a])
             };
             match admitted {
-                Ok(a) => {
+                Ok(list) if list.is_empty() => {
+                    // A protocol message held for its dependencies, or already applied: the
+                    // binding has it, so the relay may drop this copy.
+                    self.acknowledge(&[(index, stored.id.clone())]);
+                    report.duplicates += 1;
+                }
+                Ok(list) => {
+                    let mut list = list.into_iter();
+                    let Some(a) = list.next() else { continue };
                     let Ok(to) = Address::parse(&stored.recipient) else {
                         continue;
                     };
@@ -463,6 +479,14 @@ impl InboxCore {
                         woken.push(stored.recipient.clone());
                     } else {
                         report.duplicates += 1;
+                    }
+                    // Held protocol messages this one released follow it through the local
+                    // queue, each acknowledged after its own journal append.
+                    for r in list {
+                        let env = Envelope::new(r.message_id.clone(), &to, r.event.clone());
+                        if mb.enqueue(env).is_ok() {
+                            self.record(InboundRecord::accepted(&stored.recipient, &r, now));
+                        }
                     }
                 }
                 Err(refusal) => {

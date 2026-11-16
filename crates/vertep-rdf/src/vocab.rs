@@ -146,6 +146,9 @@ vt_terms! {
     HISTORY_DEFAULT = "historyDefault";
     /// `vt:choice`: the branch a target takes at an ancestor, on a selection node (derived).
     CHOICE = "choice";
+    /// `vt:plays`: a protocol role the chart declares it plays, `<protocol identity>#<role>`
+    /// (derived from the `vt:plays` extension attribute).
+    PLAYS = "plays";
 
     // Attribute properties.
     /// `vt:order`.

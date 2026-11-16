@@ -119,7 +119,7 @@ cargo build --workspace          # every crate and the examples
 cargo test --workspace           # what CI runs on every push
 cargo build --release -p vertep-cli
 ./target/release/vt --help</code></pre>
-<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles and rules
+<pre class="output" data-lang="Output"><code>The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles, rules and agent protocols
 
 Usage: vt &lt;COMMAND&gt;
 
@@ -137,6 +137,7 @@ Commands:
   explain        Verify an explanation bundle offline and print what it explains
   verify-bundle  Verify an explanation bundle offline: no decider, no network, no runtime
   rules          Rule programs beside a shard's journal (needs a build with the `rules` feature)
+  kolyada        Agent protocols: validate, hash and project documents, sign offers, check histories
   help           Print this message or the help of the given subcommand(s)
 
 Options:

@@ -178,6 +178,9 @@ pub enum Refusal {
     },
     /// The envelope is unreadable.
     MalformedEnvelope(String),
+    /// An agent protocol message refused by the conformance check of its instance, or a
+    /// genesis the join policy refused (`role_binding`).
+    Protocol(String),
 }
 
 impl fmt::Display for Refusal {
@@ -196,6 +199,7 @@ impl fmt::Display for Refusal {
                 )
             }
             Refusal::MalformedEnvelope(m) => write!(f, "malformed envelope: {m}"),
+            Refusal::Protocol(m) => write!(f, "refused by the protocol: {m}"),
         }
     }
 }

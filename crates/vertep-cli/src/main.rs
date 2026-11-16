@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use vertep_cli::{Outcome, SchemaFormat, Surface, commands, explain, rules, wallet, webvh};
+use vertep_cli::{
+    Outcome, SchemaFormat, Surface, commands, explain, kolyada, rules, wallet, webvh,
+};
 
 /// Tools for Vertep charts in SCXML, YAML and RDF.
 #[derive(Parser)]
@@ -95,6 +97,77 @@ enum Cmd {
     Rules {
         #[command(subcommand)]
         command: RulesCmd,
+    },
+    /// Agent protocols: validate, hash and project documents, sign offers, check histories.
+    Kolyada {
+        #[command(subcommand)]
+        command: KolyadaCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum KolyadaCmd {
+    /// Check a protocol document: profile, payload shapes and well-formedness.
+    Validate {
+        /// The protocol document (JSON-LD).
+        doc: PathBuf,
+    },
+    /// Print the protocol identity.
+    Hash {
+        /// The protocol document.
+        doc: PathBuf,
+    },
+    /// Print each role's projection and what it accepts in each state.
+    Project {
+        /// The protocol document.
+        doc: PathBuf,
+        /// Only this role.
+        #[arg(long)]
+        role: Option<String>,
+        /// Print JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Sign an offer to play a role, by the did:key of a key, with its service entry.
+    Offer {
+        /// The protocol document.
+        doc: PathBuf,
+        /// The role offered.
+        #[arg(long)]
+        role: String,
+        /// The key directory.
+        #[arg(long)]
+        keys: PathBuf,
+        /// The key name; a new Ed25519 key when absent.
+        #[arg(long)]
+        key: Option<String>,
+        /// When the offer lapses, in milliseconds since the epoch.
+        #[arg(long)]
+        expires_ms: Option<u64>,
+        /// An accepted initiator DID (repeatable); anyone when absent.
+        #[arg(long = "initiator")]
+        initiators: Vec<String>,
+    },
+    /// Verify a signed offer, or replay a message history and print each verdict.
+    Check {
+        /// The protocol document.
+        doc: PathBuf,
+        /// A signed offer, or a JSON array of signed messages starting with the genesis.
+        file: PathBuf,
+        /// Replay as this participant (the initiator by default).
+        #[arg(long = "as")]
+        as_did: Option<String>,
+        /// An Ed25519 public key for a DID, as DID=BASE64URL (repeatable).
+        #[arg(long = "key")]
+        keys: Vec<String>,
+        /// The time offers are checked at, in milliseconds since the epoch (default: now).
+        #[arg(long)]
+        now_ms: Option<u64>,
+    },
+    /// Check a directory of published test vectors against this implementation.
+    Vectors {
+        /// The directory with identity.json, projection.json, envelope.json and verdicts.json.
+        dir: PathBuf,
     },
 }
 
@@ -704,6 +777,7 @@ fn main() -> ExitCode {
         } => explain::explain(&file, position, json),
         Cmd::VerifyBundle { file } => explain::verify_bundle(&file),
         Cmd::Rules { command } => run_rules(command),
+        Cmd::Kolyada { command } => run_kolyada(command),
     };
     print!("{}", out.stdout);
     eprint!("{}", out.stderr);
@@ -716,6 +790,44 @@ fn split(list: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .map(str::to_owned)
         .collect()
+}
+
+fn run_kolyada(command: KolyadaCmd) -> Outcome {
+    match command {
+        KolyadaCmd::Validate { doc } => kolyada::validate(&doc),
+        KolyadaCmd::Hash { doc } => kolyada::hash(&doc),
+        KolyadaCmd::Project { doc, role, json } => kolyada::project(&doc, role.as_deref(), json),
+        KolyadaCmd::Offer {
+            doc,
+            role,
+            keys,
+            key,
+            expires_ms,
+            initiators,
+        } => kolyada::offer(&kolyada::OfferArgs {
+            doc,
+            role,
+            keys,
+            key,
+            expires_ms,
+            initiators,
+        }),
+        KolyadaCmd::Check {
+            doc,
+            file,
+            as_did,
+            keys,
+            now_ms,
+        } => {
+            let now = now_ms.unwrap_or_else(|| {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+            });
+            kolyada::check(&doc, &file, as_did.as_deref(), &keys, now)
+        }
+        KolyadaCmd::Vectors { dir } => kolyada::vectors(&dir),
+    }
 }
 
 fn run_rules(command: RulesCmd) -> Outcome {

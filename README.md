@@ -149,7 +149,7 @@ Every crate and package declares a tier in its manifest. **Stable**: checked aga
 | [`vertep-oxigraph`](https://crates.io/crates/vertep-oxigraph) | preview | Oxigraph and SPARQL 1.1 graph store adapter for Vertep |
 | [`vertep-macros`](https://crates.io/crates/vertep-macros) | preview | The statechart! macro: Rust DSL for Vertep charts |
 | [`vertep-dm-rust`](https://crates.io/crates/vertep-dm-rust) | preview | Rust datamodel for Vertep charts written with the statechart! macro |
-| [`vertep-cli`](https://crates.io/crates/vertep-cli) | preview | The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles and rules |
+| [`vertep-cli`](https://crates.io/crates/vertep-cli) | preview | The vt command line: typecheck, schema, validate, hash, convert, certify, generate code, clusters, did:webvh, wallets, explanations, bundles, rules and agent protocols |
 | [`vertep-agent`](https://crates.io/crates/vertep-agent) | preview | Deciders, LLM actors, tools with grants and sandboxed plan charts for Vertep agents |
 | [`@vertep/dm-ecma`](https://www.npmjs.com/package/@vertep/dm-ecma) | preview | The ECMAScript datamodel for @vertep/web: a build of the Vertep worker with the boa engine |
 | [`@vertep/web`](https://www.npmjs.com/package/@vertep/web) | preview | Vertep statecharts as durable actors in browsers and Node.js: SCXML semantics, typed events and a time-travelling journal, running in a worker |

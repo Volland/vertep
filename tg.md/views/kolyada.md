@@ -25,7 +25,7 @@ How agents say, in a form a stranger can verify, how to talk to them: a hash-ide
 - describes:: [[constraints#Choreography projection needs one deciding role]]
 - describes:: [[constraints#Authcrypt is not verifiable by a third party]]
 
-This view explains milestone M10 and the crate `vertep-kolyada`, whose core is built; the join policy and sealed fan-out are built in `vertep-federation`, and the mailbox binding and Lean model are not. Requirement names in backticks are from the OpenSpec change `m10-agent-protocols`. The relays that carry the messages are in [[views/distribution#Distribution#Relay mailboxes]], and the grants this replaces inside a protocol are in [[views/distribution#Distribution#Authenticated origin and grants]].
+This view explains milestone M10 and the crate `vertep-kolyada`, whose core is built, with its binding to charts and mailboxes and the `vt kolyada` command; the join policy and sealed fan-out are built in `vertep-federation`, and the Lean model is not. Requirement names in backticks are from the OpenSpec change `m10-agent-protocols`. The relays that carry the messages are in [[views/distribution#Distribution#Relay mailboxes]], and the grants this replaces inside a protocol are in [[views/distribution#Distribution#Authenticated origin and grants]].
 
 ## The idea
 
@@ -159,6 +159,43 @@ A purchase can open a payment instance and a delivery instance under one root ge
 
 The mailbox runs the check where grants run, before any journal append, and journals the verdict with the input, so replay never verifies again. The send path runs the same check on the actor's own projection, so a chart cannot emit a message its role may not send. Checker state is rebuilt on replay and never stored. The chart sees an ordinary event named by the message type, with the verified sender as origin.
 
+```mermaid
+flowchart LR
+    REL["relay pickup<br/>kolyada.message"] --> ADM{"RoleBinding.admit<br/>at the grants slot"}
+    ADM -- refused --> REC["inbound record<br/>nothing journaled"]
+    ADM -- accepted --> JRN["journal: event named by the type<br/>data: instance, role, verdict, message"]
+    JRN --> CH["chart"]
+    CH -- "send {instance, payload}" --> OUT{"RoleBinding.outbound<br/>own projection"}
+    OUT -- refused --> ERR["error.communication<br/>nothing leaves"]
+    OUT -- signed --> WIRE["relay outbox"]
+    OUT --> SENT["kolyada.sent input<br/>in the sender's journal"]
+    JRN -. "replay, no verification" .-> ST["derived checker state"]
+    SENT -.-> ST
+```
+
+### As built
+
+The binding is the module `role_binding` of `vertep-federation`, and the declaration lives in `vertep-core`.
+
+- **Declaration.** `vt:plays` on `<scxml>` holds whitespace-separated `<protocol identity>#<role>` tokens, read by `vertep_core::plays::plays`. It rides on an extension node, so SCXML, YAML and RDF keep it, and the RDF projection derives `vt:plays` from the chart node to each `<protocol identity>#<role>` IRI (declared in `vt-chart.ttl`).
+- **Binding.** `RoleBinding::new` reads the declarations and takes the protocol documents; `Federation::bind_roles` attaches it to a hosted DID actor and first derives its instances from the actor's journal. `RoleBinding::service_entry` and `publish_into` generate the `VertepProtocol` service entry; the typed `DidDocument` model keeps only URI endpoints, so the entry is written into the JSON document.
+- **Inbound.** A relay envelope named `kolyada.message` carries one signed message as JSON text. For an actor with a binding, the inbox runs `RoleBinding::admit` in place of grants and payload types; a refusal is an inbound record with `Refusal::Protocol`, and no grant is consulted or needed. A message held for its dependencies is acknowledged to the relay and kept by the binding; messages it releases follow the trigger through the local queue.
+- **Events.** Control messages reach the chart as `kolyada.genesis`, `kolyada.join`, `kolyada.decline`, `kolyada.complete` and `kolyada.violation`; data is `{protocol, instance, role, verdict, payload, message}` and the message id is `kolyada:<hash>`.
+- **Outbound.** A send whose data names one of the actor's instances (`{instance, payload, recipients?}`), or a `kolyada.genesis` for a played protocol, goes through `RoleBinding::outbound` in the relay outbox: it is checked on the actor's projection and signed with the actor's key manager, or fails with `error.communication` (`CommunicationFailure::ProtocolRefused`) before anything is queued. The pump does not re-check grants for it. Recipients default to the roles bound to the send's target; one copy goes to that target, and fan-out to further recipients is the open `Pairwise Sealed Fan-Out`.
+- **Derived state.** The signed message is fed back to the sender as a `kolyada.sent` input, so every message an instance applied is in the actor's journal. `RoleBinding::replay` applies the journaled protocol inputs with a verifier that trusts the journal, so replay resolves no DID.
+- **Join policy hook.** A genesis passes a `GenesisPolicy` closure before it is journaled, refusing by default; the full `Join Policy` requirement is task 5.2.
+
+- describes:: [[decisions#Charts declare roles and the mailbox checks before the journal]]
+
+## The vt kolyada command
+
+`vt kolyada` works on protocol documents and signed artifacts offline, in `crates/vertep-cli/src/kolyada.rs`.
+
+- `validate DOC` checks the profile, shapes and well-formedness; `hash DOC` prints the identity; `project DOC [--role R] [--json]` prints projections and interface views, the JSON in the form of `projection.json`.
+- `offer DOC --role R --keys DIR [--key NAME]` signs an offer by the `did:key` of a key in a key directory and prints the offer with its service entry.
+- `check DOC FILE` verifies a signed offer (`--now-ms` for expiry) or replays a history of signed messages for one participant (`--as DID`) and prints each verdict. `did:key` and `did:peer` keys resolve offline, and `--key DID=PUBLIC` adds any other.
+- `vectors DIR` checks the four published vector files against the implementation, one line per case.
+
 ## Verification
 
 The crate publishes `Test Vectors` (identities, projections, envelope hashes, verdict sequences) as JSON so another implementation can prove it agrees without any Rust.
@@ -190,4 +227,5 @@ The core crate follows the design with a few choices the design left open.
 - **Fan-out.** `SpaceTransport::fan_out` sends one copy per recipient DID through the relay protocols the outbox uses, trying the routes of the recipient's DID document in order, or an in-process `LocalChannel`. A sender without a TSP service skips TSP routes, since the peer must resolve the sender's VID. The signed message rides as JSON text in a relay envelope named `kolyada.message`, so no transport touches the signed bytes.
 - **The participant.** `SpaceMember` holds the documents an agent knows, its policy, its instances and a journal of admitted genesis messages and accepted messages. It acknowledges a relay copy once the message is journaled, a duplicate, or refused and recorded; a copy held for dependencies, or naming an instance whose genesis has not arrived, stays at the relay. `ActorSigner` and `ResolverVerifier` are the key-manager and DID-resolver adapters.
 - **Shape semantics.** To match SHACL, the checker counts distinct values (an RDF graph holds a literal once, while each object is its own node), and an `in` list holds only strings, numbers and booleans.
-- **Not yet built.** The inbound and outbound checks in an actor's mailbox and send path (until then the `SpaceMember` journal stands beside the actor's), the `vt:plays` declaration, `vt kolyada` and the Lean model. Fan-out sends at once and has no retry queue of its own.
+- **Binding and CLI.** The chart role binding and `vt kolyada` are described in their own sections above.
+- **Not yet built.** The Lean model. Fan-out sends at once and has no retry queue of its own, and the `SpaceMember` journal still stands beside the actor's journal rather than inside it.

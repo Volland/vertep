@@ -5408,6 +5408,7 @@ name = "vertep-cli"
 version = "0.1.12"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "clap",
  "futures",
  "getrandom 0.3.4",
@@ -5421,6 +5422,7 @@ dependencies = [
  "vertep-core",
  "vertep-dm-cel",
  "vertep-federation",
+ "vertep-kolyada",
  "vertep-objects",
  "vertep-rdf",
  "vertep-rules",

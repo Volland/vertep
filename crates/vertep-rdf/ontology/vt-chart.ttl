@@ -416,6 +416,13 @@ vt:historyDefault
     rdfs:range vt:History ;
     vt:irField "(derived)" .
 
+vt:plays
+    a owl:ObjectProperty ;
+    rdfs:label "plays"@en ;
+    rdfs:comment "Derived: a role of an agent protocol the chart plays, named by the IRI `<protocol identity>#<role>`, from the chart's `vt:plays` extension attribute. The agent's VertepProtocol DID service entry is generated from these declarations."@en ;
+    rdfs:domain vt:Chart ;
+    vt:irField "(derived)" .
+
 vt:order
     a owl:DatatypeProperty ;
     rdfs:label "order"@en ;
