@@ -76,7 +76,7 @@ Out of scope, and listed in the design as follow-ups:
 - `vertep-store`: the `JournalStore` additions and a counting wrapper in the test kit.
 - `vertep-tiramemsu`: `shard.rs` and `backend.rs`, using tiramemsu's volatile rows and `Durability`.
 - `vertep-cluster`: `transport.rs`, `runtime.rs`, `replication.rs` and `view.rs`.
-- A new `benches/` (shared with `m13-production-readiness` task 4.1).
+- A new `benches/`, which is also the `production-readiness` benchmark suite (moved here when M13 was archived on 2026-11-17).
 
 **Behaviour visible to applications:**
 - `NodeConfig` gains `snapshot_keep`, `durability`, `group_commit` and `shard_groups`.
@@ -84,7 +84,7 @@ Out of scope, and listed in the design as follow-ups:
 - `NodeStats.activations` becomes a total, with a per-address view only in debug builds.
 - Before 1.0 a minor version may change these APIs.
 
-**Stacking:** built on `mailbox-backends` (commit "Mailbox backends chosen per address"), which is not merged yet. This branch carries that commit on top of `main`.
+**Stacking:** this branch carries the `mailbox-backends` commit ("Mailbox backends chosen per address") and its OpenSpec change, so both merge together.
 
 **lat.md sections touched:**
 - `roadmap` (new `M18 Runtime performance`)
@@ -105,18 +105,19 @@ Out of scope, and listed in the design as follow-ups:
 - [[decisions#QUIC with mutual TLS and a stream per actor pair]]
 - [[decisions#At-least-once inside the cluster with journal deduplication]]
 - [[decisions#Optional standby journal replication]]
-- [[decisions#New milestones wait for production readiness]]: see below.
+- [[decisions#New milestones wait for production readiness]]: satisfied; the freeze ended when M13 was archived on 2026-11-17.
+- [[decisions#Benchmarks measure the claims]]: phase 0 implements it.
 
 **Constraints:**
 - [[constraints#Tiramemsu has a single writer per file]]
 - [[constraints#QUIC limits streams per connection]]
 - [[constraints#Relays deliver at least once]]
 
-**The milestone freeze.** [[decisions#New milestones wait for production readiness]] holds new milestones until `m13-production-readiness` is archived. This change adds no feature and supplies the performance evidence m13 asks for (m13 D3). Two ways to reconcile it, for the maintainer to choose:
-- fold this change into m13 as its performance part, or
-- record an exception.
+**The milestone freeze.** [[decisions#New milestones wait for production readiness]] held new milestones until `m13-production-readiness` was archived. M13 was archived on 2026-11-17 and moved its `Benchmark Suite` requirement into this change, so the freeze no longer applies.
 
 **Requirements added or modified:**
+- `production-readiness`:
+  - [[openspec:production-readiness#Benchmark Suite]] (moved from M13)
 - `runtime-performance`:
   - [[openspec:runtime-performance#Hot Path Benchmarks]]
   - [[openspec:runtime-performance#Operation Budgets]]

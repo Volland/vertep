@@ -161,4 +161,4 @@ flowchart LR
     p6 --> p7["7 Soak test and docs"]
 ```
 
-Open before code starts: whether M18 folds into M13 or is an exception to [[decisions#New milestones wait for production readiness]], whether the `mailbox-backends` branch merges first, and whether phase 1 makes `Immediate` the default before group commit pays for it in phase 4.
+The freeze of [[decisions#New milestones wait for production readiness]] ended when M13 was archived on 2026-11-17, and M13's benchmark suite moved into phase 0. Open before code starts: whether phase 1 makes `Immediate` the default before group commit pays for it in phase 4.

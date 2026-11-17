@@ -3,13 +3,13 @@ Each phase lands as its own pull request with green CI. Phase 0 comes first, so 
 ## 0. Measure (D1)
 
 - [ ] 0.1 `CountingStorage` in the `vertep-store` test kit: counts commits, quads written and read, SPARQL queries, and journal `read` and `head` calls, per call site
-- [ ] 0.2 `benches/runtime` (criterion), one suite that also closes `m13-production-readiness` 4.1 (owned here by agreement, 2026-11-16; [[decisions#Benchmarks measure the claims]]): pure `step` throughput on three chart sizes; journal append latency and replay speed per backend (memory, tiramemsu file); decider round trip with a scripted decider; turns/s (memory and tiramemsu, with and without a send); activation at 10, 1k and 100k entries (with and without a snapshot); receive with 0, 100 and 10k deferred messages; a cross-node send round trip on loopback QUIC
-- [ ] 0.2a Size and cold-start measurements for `@vertep/web` and the Python wheel (closes m13 4.2)
-- [ ] 0.3 Record the baseline on `main` (before any change below) in `benches/baseline.json` with commit, machine and durability mode; it doubles as the last-release results m13 D3 compares against
+- [ ] 0.2 `benches/runtime` (criterion), one suite that is also `production-readiness#Benchmark Suite`, moved here from M13 ([[decisions#Benchmarks measure the claims]]): pure `step` throughput on three chart sizes; journal append latency and replay speed per backend (memory, tiramemsu file); decider round trip with a scripted decider; turns/s (memory and tiramemsu, with and without a send); activation at 10, 1k and 100k entries (with and without a snapshot); receive with 0, 100 and 10k deferred messages; a cross-node send round trip on loopback QUIC
+- [ ] 0.2a Size and cold-start measurements for `@vertep/web` and the Python wheel
+- [ ] 0.3 Record the baseline on `main` (before any change below) in `benches/baseline.json` with commit, machine and durability mode; it doubles as the last-release results the gate compares against
 - [ ] 0.4 Budget tests through `CountingStorage`, marked `#[ignore]` until the phase that makes each one pass: a turn commits once, activation reads only after the snapshot, a duplicate is dropped without a full read
-- [ ] 0.5 Regression gate job in CI against the last release's recorded results, failing over a stated threshold (closes m13 4.3; coordinate the workflow file with the M13 CI branch)
-- [ ] 0.5a Results page under `site/` with machine and commit (closes m13 4.4); later phases add their before and after numbers to it
-- [ ] 0.6 Annotate (and `implements::` the m13 benchmark requirement on the same harness): `@tg: implements:: [[openspec:runtime-performance#Hot Path Benchmarks]]` and `[[openspec:runtime-performance#Operation Budgets]]` on the harness and the wrapper; `@tg: implements:: [[openspec:runtime-performance#Benchmark Regression Gate]]` on the gate script; `@tg: verifies::` on each budget test for its scenario
+- [ ] 0.5 Regression gate job in CI against the last release's recorded results, failing over a stated threshold
+- [ ] 0.5a Results page under `site/` with machine and commit; later phases add their before and after numbers to it
+- [ ] 0.6 Annotate: `@tg: implements:: [[openspec:production-readiness#Benchmark Suite]]` on the harness, the size measurements and the gate, and `verifies::` for `#Results are recorded` and `#A regression fails CI`; `@tg: implements:: [[openspec:runtime-performance#Hot Path Benchmarks]]` and `[[openspec:runtime-performance#Operation Budgets]]` on the harness and the wrapper; `@tg: implements:: [[openspec:runtime-performance#Benchmark Regression Gate]]` on the gate script; `@tg: verifies::` on each budget test for its scenario
 
 ## 1. Correctness under load (D2, D10 in part)
 
@@ -87,5 +87,5 @@ Each phase lands as its own pull request with green CI. Phase 0 comes first, so 
 - [x] 7.4a `tg.md/views/performance.md` records the review and the plan; `views/persistence.md` no longer claims the append acknowledges the message (done 2026-11-16)
 - [ ] 7.4 Update `tg.md/views/persistence.md` (Tiramemsu mapping once D3 and D4 land, storage traits), `views/runtime.md` (mailboxes, scheduling, shard groups) and `views/distribution.md` (routing over QUIC, replication), and list `runtime-performance` in the `openspec:` frontmatter of the view that explains it
 - [ ] 7.5 `tg.md/roadmap.md`: section `M18 Runtime performance` (drafted 2026-11-16); `capabilities.md` `Runtime performance` (drafted 2026-11-16); `components.md`: `provides::` edges for the new requirements on `vertep-runtime`, `vertep-store`, `vertep-tiramemsu`, `vertep-cluster`
-- [ ] 7.6 `CHANGELOG.md`, `site/docs/runtime.html` (tuning: durability, group commit, shard groups, capacity), results page shared with m13 4.4
+- [ ] 7.6 `CHANGELOG.md`, `site/docs/runtime.html` (tuning: durability, group commit, shard groups, capacity), results page
 - [ ] 7.7 Run `tg check`, `tg ontology check` and `tg trace runtime-performance --gaps` (and for `storage`, `event-journal`, `messaging`, `actor-model`, `cluster-transport`, `shard-placement`) and close every gap

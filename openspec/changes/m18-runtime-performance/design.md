@@ -24,7 +24,7 @@ The review evidence, with paths as of `main` at 546b54c plus the mailbox-backend
   - Every outbound message gets its own retry task (every 50 ms for up to 30 s).
   - `refresh()` clones the whole `View` before it checks the version.
   - `StandbySet::replicate` ships to standbys one after another, with a pre-flight round trip.
-- **No benchmarks** exist (`m13-production-readiness` task 4.1 is open).
+- **No benchmarks** exist. M13 was archived with its `Benchmark Suite` requirement moved into this change.
 
 ## Goals / Non-Goals
 
@@ -56,7 +56,7 @@ Phase 0 adds `benches/runtime` (criterion) with these cases:
 
 It also adds `CountingStorage` to the `vertep-store` test kit. The wrapper counts commits, quads written and read, SPARQL queries and journal reads per call. The budgets in [[openspec:runtime-performance#Operation Budgets]] are asserted against those counts in ordinary tests, so they hold on any machine. Wall-clock numbers go to the regression gate and the results page that m13 D3 already plans.
 
-- motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: primary, note: "the evidence m13 asks for"}
+- motivated_by:: [[decisions#Benchmarks measure the claims]] {weight: primary, note: "M13 D3; its requirement moved here"}
 
 Rejected: tuning without a baseline, and budgets in wall-clock time only (they flake on shared CI runners).
 
@@ -228,7 +228,6 @@ The cost is one control message per actor message. Deferred messages keep their 
 
 ## Open Questions
 
-- **The freeze.** Should this be folded into `m13-production-readiness`, or recorded as an exception to [[decisions#New milestones wait for production readiness]]? This is the maintainer's choice.
 - **`dedup_window` default.** 4096 ids per active actor is the working assumption, to be confirmed by the benchmarks.
 - **Follow-ups:**
   - one heartbeat lease per node renewing all of its shards;
