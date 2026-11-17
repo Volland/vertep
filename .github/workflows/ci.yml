@@ -24,6 +24,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      - name: Mailbox configuration without tiramemsu support (the workspace run turns it on)
+        run: cargo test -p vertep-cli --test mailbox_features
       - name: vertep-core builds without std
         run: cargo build -p vertep-core --no-default-features --target thumbv7em-none-eabihf
 

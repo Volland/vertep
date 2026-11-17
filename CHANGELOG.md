@@ -15,6 +15,8 @@ All crates of the workspace and both npm packages share one version.
   (tiramemsu directory via `MailboxBackend::tiramemsu`, or any `Storage`) or `Custom(factory)`
   such as a relay inbox over a remote TSP mediator. `MailboxConfig` is the same thing as JSON;
   `NodeBuilder::mailbox_config` applies it and `vt mailbox check FILE` validates one offline.
+  `mailbox::TIRAMEMSU_SUPPORT` says whether a build can open tiramemsu mailboxes. The OpenSpec
+  change `mailbox-backends` is archived into `messaging`.
 
 ## [0.1.13] - 2026-11-17
 

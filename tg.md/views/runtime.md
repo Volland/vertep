@@ -293,7 +293,7 @@ flowchart LR
     check["vt mailbox check FILE"] -.->|"validate only:<br/>opens nothing"| cfg
 ```
 
-The rules behind the sketch (OpenSpec change `mailbox-backends`; requirements `Mailbox Routing By Address`, `Mailbox Configuration File`, `Offline Mailbox Configuration Check`):
+The rules behind the sketch (OpenSpec change `mailbox-backends`, archived 2026-11-17 into `messaging`; requirements `Mailbox Routing By Address`, `Mailbox Configuration File`, `Offline Mailbox Configuration Check`):
 
 - **First match wins.** Rules match by scheme, prefix or exact address and are tried in the order written; an exact exception goes above the prefix it narrows.
 - **Any storage.** A `Store` backend takes any `Storage`. A tiramemsu directory for mailboxes must not be the journal's, because a tiramemsu file has one writer.

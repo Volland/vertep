@@ -567,6 +567,10 @@ impl MailboxFactory for RoutedMailboxes {
     }
 }
 
+/// Whether this build can open tiramemsu mailboxes (the `tiramemsu` feature). Without it,
+/// [`MailboxConfig::build`] refuses a tiramemsu backend.
+pub const TIRAMEMSU_SUPPORT: bool = cfg!(feature = "tiramemsu");
+
 /// A mailbox backend as written in a configuration file.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -798,6 +802,78 @@ mod tests {
             assert!(cfg.validate().is_err(), "{bad}");
             assert!(cfg.build(&Default::default()).is_err(), "{bad}");
         }
+        // A failed build opens nothing: a valid tiramemsu default next to an invalid route
+        // creates no directory, nor does a tiramemsu backend with zero shards.
+        let tmp = tempfile::tempdir().unwrap();
+        let good = tmp.path().join("good");
+        let zero = tmp.path().join("zero");
+        for (json, dir) in [
+            (
+                format!(
+                    r#"{{"default":{{"tiramemsu":{{"dir":{:?},"shards":2}}}},
+                        "routes":[{{"match":{{"exact":""}},"backend":"memory"}}]}}"#,
+                    good.to_str().unwrap()
+                ),
+                &good,
+            ),
+            (
+                format!(
+                    r#"{{"routes":[{{"match":{{"scheme":"vt"}},
+                        "backend":{{"tiramemsu":{{"dir":{:?},"shards":0}}}}}}]}}"#,
+                    zero.to_str().unwrap()
+                ),
+                &zero,
+            ),
+        ] {
+            let cfg = MailboxConfig::from_json(&json).unwrap();
+            let err = cfg.build(&Default::default()).unwrap_err();
+            assert!(err.0.contains("route 1"), "{err}");
+            assert!(!dir.exists(), "{} was created", dir.display());
+        }
+    }
+
+    // @tg: verifies:: [[openspec:messaging#Mailbox Routing By Address#Recovery spans every backend]] {level: unit}
+    #[test]
+    fn recovery_lists_each_address_of_every_backend_once_in_order() {
+        let a = Address::parse("urn:t:a").unwrap();
+        let b = Address::parse("vt://orders/b").unwrap();
+        let shared = Address::parse("urn:t:z").unwrap();
+        let first = Arc::new(vertep_store::MemoryStore::new());
+        let second = Arc::new(vertep_store::MemoryStore::new());
+        // Messages written through each store directly, as a previous run would have left them.
+        let one = StoreMailboxes::new(first.clone());
+        let two = StoreMailboxes::new(second.clone());
+        one.create(&shared).enqueue(env("m1", "x")).unwrap();
+        one.create(&a).enqueue(env("m2", "x")).unwrap();
+        two.create(&shared).enqueue(env("m3", "x")).unwrap();
+        two.create(&b).enqueue(env("m4", "x")).unwrap();
+        let boxes = RoutedMailboxes::new(MailboxBackend::Memory)
+            .route(
+                AddressMatch::Prefix("urn:t:".into()),
+                MailboxBackend::Store(first),
+            )
+            .route(
+                AddressMatch::Scheme("vt".into()),
+                MailboxBackend::Store(second),
+            );
+        let mut want = vec![a, b, shared];
+        want.sort();
+        assert_eq!(boxes.recover(), want);
+    }
+
+    // @tg: verifies:: [[openspec:messaging#Mailbox Routing By Address#Unmatched address uses the default]] {level: unit}
+    #[test]
+    fn an_address_no_rule_matches_uses_the_default_backend() {
+        let fallback = Arc::new(vertep_store::MemoryStore::new());
+        let routed = Arc::new(vertep_store::MemoryStore::new());
+        let boxes = RoutedMailboxes::new(MailboxBackend::Store(fallback.clone())).route(
+            AddressMatch::Scheme("did".into()),
+            MailboxBackend::Store(routed.clone()),
+        );
+        let stray = Address::parse("urn:other:x").unwrap();
+        boxes.create(&stray).enqueue(env("m1", "x")).unwrap();
+        assert_eq!(StoreMailboxes::new(fallback).recover(), vec![stray]);
+        assert!(StoreMailboxes::new(routed).recover().is_empty());
     }
 
     // @tg: verifies:: [[openspec:messaging#Mailbox Routing By Address#First matching rule wins]] {level: unit}

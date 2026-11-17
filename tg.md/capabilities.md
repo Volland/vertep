@@ -85,7 +85,7 @@ Pluggable mailboxes and transports, address resolution, `vt:request`, `vt:defer`
 
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
-Mailbox backends are chosen per address by ordered rules, in code (`RoutedMailboxes`) or from a JSON file (`MailboxConfig`, checked offline by `vt mailbox check`); specified by the change `mailbox-backends`. Receive cost under deferral, bounded mailboxes and durability by origin are planned in [[roadmap#M18 Runtime performance]].
+Mailbox backends are chosen per address by ordered rules, in code (`RoutedMailboxes`) or from a JSON file (`MailboxConfig`, checked offline by `vt mailbox check`); specified by the change `mailbox-backends`, archived 2026-11-17 into `messaging`. Receive cost under deferral, bounded mailboxes and durability by origin are planned in [[roadmap#M18 Runtime performance]].
 
 ## Event journal
 
