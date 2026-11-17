@@ -62,8 +62,9 @@ pub mod prelude {
 
     #[cfg(feature = "runtime")]
     pub use vertep_runtime::{
-        Actor, ActorState, Address, Envelope, FnActor, Migration, Node, NodeConfig, NodeHandle,
-        Shell, Storage, StoreMailboxes, VirtualClock,
+        Actor, ActorState, Address, AddressMatch, Envelope, FnActor, MailboxBackend, MailboxConfig,
+        Migration, Node, NodeConfig, NodeHandle, RoutedMailboxes, Shell, Storage, StoreMailboxes,
+        VirtualClock,
     };
 
     #[cfg(feature = "tiramemsu")]

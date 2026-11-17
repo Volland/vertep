@@ -427,10 +427,482 @@ impl MailboxFactory for StoreMailboxes {
     }
 }
 
+/// Which addresses a [`RoutedMailboxes`] rule applies to.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AddressMatch {
+    /// Every address of one scheme (`vt`, `did`, `https`).
+    Scheme(String),
+    /// Every address that starts with the prefix.
+    Prefix(String),
+    /// Exactly one address.
+    Exact(String),
+}
+
+impl AddressMatch {
+    /// True when `a` is selected.
+    pub fn matches(&self, a: &Address) -> bool {
+        match self {
+            AddressMatch::Scheme(s) => a.scheme() == s,
+            AddressMatch::Prefix(p) => a.as_str().starts_with(p.as_str()),
+            AddressMatch::Exact(e) => a.as_str() == e,
+        }
+    }
+}
+
+/// Where a mailbox keeps its messages, chosen per route.
+///
+/// Every variant becomes a [`MailboxFactory`]; `Custom` takes any other, such as a relay inbox
+/// whose pickup source is a remote TSP mediator.
+#[derive(Clone)]
+pub enum MailboxBackend {
+    /// In memory: lost with the process.
+    Memory,
+    /// Rows in a graph store, which may be a different store from the node's journal: a
+    /// [`vertep_store::MemoryStore`], a tiramemsu shard file or any other [`Storage`].
+    Store(Arc<dyn Storage>),
+    /// Any other factory, for example `RelayInbox` (a mediator holds the messages).
+    Custom(Arc<dyn MailboxFactory>),
+}
+
+impl std::fmt::Debug for MailboxBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MailboxBackend::Memory => f.write_str("Memory"),
+            MailboxBackend::Store(_) => f.write_str("Store"),
+            MailboxBackend::Custom(_) => f.write_str("Custom"),
+        }
+    }
+}
+
+impl MailboxBackend {
+    /// Store-backed mailboxes in a tiramemsu directory of `shard_count` files, opened here
+    /// (one writer per file, so the directory must not be open elsewhere in the process).
+    ///
+    /// # Errors
+    ///
+    /// The store's open errors.
+    #[cfg(feature = "tiramemsu")]
+    pub fn tiramemsu(
+        dir: impl AsRef<std::path::Path>,
+        shard_count: usize,
+    ) -> Result<Self, vertep_store::StoreError> {
+        let backend = vertep_tiramemsu::TiramemsuBackend::open(dir, shard_count)?;
+        Ok(MailboxBackend::Store(Arc::new(backend)))
+    }
+
+    /// The factory this backend stands for.
+    pub fn factory(&self) -> Arc<dyn MailboxFactory> {
+        match self {
+            MailboxBackend::Memory => Arc::new(MemoryMailboxes),
+            MailboxBackend::Store(s) => Arc::new(StoreMailboxes::new(s.clone())),
+            MailboxBackend::Custom(f) => f.clone(),
+        }
+    }
+}
+
+/// A [`MailboxFactory`] that picks the backend per address: the first matching rule wins, and
+/// the default serves the rest. A node's mailboxes, the federation's local mailboxes and any
+/// route of another router can all be a `RoutedMailboxes`.
+///
+/// ```ignore
+/// let boxes = RoutedMailboxes::new(MailboxBackend::Memory)
+///     .route(AddressMatch::Scheme("did".into()), MailboxBackend::Custom(inbox))
+///     .route(AddressMatch::Prefix("vt://orders/".into()), MailboxBackend::tiramemsu(dir, 4)?);
+/// ```
+// @tg: implements:: [[openspec:messaging#Pluggable Mailboxes]]
+// @tg: implements:: [[decisions#Mailbox backend is chosen per address]]
+// @tg: implements:: [[openspec:messaging#Mailbox Routing By Address]]
+#[derive(Clone)]
+pub struct RoutedMailboxes {
+    rules: Vec<(AddressMatch, Arc<dyn MailboxFactory>)>,
+    default: Arc<dyn MailboxFactory>,
+}
+
+impl std::fmt::Debug for RoutedMailboxes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RoutedMailboxes")
+            .field("rules", &self.rules.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl RoutedMailboxes {
+    /// Routes everything to `default` until rules are added.
+    pub fn new(default: MailboxBackend) -> Self {
+        RoutedMailboxes {
+            rules: Vec::new(),
+            default: default.factory(),
+        }
+    }
+
+    /// Addresses selected by `when` use `backend`. Rules are tried in the order added.
+    #[must_use]
+    pub fn route(mut self, when: AddressMatch, backend: MailboxBackend) -> Self {
+        self.rules.push((when, backend.factory()));
+        self
+    }
+
+    fn factory_for(&self, a: &Address) -> &Arc<dyn MailboxFactory> {
+        self.rules
+            .iter()
+            .find(|(m, _)| m.matches(a))
+            .map_or(&self.default, |(_, f)| f)
+    }
+}
+
+impl MailboxFactory for RoutedMailboxes {
+    fn create(&self, address: &Address) -> Arc<dyn Mailbox> {
+        self.factory_for(address).create(address)
+    }
+
+    /// The addresses every backend has messages for.
+    fn recover(&self) -> Vec<Address> {
+        let mut out: Vec<Address> = self.default.recover();
+        for (_, f) in &self.rules {
+            out.extend(f.recover());
+        }
+        out.sort();
+        out.dedup();
+        out
+    }
+}
+
+/// Whether this build can open tiramemsu mailboxes (the `tiramemsu` feature). Without it,
+/// [`MailboxConfig::build`] refuses a tiramemsu backend.
+pub const TIRAMEMSU_SUPPORT: bool = cfg!(feature = "tiramemsu");
+
+/// A mailbox backend as written in a configuration file.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BackendSpec {
+    /// In memory.
+    Memory,
+    /// Rows in a tiramemsu directory of `shards` files (needs the `tiramemsu` feature).
+    Tiramemsu {
+        /// The directory, created when missing.
+        dir: String,
+        /// The number of shard files.
+        shards: usize,
+    },
+    /// A factory the application registered under this name, such as a relay inbox whose
+    /// pickup source is a TSP mediator.
+    Named(String),
+}
+
+/// One routing rule in a configuration file.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteSpec {
+    /// The addresses it applies to.
+    #[serde(rename = "match")]
+    pub when: MatchSpec,
+    /// Where their mailboxes live.
+    pub backend: BackendSpec,
+}
+
+/// Address selection as written in a configuration file.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchSpec {
+    /// Every address of the scheme.
+    Scheme(String),
+    /// Every address with the prefix.
+    Prefix(String),
+    /// One address.
+    Exact(String),
+}
+
+/// The mailbox configuration of a node: a default backend and ordered routes.
+///
+/// ```json
+/// { "default": "memory",
+///   "routes": [
+///     { "match": { "scheme": "did" }, "backend": { "named": "tsp" } },
+///     { "match": { "prefix": "vt://orders/" },
+///       "backend": { "tiramemsu": { "dir": "data/orders-mailboxes", "shards": 4 } } } ] }
+/// ```
+// @tg: implements:: [[openspec:messaging#Pluggable Mailboxes]]
+// @tg: implements:: [[decisions#Mailbox backend is chosen per address]]
+// @tg: implements:: [[openspec:messaging#Mailbox Configuration File]]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MailboxConfig {
+    /// The backend of every address no route selects.
+    #[serde(default = "MailboxConfig::memory")]
+    pub default: BackendSpec,
+    /// Routes, tried in order.
+    #[serde(default)]
+    pub routes: Vec<RouteSpec>,
+}
+
+impl Default for MailboxConfig {
+    fn default() -> Self {
+        MailboxConfig {
+            default: BackendSpec::Memory,
+            routes: Vec::new(),
+        }
+    }
+}
+
+impl MailboxConfig {
+    fn memory() -> BackendSpec {
+        BackendSpec::Memory
+    }
+
+    /// Parses a JSON configuration.
+    ///
+    /// # Errors
+    ///
+    /// [`MailboxError`] when the text is not a valid configuration.
+    pub fn from_json(text: &str) -> Result<Self, MailboxError> {
+        serde_json::from_str(text).map_err(|e| MailboxError(format!("mailbox config: {e}")))
+    }
+
+    /// Checks the configuration without opening anything: every tiramemsu backend has a
+    /// directory and at least one shard, every name and match is non-empty. Returns the names
+    /// the application must register, in order of first use.
+    ///
+    /// # Errors
+    ///
+    /// [`MailboxError`] naming the first problem.
+    pub fn validate(&self) -> Result<Vec<String>, MailboxError> {
+        let mut names: Vec<String> = Vec::new();
+        let specs = std::iter::once(("default".to_owned(), &self.default)).chain(
+            self.routes
+                .iter()
+                .enumerate()
+                .map(|(i, r)| (format!("route {}", i + 1), &r.backend)),
+        );
+        for (at, spec) in specs {
+            let bad = |why: &str| MailboxError(format!("mailbox config: {at}: {why}"));
+            match spec {
+                BackendSpec::Memory => {}
+                BackendSpec::Tiramemsu { dir, shards } => {
+                    if dir.is_empty() {
+                        return Err(bad("tiramemsu needs a dir"));
+                    }
+                    if *shards == 0 {
+                        return Err(bad("tiramemsu needs at least one shard"));
+                    }
+                }
+                BackendSpec::Named(n) => {
+                    if n.is_empty() {
+                        return Err(bad("a named backend needs a name"));
+                    }
+                    if !names.contains(n) {
+                        names.push(n.clone());
+                    }
+                }
+            }
+        }
+        for (i, r) in self.routes.iter().enumerate() {
+            let (MatchSpec::Scheme(t) | MatchSpec::Prefix(t) | MatchSpec::Exact(t)) = &r.when;
+            if t.is_empty() {
+                return Err(MailboxError(format!(
+                    "mailbox config: route {}: the match is empty",
+                    i + 1
+                )));
+            }
+        }
+        Ok(names)
+    }
+
+    /// Builds the router. `named` holds the factories that `named` backends refer to.
+    ///
+    /// # Errors
+    ///
+    /// [`MailboxError`] for a name that is not in `named`, for a tiramemsu backend when the
+    /// feature is off, and for a store that cannot be opened.
+    pub fn build(
+        &self,
+        named: &std::collections::BTreeMap<String, Arc<dyn MailboxFactory>>,
+    ) -> Result<RoutedMailboxes, MailboxError> {
+        self.validate()?;
+        let backend = |spec: &BackendSpec| -> Result<MailboxBackend, MailboxError> {
+            match spec {
+                BackendSpec::Memory => Ok(MailboxBackend::Memory),
+                BackendSpec::Named(n) => named
+                    .get(n)
+                    .cloned()
+                    .map(MailboxBackend::Custom)
+                    .ok_or_else(|| MailboxError(format!("mailbox config: no backend named {n}"))),
+                #[cfg(feature = "tiramemsu")]
+                BackendSpec::Tiramemsu { dir, shards } => {
+                    std::fs::create_dir_all(dir)
+                        .map_err(|e| MailboxError(format!("mailbox config: {dir}: {e}")))?;
+                    MailboxBackend::tiramemsu(dir, *shards)
+                        .map_err(|e| MailboxError(format!("mailbox config: {dir}: {e}")))
+                }
+                #[cfg(not(feature = "tiramemsu"))]
+                BackendSpec::Tiramemsu { .. } => Err(MailboxError(
+                    "mailbox config: tiramemsu backend needs the `tiramemsu` feature".into(),
+                )),
+            }
+        };
+        let mut routed = RoutedMailboxes::new(backend(&self.default)?);
+        for r in &self.routes {
+            let when = match &r.when {
+                MatchSpec::Scheme(s) => AddressMatch::Scheme(s.clone()),
+                MatchSpec::Prefix(p) => AddressMatch::Prefix(p.clone()),
+                MatchSpec::Exact(e) => AddressMatch::Exact(e.clone()),
+            };
+            routed = routed.route(when, backend(&r.backend)?);
+        }
+        Ok(routed)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use vertep_core::datamodel::EventType;
+
+    // @tg: verifies:: [[openspec:messaging#Pluggable Mailboxes#Mailbox routes from configuration]] {level: unit}
+    // @tg: verifies:: [[openspec:messaging#Mailbox Routing By Address#Application factory behind a route]] {level: unit}
+    // @tg: verifies:: [[openspec:messaging#Mailbox Configuration File#Omitted default is memory]] {level: unit}
+    // @tg: verifies:: [[openspec:messaging#Mailbox Configuration File#Malformed document rejected]] {level: unit}
+    #[test]
+    fn config_builds_routes_and_rejects_unknown_names() {
+        let json = r#"{"routes":[
+            {"match":{"prefix":"urn:t:"},"backend":{"named":"relay"}},
+            {"match":{"scheme":"vt"},"backend":"memory"}]}"#;
+        let cfg = MailboxConfig::from_json(json).unwrap();
+        assert_eq!(cfg.default, BackendSpec::Memory);
+        assert_eq!(cfg.routes.len(), 2);
+        let err = cfg.build(&Default::default()).unwrap_err();
+        assert!(err.0.contains("no backend named relay"), "{err}");
+        let relay = Arc::new(vertep_store::MemoryStore::new());
+        let mut named: std::collections::BTreeMap<String, Arc<dyn MailboxFactory>> =
+            Default::default();
+        named.insert("relay".into(), Arc::new(StoreMailboxes::new(relay.clone())));
+        let boxes = cfg.build(&named).unwrap();
+        boxes
+            .create(&Address::parse("urn:t:a").unwrap())
+            .enqueue(env("m1", "x"))
+            .unwrap();
+        assert_eq!(boxes.recover().len(), 1);
+        assert!(MailboxConfig::from_json("{\"default\": 3}").is_err());
+    }
+
+    // @tg: verifies:: [[openspec:messaging#Mailbox Configuration File#Validation lists the names to register]] {level: unit}
+    // @tg: verifies:: [[openspec:messaging#Mailbox Configuration File#Invalid backend rejected before anything opens]] {level: unit}
+    #[test]
+    fn validate_names_what_to_register_and_rejects_bad_specs() {
+        let ok = MailboxConfig::from_json(
+            r#"{"routes":[{"match":{"scheme":"did"},"backend":{"named":"tsp"}},
+                          {"match":{"scheme":"vt"},"backend":{"named":"tsp"}}]}"#,
+        )
+        .unwrap();
+        assert_eq!(ok.validate().unwrap(), vec!["tsp".to_owned()]);
+        for bad in [
+            r#"{"default":{"tiramemsu":{"dir":"d","shards":0}}}"#,
+            r#"{"default":{"tiramemsu":{"dir":"","shards":2}}}"#,
+            r#"{"routes":[{"match":{"prefix":""},"backend":"memory"}]}"#,
+            r#"{"routes":[{"match":{"scheme":"x"},"backend":{"named":""}}]}"#,
+        ] {
+            let cfg = MailboxConfig::from_json(bad).unwrap();
+            assert!(cfg.validate().is_err(), "{bad}");
+            assert!(cfg.build(&Default::default()).is_err(), "{bad}");
+        }
+        // A failed build opens nothing: a valid tiramemsu default next to an invalid route
+        // creates no directory, nor does a tiramemsu backend with zero shards.
+        let tmp = tempfile::tempdir().unwrap();
+        let good = tmp.path().join("good");
+        let zero = tmp.path().join("zero");
+        for (json, dir) in [
+            (
+                format!(
+                    r#"{{"default":{{"tiramemsu":{{"dir":{:?},"shards":2}}}},
+                        "routes":[{{"match":{{"exact":""}},"backend":"memory"}}]}}"#,
+                    good.to_str().unwrap()
+                ),
+                &good,
+            ),
+            (
+                format!(
+                    r#"{{"routes":[{{"match":{{"scheme":"vt"}},
+                        "backend":{{"tiramemsu":{{"dir":{:?},"shards":0}}}}}}]}}"#,
+                    zero.to_str().unwrap()
+                ),
+                &zero,
+            ),
+        ] {
+            let cfg = MailboxConfig::from_json(&json).unwrap();
+            let err = cfg.build(&Default::default()).unwrap_err();
+            assert!(err.0.contains("route 1"), "{err}");
+            assert!(!dir.exists(), "{} was created", dir.display());
+        }
+    }
+
+    // @tg: verifies:: [[openspec:messaging#Mailbox Routing By Address#Recovery spans every backend]] {level: unit}
+    #[test]
+    fn recovery_lists_each_address_of_every_backend_once_in_order() {
+        let a = Address::parse("urn:t:a").unwrap();
+        let b = Address::parse("vt://orders/b").unwrap();
+        let shared = Address::parse("urn:t:z").unwrap();
+        let first = Arc::new(vertep_store::MemoryStore::new());
+        let second = Arc::new(vertep_store::MemoryStore::new());
+        // Messages written through each store directly, as a previous run would have left them.
+        let one = StoreMailboxes::new(first.clone());
+        let two = StoreMailboxes::new(second.clone());
+        one.create(&shared).enqueue(env("m1", "x")).unwrap();
+        one.create(&a).enqueue(env("m2", "x")).unwrap();
+        two.create(&shared).enqueue(env("m3", "x")).unwrap();
+        two.create(&b).enqueue(env("m4", "x")).unwrap();
+        let boxes = RoutedMailboxes::new(MailboxBackend::Memory)
+            .route(
+                AddressMatch::Prefix("urn:t:".into()),
+                MailboxBackend::Store(first),
+            )
+            .route(
+                AddressMatch::Scheme("vt".into()),
+                MailboxBackend::Store(second),
+            );
+        let mut want = vec![a, b, shared];
+        want.sort();
+        assert_eq!(boxes.recover(), want);
+    }
+
+    // @tg: verifies:: [[openspec:messaging#Mailbox Routing By Address#Unmatched address uses the default]] {level: unit}
+    #[test]
+    fn an_address_no_rule_matches_uses_the_default_backend() {
+        let fallback = Arc::new(vertep_store::MemoryStore::new());
+        let routed = Arc::new(vertep_store::MemoryStore::new());
+        let boxes = RoutedMailboxes::new(MailboxBackend::Store(fallback.clone())).route(
+            AddressMatch::Scheme("did".into()),
+            MailboxBackend::Store(routed.clone()),
+        );
+        let stray = Address::parse("urn:other:x").unwrap();
+        boxes.create(&stray).enqueue(env("m1", "x")).unwrap();
+        assert_eq!(StoreMailboxes::new(fallback).recover(), vec![stray]);
+        assert!(StoreMailboxes::new(routed).recover().is_empty());
+    }
+
+    // @tg: verifies:: [[openspec:messaging#Mailbox Routing By Address#First matching rule wins]] {level: unit}
+    #[test]
+    fn routes_pick_backend_per_address_first_match_wins() {
+        let durable = Arc::new(vertep_store::MemoryStore::new());
+        let boxes = RoutedMailboxes::new(MailboxBackend::Memory)
+            .route(
+                AddressMatch::Exact("urn:t:special".into()),
+                MailboxBackend::Memory,
+            )
+            .route(
+                AddressMatch::Prefix("urn:t:".into()),
+                MailboxBackend::Store(durable.clone()),
+            );
+        let kept = Address::parse("urn:t:a").unwrap();
+        let lost = Address::parse("urn:t:special").unwrap();
+        boxes.create(&kept).enqueue(env("m1", "x")).unwrap();
+        boxes.create(&lost).enqueue(env("m2", "x")).unwrap();
+        // A new router over the same store: the prefix route's message is recovered, the
+        // exact route's (in memory) is not.
+        let again = RoutedMailboxes::new(MailboxBackend::Memory).route(
+            AddressMatch::Prefix("urn:t:".into()),
+            MailboxBackend::Store(durable),
+        );
+        assert_eq!(again.recover(), vec![kept.clone()]);
+        assert_eq!(again.create(&kept).pending().len(), 1);
+        assert!(again.create(&lost).pending().is_empty());
+    }
 
     fn env(id: &str, name: &str) -> Envelope {
         Envelope::new(

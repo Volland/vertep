@@ -85,6 +85,8 @@ Pluggable mailboxes and transports, address resolution, `vt:request`, `vt:defer`
 
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
+Mailbox backends are chosen per address by ordered rules, in code (`RoutedMailboxes`) or from a JSON file (`MailboxConfig`, checked offline by `vt mailbox check`); specified by the change `mailbox-backends`, archived 2026-11-17 into `messaging`. Receive cost under deferral, bounded mailboxes and durability by origin are planned in [[roadmap#M18 Runtime performance]].
+
 ## Event journal
 
 Event-sourced actor state: journal entries, compare-and-set append, deduplication, transactional outbox, snapshots and deterministic replay. OpenSpec: `event-journal`.
@@ -302,6 +304,14 @@ Stability tiers, a reproducible toolchain, a supply-chain gate, a docs-versus-be
 - scheduled_in:: [[roadmap#M13 Production readiness]]
 
 Implemented: tiers in every manifest rendered by `site/tools/tiers.py`, `scripts/build.sh` with the pinned container, `deny.toml` with SBOMs and signed provenance at release, `scripts/docs-audit.py`, and `scripts/ten-minute-path.py`, each checked in CI. The benchmark suite and its gate moved to M18 (`m18-runtime-performance`).
+
+## Runtime performance
+
+Benchmarks and counted-operation budgets for the hot paths, a regression gate, and bounded memory and storage over a long run. OpenSpec: `runtime-performance`.
+
+- scheduled_in:: [[roadmap#M18 Runtime performance]]
+
+Not implemented: the change `m18-runtime-performance` is a draft. The review behind it is in [[views/performance#Performance]].
 
 ## Journal shipping
 

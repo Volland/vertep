@@ -406,6 +406,45 @@ pub fn certify(path: &Path) -> Outcome {
     }
 }
 
+/// `vt mailbox check <file>`: parses a mailbox configuration and checks it without opening any
+/// store. Prints the default backend, each route, and the names an application must register;
+/// exits 1 when the file is not a valid configuration, 2 when it cannot be read.
+// @tg: implements:: [[decisions#Mailbox backend is chosen per address]]
+// @tg: implements:: [[openspec:messaging#Offline Mailbox Configuration Check]]
+pub fn mailbox_check(file: &Path) -> Outcome {
+    use vertep_runtime::{BackendSpec, MailboxConfig, MatchSpec};
+    let text = match std::fs::read_to_string(file) {
+        Ok(t) => t,
+        Err(e) => return Outcome::fail(2, [format!("{}: {e}", file.display())]),
+    };
+    let cfg = match MailboxConfig::from_json(&text) {
+        Ok(c) => c,
+        Err(e) => return Outcome::fail(1, [format!("{}: {e}", file.display())]),
+    };
+    let names = match cfg.validate() {
+        Ok(n) => n,
+        Err(e) => return Outcome::fail(1, [format!("{}: {e}", file.display())]),
+    };
+    let backend = |b: &BackendSpec| match b {
+        BackendSpec::Memory => "memory".to_owned(),
+        BackendSpec::Tiramemsu { dir, shards } => format!("tiramemsu {dir} ({shards} shards)"),
+        BackendSpec::Named(n) => format!("named {n}"),
+    };
+    let mut out = format!("default -> {}\n", backend(&cfg.default));
+    for r in &cfg.routes {
+        let (kind, text) = match &r.when {
+            MatchSpec::Scheme(t) => ("scheme", t),
+            MatchSpec::Prefix(t) => ("prefix", t),
+            MatchSpec::Exact(t) => ("exact", t),
+        };
+        out.push_str(&format!("{kind} {text} -> {}\n", backend(&r.backend)));
+    }
+    if !names.is_empty() {
+        out.push_str(&format!("register before build: {}\n", names.join(", ")));
+    }
+    Outcome::ok(out)
+}
+
 /// `vt cluster reshard <dir> <out>`: the offline doubling of a stopped cluster's shard count.
 /// Reads the cluster metadata and shard files of `dir`, refuses while its `leases` file lists
 /// a live lease (naming the nodes), writes twice as many shard files and the new metadata to

@@ -55,7 +55,10 @@ pub use actor::{
 pub use address::{Address, AddressError};
 pub use chart::{ChartInfo, ChartRegistry, Migration, RegisterError, UnhandledPolicy};
 pub use journal::{EntryBody, EntryData, TimerRecord};
-pub use mailbox::{Envelope, Mailbox, MailboxFactory, MemoryMailboxes, StoreMailboxes};
+pub use mailbox::{
+    AddressMatch, BackendSpec, Envelope, Mailbox, MailboxBackend, MailboxConfig, MailboxFactory,
+    MatchSpec, MemoryMailboxes, RouteSpec, RoutedMailboxes, StoreMailboxes,
+};
 pub use node::{
     ActivationError, ActorState, AskError, CrashPoint, DeadLetter, DeliveryError, MigrateError,
     Node, NodeBuilder, NodeConfig, NodeHandle, NodeStats, RemoveError,

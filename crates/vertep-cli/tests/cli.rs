@@ -474,3 +474,42 @@ fn yaml_to_scxml_to_rdf_and_back() {
     );
     assert_eq!(back, orig);
 }
+
+// @tg: verifies:: [[openspec:messaging#Pluggable Mailboxes#Mailbox routes from configuration]] {level: e2e}
+// @tg: verifies:: [[openspec:messaging#Offline Mailbox Configuration Check#Valid file is listed]] {level: e2e}
+// @tg: verifies:: [[openspec:messaging#Offline Mailbox Configuration Check#Invalid file exits 1]] {level: e2e}
+// @tg: verifies:: [[openspec:messaging#Offline Mailbox Configuration Check#Unreadable file exits 2]] {level: e2e}
+#[test]
+fn mailbox_check_lists_routes_and_names_and_rejects_bad_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let run = |text: &str| {
+        let f = dir.path().join("mailboxes.json");
+        std::fs::write(&f, text).unwrap();
+        Command::new(VT)
+            .args(["mailbox", "check"])
+            .arg(&f)
+            .output()
+            .unwrap()
+    };
+    let good = run(
+        r#"{"routes":[{"match":{"scheme":"did"},"backend":{"named":"tsp"}},
+            {"match":{"prefix":"vt://orders/"},"backend":{"tiramemsu":{"dir":"d","shards":4}}}]}"#,
+    );
+    assert_eq!(good.status.code(), Some(0));
+    let out = String::from_utf8_lossy(&good.stdout);
+    assert!(out.contains("default -> memory"), "{out}");
+    assert!(out.contains("scheme did -> named tsp"), "{out}");
+    assert!(
+        out.contains("prefix vt://orders/ -> tiramemsu d (4 shards)"),
+        "{out}"
+    );
+    assert!(out.contains("register before build: tsp"), "{out}");
+    let bad = run(r#"{"default":{"tiramemsu":{"dir":"d","shards":0}}}"#);
+    assert_eq!(bad.status.code(), Some(1));
+    let missing = Command::new(VT)
+        .args(["mailbox", "check"])
+        .arg(dir.path().join("nope.json"))
+        .output()
+        .unwrap();
+    assert_eq!(missing.status.code(), Some(2));
+}

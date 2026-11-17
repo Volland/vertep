@@ -25,6 +25,3 @@ site/docs/rules.html | the federation layer's grant credentials are not wired in
 
 # Tier reasons are generated from the manifests by site/tools/tiers.py and describe maturity, not a feature claim.
 site/docs/tiers.html | shipping not yet wired into node replication
-
-# A plan with no code anchor until m18-runtime-performance lands on main.
-site/why.html | published benchmarks, which come with the runtime-performance milestone

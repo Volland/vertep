@@ -8,6 +8,16 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+### Added
+
+- **Mailbox backends per address.** `RoutedMailboxes` picks a mailbox backend per address (scheme,
+  prefix or exact match; first rule wins), with `MailboxBackend` = `Memory`, `Store(Storage)`
+  (tiramemsu directory via `MailboxBackend::tiramemsu`, or any `Storage`) or `Custom(factory)`
+  such as a relay inbox over a remote TSP mediator. `MailboxConfig` is the same thing as JSON;
+  `NodeBuilder::mailbox_config` applies it and `vt mailbox check FILE` validates one offline.
+  `mailbox::TIRAMEMSU_SUPPORT` says whether a build can open tiramemsu mailboxes. The OpenSpec
+  change `mailbox-backends` is archived into `messaging`.
+
 ## [0.1.13] - 2026-11-17
 
 Milestones M10 (agent protocols) and M12 (decision records) archived, M13 (production readiness)
@@ -266,6 +276,7 @@ Milestone M11: Python bindings. Change `m11-python-bindings`; design in `tg.md/v
   platforms, smoke tests, TestPyPI dry run, PyPI Trusted Publishing) and
   `bindings/python/RELEASING.md`; a `python` CI job.
 
+||||||| parent of 8cb841a (Mailbox backends chosen per address, from code or a JSON file)
 ## [0.1.5] - 2026-11-14
 
 Milestone M9: agent wallets. Change `m9-agent-wallet`; design in `tg.md/views/wallet.md`.

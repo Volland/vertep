@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in eighteen milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in twenty milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -35,6 +35,8 @@ flowchart LR
     M14 --> M16["M16 Verified rules<br/>m16-verified-rules"]
     M15 --> M17["M17 Agent rules<br/>m17-agent-rules"]
     M16 --> M17
+    M4 --> M18["M18 Runtime performance<br/>m18-runtime-performance"]
+    M13 --> M18
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
@@ -215,6 +217,12 @@ Delivered by the OpenSpec change `m16-verified-rules` (capability `rule-verifica
 Delivered: agents propose rules that pass an ordered gate, run in shadow and are promoted by journaled acts, and no actor can change the rules that govern it.
 
 Delivered by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`), building on the grants of [[roadmap#M5 Federation]]. Built: the gate with structured errors, authorship, shadow runs (with sampling), staged promotion, scoped-live deciders, the self-governance limit, the agent tool `vt:tool/rules/propose` and `vt rules propose|shadow|promote`. Grants come from a function the host supplies; wiring federation grant credentials into it is left to the host. Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m17-agent-rules` with 7 requirements in `openspec/specs/`.
+
+## M18 Runtime performance
+
+Drafted, not started: measured hot paths, one commit per turn, unversioned bookkeeping, activation from the snapshot, bounded mailboxes and memory, group commit, shard groups, and a cluster transport that stays within the peer's stream limit.
+
+Specified by the OpenSpec change `m18-runtime-performance` (new capability `runtime-performance`, and additions to `storage`, `event-journal`, `messaging`, `actor-model`, `cluster-transport` and `shard-placement`). It comes from the architecture review of 2026-11-16 and supplies the performance evidence that [[roadmap#M13 Production readiness]] asked for: M13 was archived on 2026-11-17 and moved its benchmark suite here, so phase 0 builds it. <!-- claim: missing openspec:production-readiness#Benchmark Suite --> It supersedes [[decisions#Deduplication reads the whole journal on activation]] and [[decisions#Outbox progress lives in an outbox graph]] once accepted.
 
 ## M19 Custody proof
 
