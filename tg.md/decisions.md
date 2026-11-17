@@ -1943,7 +1943,7 @@ CI and the release workflow run `cargo deny` over advisories, licences, bans and
 
 - motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: primary, since: "2026-11-16", note: "M13 Supply Chain Gate"}
 
-The first exceptions (2026-11-16) are two quick-xml 0.37 advisories reached only through oxigraph 0.5.13 and a bundled-SQLite advisory reached through tiramemsu 0.12; neither upstream has a fixed release yet.
+The first exceptions (2026-11-16) are two quick-xml 0.37 advisories reached only through oxigraph 0.5.13 and a bundled-SQLite advisory reached through tiramemsu 0.12; neither upstream has a fixed release yet. On 2026-11-17 an unmaintained notice for chrono (RUSTSEC-2026-0543, no vulnerability) was added: vertep-webvh names chrono because the did:webvh library's API takes and returns its times.
 
 ## Release artifacts carry signed build provenance
 
