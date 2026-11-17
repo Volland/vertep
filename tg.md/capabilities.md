@@ -1,7 +1,7 @@
 ---
 type: Capability
 status: draft
-openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces, python-bindings, decision-records, journal-redaction, production-readiness, journal-shipping, rule-programs, rule-decider, rule-invariants, derived-facts, rule-verification, rule-authoring]
+openspec: [chart-model, scxml-interpretation, scxml-format, datamodel, chart-rdf, formal-model, scxml-conformance, type-system, rust-dsl, yaml-format, cel-datamodel, actor-model, messaging, event-journal, storage, durable-timers, chart-versioning, runtime-ontology, deciders, llm-actors, plan-charts, cluster-membership, shard-placement, cluster-transport, worker-pools, did-identity, relay-mailboxes, wasm-bindings, durable-objects, object-custody, tsp-mediator, webvh-identity, webvh-hosting, agent-wallet, credential-exchange, oid4vc, agent-protocols, protocol-conformance, protocol-spaces, python-bindings, decision-records, journal-redaction, production-readiness, journal-shipping, rule-programs, rule-decider, rule-invariants, derived-facts, rule-verification, rule-authoring, rule-engines]
 ---
 # Capabilities
 
@@ -336,7 +336,7 @@ A decider whose answer is a derivation over the offer and state written as state
 
 - scheduled_in:: [[roadmap#M14 Rules decider]]
 
-Implemented in [[components#vertep-rules]]: the decider, derivation support, refusals, bundles that verify offline and counterfactual replay; the entry field and the whole-bundle verification wait on M12.
+Implemented in [[components#vertep-rules]]: the decider, derivation support, refusals, bundles that verify offline and counterfactual replay. A conclusion whose support names a statement the run never read is refused as `forged-support`, so every requirement of `rule-decider` is verified.
 
 
 ## Rule invariants
@@ -373,3 +373,11 @@ Agent-proposed rules behind an ordered gate with structured errors, shadow evalu
 - scheduled_in:: [[roadmap#M17 Agent rules]]
 
 Implemented in [[components#vertep-rules]] (`authoring`, `tools`): the gate with structured errors, authorship, shadow runs, staged journaled promotion, scoped-live deciders, self-governance, diff and the agent tool.
+
+## Rule engines
+
+Two engines for rule programs: the native ELPI engine and a portable Rust engine for the portable profile, chosen per program, agreeing on conclusions and support, and recorded on every derivation. OpenSpec: `rule-engines`.
+
+- scheduled_in:: [[roadmap#M20 Portable rules]]
+
+Only the native engine is built; the portable engine is specified in `m20-portable-rules`.

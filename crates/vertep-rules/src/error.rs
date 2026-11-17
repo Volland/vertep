@@ -29,6 +29,8 @@ pub enum RulesError {
     Violations(Vec<vertep_store::Violation>),
     /// Replay reached a different conclusion, support or closure than the record.
     Diverged(String),
+    /// A conclusion stated as support a statement its run never read; the engine's message.
+    ForgedSupport(String),
 }
 
 impl fmt::Display for RulesError {
@@ -56,6 +58,7 @@ impl fmt::Display for RulesError {
                 Ok(())
             }
             RulesError::Diverged(m) => write!(f, "replay diverged: {m}"),
+            RulesError::ForgedSupport(m) => write!(f, "forged-support: {m}"),
         }
     }
 }

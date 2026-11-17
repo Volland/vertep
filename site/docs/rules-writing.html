@@ -113,6 +113,7 @@
       <li>The decider takes the <strong>first offered event, in offer order, that the program concluded</strong>. Order your offer, not your clauses, when two events could both apply.</li>
       <li>If nothing was concluded: refusal <code>no-applicable-rule</code>. If something was concluded but none of it was offered: <code>not-offered</code>. If the program concluded <code>urn:vt:event:refuse</code> and no offered event: <code>explicit-refusal</code>.</li>
       <li>A run that exceeds the step budget is a refusal <code>fuel-exhausted</code>; the default budget is 1&nbsp;000&nbsp;000 steps, set in <code>RulePolicy</code>.</li>
+      <li>Support must name statements the run read. A program that states another eid as support fails the run, and the decider refuses with <code>forged-support</code>.</li>
     </ul>
 
     <h2 id="patterns">Patterns</h2>
