@@ -189,6 +189,7 @@ Stability tiers are declared in every crate, npm and Python manifest and rendere
 
 Delivered: rule programs stored beside the journal and run by lean-elpi through tiramemsu, a rules decider whose rationale is a derivation over the recorded offer and state, pinned versions and rule-version counterfactuals.
 
+- precedes:: [[roadmap#M20 Portable rules]]
 - precedes:: [[roadmap#M15 Rule invariants]]
 - precedes:: [[roadmap#M16 Verified rules]]
 
@@ -208,6 +209,7 @@ Delivered by the OpenSpec change `m15-rule-invariants` (capabilities `rule-invar
 
 Delivered: a rules profile, totality and support-necessity checks, a differential oracle against Datalog and derivation certificates checked in Lean for a fragment.
 
+- precedes:: [[roadmap#M20 Portable rules]]
 - precedes:: [[roadmap#M17 Agent rules]]
 
 Delivered by the OpenSpec change `m16-verified-rules` (capability `rule-verification`). The go or no-go on lean-elpi's LF layer came out partial (see its design), so certificates take the narrow path: the Rust exporter writes Lean source for clauses of `tm.triple` atoms and integer comparisons, and `VertepLean.RuleCert` checks it with proved soundness and completeness theorems; negation and other predicates are reported as outside the fragment, and the clause parser is trusted. Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m16-verified-rules` with 5 requirements in `openspec/specs/`.
@@ -229,3 +231,9 @@ Specified by the OpenSpec change `m18-runtime-performance` (new capability `runt
 The Lean proof that custody under custodian-set changes keeps one writer per epoch and loses no committed entry, for elections that fix their configuration record first.
 
 Specified by the OpenSpec change `m19-custody-proof` (capability `object-custody`). Opened 2026-11-17 after the M7 attempt refuted the conjectures as first stated. Not proven yet. <!-- claim: missing openspec:object-custody#Joint Custody Safety Is Proven --> It is a proof, not a feature, so it does not wait on [[roadmap#M13 Production readiness]].
+
+## M20 Portable rules
+
+A pure-Rust engine for the portable part of the rules profile, so rule decisions run in the browser, on Windows and in Python without the native engine library.
+
+Specified by the OpenSpec change `m20-portable-rules` (capability `rule-engines`, with changes to `rule-programs` and `rule-decider`). Opened 2026-11-17. Not started: the spike on `tm-datalog` comes first. <!-- claim: missing openspec:rule-engines#Portable Engine -->

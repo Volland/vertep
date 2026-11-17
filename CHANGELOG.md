@@ -17,6 +17,11 @@ All crates of the workspace and both npm packages share one version.
   `NodeBuilder::mailbox_config` applies it and `vt mailbox check FILE` validates one offline.
   `mailbox::TIRAMEMSU_SUPPORT` says whether a build can open tiramemsu mailboxes. The OpenSpec
   change `mailbox-backends` is archived into `messaging`.
+- Rules: a conclusion whose support names a statement its run never read is refused with
+  reason `forged-support` (`RulesError::ForgedSupport`); the last open `rule-decider` scenario
+  is verified.
+- OpenSpec change `m20-portable-rules`: a pure-Rust engine for the portable part of the rules
+  profile, so rule decisions run in the browser, on Windows and in Python (specified, not built).
 
 ## [0.1.13] - 2026-11-17
 

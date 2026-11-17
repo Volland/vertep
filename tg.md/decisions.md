@@ -1840,7 +1840,7 @@ Rules need the native engine library behind a cargo feature that is off by defau
 
 - motivated_by:: [[constraints#The native rules engine exists for four platforms]] {weight: primary, since: "2026-11-14"}
 
-A Rust evaluator for a rules profile, which would run everywhere, is a possible later milestone and is not decided here.
+A Rust evaluator for a rules profile, which would run everywhere, was left to a later milestone; `m20-portable-rules` (2026-11-17) proposes it for the portable part of the profile, keeping this refusal for programs outside it.
 
 
 ## A refused append writes no entry and dead-letters the message
