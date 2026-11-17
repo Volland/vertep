@@ -44,4 +44,4 @@ export type {
 } from "./audit.js";
 
 /** The version of the package, equal to the Rust crates it was built from. */
-export const VERSION = "0.1.13";
+export const VERSION = "0.1.14";
