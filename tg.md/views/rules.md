@@ -22,6 +22,8 @@ A rules decider writes the offer and the state as statements, runs the program u
 
 `Derivation Is The Rationale` and `Offer And State Are Statements` define the two arrows that matter: the offer goes into the graph before the rule runs, and the support comes out on the entry.
 
+The engine keeps the set of statements each run read. A program that states support outside that set fails the run, and the decider refuses with `forged-support`, so a rationale can only name evidence the rule used.
+
 ```mermaid
 sequenceDiagram
     autonumber

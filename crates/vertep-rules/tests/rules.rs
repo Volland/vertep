@@ -131,6 +131,42 @@ mod with_engine {
         assert!(log[0].fuel_used > 0 && log[0].fuel_used <= log[0].fuel_limit);
     }
 
+    // @tg: verifies:: [[openspec:rule-decider#Derivation Is The Rationale#Forged support]] {level: integration}
+    #[test]
+    fn support_the_run_never_read_is_refused() {
+        // The rule reads only the context statement, then states as support a statement it
+        // never read: the rationale would name evidence the decision did not use.
+        const FORGED: &str = r#"
+tm.conclude (triple C (iri "urn:vt:decision") (iri "urn:vt:event:approve")) [X, (eid 1)] :-
+  tm.triple (iri "urn:vt:ctx") (iri "urn:vt:deciding") C X.
+"#;
+        let (_d, shard) = shard();
+        put_program(&shard, "urn:vt:program:forged", FORGED).unwrap();
+        let d = RuleDecider::new(
+            shard.clone(),
+            "urn:vt:program:forged",
+            RulePolicy::default(),
+        )
+        .unwrap();
+        let r = reason(answer(
+            &d,
+            request("c-forged", 20_000.0, 31.0, &["approve"]),
+        ));
+        assert!(r.starts_with("forged-support:"), "{r}");
+        assert!(
+            d.derivations().is_empty(),
+            "a forged run leaves no derivation"
+        );
+        // the honest program still decides on the same shard
+        match answer(
+            &decider(&shard),
+            request("c-honest", 20_000.0, 31.0, &["approve"]),
+        ) {
+            DecisionOutcome::Decision(dec) => assert_eq!(dec.event, "approve"),
+            o => panic!("{o:?}"),
+        }
+    }
+
     // @tg: verifies:: [[openspec:rule-decider#Rule Decider#A rule chooses an offered event]] {level: integration}
     #[test]
     fn a_rule_refers_above_the_ceiling() {

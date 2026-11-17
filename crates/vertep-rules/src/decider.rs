@@ -436,6 +436,13 @@ impl RuleDecider {
                     .to_string(),
                 ));
             }
+            // The engine refuses support the run never read; that is a forged rationale, not an
+            // engine fault ([[openspec:rule-decider#Derivation Is The Rationale#Forged support]]).
+            Err(e) if e.to_string().contains("was not read by this run") => {
+                return Err(refuse(
+                    &RulesError::ForgedSupport(e.to_string()).to_string(),
+                ));
+            }
             Err(e) => return Err(refuse(&format!("rules-error: {e}"))),
         };
 
