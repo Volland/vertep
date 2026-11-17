@@ -115,9 +115,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      # By name: the container build also uploads a build-record artifact that is not ours to
+      # download (it failed the first release run, v0.1.13).
       - uses: actions/download-artifact@v4
         with:
-          path: assets
+          name: npm
+          path: assets/npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: sbom
+          path: assets/sbom
       - name: Upload the tarballs and the SBOMs
         env:
           GH_TOKEN: ${{ github.token }}
