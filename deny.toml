@@ -42,6 +42,11 @@ ignore = [
   # and -wal file that a less trusted party wrote, and tiramemsu opens only its own store files.
   # Remove when tiramemsu releases on rusqlite >= 0.41 (libsqlite3-sys >= 0.39).
   { id = "RUSTSEC-2026-0459", reason = "bundled SQLite via tiramemsu 0.12 -> rusqlite 0.40; no fixed tiramemsu release; local-file vector only" },
+  # chrono is unmaintained (notice 2026-11-17, no vulnerability). vertep-webvh names it directly
+  # because didwebvh-rs 0.8 and affinidi-data-integrity 0.8 take and return chrono times in their
+  # API, and tsp_sdk 0.16 depends on it too. Remove when those move to another time crate; then
+  # vertep-webvh's Clock follows.
+  { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained notice, no vulnerability; required by the didwebvh-rs 0.8 API that vertep-webvh wraps" },
 ]
 
 [licenses]
