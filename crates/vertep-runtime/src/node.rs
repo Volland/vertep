@@ -791,6 +791,7 @@ impl NodeBuilder {
     /// # Errors
     ///
     /// [`MailboxError`] as [`MailboxConfig::build`](crate::MailboxConfig::build).
+    // @tg: implements:: [[openspec:messaging#Mailbox Configuration File]]
     pub fn mailbox_config(
         self,
         config: &crate::mailbox::MailboxConfig,

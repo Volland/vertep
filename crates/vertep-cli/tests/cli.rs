@@ -476,6 +476,9 @@ fn yaml_to_scxml_to_rdf_and_back() {
 }
 
 // @tg: verifies:: [[openspec:messaging#Pluggable Mailboxes#Mailbox routes from configuration]] {level: e2e}
+// @tg: verifies:: [[openspec:messaging#Offline Mailbox Configuration Check#Valid file is listed]] {level: e2e}
+// @tg: verifies:: [[openspec:messaging#Offline Mailbox Configuration Check#Invalid file exits 1]] {level: e2e}
+// @tg: verifies:: [[openspec:messaging#Offline Mailbox Configuration Check#Unreadable file exits 2]] {level: e2e}
 #[test]
 fn mailbox_check_lists_routes_and_names_and_rejects_bad_files() {
     let dir = tempfile::tempdir().unwrap();

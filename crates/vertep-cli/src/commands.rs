@@ -410,6 +410,7 @@ pub fn certify(path: &Path) -> Outcome {
 /// store. Prints the default backend, each route, and the names an application must register;
 /// exits 1 when the file is not a valid configuration, 2 when it cannot be read.
 // @tg: implements:: [[decisions#Mailbox backend is chosen per address]]
+// @tg: implements:: [[openspec:messaging#Offline Mailbox Configuration Check]]
 pub fn mailbox_check(file: &Path) -> Outcome {
     use vertep_runtime::{BackendSpec, MailboxConfig, MatchSpec};
     let text = match std::fs::read_to_string(file) {

@@ -229,11 +229,15 @@ Every backend must pass the shared test kit (`Shared Backend Test Kit`). The gra
 
 ## Tiramemsu mapping
 
-Tiramemsu implements both traits on one file per shard: one append is one `Db::transact` that checks the head, writes the entry, derives the new state with the entry as support and acknowledges the message.
+Tiramemsu implements both traits on one file per shard: one append is one `Db::transact` that checks the head, writes the entry and derives the new state with the entry as support.
 
 - describes:: [[components#vertep-tiramemsu]]
 - describes:: [[constraints#Tiramemsu has a single writer per file]]
 - describes:: [[glossary#Shard]]
+- describes:: [[decisions#One transaction per turn]] {note: "proposed: moves the acknowledgement, annotations, outbox mark and snapshot into the append"}
+- describes:: [[constraints#SQLite NORMAL synchronous can lose the newest commits]]
+
+The append does not acknowledge the message. Today the mailbox acknowledgement, the transition annotations, the outbox mark and any snapshot are separate commits after it, and the shard opens at `Durability::Normal`; [[views/performance#Performance#Cost of one durable message]] counts them and M18 plans the fix.
 
 ```mermaid
 flowchart LR

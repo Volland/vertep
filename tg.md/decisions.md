@@ -602,12 +602,16 @@ An activation collects every accepted message id from its journal, snapshot or n
 
 The cost grows with the journal; an index of message ids in the current-state graph is the planned fix.
 
+M18 proposes the fix: [[decisions#Activation reads from the snapshot and deduplication uses an index]].
+
 ## Outbox progress lives in an outbox graph
 
 Each actor has a graph `<A>/outbox` holding `vt:dispatchedThrough n` and `vt:dispatched` marks on fired timers; restart and activation dispatch every send after the mark again, and receivers deduplicate.
 
 - motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-11"}
 - motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary}
+
+M18 proposes moving the marks to unversioned rows: [[decisions#Runtime bookkeeping is unversioned]].
 
 ## Pending timers live in the current-state graph
 
@@ -1963,3 +1967,112 @@ npm tarballs, wheels, the sdist and the SBOMs get GitHub build-provenance attest
 - motivated_by:: [[constraints#PyPI releases are immutable]] {weight: secondary, since: "2026-11-16"}
 
 Crates get SBOMs but no attestation of the uploaded file, because crates.io offers none. npm publishing stays manual; publishing the attested tarballs with `npm publish --provenance` from CI is documented in CONTRIBUTING.md.
+
+## Performance is measured by counted operations and benchmarks
+
+Every performance claim has a criterion benchmark or a test that counts store operations through `CountingStorage`; budgets are asserted on counts, so they hold on any machine. Proposed 2026-11-16 (M18 D1).
+
+- motivated_by:: [[decisions#Benchmarks measure the claims]] {weight: primary, since: "2026-11-16", note: "one suite: M18 phase 0 builds M13 group 4"}
+- motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: secondary, note: "the evidence M13 asks for"}
+
+Rejected: tuning without a baseline, and budgets in wall-clock time only, which flake on shared CI runners. Wall-clock numbers go to the regression gate and the results page M13 plans.
+
+## Effects follow a durable commit
+
+Journal shards open with `Durability::Immediate` by default, so a turn's sends go out only after its entry is synced; `Relaxed` is an opt-in a store declares through `JournalCapabilities::durable_commit`. Proposed 2026-11-16 (M18 D2).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-16"}
+- motivated_by:: [[constraints#SQLite NORMAL synchronous can lose the newest commits]] {weight: primary}
+
+Group commit ([[decisions#Group commit per shard]]) pays for the sync. Rejected: keeping `Normal` and flushing before dispatch, which is a second sync per turn.
+
+## One transaction per turn
+
+`AppendMeta` carries the transition annotations, the new outbox mark, the message id to acknowledge and a due snapshot, and tiramemsu writes them in the one transaction that checks the head. Proposed 2026-11-16 (M18 D3).
+
+- motivated_by:: [[decisions#State changes travel in the append]] {weight: primary, since: "2026-11-16"}
+- motivated_by:: [[constraints#Tiramemsu has a single writer per file]] {weight: secondary, note: "one writer makes one transaction per turn cheap"}
+
+A store that cannot hold one of them reports it unsupported, and the node falls back to separate writes, as it does for state today. Rejected: batching the side writes later, which reopens the window between append and acknowledgement.
+
+## Runtime bookkeeping is unversioned
+
+Mailbox rows, outbox marks, `vt:dispatched` timer marks, heads, accepted message ids and snapshots move to tiramemsu's volatile table, where clearing a row frees it; entries, state, annotations and dead letters stay RDF. Proposed 2026-11-16 (M18 D4).
+
+- supersedes:: [[decisions#Outbox progress lives in an outbox graph]] {since: "M18 phase 2", reason: "an outbox mark replaced every turn leaves a versioned row each time"}
+- motivated_by:: [[constraints#Tiramemsu canonicalises literals]] {weight: secondary, note: "envelope literals become permanent term rows"}
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-16", note: "bookkeeping is recomputable or transient, so it needs no history"}
+
+A mailbox row stores the envelope once, as compact JSON. Rejected: a second SQLite file for bookkeeping (two writers and no shared transaction with the append), and physical deletes in tiramemsu (against its design).
+
+## Group commit per shard
+
+The node appends the ready turns of one scheduling round per shard with `JournalStore::append_batch`, which checks every head and fence in one transaction, skips conflicts, writes the rest and syncs once. Proposed 2026-11-16 (M18 D5).
+
+- motivated_by:: [[constraints#Tiramemsu has a single writer per file]] {weight: primary, since: "2026-11-16", note: "heads cannot move between the check and the write"}
+- motivated_by:: [[decisions#Fencing epochs on journal appends]] {weight: secondary}
+
+Acknowledgement and dispatch wait for the batch commit; each actor's turns stay in order. Bounded by `group_commit.max_turns` (64) and `max_wait_ms` (0: only work already ready). Rejected: a savepoint per actor, which adds work without changing the outcome under one writer.
+
+## Shard groups run several single-threaded nodes
+
+`NodeGroup` runs k nodes on k threads in one process; node i owns the shards with `shard % k == i`, activations never cross threads, and cross-group sends go through a `Send` inbox. Proposed 2026-11-16 (M18 D6).
+
+- motivated_by:: [[decisions#A node runs its actors on one thread]] {weight: primary, since: "2026-11-16", note: "kept: each group is such a node"}
+- motivated_by:: [[decisions#Single-node shards placed by FNV-1a of the address IRI]] {weight: primary}
+
+k = 1 is today's node. Rejected: a work-stealing pool of activations (needs `Send` datamodels and breaks single-thread determinism), and `spawn_blocking` storage calls in one node (overlaps IO, turns still serial).
+
+## Activation reads from the snapshot and deduplication uses an index
+
+`JournalStore` gains `latest_snapshot` and `contains_message` beside `read_range`; activation loads the latest snapshot and reads only later entries, and deduplication checks a window of recent ids, then the index. Proposed 2026-11-16 (M18 D7).
+
+- supersedes:: [[decisions#Deduplication reads the whole journal on activation]] {since: "M18 phase 2", reason: "its own note names the index as the planned fix"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: primary, since: "2026-11-16", note: "deduplication must stay exact"}
+
+Each method has a default over `read`, so other backends keep working; `dedup_window` defaults to 4096. Rejected: per-sender sequence watermarks, because deferral accepts one sender's messages out of order and outside messages have no sender sequence.
+
+## Mailboxes queue, stash deferred messages and may be bounded
+
+A mailbox keeps a FIFO ready queue, a stash of deferred messages merged back by sequence when the deferring descriptors change, and an id index; a route may declare `capacity` with `overflow: reject | wait`. Proposed 2026-11-16 (M18 D8).
+
+- motivated_by:: [[decisions#Mailbox backend is chosen per address]] {weight: secondary, since: "2026-11-16", note: "capacity and overflow are per route"}
+- motivated_by:: [[decisions#Non-blocking request and deferred events]] {weight: primary, note: "deferred messages must not be rescanned on every receive"}
+
+`reject` returns `MailboxError::Full`, which the outbox retries after back-off. Rejected: a priority queue keyed by deferral status, which every configuration change would rebuild.
+
+## Deactivation releases per-actor memory
+
+Deactivation drops the actor's empty mailbox handle, settled outbox record and deduplication window; idle detection uses a set ordered by last activity; statistics count instead of keeping a map per address. Proposed 2026-11-16 (M18 D9).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-16", note: "state is recoverable, so memory need not be kept"}
+
+In the cluster, `virtuals` holds only active actors, idle pair streams are evicted after `pair_idle_ms`, and replication progress drops actors whose shard moved.
+
+## Cluster streams stay within the peer's stream budget
+
+The QUIC transport sets its stream limit and keeps pair streams below it, locks per peer with no lock held across connect or `open_bi`, and sends each pair through one ordered task with a window of frames. Proposed 2026-11-16 (M18 D10).
+
+- motivated_by:: [[constraints#QUIC limits streams per connection]] {weight: primary, since: "2026-11-16"}
+- motivated_by:: [[decisions#QUIC with mutual TLS and a stream per actor pair]] {weight: primary, note: "kept: pairs share streams past the cap"}
+- motivated_by:: [[decisions#At-least-once inside the cluster with journal deduplication]] {weight: secondary}
+
+Today `max_pair_streams` is 1024 against quinn's default of 100 streams, and the transport-wide lock is held across `open_bi`, so the 101st pair to a peer stalls every peer. A retry task per message can also reorder a pair. The membership view becomes an `ArcSwap` compared by version.
+
+## Standbys are shipped to in parallel
+
+The shard owner ships an append to all standbys concurrently, acknowledges once the configured number have stored it, and skips the pre-flight round trip to a standby that is caught up. Proposed 2026-11-16 (M18 D11).
+
+- motivated_by:: [[decisions#Optional standby journal replication]] {weight: primary, since: "2026-11-16"}
+- motivated_by:: [[decisions#Unreplicated entries stay unreadable until the quorum catches up]] {weight: secondary}
+
+Shipping is batched with group commit.
+
+## Durability by origin is opt-in
+
+With `durability: by_origin` on a route, a message an actor sent waits in memory, because the sender's outbox holds it until the receiver confirms the consuming turn; a message from outside is stored durably. Proposed 2026-11-16 (M18 D12).
+
+- motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-16"}
+- motivated_by:: [[constraints#Relays deliver at least once]] {weight: secondary}
+
+This is reliable delivery as in Akka (producer-side buffer, consumer confirmation) on the journal Vertep already has. It costs one control message per actor message, and deferred messages hold the sender's outbox mark back. The default stays `durable`. Rejected for the default: an external broker (NATS JetStream, Redis Streams), which adds a second source of truth beside the journal.

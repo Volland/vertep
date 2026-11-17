@@ -511,6 +511,7 @@ impl MailboxBackend {
 /// ```
 // @tg: implements:: [[openspec:messaging#Pluggable Mailboxes]]
 // @tg: implements:: [[decisions#Mailbox backend is chosen per address]]
+// @tg: implements:: [[openspec:messaging#Mailbox Routing By Address]]
 #[derive(Clone)]
 pub struct RoutedMailboxes {
     rules: Vec<(AddressMatch, Arc<dyn MailboxFactory>)>,
@@ -617,6 +618,7 @@ pub enum MatchSpec {
 /// ```
 // @tg: implements:: [[openspec:messaging#Pluggable Mailboxes]]
 // @tg: implements:: [[decisions#Mailbox backend is chosen per address]]
+// @tg: implements:: [[openspec:messaging#Mailbox Configuration File]]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MailboxConfig {
     /// The backend of every address no route selects.
@@ -750,6 +752,9 @@ mod tests {
     use vertep_core::datamodel::EventType;
 
     // @tg: verifies:: [[openspec:messaging#Pluggable Mailboxes#Mailbox routes from configuration]] {level: unit}
+    // @tg: verifies:: [[openspec:messaging#Mailbox Routing By Address#Application factory behind a route]] {level: unit}
+    // @tg: verifies:: [[openspec:messaging#Mailbox Configuration File#Omitted default is memory]] {level: unit}
+    // @tg: verifies:: [[openspec:messaging#Mailbox Configuration File#Malformed document rejected]] {level: unit}
     #[test]
     fn config_builds_routes_and_rejects_unknown_names() {
         let json = r#"{"routes":[
@@ -773,6 +778,8 @@ mod tests {
         assert!(MailboxConfig::from_json("{\"default\": 3}").is_err());
     }
 
+    // @tg: verifies:: [[openspec:messaging#Mailbox Configuration File#Validation lists the names to register]] {level: unit}
+    // @tg: verifies:: [[openspec:messaging#Mailbox Configuration File#Invalid backend rejected before anything opens]] {level: unit}
     #[test]
     fn validate_names_what_to_register_and_rejects_bad_specs() {
         let ok = MailboxConfig::from_json(
@@ -793,6 +800,7 @@ mod tests {
         }
     }
 
+    // @tg: verifies:: [[openspec:messaging#Mailbox Routing By Address#First matching rule wins]] {level: unit}
     #[test]
     fn routes_pick_backend_per_address_first_match_wins() {
         let durable = Arc::new(vertep_store::MemoryStore::new());

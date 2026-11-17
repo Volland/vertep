@@ -271,6 +271,36 @@ The rules behind the sketch:
 - **Resolution depends only on the address** (`Address Resolution`). The directory maps the IRI to wherever the mailbox currently is.
 - **Every event carries its origin** (`Event Origin`). `_event.origin` is the sender's address and `_event.origintype` the transport's type IRI, so `<send target="_event.origin">` always replies correctly. In M5 the origin becomes a verified DID.
 
+### Mailbox routing
+
+`RoutedMailboxes` picks the mailbox backend per address from ordered rules, first match wins, so one node keeps some actors' mailboxes in memory, some in a tiramemsu directory and some at a relay.
+
+- describes:: [[decisions#Mailbox backend is chosen per address]]
+- describes:: [[capabilities#Messaging]]
+- describes:: [[constraints#Tiramemsu has a single writer per file]]
+- describes:: [[components#vertep-cli]]
+
+```mermaid
+flowchart LR
+    addr["address IRI"] --> r1{"rule 1<br/>exact urn:t:special"}
+    r1 -->|"no"| r2{"rule 2<br/>prefix vt://orders/"}
+    r2 -->|"no"| r3{"rule 3<br/>scheme did"}
+    r3 -->|"no"| def["default backend<br/>memory"]
+    r1 -->|"yes"| mem["Memory"]
+    r2 -->|"yes"| store["Store: tiramemsu dir, 4 shard files<br/>not the journal's files"]
+    r3 -->|"yes"| custom["Custom factory<br/>relay inbox at a TSP mediator"]
+    cfg["mailboxes.json<br/>default + routes"] -->|"MailboxConfig::build<br/>with registered names"| addr
+    check["vt mailbox check FILE"] -.->|"validate only:<br/>opens nothing"| cfg
+```
+
+The rules behind the sketch (OpenSpec change `mailbox-backends`; requirements `Mailbox Routing By Address`, `Mailbox Configuration File`, `Offline Mailbox Configuration Check`):
+
+- **First match wins.** Rules match by scheme, prefix or exact address and are tried in the order written; an exact exception goes above the prefix it narrows.
+- **Any storage.** A `Store` backend takes any `Storage`. A tiramemsu directory for mailboxes must not be the journal's, because a tiramemsu file has one writer.
+- **The file names, the application registers.** A `named` backend in the JSON file is looked up in a map of factories passed to `NodeBuilder::mailbox_config`; an unregistered name fails the build, not the first delivery.
+- **Recovery spans backends.** After a restart the router reports every address any backend holds messages for, so durable routes reactivate their actors and memory routes start empty.
+- **Planned per route** (M18, `m18-runtime-performance`): `capacity` with `overflow: reject | wait`, and `durability: by_origin`.
+
 ### Local transport
 
 M2 ships one transport, the local one, registered as an SCXML Event I/O Processor; the cluster QUIC transport and the DIDComm and TSP transports register the same way later.

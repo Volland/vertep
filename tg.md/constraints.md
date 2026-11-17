@@ -322,3 +322,13 @@ The browser build depends on exact LLVM and `wasm-bindgen` versions: `wasm-bindg
 crates.io records a checksum for each crate file but no signature and no build provenance, so a consumer cannot verify a published crate against the workflow that built it.
 
 - constrains:: [[decisions#Release artifacts carry signed build provenance]] {strength: must, source: "crates.io, 2026-11"}
+
+## SQLite NORMAL synchronous can lose the newest commits
+
+In WAL mode with `synchronous=NORMAL` a commit is durable only after a later checkpoint, so a power loss or OS crash can roll back the newest transactions. Tiramemsu opens shards at `Durability::Normal`.
+
+- constrains:: [[decisions#Effects follow a durable commit]] {strength: must, source: "SQLite documentation, PRAGMA synchronous"}
+- constrains:: [[decisions#Event-sourced actors]] {strength: must, source: "SQLite documentation, PRAGMA synchronous", note: "a send dispatched after a commit the crash rolls back is held by a receiver while the sender's history lacks it"}
+- constrains:: [[crates/vertep-tiramemsu/src/backend.rs#TiramemsuBackend#open]] {strength: must, source: "SQLite documentation, PRAGMA synchronous", note: "opens every shard with default options, so at Normal"}
+
+Found in the architecture review of 2026-11-16. `TiramemsuBackend::open` takes no options, so a multi-shard store cannot be opened at `Durability::Immediate` today; only a single shard opened with `TiramemsuShard::open_with` can. [[decisions#Effects follow a durable commit]] makes `Immediate` the default.

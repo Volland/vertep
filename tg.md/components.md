@@ -638,9 +638,11 @@ The `vt` command: convert between SCXML, YAML and RDF, validate and hash charts,
 - provides:: [[capabilities#webvh hosting]] {confidence: partial, note: "the vt webvh commands"}
 - scheduled_in:: [[roadmap#M1 Typed authoring]]
 - scheduled_in:: [[roadmap#M8 did:webvh hosting]] {note: "vt webvh"}
+- realizes:: [[decisions#Mailbox backend is chosen per address]] {confidence: partial, note: "vt mailbox check validates a mailbox configuration file"}
 
 Implemented 2026-11-11: the `vt` binary with `typecheck`, `schema` (JSON Schema, SHACL, CEL; Rust waits for the macro crate), `validate`, `hash`, `convert` between SCXML, YAML and RDF formats, and `certify` per [[decisions#vt certify runs the Lean checker as a process]]. Exit codes: 0 success, 1 the chart fails, 2 usage or I/O.
 
+`vt mailbox check FILE` (added 2026-11-15, OpenSpec change `mailbox-backends`) parses a mailbox configuration, validates it without opening a store, and lists the default, each route and the names an application must register (exit 1 when invalid, 2 when unreadable).
 
 Since M8, `vt webvh` creates, updates, rotates, deactivates, verifies, witnesses, publishes and serves `did:webvh` DIDs, creates durable-object DIDs (`object create`) and prepares custody changes (`custody change`). Keys stay in a file key manager directory; `dids/<did>/` beside them holds the update-key names and the working log.
 
@@ -659,14 +661,11 @@ The facade crate an application depends on, re-exporting the other crates behind
 
 Implemented 2026-11-11: re-exports core, store and RDF, plus runtime, tiramemsu and SCXML behind default features and ECMAScript on request; `examples/quickstart.rs` runs one virtual actor with a delayed send and a time-travel query.
 
-- realizes:: [[decisions#Mailbox backend is chosen per address]] {confidence: partial, note: "vt mailbox check validates a mailbox configuration file"}
 ## vertep-examples
 
 Runnable examples for newcomers and the documentation site, one binary per example with its charts, and tests that hold every example to its recorded output.
 
 - uses:: [[components#vertep]] {kind: required, note: "the facade with the agent feature: core, SCXML, runtime, tiramemsu, agents"}
-`vt mailbox check FILE` parses a mailbox configuration, validates it without opening a store, and lists the default, each route and the names an application must register (exit 1 when invalid, 2 when unreadable).
-
 - uses:: [[components#vertep-dm-cel]] {kind: required, note: "the facade does not re-export the CEL datamodel"}
 - uses:: [[components#vertep-dm-rust]] {kind: required, note: "statechart! and the rust datamodel"}
 - uses:: [[components#vertep-cli]] {kind: dev, note: "the vt commands as a library, to check their recorded outputs"}
