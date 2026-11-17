@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Build it as a chart — Vertep</title>
+<meta name="description" content="A working guide: build a durable refund desk with Vertep, step by step, with real code and output, and compare it with XState, Akka and Orleans: what each stores, replays, times and decides, and when to choose which.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="../docs/index.html">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="index.html" aria-current="page">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="article">
+  <header class="article-head">
+    <p class="kicker">A working guide</p>
+    <h1>Build it as a chart</h1>
+    <p class="byline">A refund desk in Vertep, step by step, and what XState, Akka and Orleans would ask of you instead</p>
+  </header>
+
+  <p>Some programs answer a request and forget it. Others live for days. An order waits for payment. A refund waits for someone to decide. A claim waits for a document, then for an assessor, then for a deadline. These long-lived programs fail in a particular way. Nobody can say afterwards exactly what happened, or why, or what the program would do now if you ran it again.</p>
+
+  <p>Vertep is built for the second kind. This article shows how to build one with it, from an empty file to a durable, replayable process with a language model or a person at its choice points. Every Vertep listing below is a file in the repository, and every output was pasted from a real run. Along the way the article asks what the same thing would take in three tools you may already use: XState, Akka and Microsoft Orleans. They are good tools, and at the end you will find a plain guide to when each is the better choice.</p>
+
+  <h2>The idea in one picture</h2>
+
+  <p>Vertep makes three decisions, and everything else follows from them.</p>
+
+  <ol>
+    <li><strong>The program is a chart.</strong> Behaviour is a statechart: states, nested states, parallel regions, history, guarded transitions. A chart is data, not code. You write it in SCXML, the W3C notation, in YAML, or with a Rust macro. Each chart is named by the hash of its content, so a changed transition is a new version, and you can see which version did what.</li>
+    <li><strong>The actor is its journal.</strong> An actor is a running chart with an address. Every input it accepts is written to its journal <em>before</em> it is processed: messages, timer firings, and the answers of models and people. The state is whatever those inputs produce.</li>
+    <li><strong>The step is pure.</strong> The interpreter is one function, <code>step(chart, session, input)</code>, with no I/O, no clock and no randomness. When the chart wants to send a message, start a timer or ask for a decision, <code>step</code> returns an <em>effect</em>, and a shell around it does the work. The result comes back later as another input, and goes into the journal like any other.</li>
+  </ol>
+
+  <figure class="plate">
+    <div class="plate-inner">
+      <svg viewBox="0 0 640 300" width="640" role="img" aria-labelledby="b1t">
+        <title id="b1t">The Vertep loop. An input (an event, a timer firing or a decision) is appended to the journal at the next position. The pure step function applies it to the chart and returns effects. The shell carries out the effects (sending, scheduling, asking a decider), and their results return as new inputs.</title>
+        <defs>
+          <marker id="b1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+          <pattern id="b1h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--ink)" stroke-width="1" opacity=".3"/></pattern>
+        </defs>
+        <g font-family="JetBrains Mono, monospace" font-size="13" style="fill:var(--ink)" text-anchor="middle">
+          <g style="stroke:var(--ink)" stroke-width="2">
+            <rect x="250" y="12" width="140" height="50" rx="10" style="fill:url(#b1h)"/>
+            <rect x="250" y="120" width="140" height="54" rx="10" style="fill:var(--paper);stroke:var(--orange)" stroke-width="3"/>
+            <rect x="30" y="120" width="160" height="54" rx="10" style="fill:var(--paper)"/>
+            <rect x="30" y="232" width="160" height="54" rx="10" style="fill:var(--paper)"/>
+            <rect x="450" y="120" width="160" height="54" rx="10" style="fill:var(--paper)"/>
+            <rect x="450" y="232" width="160" height="54" rx="10" style="fill:var(--paper)"/>
+          </g>
+          <text x="320" y="34">chart</text>
+          <text x="320" y="142">step()</text>
+          <text x="110" y="142">journal</text>
+          <text x="110" y="254">input</text>
+          <text x="530" y="142">effects</text>
+          <text x="530" y="254">shell</text>
+          <g font-family="EB Garamond, Georgia, serif" font-size="13" style="fill:var(--ink-2)">
+            <text x="320" y="52">data, named by its hash</text>
+            <text x="320" y="162">pure: no I/O, no clock</text>
+            <text x="110" y="162">append at n, else refuse</text>
+            <text x="110" y="274">event · timer · decision</text>
+            <text x="530" y="162">send · schedule · ask</text>
+            <text x="530" y="274">clock · network · deciders</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="1.8" marker-end="url(#b1a)">
+            <path d="M110 230 V178"/>
+            <path d="M190 147 H246"/>
+            <path d="M320 62 V116"/>
+            <path d="M390 147 H446"/>
+            <path d="M530 174 V228"/>
+            <path d="M450 259 H194"/>
+          </g>
+          <text x="322" y="250" font-family="IM Fell English SC, Georgia, serif" font-size="14" style="fill:var(--orange-text)">results return as inputs</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Plate I. <b>The loop.</b> The journal sits in front of the step, so the record exists before the action.</figcaption>
+  </figure>
+
+  <p>Some of what you get from that loop:</p>
+
+  <ul>
+    <li><strong>Restart.</strong> A process that stops loses nothing. The next one reads the journal and replays it through the same chart.</li>
+    <li><strong>Time travel.</strong> The state at entry 17 is the replay of entries 1 to 17.</li>
+    <li><strong>Replay without the world.</strong> A model's answer is a journal entry, so replay needs no model, no network and no person.</li>
+    <li><strong>One history.</strong> An append succeeds only if the journal is still at the position the actor last saw. Two activations of one actor can never both extend its history.</li>
+    <li><strong>Many hosts.</strong> The core runs natively, in WebAssembly in a browser or Node.js, and from Python. The same chart behaves the same in all of them.</li>
+  </ul>
+
+  <h2>What we will build</h2>
+
+  <p>The example is a refund desk. A customer asks for a refund of some amount. A reviewer can approve it, reject it, or escalate it to a manager. There is one policy the business will not bend: a reviewer may approve at most 100 on their own, and anything above that goes to the manager. Who is the reviewer? Today it is a language model. Tomorrow it may be a person, or a rule program. The chart should not care.</p>
+
+  <figure class="plate">
+    <div class="plate-inner">
+      <svg viewBox="0 0 620 290" width="620" role="img" aria-labelledby="b2t">
+        <title id="b2t">The refund chart. From idle, request leads to review. Review is a decide state bound to policy: approve leads to approved when the amount is at most 100, reject leads to rejected, escalate leads to manager when the amount is over 100. Manager is also a decide state: approve or reject.</title>
+        <defs>
+          <marker id="b2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+          <pattern id="b2h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--orange)" stroke-width="1.4" opacity=".45"/></pattern>
+        </defs>
+        <g font-family="JetBrains Mono, monospace" font-size="13" style="fill:var(--ink)" text-anchor="middle">
+          <circle cx="40" cy="30" r="7" style="fill:var(--ink)"/>
+          <g style="stroke:var(--ink)" stroke-width="2">
+            <rect x="14" y="60" width="90" height="44" rx="10" style="fill:var(--paper)"/>
+            <rect x="160" y="46" width="150" height="72" rx="12" style="fill:url(#b2h)" stroke-width="2.5"/>
+            <rect x="160" y="200" width="150" height="72" rx="12" style="fill:url(#b2h)" stroke-width="2.5"/>
+            <rect x="476" y="60" width="124" height="44" rx="10" style="fill:var(--paper)"/>
+            <rect x="476" y="214" width="124" height="44" rx="10" style="fill:var(--paper)"/>
+            <rect x="480" y="64" width="116" height="36" rx="8" fill="none" stroke-width="1"/>
+            <rect x="480" y="218" width="116" height="36" rx="8" fill="none" stroke-width="1"/>
+          </g>
+          <text x="59" y="87">idle</text>
+          <text x="235" y="78">review</text>
+          <text x="235" y="232">manager</text>
+          <text x="538" y="87">approved</text>
+          <text x="538" y="241">rejected</text>
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="13" style="fill:var(--orange-text)">
+            <text x="235" y="100">decide: policy</text>
+            <text x="235" y="254">decide: policy</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="1.8" marker-end="url(#b2a)">
+            <path d="M40 37 V56"/>
+            <path d="M104 82 H156"/>
+            <path d="M310 70 H472"/>
+            <path d="M310 108 L472 224"/>
+            <path d="M235 118 V196"/>
+            <path d="M310 212 L472 94"/>
+            <path d="M310 246 H472"/>
+          </g>
+          <g font-size="11.5">
+            <text x="130" y="74">request</text>
+            <text x="392" y="62">approve [amount ≤ 100]</text>
+            <text x="352" y="122" text-anchor="start">reject</text>
+            <text x="244" y="152" text-anchor="start">escalate</text>
+            <text x="244" y="168" text-anchor="start">[amount &gt; 100]</text>
+            <text x="352" y="196" text-anchor="start">approve</text>
+            <text x="392" y="240">reject</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Plate II. <b>The refund desk.</b> Hatched states are choice points. The guards belong to the chart, not to whoever decides.</figcaption>
+  </figure>
+
+  <h2>Step 1. Install</h2>
+
+  <p>The crates are on crates.io, the JavaScript packages on npm and the Python package on PyPI. A Rust program depends on the facade crate <code>vertep</code>. The <code>vt</code> command validates, hashes, converts and type-checks charts.</p>
+
+<pre data-lang="TOML"><code>[dependencies]
+vertep = "0.1"</code></pre>
+
+<pre data-lang="Shell"><code>cargo install vertep-cli          # the vt command
+npm install @vertep/web@next      # browsers and Node.js
+pip install vertep                # Python 3.9 or later</code></pre>
+
+  <p>To follow along with the examples, clone the repository. Each example is a binary of the <code>vertep-examples</code> package, and <code>cargo test -p vertep-examples</code> checks that each one still prints what this page shows.</p>
+
+  <h2>Step 2. Write the chart</h2>
+
+  <p>Here is the refund desk as SCXML, from <code>examples/decider-agent/refund.scxml</code>. It uses the CEL datamodel: <code>ctx</code> is the actor's data and <code>ev.data</code> is the event's payload. Two attributes from the Vertep namespace make <code>review</code> and <code>manager</code> into <em>decide states</em>. <code>vt:decide="policy"</code> names the binding that will decide, and <code>vt:candidates</code> lists the events it may choose from.</p>
+
+<pre data-lang="SCXML"><code><span class="nt">&lt;scxml</span> <span class="na">xmlns=</span><span class="s">"http://www.w3.org/2005/07/scxml"</span> <span class="na">xmlns:vt=</span><span class="s">"https://w3id.org/vertep/vt#"</span>
+       <span class="na">version=</span><span class="s">"1.0"</span> <span class="na">datamodel=</span><span class="s">"cel"</span> <span class="na">name=</span><span class="s">"refund-agent"</span> <span class="na">initial=</span><span class="s">"idle"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;datamodel&gt;</span>
+    <span class="nt">&lt;data</span> <span class="na">id=</span><span class="s">"amount"</span> <span class="na">expr=</span><span class="s">"0"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/datamodel&gt;</span>
+
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"idle"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"request"</span> <span class="na">target=</span><span class="s">"review"</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;assign</span> <span class="na">location=</span><span class="s">"amount"</span> <span class="na">expr=</span><span class="s">"ev.data.amount"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/transition&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"review"</span> <span class="na">vt:decide=</span><span class="s">"policy"</span> <span class="na">vt:candidates=</span><span class="s">"approve reject escalate"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">cond=</span><span class="s">"ctx.amount &amp;lt;= 100"</span> <span class="na">target=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"reject"</span> <span class="na">target=</span><span class="s">"rejected"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"escalate"</span> <span class="na">cond=</span><span class="s">"ctx.amount &gt; 100"</span> <span class="na">target=</span><span class="s">"manager"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"manager"</span> <span class="na">vt:decide=</span><span class="s">"policy"</span> <span class="na">vt:candidates=</span><span class="s">"approve reject"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"approve"</span> <span class="na">target=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"reject"</span> <span class="na">target=</span><span class="s">"rejected"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/state&gt;</span>
+
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"approved"</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"rejected"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/scxml&gt;</span></code></pre>
+
+  <p>Read the guards. Above 100, <code>approve</code> in <code>review</code> is disabled, so it is never offered. Whatever decides here cannot approve a large refund alone, because the chart never presents that move. That is the most important property of the design, and we will come back to it.</p>
+
+  <p>Now ask <code>vt</code> whether the chart is well formed, and what its name is.</p>
+
+<pre class="output" data-lang="vt validate"><code>$ vt validate examples/decider-agent/refund.scxml
+examples/decider-agent/refund.scxml: ok: urn:vertep:chart:sha256:c6282b762c855df3792c2fea39fc345df6ed5e317484461e5d0a7f8d68f292aa</code></pre>
+
+  <p>That IRI is the chart's version. Change a guard and you get a new one. Every journal entry records the version it ran under, and an actor stays on its version until it ends or you migrate it explicitly, with a compatibility check. The same chart in YAML hashes to the same IRI, because the hash is taken over the chart's meaning, not its spelling:</p>
+
+<pre class="output" data-lang="vt convert --to yaml"><code>$ vt convert --to yaml examples/decider-agent/refund.scxml
+vertep: 1
+name: refund-agent
+datamodel: cel
+context:
+  amount:
+    init: "0"
+initial: idle
+states:
+  idle:
+    on:
+      request:
+        target: review
+        actions:
+          - assign:
+              location: amount
+              expr: ev.data.amount
+  review:
+    on:
+      approve:
+        cond: "ctx.amount &lt;= 100"
+        target: approved
+      reject: rejected
+      escalate:
+        cond: "ctx.amount &gt; 100"
+        target: manager
+    extensions:
+      - local: candidates
+        attribute: "approve reject escalate"
+      - local: decide
+        attribute: policy
+  ...</code></pre>
+
+  <p>If you want types, write the chart in YAML with declared event payloads and context. <code>vt typecheck</code> then checks every guard and assignment before anything runs. This is the error it gives for the ill-typed order in <code>examples/typed-order</code>:</p>
+
+<pre class="output" data-lang="vt typecheck"><code>$ vt typecheck examples/typed-order/order-ill-typed.yaml
+examples/typed-order/order-ill-typed.yaml:44:19: states.shopping.states.cart.on.add[0].actions[1]: state "cart", transition 0 (on add), action 1: the value assigned to `ctx.total` has type string, expected decimal</code></pre>
+
+  <h2>Step 3. Make it durable</h2>
+
+  <p>Before we add judgement, look at the durable part on its own. <code>examples/durable-actor</code> runs an order with a payment window: after <code>checkout</code> the chart waits 15 minutes for <code>pay</code>, then expires. The timer is an ordinary <code>&lt;send&gt;</code> with a delay:</p>
+
+<pre data-lang="SCXML"><code><span class="nt">&lt;state</span> <span class="na">id=</span><span class="s">"awaiting_payment"</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;onentry&gt;&lt;send</span> <span class="na">id=</span><span class="s">"payment-timer"</span> <span class="na">event=</span><span class="s">"payment.timeout"</span> <span class="na">delay=</span><span class="s">"900s"</span><span class="nt">/&gt;&lt;/onentry&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"pay"</span> <span class="na">target=</span><span class="s">"paid"</span><span class="nt">&gt;&lt;cancel</span> <span class="na">sendid=</span><span class="s">"payment-timer"</span><span class="nt">/&gt;&lt;/transition&gt;</span>
+  <span class="nt">&lt;transition</span> <span class="na">event=</span><span class="s">"payment.timeout"</span> <span class="na">target=</span><span class="s">"expired"</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/state&gt;</span></code></pre>
+
+  <p>The host opens a tiramemsu store (an SQLite-backed graph store), registers the chart under a type IRI, and sends messages to a <em>virtual actor</em>. There is no create call. The address <code>type/key</code> exists for every key, and the first message activates it. The idea comes from Orleans.</p>
+
+<pre data-lang="Rust"><code><span class="k">fn</span> <span class="nf">node</span>(backend: <span class="nc">Arc</span><span class="o">&lt;</span>TiramemsuBackend<span class="o">&gt;</span>, shell: <span class="nc">Shell</span>) -&gt; <span class="nb">Result</span><span class="o">&lt;</span>Node, Error<span class="o">&gt;</span> {
+    <span class="kd">let</span> <span class="k">mut</span> node <span class="o">=</span> Node::builder(backend, shell)
+        .datamodels(Arc::new(vertep_dm_cel::CelRegistry))
+        .build();
+    <span class="c1">// `read_str` accepts only the `null` datamodel; name the ones the host supports.
+</span>    <span class="kd">let</span> opts <span class="o">=</span> vertep::scxml::ReadOptions::new().with_datamodels(<span class="o">&amp;</span>vertep::scxml::AnyDatamodel);
+    <span class="kd">let</span> chart <span class="o">=</span> vertep::scxml::read(ORDER, <span class="o">&amp;</span>opts)<span class="o">?</span>.chart;
+    <span class="c1">// Registering is idempotent: the same chart gets the same content-addressed version.
+</span>    node.register_type(ORDER_TYPE, chart)<span class="o">?</span>;
+    <span class="nb">Ok</span>(node)</code></pre>
+
+<pre data-lang="Rust"><code><span class="kd">let</span> backend <span class="o">=</span> Arc::new(TiramemsuBackend::open(dir, <span class="mi">1</span>)<span class="o">?</span>);
+<span class="kd">let</span> <span class="k">mut</span> node <span class="o">=</span> node(backend, shell.clone())<span class="o">?</span>;
+
+<span class="c1">// A virtual actor needs no create call: the first message activates it.
+</span><span class="k">for</span> name <span class="k">in</span> [<span class="s">"add"</span>, <span class="s">"add"</span>, <span class="s">"checkout"</span>] {
+    node.send(<span class="o">&amp;</span>order, Event::named(name, EventType::External))<span class="o">?</span>;
+}
+node.run_until_idle();</code></pre>
+
+  <p>The example then drops the node and the store, as if the process had stopped. A second "process" opens the same directory ten minutes later on a virtual clock. Asking for the actor's state replays its journal. Five minutes after that, the timer the first process scheduled fires in the second one:</p>
+
+<pre class="output" data-lang="cargo run -p vertep-examples --bin durable-actor"><code>actor https://example.org/charts/order/42
+process 1: ["awaiting_payment"] context={"items":2}
+  entry 1 at +0s: add              timers scheduled: []
+  entry 2 at +0s: add              timers scheduled: []
+  entry 3 at +0s: checkout         timers scheduled: ["payment.timeout"]
+  pending timer payment.timeout due at +900s
+process 1 stops
+process 2: ["awaiting_payment"] context={"items":2} (replayed 3 entries)
+process 2 at +900s: ["expired"] context={"items":2}
+  entry 1 at +0s: add              timers scheduled: []
+  entry 2 at +0s: add              timers scheduled: []
+  entry 3 at +0s: checkout         timers scheduled: ["payment.timeout"]
+  entry 4 at +900s: payment.timeout  timers scheduled: []
+as of entry 1: ["cart"] context={"items":1}</code></pre>
+
+  <p>Three things to notice. The <code>checkout</code> entry carries the timer it scheduled, so the timer is part of the record and not a <code>setTimeout</code> in some process's memory. The firing is entry 4, an input like any other. And <code>as of entry 1</code> rebuilds the past from the journal. Nothing had to be stored for it.</p>
+
+  <div class="callout">
+    <p>Tests run on a virtual clock (<code>Shell::virtual_time</code>) and drive the node with <code>run_until_idle</code>, so a fifteen-minute timeout takes no time and prints the same thing on every run. A server uses <code>Shell::tokio()</code> and <code>node.run().await</code> instead.</p>
+  </div>
+
+  <h2>Step 4. Put judgement at the choice points</h2>
+
+  <p>Now the refund desk. An <em>agent host</em> runs charts with decide states. A <em>decider</em> is bound to each binding name. When an actor enters a decide state, the host builds an offer, a <code>DecisionRequest</code>, holding the state, the candidate events that are enabled <em>right now</em>, a read-only view of the context, and a correlation id. The decider answers with one event, or refuses. The answer is journaled, then processed.</p>
+
+  <figure class="plate">
+    <div class="plate-inner">
+      <svg viewBox="0 0 640 220" width="640" role="img" aria-labelledby="b4t">
+        <title id="b4t">A decision, live and replayed. Live: the chart offers the enabled events, the decider chooses one, the choice is appended to the journal, and the step takes the transition. Replay: the journal feeds the step directly and the decider is never asked.</title>
+        <defs>
+          <marker id="b4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+        </defs>
+        <g font-family="JetBrains Mono, monospace" font-size="13" style="fill:var(--ink)" text-anchor="middle">
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="15" style="fill:var(--ink-2)" text-anchor="start">
+            <text x="8" y="62">live</text>
+            <text x="8" y="172">replay</text>
+          </g>
+          <g style="fill:var(--paper);stroke:var(--ink)" stroke-width="2">
+            <rect x="70" y="30" width="120" height="54" rx="10"/>
+            <rect x="220" y="30" width="120" height="54" rx="10"/>
+            <rect x="370" y="30" width="120" height="54" rx="10" style="fill:var(--paper);stroke:var(--orange)" stroke-width="3"/>
+            <rect x="520" y="30" width="110" height="54" rx="10"/>
+            <rect x="370" y="140" width="120" height="54" rx="10" style="fill:var(--paper);stroke:var(--orange)" stroke-width="3"/>
+            <rect x="520" y="140" width="110" height="54" rx="10"/>
+          </g>
+          <rect x="220" y="140" width="120" height="54" rx="10" fill="none" style="stroke:var(--ink-3)" stroke-width="2" stroke-dasharray="6 5"/>
+          <text x="130" y="53">offer</text><text x="280" y="53">decider</text><text x="430" y="53">journal</text><text x="575" y="53">step</text>
+          <text x="430" y="163">journal</text><text x="575" y="163">step</text>
+          <text x="280" y="163" style="fill:var(--ink-3)">decider</text>
+          <g font-family="EB Garamond, Georgia, serif" font-size="13" style="fill:var(--ink-2)">
+            <text x="130" y="72">enabled events only</text>
+            <text x="280" y="72">model · person · rule</text>
+            <text x="430" y="72">decision entry</text>
+            <text x="575" y="72">transition</text>
+            <text x="430" y="182">same entries</text>
+            <text x="575" y="182">same states</text>
+            <text x="280" y="182" style="fill:var(--ink-3)">never asked</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="1.8" marker-end="url(#b4a)">
+            <path d="M190 57 H216"/><path d="M340 57 H366"/><path d="M490 57 H516"/>
+            <path d="M490 167 H516"/>
+            <path d="M430 84 V136" stroke-dasharray="4 4"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Plate III. <b>A decision, live and replayed.</b> The journal stands between the decider and the step, so replay can skip the decider.</figcaption>
+  </figure>
+
+  <p>The example binds <code>policy</code> to a scripted decider, a stand-in for a model that answers from a list, so it needs no network and prints the same thing on every run. The host is built like this (<code>examples/decider-agent/main.rs</code>):</p>
+
+<pre data-lang="Rust"><code><span class="kd">let</span> <span class="k">mut</span> host <span class="o">=</span> AgentHost::builder(Arc::new(VirtualClock::new(T0)))
+    .journal(journal.clone())
+    .decider(<span class="s">"policy"</span>, Arc::new(decider))
+    .build();
+<span class="kd">let</span> version <span class="o">=</span> host.register(chart()<span class="o">?</span>)<span class="o">?</span>;
+host.spawn(AGENT, <span class="o">&amp;</span>version)<span class="o">?</span>;
+host.send(AGENT, request(<span class="mi">250</span>));
+host.run_until_idle();</code></pre>
+
+  <p>A refund of 250 arrives. Here is the whole run, followed by a second host that opens the same journal with <em>no decider bound at all</em>:</p>
+
+<pre class="output" data-lang="cargo run -p vertep-examples --bin decider-agent"><code>run 1, decider bound to `policy`:
+  decider asked in `review`: offered ["reject", "escalate"] -&gt; escalate
+  decider asked in `manager`: offered ["approve", "reject"] -&gt; approve
+  final: ["approved"] context={"amount":250}
+journal:
+  1 start
+  2 event     request
+  3 decision  escalate (offer https://example.org/agents/refund/7/decision/2.0, rationale "amount is above my approval limit")
+  4 decision  approve (offer https://example.org/agents/refund/7/decision/3.0, rationale "manager approved: item returned unopened")
+run 2, same journal, no decider bound:
+  final: ["approved"] context={"amount":250}
+  as of entry 2: ["review"]
+  as of entry 3: ["manager"]
+  as of entry 4: ["approved"]
+  entries replayed: 4, decider calls: 0</code></pre>
+
+  <p>The first line is the policy at work. In <code>review</code>, with 250, the decider was offered <code>reject</code> and <code>escalate</code>. <code>approve</code> was never on the table. Each answer is a journal entry with the offer it answered and the reason given, written before the chart acted on it. The replay then reaches the same final state and context with zero decider calls.</p>
+
+  <p>To use a real model, bind a <code>LlmDecider</code> instead. It asks for structured output whose schema is a choice over the offered candidates, so a model cannot name an event that was not offered. This binding is from <code>crates/vertep-agent/examples/support/kit.rs</code>:</p>
+
+<pre data-lang="Rust"><code><span class="kd">let</span> <span class="k">mut</span> b <span class="o">=</span> AgentHost::builder(Arc::new(clock.clone()))
+    .provider(<span class="s">"triage"</span>, Arc::new(triage))
+    .decider(
+        <span class="s">"llm/claude"</span>,
+        Arc::new(
+            LlmDecider::new(<span class="s">"claude"</span>, Arc::new(model), <span class="s">"claude-opus-5-5"</span>).with_instructions(
+                <span class="s">"You are a support agent. Use the tools, then finish with an answer."</span>,
+            ),
+        ),
+    )
+    .decider(
+        <span class="s">"human/support"</span>,
+        Arc::new(GuardDecider::with_rules(<span class="fm">vec!</span>[
+            vertep_agent::decider::GuardRule {
+                event: <span class="s">"finish"</span>.into(),
+                guard: <span class="nb">None</span>,
+                payload: <span class="nb">Some</span>(<span class="s">"{'text': 'A person will get back to you.'}"</span>.into()),
+            },
+        ])),
+    );</code></pre>
+
+  <p>The other built-in deciders follow the same contract. A <code>HumanDecider</code> puts the offer in an inbox for a person. A <code>GuardDecider</code> picks by CEL rules. An <code>ActorDecider</code> asks another actor. A <code>RuleDecider</code> runs a rule program and records the derivation as its reason. Swapping one for another changes no line of the chart.</p>
+
+  <h2>Step 5. Run the same chart elsewhere</h2>
+
+  <p>The core is compiled to WebAssembly for <code>@vertep/web</code>. It runs in a worker, with the journal in memory or in the browser's private file system (OPFS). This is <code>examples/browser-js/main.mjs</code> run under Node.js. A cart, its snapshots, its journal with the transitions each event took, and a look back at entry 1:</p>
+
+<pre class="output" data-lang="node main.mjs"><code>actor https://example.org/charts/cart/alice
+snapshot @1: ["filled"] items=2
+snapshot @2: ["filled"] items=3
+snapshot @4: ["ordered"] items=3
+now: ["ordered"] matches('ordered') = true
+journal:
+  1 add      {"qty":2} -&gt; ["s.empty:t0"]
+  2 add      {"qty":1} -&gt; ["s.filled:t0"]
+  3 pay      null      -&gt; []
+  4 checkout null      -&gt; ["s.filled:t1"]
+as of entry 1: ["filled"] items = 2</code></pre>
+
+  <p>Note entry 3. <code>pay</code> was not enabled in <code>filled</code>, so it took no transition, but it was still journaled. The record shows what arrived, not only what mattered.</p>
+
+  <p>And from Python, with a virtual clock and a delayed send (<code>examples/python/quickstart.py</code>):</p>
+
+<pre class="output" data-lang="python examples/python/quickstart.py"><code>actor https://example.org/charts/order/42
+start: ('open',)
+after pay: ('paid',)
+pending timers: [('ship', 200)]
+after 100 ms: ('paid',)
+after 200 ms: ('shipped',)
+journal:
+  1 pay   -&gt; ['s.open:t0']
+  2 ship  -&gt; ['s.paid:t0']
+as of entry 1: ('paid',)</code></pre>
+
+  <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+  <h2>The same desk in XState</h2>
+
+  <p>XState is the statechart library most JavaScript developers know, and it is excellent. Version 5 models statecharts with nested and parallel states, history, guards and delayed transitions, and treats invoked promises, callbacks and other machines as actors. Stately's visual editor works on the same machines. Here is the refund desk, written for this comparison. The model call becomes an invoked promise:</p>
+
+<pre data-lang="TypeScript (XState 5, for comparison)"><code>import { setup, assign, fromPromise, createActor } from "xstate";
+
+const refund = setup({
+  types: {
+    context: {} as { amount: number },
+    events: {} as { type: "request"; amount: number },
+  },
+  actors: {
+    // your code: an LLM call, a queue for a person, a rules service
+    policy: fromPromise&lt;string, { amount: number; options: string[] }&gt;(
+      async ({ input }) =&gt; askModel(input),
+    ),
+  },
+}).createMachine({
+  id: "refund",
+  context: { amount: 0 },
+  initial: "idle",
+  states: {
+    idle: {
+      on: { request: { target: "review", actions: assign({ amount: ({ event }) =&gt; event.amount }) } },
+    },
+    review: {
+      invoke: {
+        src: "policy",
+        // the offer is computed by hand, and must agree with the guards below
+        input: ({ context }) =&gt; ({
+          amount: context.amount,
+          options: context.amount &lt;= 100 ? ["approve", "reject"] : ["reject", "escalate"],
+        }),
+        onDone: [
+          { guard: ({ context, event }) =&gt; event.output === "approve" &amp;&amp; context.amount &lt;= 100, target: "approved" },
+          { guard: ({ context, event }) =&gt; event.output === "escalate" &amp;&amp; context.amount &gt; 100, target: "manager" },
+          { target: "rejected" },
+        ],
+      },
+    },
+    manager: { /* the same shape again */ },
+    approved: { type: "final" },
+    rejected: { type: "final" },
+  },
+});
+
+const actor = createActor(refund).start();
+actor.send({ type: "request", amount: 250 });
+// to survive a restart, store a snapshot and restore from it:
+await db.save("refund/7", actor.getPersistedSnapshot());</code></pre>
+
+  <p>It reads well, and for user-interface logic it is hard to beat. The differences show when the process outlives the page or the server:</p>
+
+  <ul>
+    <li><strong>A snapshot, not a history.</strong> <code>getPersistedSnapshot</code> tells you where the actor is now. It does not tell you how it got there, unless you also log every event yourself. Time travel and audit are things you build.</li>
+    <li><strong>The decision is a promise result.</strong> The model's answer flows into <code>onDone</code> and is gone. To replay without the model, you would store its outputs and inject them on replay.</li>
+    <li><strong>The offer is hand-written.</strong> The <code>options</code> list repeats the guards. Vertep computes the offer from the guards, so the two cannot drift apart.</li>
+    <li><strong>The host is yours.</strong> Where actors live, which of two processes owns one, and how a timer survives a deploy are your service's job.</li>
+  </ul>
+
+  <p>XState follows SCXML's semantics closely and has tested itself against parts of the W3C suite, but its machines are JavaScript objects, not SCXML documents. Vertep reads SCXML directly and runs the full W3C conformance suite in CI. You can carry a chart from one to the other with the mapping at the end of this article.</p>
+
+  <h2>The same desk in Akka</h2>
+
+  <p>Akka, and Apache Pekko, its Apache-licensed fork, is the classic actor toolkit on the JVM. It has mailboxes, supervision, location transparency, Cluster Sharding for millions of entities, and Akka Persistence for event sourcing. In Akka Typed a state machine is usually written as event-sourced behaviour: commands come in, a command handler decides which events to persist, and an event handler folds them into the state.</p>
+
+<pre data-lang="Scala (Akka Typed, for comparison)"><code>sealed trait Command
+final case class Request(amount: BigDecimal) extends Command
+final case class Decide(choice: String, rationale: String) extends Command
+
+sealed trait Event
+final case class Requested(amount: BigDecimal) extends Event
+final case class Decided(choice: String, rationale: String) extends Event
+
+sealed trait State
+case object Idle extends State
+final case class Review(amount: BigDecimal) extends State
+final case class Manager(amount: BigDecimal) extends State
+final case class Done(outcome: String) extends State
+
+def refund(id: String): Behavior[Command] =
+  EventSourcedBehavior[Command, Event, State](
+    persistenceId = PersistenceId.ofUniqueId(id),
+    emptyState = Idle,
+    commandHandler = (state, cmd) =&gt; (state, cmd) match {
+      case (Idle, Request(a))                                   =&gt; Effect.persist(Requested(a))
+      case (Review(a), Decide("approve", r)) if a &lt;= 100        =&gt; Effect.persist(Decided("approve", r))
+      case (Review(a), Decide("escalate", r)) if a &gt; 100        =&gt; Effect.persist(Decided("escalate", r))
+      case (Manager(_), Decide("approve", r))                   =&gt; Effect.persist(Decided("approve", r))
+      case (Review(_) | Manager(_), Decide("reject", r))        =&gt; Effect.persist(Decided("reject", r))
+      case _                                                    =&gt; Effect.unhandled
+    },
+    eventHandler = (state, evt) =&gt; (state, evt) match {
+      case (Idle, Requested(a))                =&gt; Review(a)
+      case (Review(a), Decided("escalate", _)) =&gt; Manager(a)
+      case (_, Decided(outcome, _))            =&gt; Done(outcome)
+      case (s, _)                              =&gt; s
+    })
+// something else asks the model and sends Decide to this entity</code></pre>
+
+  <p>This is a sound design with a long production record. Event sourcing gives you recovery by replay, and Cluster Sharding gives you one live entity per id across a cluster. Compared with the chart:</p>
+
+  <ul>
+    <li><strong>The transition table is code, written twice.</strong> Once in the command handler, which decides what is allowed, and once in the event handler, which decides where it leads. Nested states, parallel regions and history are patterns you write by hand. There is no diagram to check them against.</li>
+    <li><strong>You choose what to persist.</strong> That is flexible, and it means the record holds the domain events you thought of. A message that was refused, or a timer that fired into a state that ignored it, leaves no trace unless you add one.</li>
+    <li><strong>Timers are not persisted.</strong> <code>Behaviors.withTimers</code> schedules in memory. A timeout that must survive a restart needs its own design.</li>
+    <li><strong>The model sits outside.</strong> Akka has no notion of an offer. Whatever calls the model must know which choices are legal, and the entity must check again.</li>
+  </ul>
+
+  <h2>The same desk in Orleans</h2>
+
+  <p>Microsoft Orleans introduced the <em>virtual actor</em>. A grain exists for every key, is activated on first call, and is deactivated when idle. The runtime guarantees one activation per key in the cluster. It has run large services, the Halo game backends among them, and it is a natural choice on .NET. Orleans offers plain persisted state, and <code>JournaledGrain</code> for event sourcing:</p>
+
+<pre data-lang="C# (Orleans, for comparison)"><code>public interface IRefundGrain : IGrainWithStringKey
+{
+    Task Request(decimal amount);
+    Task Decide(string choice, string rationale);
+}
+
+[GenerateSerializer] public record Requested([property: Id(0)] decimal Amount);
+[GenerateSerializer] public record Decided([property: Id(0)] string Choice, [property: Id(1)] string Rationale);
+
+public class RefundState
+{
+    public string Stage { get; set; } = "idle";
+    public decimal Amount { get; set; }
+    public void Apply(Requested e) { Stage = "review"; Amount = e.Amount; }
+    public void Apply(Decided e) =&gt; Stage = e.Choice switch
+    {
+        "escalate" =&gt; "manager",
+        "approve" =&gt; "approved",
+        _ =&gt; "rejected",
+    };
+}
+
+[LogConsistencyProvider(ProviderName = "LogStorage")]
+public class RefundGrain : JournaledGrain&lt;RefundState, object&gt;, IRefundGrain
+{
+    public async Task Request(decimal amount)
+    {
+        if (State.Stage != "idle") throw new InvalidOperationException(State.Stage);
+        RaiseEvent(new Requested(amount));
+        await ConfirmEvents();
+    }
+
+    public async Task Decide(string choice, string rationale)
+    {
+        var allowed = State.Stage switch
+        {
+            "review" =&gt; State.Amount &lt;= 100 ? new[] { "approve", "reject" } : new[] { "reject", "escalate" },
+            "manager" =&gt; new[] { "approve", "reject" },
+            _ =&gt; Array.Empty&lt;string&gt;(),
+        };
+        if (!allowed.Contains(choice)) throw new InvalidOperationException($"{choice} in {State.Stage}");
+        RaiseEvent(new Decided(choice, rationale));
+        await ConfirmEvents();
+    }
+}</code></pre>
+
+  <p>Vertep borrows the virtual actor from Orleans, and a durable timer works much like an Orleans <em>reminder</em>. Orleans <em>timers</em>, by contrast, live only as long as the activation. The differences are the same as with Akka. The states are strings or classes you manage, the allowed moves are a <code>switch</code> you keep in step with the transitions, and the event log holds what you raise. Orleans scales very well. What it leaves to you is the shape of the behaviour.</p>
+
+  <figure class="plate">
+    <div class="plate-inner">
+      <svg viewBox="0 0 640 240" width="640" role="img" aria-labelledby="b5t">
+        <title id="b5t">Where the truth lives, in four tools. XState: the program is a machine object, and what is stored is a snapshot of where it is now. Akka: the program is behaviour code, and what is stored is the events you choose to persist. Orleans: the program is a grain class, and what is stored is state or events you choose. Vertep: the program is a chart, data named by its hash, and what is stored is every accepted input, before it runs.</title>
+        <defs>
+          <marker id="b5a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" style="fill:var(--ink)"/></marker>
+          <pattern id="b5h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--orange)" stroke-width="1.4" opacity=".45"/></pattern>
+        </defs>
+        <g font-family="JetBrains Mono, monospace" font-size="13" style="fill:var(--ink)" text-anchor="middle">
+          <g font-family="IM Fell English SC, Georgia, serif" font-size="16" style="fill:var(--ink)">
+            <text x="85" y="22">XState</text><text x="243" y="22">Akka</text><text x="401" y="22">Orleans</text><text x="559" y="22" style="fill:var(--orange-text)">Vertep</text>
+          </g>
+          <g style="fill:var(--paper);stroke:var(--ink)" stroke-width="2">
+            <rect x="15" y="36" width="140" height="64" rx="10"/><rect x="173" y="36" width="140" height="64" rx="10"/><rect x="331" y="36" width="140" height="64" rx="10"/>
+            <rect x="15" y="150" width="140" height="64" rx="10"/><rect x="173" y="150" width="140" height="64" rx="10"/><rect x="331" y="150" width="140" height="64" rx="10"/>
+          </g>
+          <rect x="489" y="36" width="140" height="64" rx="10" style="fill:url(#b5h);stroke:var(--orange)" stroke-width="3"/>
+          <rect x="489" y="150" width="140" height="64" rx="10" style="fill:var(--paper);stroke:var(--orange)" stroke-width="3"/>
+          <text x="85" y="64">machine</text><text x="243" y="64">behaviour</text><text x="401" y="64">grain</text><text x="559" y="64">chart</text>
+          <text x="85" y="178">snapshot</text><text x="243" y="178">your events</text><text x="401" y="178">state or events</text><text x="559" y="178">every input</text>
+          <g font-family="EB Garamond, Georgia, serif" font-size="13" style="fill:var(--ink-2)">
+            <text x="85" y="84">a JS object</text><text x="243" y="84">Scala or Java code</text><text x="401" y="84">a .NET class</text><text x="559" y="84">data, named by hash</text>
+            <text x="85" y="198">where it is now</text><text x="243" y="198">what you persist</text><text x="401" y="198">what you raise</text><text x="559" y="198">before it runs</text>
+          </g>
+          <g fill="none" style="stroke:var(--ink)" stroke-width="1.6" marker-end="url(#b5a)">
+            <path d="M85 100 V146"/><path d="M243 100 V146"/><path d="M401 100 V146"/><path d="M559 100 V146"/>
+          </g>
+          <g font-family="EB Garamond, Georgia, serif" font-size="12" style="fill:var(--ink-2)" text-anchor="start">
+            <text x="91" y="128">you save</text><text x="249" y="128">you choose</text><text x="407" y="128">you raise</text><text x="565" y="128">always</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Plate IV. <b>Where the truth lives.</b> The top row is what you write, the bottom row is what survives a restart.</figcaption>
+  </figure>
+
+  <h2>Side by side</h2>
+
+  <table>
+    <thead><tr><th></th><th>XState 5</th><th>Akka / Pekko</th><th>Orleans</th><th>Vertep</th></tr></thead>
+    <tbody>
+      <tr><td>You write</td><td>A machine as a JS object</td><td>Behaviours and handlers in Scala or Java</td><td>Grain classes in .NET</td><td>A chart in SCXML, YAML or a Rust macro</td></tr>
+      <tr><td>Hierarchy, parallel regions, history</td><td>Yes</td><td>By hand</td><td>By hand</td><td>Yes, full SCXML</td></tr>
+      <tr><td>Semantics defined by</td><td>XState's docs and tests, close to SCXML</td><td>Your code</td><td>Your code</td><td>The W3C SCXML algorithm, the W3C suite in CI, and a Lean model checked against the Rust core</td></tr>
+      <tr><td>What is stored</td><td>A snapshot, where you put it</td><td>Events you persist</td><td>State, or events you raise</td><td>Every accepted input, before it runs, with the chart version</td></tr>
+      <tr><td>Replay and time travel</td><td>From a snapshot; history if you log events</td><td>Recovery by replay; past states if you query for them</td><td>Recovery from the log</td><td>Built in: <code>state_at(position)</code>, on any host</td></tr>
+      <tr><td>Timers that survive a restart</td><td>Your host's job</td><td>Your design</td><td>Reminders</td><td>A delayed <code>&lt;send&gt;</code> is journaled</td></tr>
+      <tr><td>Model or person deciding</td><td>Your code in an invoked actor</td><td>Your code sends a command</td><td>Your code calls the grain</td><td>Decide states: offered only enabled events, answers journaled, replay without the decider</td></tr>
+      <tr><td>Changing the logic of running instances</td><td>Your migration of snapshots</td><td>Event adapters and schema evolution</td><td>Your versioning</td><td>Version per entry, pinned until final, explicit migration with a check</td></tr>
+      <tr><td>Distribution</td><td>One process; you build the rest</td><td>Cluster Sharding, mature</td><td>Silo clusters, mature</td><td>Shards and placement, experimental tier</td></tr>
+      <tr><td>Languages</td><td>JavaScript, TypeScript</td><td>Scala, Java</td><td>C#, F#</td><td>Rust; JavaScript through WebAssembly; Python</td></tr>
+      <tr><td>Maturity</td><td>Widely used, visual editor</td><td>Over fifteen years in production</td><td>Open source since 2015, large services</td><td>Version 0.1.x; tier declared per crate</td></tr>
+      <tr><td>Licence</td><td>MIT</td><td>Akka: BSL; Pekko: Apache-2.0</td><td>MIT</td><td>MIT or Apache-2.0</td></tr>
+    </tbody>
+  </table>
+
+  <h2>When to choose which</h2>
+
+  <p>Here is the honest version.</p>
+
+  <ul>
+    <li><strong>Choose XState</strong> for behaviour that lives in a user interface or a single service, where losing the history on a crash costs nothing and its tooling and community matter. Many apps should stop here.</li>
+    <li><strong>Choose Akka or Pekko</strong> when you are on the JVM and need millions of live entities, streams and supervision, with a decade of operational knowledge behind you. The same goes for <strong>Orleans</strong> on .NET. If your hard problem is scale, they have solved it at sizes Vertep has not been tested at.</li>
+    <li><strong>Choose Vertep</strong> when the hard problem is <em>accountability</em>. That means processes that wait for days, decisions made by models or people under rules that must hold, and a need to show later what happened and why, and to replay it. The chart bounds what any decider can do. The journal is written before the action. The record replays without the model. Regulated decisions, claims, approvals and agent workflows are the cases it was built for.</li>
+  </ul>
+
+  <p>You can also mix them. A Vertep actor can sit behind an Akka or Orleans front end. An XState machine in the browser can drive the user interface for a Vertep actor on the server. And <code>@vertep/web</code> can run the same chart in the page when you want the journal there too.</p>
+
+  <h2>Moving a chart across</h2>
+
+  <p>If you have an XState machine, most of it maps one to one:</p>
+
+  <table>
+    <thead><tr><th>XState 5</th><th>Vertep (SCXML)</th></tr></thead>
+    <tbody>
+      <tr><td><code>states</code>, <code>initial</code></td><td><code>&lt;state&gt;</code>, <code>initial="…"</code></td></tr>
+      <tr><td><code>type: "parallel"</code>, <code>type: "history"</code>, <code>type: "final"</code></td><td><code>&lt;parallel&gt;</code>, <code>&lt;history&gt;</code>, <code>&lt;final&gt;</code></td></tr>
+      <tr><td><code>on: { ev: { target, guard } }</code></td><td><code>&lt;transition event="ev" cond="…" target="…"/&gt;</code></td></tr>
+      <tr><td><code>always</code></td><td>A transition with no <code>event</code></td></tr>
+      <tr><td><code>entry</code>, <code>exit</code></td><td><code>&lt;onentry&gt;</code>, <code>&lt;onexit&gt;</code></td></tr>
+      <tr><td><code>context</code>, <code>assign</code></td><td><code>&lt;datamodel&gt;</code>, <code>&lt;assign&gt;</code> (CEL or ECMAScript)</td></tr>
+      <tr><td><code>after: { 900000: "expired" }</code></td><td><code>&lt;send event="timeout" delay="900s"/&gt;</code> on entry, plus a transition on it</td></tr>
+      <tr><td><code>raise</code>, <code>sendTo</code></td><td><code>&lt;raise&gt;</code>, <code>&lt;send target="…"&gt;</code></td></tr>
+      <tr><td><code>invoke</code> of a promise that chooses</td><td>A decide state: <code>vt:decide</code> and <code>vt:candidates</code></td></tr>
+      <tr><td><code>invoke</code> of a child machine</td><td><code>&lt;invoke&gt;</code> of a child chart</td></tr>
+    </tbody>
+  </table>
+
+  <p>From Akka or Orleans, the move is the other way round. Draw the states your handlers imply, which is usually a revealing exercise. Turn each <code>match</code> arm or <code>switch</code> case into a transition with its guard, and let the event handler disappear, because <code>step</code> is the event handler. The entity id or grain key becomes the virtual actor's key. Reminders become delayed sends.</p>
+
+  <h2>Try it on one process this week</h2>
+
+  <ol>
+    <li>Pick one process that waits: an approval, a refund, an onboarding, a claim.</li>
+    <li>Draw it. Write it as SCXML or typed YAML, and run <code>vt validate</code> and <code>vt typecheck</code> until both are quiet.</li>
+    <li>Find every place where someone or something <em>chooses</em>. Make each one a decide state, and let the guards say what is allowed.</li>
+    <li>Run it on a node with a virtual clock in a test. Send the events of a real case, drop the node, open the store again, and check that the state survived.</li>
+    <li>Bind a scripted decider in tests and a model or an inbox in production. Then replay a production journal in CI with no decider at all.</li>
+    <li>Check the <a href="../docs/tiers.html">stability tier</a> of each part you depend on before you depend on it.</li>
+  </ol>
+
+  <p>The <a href="../docs/index.html">docs</a> have the full API. The <a href="../examples/index.html">examples</a> are the programs quoted here, and the <a href="statecharts.html">first article</a> explains why the step function is pure.</p>
+
+  <blockquote>Write down what may happen. Record what did. Then any machine, a year later, can tell you why.</blockquote>
+
+  <nav class="pager" aria-label="Articles">
+    <a href="index.html">← All articles</a>
+    <a href="statecharts.html">The shape of behaviour →</a>
+  </nav>
+
+</main>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="../docs/index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>
