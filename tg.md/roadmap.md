@@ -4,7 +4,7 @@ status: planned
 ---
 # Roadmap
 
-Vertep is delivered bottom-up in twenty milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
+Vertep is delivered bottom-up in twenty-one milestones, each an OpenSpec change named after it; full SCXML comes first, distribution and bindings last.
 
 ```mermaid
 flowchart LR
@@ -37,6 +37,9 @@ flowchart LR
     M16 --> M17
     M4 --> M18["M18 Runtime performance<br/>m18-runtime-performance"]
     M13 --> M18
+    M7 --> M19["M19 Custody proof<br/>m19-custody-proof"]
+    M14 --> M20["M20 Portable rules<br/>m20-portable-rules"]
+    M16 --> M20
     S(["Integration spike<br/>throwaway"]) -.-> M0
 ```
 
