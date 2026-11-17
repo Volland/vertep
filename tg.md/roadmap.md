@@ -149,7 +149,7 @@ Agents publish verifiable role-based protocols, hash-identified JSON-LD choreogr
 
 Delivered by the OpenSpec change `m10-agent-protocols` (capabilities `agent-protocols`, `protocol-conformance` and `protocol-spaces`), in [[components#vertep-kolyada]]. The design is in [[views/kolyada#Kolyada]]. Test vectors come first and the Lean model second.
 
-The layer is called Kolyada. The core crate was implemented 2026-11-14: documents, identity, projection, signed envelopes, the conformance check, causal delivery, instances and offers, with test vectors. Open: the join policy, sealed fan-out and the mailbox binding in `vertep-federation`, the `vt:plays` declaration, `vt kolyada` and the Lean model.
+The layer is called Kolyada. The core crate was implemented 2026-11-14: documents, identity, projection, signed envelopes, the conformance check, causal delivery, instances and offers, with test vectors. Completed 2026-11-16: the join policy, sealed fan-out and the chart and mailbox binding in `vertep-federation`, the `vt:plays` declaration, `vt kolyada`, and the Lean protocol model with strict replay of Rust histories. Archived as `openspec/changes/archive/2026-11-16-m10-agent-protocols` with 22 requirements in `openspec/specs/`.
 
 ## M11 Python bindings
 

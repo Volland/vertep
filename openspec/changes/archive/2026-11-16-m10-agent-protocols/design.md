@@ -142,6 +142,14 @@ Identities, projections, envelope hashes and verdict sequences are published as 
 - Nothing existing changes: grants, mailboxes and envelopes work as before for traffic outside protocols.
 - Rollback: the facade feature `protocol` is off by default.
 
+## Built (2026-11-16): spaces on the wire, chart binding, CLI and Lean model
+
+- **Join policy and fan-out** (`vertep-federation::protocol`): `JoinPolicy` refuses every genesis unless a rule admits its protocol, role, initiator and an optional credential check, reading the genesis alone. `SpaceTransport::fan_out` seals one copy per recipient DID over the existing relays (TSP, DIDComm, or an in-process channel); the signed message rides as JSON text in a `kolyada.message` envelope. `SpaceMember` acknowledges a relay copy only after the journal entry or a recorded refusal. The SHACL agreement test changed the checker to count distinct values and to accept only scalars in `in` lists.
+- **Chart role binding** (`vertep-core::plays`, `vertep-federation::role_binding`): `vt:plays` on `<scxml>`; the inbox runs `RoleBinding::admit` in place of grants for `kolyada.message` envelopes and the outbox checks sends against the actor's own role. Replay rebuilds protocol state from the journal without resolving a DID.
+- **`vt kolyada`**: `validate`, `hash`, `project`, `offer`, `check`, `vectors`.
+- **Lean** (`Protocol*.lean`, exe `vertep-kolyada`): `accepted_enabled_by_projection`, `unbound_refused`, `log_bound`, `causal_orders_converge` (assuming both orders put the protocol steps in the same order, true of honest hash-linked runs), `run_causal`; `ProtocolUnsafe.lean` shows an unbound sender applied when the role check is removed. Six recorded Rust histories replay strictly in the "Lean model" CI job; signatures and payload shapes are taken from Rust.
+- **Open, not blocking:** a `SpaceMember` keeps its own journal beside the actor's; fan-out has no retry queue of its own; a message waiting for dependencies is held in memory by the binding; sub-protocol geneses are not modelled in Lean.
+
 ## Open Questions
 
 - **Evolution.** A changed protocol has a new identity. Whether a document may name the protocol it replaces, advisory only, is undecided.

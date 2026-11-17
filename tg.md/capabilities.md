@@ -261,7 +261,7 @@ Role-based protocols as restricted JSON-LD documents: hash identity, payload sha
 
 - scheduled_in:: [[roadmap#M10 Agent protocols]]
 
-Implemented in [[components#vertep-kolyada]]: every requirement but the RDF agreement test of shapes carries `@tg: implements::` and every scenario a `@tg: verifies::` test. The design is in [[views/kolyada#Kolyada]].
+Implemented in [[components#vertep-kolyada]]: every requirement carries `@tg: implements::` and every scenario a `@tg: verifies::` test, including the agreement of the payload checker with full SHACL. The design is in [[views/kolyada#Kolyada]].
 
 ## Protocol conformance
 
@@ -269,7 +269,7 @@ The signed message envelope, the pure `accept` check, causal delivery, violation
 
 - scheduled_in:: [[roadmap#M10 Agent protocols]]
 
-Implemented in [[components#vertep-kolyada]] except the Lean protocol model, which is not yet written. The vectors are checked in Rust and, for envelopes, with Node alone.
+Implemented in [[components#vertep-kolyada]], with the Lean protocol model in `lean/vertep-lean` (`Protocol*.lean`) replaying recorded Rust histories strictly. The vectors are checked in Rust, with `vt kolyada vectors`, and, for envelopes, with Node alone.
 
 ## Protocol spaces
 
@@ -277,7 +277,7 @@ Protocol instances shared by agents: signed genesis, countersigned joins, join p
 
 - scheduled_in:: [[roadmap#M10 Agent protocols]]
 
-Partly implemented in [[components#vertep-kolyada]]: instances, joins, role-derived authority, the hash-linked history and sub-protocol genesis. The join policy, sealed fan-out over mailboxes and the chart and mailbox binding are planned in [[components#vertep-federation]].
+Implemented in [[components#vertep-kolyada]] (instances, joins, role-derived authority, the hash-linked history, sub-protocol genesis) and [[components#vertep-federation]] (the join policy, pairwise sealed fan-out over the relays, and the chart and mailbox binding through `vt:plays`). A `SpaceMember` still keeps its own journal beside the actor's.
 
 ## Decision records
 
