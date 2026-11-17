@@ -32,6 +32,9 @@ Reasons: bus factor. A project whose browser build runs on one laptop is a one-l
 
 ### D3. Benchmarks measure the claims
 
+Moved 2026-11-17: the benchmark suite, its gate and its results page are carried by `m18-runtime-performance` (phase 0), so that M13 could be archived without them.
+
+
 Suite: pure `step` throughput on three chart sizes; journal append latency and replay speed per backend (memory, tiramemsu file); decider round trip with a scripted decider; `@vertep/web` and wheel size; cold start in the browser. The gate fails CI on a regression over a stated threshold against the last release's recorded results. Results are published on a page with the machine and commit recorded.
 
 ### D4. Journal shipping is a pull protocol over the cluster transport

@@ -4,8 +4,8 @@
 A statement of availability carries a claim, which says what it asserts and where the code is:
 
     <span data-claim="built" data-ref="crates/vertep-agent/src/journal.rs#StoreAgentJournal">...</span>
-    <li data-claim="missing" data-ref="openspec:production-readiness#Benchmark Suite">...</li>
-    ... a sentence in markdown <!-- claim: missing openspec:production-readiness#Benchmark Suite -->
+    <li data-claim="missing" data-ref="openspec:object-custody#Joint Custody Safety Is Proven">...</li>
+    ... a sentence in markdown <!-- claim: missing openspec:object-custody#Joint Custody Safety Is Proven -->
 
 Any HTML element can carry `data-claim` (`built` or `missing`) and `data-ref`; the comment form
 covers the line it is on, in markdown and HTML alike. `data-ref` holds one or more references,
@@ -417,13 +417,13 @@ def self_test():
         path.write_text(text)
 
         # @tg: verifies:: [[openspec:production-readiness#Docs Match Behaviour#An audit finds a stale claim]] {level: integration}
-        bench = "openspec:production-readiness#Benchmark Suite"
+        bench = "openspec:object-custody#Joint Custody Safety Is Proven"
         stale_pages = {c.where for c in claims if c.kind == "missing" and bench in c.refs}
-        assert stale_pages, "some page says the benchmark suite is missing"
+        assert stale_pages, "some page says the custody proof is missing"
         lib = scratch / "crates/vertep-bench/src/lib.rs"
         lib.parent.mkdir(parents=True)
         tag = "@" + "tg"  # spelled apart, so this file does not itself implement the requirement
-        lib.write_text(f"//! Benchmarks.\n\n// {tag}: implements:: [[{bench}]]\npub fn run() {{}}\n")
+        lib.write_text(f"//! A stub.\n\n// {tag}: implements:: [[{bench}]]\npub fn run() {{}}\n")
         code, err = quiet(["--check"], scratch)
         assert code == 1, "a page that says a delivered feature is missing passed the audit"
         for where in stale_pages:

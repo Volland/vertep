@@ -1719,7 +1719,7 @@ After M10 and M11 are finished, no new milestone starts until `m13-production-re
 
 - motivated_by:: [[decisions#Full SCXML first]] {weight: secondary, since: "2026-11-14", note: "depth in the strongest layers before breadth"}
 
-Rejected: continuing at the same pace, because adoption comes from depth in the layers people use first. This is M13 design D6, the scope freeze.
+Rejected: continuing at the same pace, because adoption comes from depth in the layers people use first. This is M13 design D6, the scope freeze. It ended on 2026-11-17, when M13 was archived with the benchmark suite moved to M18.
 
 ## Stability tiers are data in the manifests
 

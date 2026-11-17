@@ -297,11 +297,11 @@ Implemented in [[components#vertep-agent]] (`redaction`) and [[components#vertep
 
 ## Production readiness
 
-Stability tiers, a reproducible toolchain, a benchmark suite and gate, a supply-chain gate, a docs-versus-behaviour audit and a tested ten-minute path. OpenSpec: `production-readiness`.
+Stability tiers, a reproducible toolchain, a supply-chain gate, a docs-versus-behaviour audit and a tested ten-minute path. OpenSpec: `production-readiness`.
 
 - scheduled_in:: [[roadmap#M13 Production readiness]]
 
-Not implemented: the change is a draft.
+Implemented: tiers in every manifest rendered by `site/tools/tiers.py`, `scripts/build.sh` with the pinned container, `deny.toml` with SBOMs and signed provenance at release, `scripts/docs-audit.py`, and `scripts/ten-minute-path.py`, each checked in CI. The benchmark suite and its gate moved to M18 (`m18-runtime-performance`).
 
 ## Journal shipping
 
