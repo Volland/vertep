@@ -85,7 +85,7 @@
 - [x] 10.2 Prove one writer per epoch and that every committed entry appears in every later writer's chain, for a fixed custodian set and for runs that start no change (`CustodyTheorems.lean`, `one_writer_per_epoch_noChange`, `committed_survives_noChange`)
 - [x] 10.3 Replay the custody fault histories from 9.2 and 9.4 through the Lean model in strict mode, as the lease model does
 
-- [ ] 10.4 Prove one writer per epoch and committed survival under custodian-set changes (joint consensus: the conjectures `OneWriterPerEpoch` and `CommittedSurvives` in `CustodyJoint.lean`, which need a rank-aware Paxos invariant); until then they are checked by the build-time random search and by the strict replay of every fault history
+- [x] 10.4 Prove one writer per epoch and committed survival under custodian-set changes. Result (2026-11-16): the conjectures `OneWriterPerEpoch` and `CommittedSurvives` as first stated are false (`CustodyJointStale.lean`: a candidate counting promises made before it knew its record can give an epoch two writers). The corrected `OneWriterPerEpochR` and `CommittedSurvivesR` (elections whose record is fixed before their promises, as Rust does) are checked by the build-time search and the strict replay of every fault history, not yet proven; the proof moves to `m19-custody-proof`. The stale-record path in `CustodyHost::elect` was fixed (pull request 48)
 
 ## 11. Views and closing checks
 
