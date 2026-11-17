@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "vertep"
-version = "0.1.13"
+version = "0.1.14"
 description = "W3C SCXML statecharts as durable, journaled actors, from Python: typed events, time travel, SPARQL over the state graph"
 readme = "README.md"
 requires-python = ">=3.9"

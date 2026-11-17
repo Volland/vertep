@@ -8,6 +8,11 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-11-17
+
+Mailbox backends chosen per address, the forged-support refusal for rules, and specifications for
+M18 (runtime performance), M19 (custody proof) and M20 (portable rules). M13 is archived.
+
 ### Added
 
 - **Mailbox backends per address.** `RoutedMailboxes` picks a mailbox backend per address (scheme,
@@ -22,6 +27,17 @@ All crates of the workspace and both npm packages share one version.
   is verified.
 - OpenSpec change `m20-portable-rules`: a pure-Rust engine for the portable part of the rules
   profile, so rule decisions run in the browser, on Windows and in Python (specified, not built).
+- OpenSpec change `m18-runtime-performance` (benchmarks with a CI regression gate, faster
+  receives, bounded mailboxes; it takes over the M13 benchmark suite) and a finer
+  `m19-custody-proof` (specified, not built).
+- Article: *Build it as a chart*, building with Vertep compared with XState, Akka and Orleans.
+
+### Changed
+
+- M13 (production readiness) is archived.
+- Supply chain: the chrono "unmaintained" notice (RUSTSEC-2026-0543, no vulnerability) is a
+  recorded `cargo-deny` exception; `didwebvh-rs` 0.8, which `vertep-webvh` wraps, requires chrono.
+- The release workflow downloads the npm and SBOM artifacts by name.
 
 ## [0.1.13] - 2026-11-17
 
