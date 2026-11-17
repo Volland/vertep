@@ -44,7 +44,7 @@
 
 ## 8. Dependencies closed elsewhere
 
-- [ ] 8.1 Confirm `m7-durable-objects` task 10.4 (Lean proof of custody safety under custodian-set changes) is closed, or move it here
+- [x] 8.1 (10.4 refuted as stated and corrected; its proof moved to `m19-custody-proof`, M7 archived 2026-11-17) Confirm `m7-durable-objects` task 10.4 (Lean proof of custody safety under custodian-set changes) is closed, or move it here
 - [x] 8.2 Confirm the open items of `m10-agent-protocols` are closed or explicitly deferred with a ticket (all closed 2026-11-16; archived)
 
 ## 9. Annotations and checks

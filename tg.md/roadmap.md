@@ -122,8 +122,9 @@ DID-addressed durable objects with verifiable journals, decentralised custody ov
 
 - precedes:: [[roadmap#M8 did:webvh hosting]] {note: "custodian-set changes publish witnessed DID log entries"}
 - precedes:: [[roadmap#M12 Decision records]] {note: "the hash-chained journal envelope is reused for agent journals"}
+- precedes:: [[roadmap#M19 Custody proof]] {note: "task 10.4: the proof of the corrected statements"}
 
-Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Open: task 10.4, the Lean proof of custody safety under custodian-set changes. The durable agent journal is `StoreAgentJournal` in `vertep-agent`, over any `JournalStore` such as a tiramemsu file. <!-- claim: built crates/vertep-agent/src/journal.rs#StoreAgentJournal; openspec:durable-objects#Durable Agent Journal --> Creating and hosting `did:webvh` logs followed in [[roadmap#M8 did:webvh hosting]].
+Delivered by the OpenSpec change `m7-durable-objects` (capabilities `durable-objects`, `object-custody`, `tsp-mediator`, and additions to `relay-mailboxes`). Merged 2026-11-12 (pull request 1) and released in 0.1.2 on 2026-11-13. Task 10.4 found the joint-consensus conjectures false as first stated; the corrected statements are checked by search and replay, and their proof moved to [[roadmap#M19 Custody proof]]. Archived 2026-11-17 as `openspec/changes/archive/2026-11-17-m7-durable-objects`. The durable agent journal is `StoreAgentJournal` in `vertep-agent`, over any `JournalStore` such as a tiramemsu file. <!-- claim: built crates/vertep-agent/src/journal.rs#StoreAgentJournal; openspec:durable-objects#Durable Agent Journal --> Creating and hosting `did:webvh` logs followed in [[roadmap#M8 did:webvh hosting]].
 
 ## M8 did:webvh hosting
 
@@ -159,7 +160,7 @@ The actor system from Python as a PyO3 extension and a pure-Python API, installe
 
 Delivered by the OpenSpec change `m11-python-bindings` (capability `python-bindings`), in [[components#vertep-py]]. The design is in [[views/python#Python]].
 
-Implemented 2026-11-14: the crate and the package `vertep` in `bindings/python` with 27 tests that prove each scenario and run every example, examples in `examples/python`, the docs page, a CI job and the release workflow. PyPI and TestPyPI pending publishers and the `pypi` and `testpypi` environments were set up by the maintainer on 2026-11-14. The package is on PyPI from 0.1.9 (0.1.9, 0.1.10 and 0.1.11 are published); the change is not archived, and tasks 5.6 (TestPyPI dry run of every platform's wheel) and 5.7 (first upload) are still unticked in its task list.
+Implemented 2026-11-14: the crate and the package `vertep` in `bindings/python` with 27 tests that prove each scenario and run every example, examples in `examples/python`, the docs page, a CI job and the release workflow. PyPI and TestPyPI pending publishers and the `pypi` and `testpypi` environments were set up by the maintainer on 2026-11-14. The package is on PyPI from 0.1.9 (0.1.9, 0.1.10 and 0.1.11 are published); archived 2026-11-17 as `openspec/changes/archive/2026-11-17-m11-python-bindings`.
 
 ## M12 Decision records
 
@@ -214,3 +215,9 @@ Delivered by the OpenSpec change `m16-verified-rules` (capability `rule-verifica
 Delivered: agents propose rules that pass an ordered gate, run in shadow and are promoted by journaled acts, and no actor can change the rules that govern it.
 
 Delivered by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`), building on the grants of [[roadmap#M5 Federation]]. Built: the gate with structured errors, authorship, shadow runs (with sampling), staged promotion, scoped-live deciders, the self-governance limit, the agent tool `vt:tool/rules/propose` and `vt rules propose|shadow|promote`. Grants come from a function the host supplies; wiring federation grant credentials into it is left to the host. Archived 2026-11-15 as `openspec/changes/archive/2026-11-15-m17-agent-rules` with 7 requirements in `openspec/specs/`.
+
+## M19 Custody proof
+
+The Lean proof that custody under custodian-set changes keeps one writer per epoch and loses no committed entry, for elections that fix their configuration record first.
+
+Specified by the OpenSpec change `m19-custody-proof` (capability `object-custody`). Opened 2026-11-17 after the M7 attempt refuted the conjectures as first stated; not started. It is a proof, not a feature, so it does not wait on [[roadmap#M13 Production readiness]].

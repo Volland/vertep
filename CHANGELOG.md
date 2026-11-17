@@ -8,6 +8,12 @@ All crates of the workspace and both npm packages share one version.
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-11-17
+
+Milestones M10 (agent protocols) and M12 (decision records) archived, M13 (production readiness)
+nearly done, and a custody safety fix. M7 and M11 archived; the M7 custody proof moves to
+`m19-custody-proof`.
+
 ### Added
 
 - **Journal shipping** (`vertep-cluster`, M13): a pull protocol over the cluster transport. A
@@ -51,6 +57,9 @@ All crates of the workspace and both npm packages share one version.
 - The DIDComm relay tests are now compiled and run in CI (the `didcomm` feature was never on).
 
 ## [0.1.12] - 2026-11-16
+
+Version 0.1.12 was merged but never published to crates.io, PyPI or npm; its changes ship in
+0.1.13.
 
 Milestone M12 (decision records): redaction completed. Milestone M13 (production readiness):
 tiers, docs audit, toolchain, supply chain and the ten-minute path.
