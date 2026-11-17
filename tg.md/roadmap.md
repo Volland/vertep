@@ -175,13 +175,13 @@ Built in `vertep-agent`, `vertep-objects` and `vertep-cli`: the disposition and 
 
 ## M13 Production readiness
 
-In progress (2026-11-16): stability tiers, a reproducible toolchain, a benchmark suite with a regression gate, a supply-chain gate, a docs-versus-behaviour audit, a tested ten-minute path, journal shipping between nodes and WebSocket live delivery.
+Delivered: stability tiers, a reproducible toolchain, a supply-chain gate, a docs-versus-behaviour audit, a tested ten-minute path, journal shipping between nodes and WebSocket live delivery.
 
 - precedes:: [[roadmap#M14 Rules decider]] {note: "rules start only after production readiness"}
 
 Specified by the OpenSpec change `m13-production-readiness` (capabilities `production-readiness` and `journal-shipping`, and an addition to `relay-mailboxes`). It also tracks the open Lean custody proof (M7 task 10.4) and the open M10 items. New milestones wait for it, see [[decisions#New milestones wait for production readiness]].
 
-Stability tiers are declared in every crate, npm and Python manifest and rendered into the README and `site/docs/tiers.html` by `site/tools/tiers.py`, which CI runs in check mode. The first docs-versus-behaviour audit (2026-11-16, release 0.1.11) corrected the site pages and this roadmap by hand; `scripts/docs-audit.py` now repeats it in CI and before each release, against claims marked on the statements themselves. In 0.1.12: the pinned toolchain and container build, `cargo-deny`, SBOMs and signed provenance at release, and the ten-minute-path CI job. After 0.1.12: journal shipping as a pull protocol in `vertep-cluster` with fault histories replayed through the Lean lease model, WebSocket live delivery for relay mailboxes with polling fallback in `vertep-federation`, and the repeatable docs audit. Not built yet: the benchmark suite and its regression gate, carried by `m18-runtime-performance`. <!-- claim: missing openspec:production-readiness#Benchmark Suite --> Open besides: the M7 and M10 dependencies.
+Stability tiers are declared in every crate, npm and Python manifest and rendered into the README and `site/docs/tiers.html` by `site/tools/tiers.py`, which CI runs in check mode. The first docs-versus-behaviour audit (2026-11-16, release 0.1.11) corrected the site pages and this roadmap by hand; `scripts/docs-audit.py` now repeats it in CI and before each release, against claims marked on the statements themselves. In 0.1.12: the pinned toolchain and container build, `cargo-deny`, SBOMs and signed provenance at release, and the ten-minute-path CI job. After 0.1.12: journal shipping as a pull protocol in `vertep-cluster` with fault histories replayed through the Lean lease model, WebSocket live delivery for relay mailboxes with polling fallback in `vertep-federation`, and the repeatable docs audit. The benchmark suite, its regression gate and its results page moved to M18 (`m18-runtime-performance`, phase 0). The M7 and M10 dependencies are closed (M10 archived; M7 task 10.4 moved to [[roadmap#M19 Custody proof]]). Archived 2026-11-17 as `openspec/changes/archive/2026-11-17-m13-production-readiness` with 9 requirements in `openspec/specs/`; the scope freeze of [[decisions#New milestones wait for production readiness]] ends with it.
 
 ## M14 Rules decider
 
@@ -220,4 +220,4 @@ Delivered by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`)
 
 The Lean proof that custody under custodian-set changes keeps one writer per epoch and loses no committed entry, for elections that fix their configuration record first.
 
-Specified by the OpenSpec change `m19-custody-proof` (capability `object-custody`). Opened 2026-11-17 after the M7 attempt refuted the conjectures as first stated; not started. It is a proof, not a feature, so it does not wait on [[roadmap#M13 Production readiness]].
+Specified by the OpenSpec change `m19-custody-proof` (capability `object-custody`). Opened 2026-11-17 after the M7 attempt refuted the conjectures as first stated. Not proven yet. <!-- claim: missing openspec:object-custody#Joint Custody Safety Is Proven --> It is a proof, not a feature, so it does not wait on [[roadmap#M13 Production readiness]].

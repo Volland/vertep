@@ -19,10 +19,10 @@
 
 ## 4. Benchmarks
 
-- [ ] 4.1 (owned by `m18-runtime-performance` phase 0) `benches/` for step, journal append, replay, decider round trip
-- [ ] 4.2 Size and cold-start measurements for `@vertep/web` and the wheel
-- [ ] 4.3 Regression gate against the last release's recorded results
-- [ ] 4.4 Results page under `site/` with machine and commit
+- [x] 4.1 (moved to `m18-runtime-performance` phase 0, 2026-11-17) `benches/` for step, journal append, replay, decider round trip
+- [x] 4.2 (moved to `m18-runtime-performance` phase 0) Size and cold-start measurements for `@vertep/web` and the wheel
+- [x] 4.3 (moved to `m18-runtime-performance` phase 0) Regression gate against the last release's recorded results
+- [x] 4.4 (moved to `m18-runtime-performance` phase 0) Results page under `site/` with machine and commit
 
 ## 5. Supply chain
 
@@ -49,6 +49,6 @@
 
 ## 9. Annotations and checks
 
-- [ ] 9.1 For each requirement, annotate the implementing code with `@tg: implements:: [[openspec:<capability>#<Requirement>]]`
-- [ ] 9.2 For each scenario, annotate its test or CI job with `@tg: verifies:: [[openspec:<capability>#<Requirement>#<Scenario>]]`
-- [ ] 9.3 Run `tg check`, `tg ontology check` and `tg trace production-readiness --gaps`, and the same for `journal-shipping`, and close every gap
+- [x] 9.1 For each requirement, annotate the implementing code with `@tg: implements:: [[openspec:<capability>#<Requirement>]]`
+- [x] 9.2 For each scenario, annotate its test or CI job with `@tg: verifies:: [[openspec:<capability>#<Requirement>#<Scenario>]]`
+- [x] 9.3 Run `tg check`, `tg ontology check` and `tg trace production-readiness --gaps`, and the same for `journal-shipping`, and close every gap

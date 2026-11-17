@@ -12,7 +12,7 @@ Twelve milestones were built in four days. The specification is complete for wha
 
 ## What Changes
 
-- **New capability `production-readiness`:** stability tiers per crate and package; a reproducible toolchain with a CI job that builds `@vertep/web` and the Python wheel from a clean checkout; a benchmark suite with a regression gate and a published results page; a supply-chain gate (advisories, licences, SBOM, signed releases); a docs-versus-behaviour audit; and a tested ten-minute path.
+- **New capability `production-readiness`:** stability tiers per crate and package; a reproducible toolchain with a CI job that builds `@vertep/web` and the Python wheel from a clean checkout; a supply-chain gate (advisories, licences, SBOM, signed releases); a docs-versus-behaviour audit; and a tested ten-minute path.
 - **New capability `journal-shipping`:** a wire protocol for journal replication between cluster nodes, with ordering, back-pressure and resumption, using the existing journal format and the transport of `vertep-cluster`.
 - **Modified capability `relay-mailboxes`:** live delivery over WebSocket.
 - **Tracked, not re-specified here:** the Lean proof of custody safety under custodian-set changes stays in `m7-durable-objects` task 10.4 and is listed in this change's tasks as a dependency to close; the M10 open items stay in `m10-agent-protocols`.
@@ -22,7 +22,7 @@ Twelve milestones were built in four days. The specification is complete for wha
 
 ### New Capabilities
 
-- `production-readiness`: tiers, toolchain, benchmarks, supply chain, doc audit, first-run path.
+- `production-readiness`: tiers, toolchain, supply chain, doc audit, first-run path. The benchmark suite moved to `m18-runtime-performance` (phase 0) on 2026-11-17, before this change was archived.
 - `journal-shipping`: replicating a journal between nodes.
 
 ### Modified Capabilities
@@ -34,4 +34,4 @@ Twelve milestones were built in four days. The specification is complete for wha
 - New `benches/` and a results page under `site/`; new CI jobs and a `deny.toml`; `Cargo.toml` metadata for tiers; `bindings/js` and `bindings/python` build scripts; `vertep-cluster` (shipping), `vertep-federation` (WebSocket).
 - tg.md sections touched: `roadmap#M13 Production readiness` (new), `capabilities#Production readiness`, `capabilities#Journal shipping`, `capabilities#Relay mailboxes`, `components#vertep-cluster`, `components#vertep-federation`, `views/distribution`, `constraints#Toolchain pins`, `decisions` (D1-D5).
 - Decisions that bind the area: [[decisions#Event-sourced actors]].
-- Adds requirements `[[openspec:production-readiness#Stability Tiers]]`, `[[openspec:production-readiness#Reproducible Toolchain]]`, `[[openspec:production-readiness#Benchmark Suite]]`, `[[openspec:production-readiness#Supply Chain Gate]]`, `[[openspec:production-readiness#Docs Match Behaviour]]`, `[[openspec:production-readiness#Ten Minute Path]]`, `[[openspec:journal-shipping#Ordered Shipping]]`, `[[openspec:journal-shipping#Resumption]]`, `[[openspec:journal-shipping#Back Pressure]]` and `[[openspec:relay-mailboxes#WebSocket Live Delivery]]`.
+- Adds requirements `[[openspec:production-readiness#Stability Tiers]]`, `[[openspec:production-readiness#Reproducible Toolchain]]`, `[[openspec:production-readiness#Supply Chain Gate]]`, `[[openspec:production-readiness#Docs Match Behaviour]]`, `[[openspec:production-readiness#Ten Minute Path]]`, `[[openspec:journal-shipping#Ordered Shipping]]`, `[[openspec:journal-shipping#Resumption]]`, `[[openspec:journal-shipping#Back Pressure]]` and `[[openspec:relay-mailboxes#WebSocket Live Delivery]]`.
