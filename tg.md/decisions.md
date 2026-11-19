@@ -1180,6 +1180,15 @@ The website in `site/` is hand-written HTML with one stylesheet and SVG marks: n
 
 The look is woodcut gravure in three inks, black, white and orange, with paper and ink swapped in dark mode; the tokens and components are in `site/assets/css/vertep.css`. Code on the pages is taken from files in the repository, and command output is pasted from real runs, so a page that disagrees with the code is a bug in the page. The example pages are written by `site/tools/sync-examples.py` from the sources and recorded outputs that `cargo test -p vertep-examples` checks; the pages are committed, so viewing the site still needs no build. The workflow `.github/workflows/pages.yml` deploys `site/` unchanged to GitHub Pages at https://volland.github.io/vertep/ on every push that touches it; package READMEs and crate metadata (`homepage`) link there, and load the logo from it.
 
+## The site explains Vertep in business terms before mechanism
+
+`site/use-cases.html` explains Vertep without jargon: a new-employee analogy, eight cases as without / with Vertep / worth, who in a company cares, and when it is not needed.
+
+- motivated_by:: [[decisions#Explanation is the process record, not a story about it]] {weight: primary, since: "2026-11-19"}
+- motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: secondary, since: "2026-11-19"}
+
+Reader feedback (2026-11-19) asked for simpler examples with business impact and the problems solved; the landing, Why and Regulated pages lead with mechanism (SCXML, journal, Lean). Every case maps to a shipped capability: decide-state candidates, guards, human deciders, durable timers, decision budgets, replay without a model, chart versions by hash and fork-under-another-version. The impact is stated qualitatively, with no invented numbers. The main and footer navigation of every page, including those written by `site/tools/sync-examples.py`, link it after Why.
+
 ## Legal pages mirror the author's own site
 
 The site carries a German Impressum, Datenschutzerklärung and AGB, plus an About page, all taken from pavlyshyn.me, and links to lean4knowledge.com and pavlyshyn.me from every footer.
