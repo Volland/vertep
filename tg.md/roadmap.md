@@ -225,9 +225,9 @@ Delivered by the OpenSpec change `m17-agent-rules` (capability `rule-authoring`)
 
 ## M18 Runtime performance
 
-Drafted, not started: measured hot paths, one commit per turn, unversioned bookkeeping, activation from the snapshot, bounded mailboxes and memory, group commit, shard groups, and a cluster transport that stays within the peer's stream limit.
+In progress: measured hot paths, one commit per turn, unversioned bookkeeping, activation from the snapshot, bounded mailboxes and memory, group commit, shard groups, and a cluster transport that stays within the peer's stream limit.
 
-Specified by the OpenSpec change `m18-runtime-performance` (new capability `runtime-performance`, and additions to `storage`, `event-journal`, `messaging`, `actor-model`, `cluster-transport` and `shard-placement`). It comes from the architecture review of 2026-11-16 and supplies the performance evidence that [[roadmap#M13 Production readiness]] asked for: M13 was archived on 2026-11-17 and moved its benchmark suite here, so phase 0 builds it. <!-- claim: missing openspec:production-readiness#Benchmark Suite --> It supersedes [[decisions#Deduplication reads the whole journal on activation]] and [[decisions#Outbox progress lives in an outbox graph]] once accepted.
+Specified by the OpenSpec change `m18-runtime-performance` (new capability `runtime-performance`, and additions to `storage`, `event-journal`, `messaging`, `actor-model`, `cluster-transport` and `shard-placement`). It comes from the architecture review of 2026-11-16 and supplies the performance evidence that [[roadmap#M13 Production readiness]] asked for: M13 was archived on 2026-11-17 and moved its benchmark suite here, so phase 0 builds it. Phase 0 landed 2026-11-19: the suite, `CountingStorage`, the budget tests (ignored until phase 2), the gate job and the results page. <!-- claim: built openspec:production-readiness#Benchmark Suite --> It supersedes [[decisions#Deduplication reads the whole journal on activation]] and [[decisions#Outbox progress lives in an outbox graph]] once accepted.
 
 ## M19 Custody proof
 

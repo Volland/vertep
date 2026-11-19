@@ -314,3 +314,46 @@ jobs:
         run: python3 scripts/ten-minute-path.py --self-test
       - name: Follow the pages
         run: python3 scripts/ten-minute-path.py ${{ github.event_name == 'schedule' && '--full' || '' }}
+
+  # M18 phase 0, "Benchmark Regression Gate": the suite (benches/runtime) runs at the last
+  # release tag and at this change on the same runner, so the comparison does not depend on the
+  # machine; thresholds and accepted moves are in benches/baseline.json (scripts/bench-gate.py).
+  # A release without the suite has nothing to compare against, and the gate passes with a note.
+  bench-gate:
+    name: Benchmark regression gate (last release vs this change)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      VERTEP_BENCH_QUICK: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+      - run: python3 scripts/bench-gate.py self-test
+      - name: The results page shows the recorded baseline
+        run: python3 scripts/bench-gate.py page --check
+      - name: Suite at the last release
+        run: |
+          base=$(git describe --tags --abbrev=0 --match 'v*' HEAD)
+          echo "last release: $base"
+          git worktree add ../base "$base"
+          if [ -d ../base/benches/runtime ]; then
+            (cd ../base && cargo bench -p vertep-bench -- --warm-up-time 1 --measurement-time 3)
+            python3 scripts/bench-gate.py collect --criterion ../base/target/criterion --out base.json
+          else
+            echo '{"describe": "'"$base"'", "cases": {}}' > base.json
+          fi
+      - name: Suite at this change
+        run: |
+          cargo bench -p vertep-bench -- --warm-up-time 1 --measurement-time 3
+          python3 scripts/bench-gate.py collect --out head.json
+      - name: Compare
+        run: python3 scripts/bench-gate.py compare --base base.json --head head.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-results
+          path: "*.json"
+          retention-days: 30

@@ -269,6 +269,19 @@ The storage traits `JournalStore` and `GraphStore`, their contracts and a shared
 
 Implemented 2026-11-11: `JournalStore` (compare-and-set append with fencing tokens and state deltas), `GraphStore` (quads and SPARQL), an in-memory reference store, the RDF 1.1 reification fallback, a projector to an external graph store and a test kit that every backend runs. Message-id deduplication is the runtime's job.
 
+## vertep-bench
+
+The benchmark suite of the hot paths (`benches/runtime`, criterion, not published), with shared fixtures for nodes on each store; `scripts/bench-gate.py` turns its results into the regression gate and the results page.
+
+- provides:: [[capabilities#Runtime performance]] {confidence: partial, note: "M18 phase 0: harness, budgets, gate"}
+- uses:: [[components#vertep-runtime]] {kind: required}
+- uses:: [[components#vertep-store]] {kind: required}
+- uses:: [[components#vertep-tiramemsu]] {kind: required}
+- realizes:: [[decisions#Performance is measured by counted operations and benchmarks]]
+- scheduled_in:: [[roadmap#M18 Runtime performance]]
+
+Built 2026-11-19 (M18 phase 0): turns, activation against history, receive under deferral, journal append and replay, the core step, the decider round trip and the loopback QUIC round trip. `CountingStorage` (in `vertep-runtime` behind `testkit`, on the counting wrapper of the `vertep-store` kit) counts commits and reads for the budget tests.
+
 ## vertep-tiramemsu
 
 The default backend: one tiramemsu file per shard implements both `JournalStore` and `GraphStore`, with `now()` as the current-state graph and `as_of` as time travel.

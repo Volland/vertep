@@ -1970,7 +1970,7 @@ Crates get SBOMs but no attestation of the uploaded file, because crates.io offe
 
 ## Performance is measured by counted operations and benchmarks
 
-Every performance claim has a criterion benchmark or a test that counts store operations through `CountingStorage`; budgets are asserted on counts, so they hold on any machine. Proposed 2026-11-16 (M18 D1).
+Every performance claim has a criterion benchmark or a test that counts store operations through `CountingStorage`; budgets are asserted on counts, so they hold on any machine. Proposed 2026-11-16, accepted 2026-11-19 when phase 0 landed (M18 D1).
 
 - motivated_by:: [[decisions#Benchmarks measure the claims]] {weight: primary, since: "2026-11-16", note: "one suite: M18 phase 0 builds M13 group 4"}
 - motivated_by:: [[decisions#New milestones wait for production readiness]] {weight: secondary, note: "the evidence M13 asks for"}

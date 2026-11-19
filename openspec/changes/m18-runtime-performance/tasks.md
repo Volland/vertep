@@ -2,14 +2,14 @@ Each phase lands as its own pull request with green CI. Phase 0 comes first, so 
 
 ## 0. Measure (D1)
 
-- [ ] 0.1 `CountingStorage` in the `vertep-store` test kit: counts commits, quads written and read, SPARQL queries, and journal `read` and `head` calls, per call site
-- [ ] 0.2 `benches/runtime` (criterion), one suite that is also `production-readiness#Benchmark Suite`, moved here from M13 ([[decisions#Benchmarks measure the claims]]): pure `step` throughput on three chart sizes; journal append latency and replay speed per backend (memory, tiramemsu file); decider round trip with a scripted decider; turns/s (memory and tiramemsu, with and without a send); activation at 10, 1k and 100k entries (with and without a snapshot); receive with 0, 100 and 10k deferred messages; a cross-node send round trip on loopback QUIC
-- [ ] 0.2a Size and cold-start measurements for `@vertep/web` and the Python wheel
-- [ ] 0.3 Record the baseline on `main` (before any change below) in `benches/baseline.json` with commit, machine and durability mode; it doubles as the last-release results the gate compares against
-- [ ] 0.4 Budget tests through `CountingStorage`, marked `#[ignore]` until the phase that makes each one pass: a turn commits once, activation reads only after the snapshot, a duplicate is dropped without a full read
-- [ ] 0.5 Regression gate job in CI against the last release's recorded results, failing over a stated threshold
-- [ ] 0.5a Results page under `site/` with machine and commit; later phases add their before and after numbers to it
-- [ ] 0.6 Annotate: `@tg: implements:: [[openspec:production-readiness#Benchmark Suite]]` on the harness, the size measurements and the gate, and `verifies::` for `#Results are recorded` and `#A regression fails CI`; `@tg: implements:: [[openspec:runtime-performance#Hot Path Benchmarks]]` and `[[openspec:runtime-performance#Operation Budgets]]` on the harness and the wrapper; `@tg: implements:: [[openspec:runtime-performance#Benchmark Regression Gate]]` on the gate script; `@tg: verifies::` on each budget test for its scenario
+- [x] 0.1 `CountingStorage` in the `vertep-store` test kit: counts commits, quads written and read, SPARQL queries, and journal `read` and `head` calls, per call site
+- [x] 0.2 `benches/runtime` (criterion), one suite that is also `production-readiness#Benchmark Suite`, moved here from M13 ([[decisions#Benchmarks measure the claims]]): pure `step` throughput on three chart sizes; journal append latency and replay speed per backend (memory, tiramemsu file); decider round trip with a scripted decider; turns/s (memory and tiramemsu, with and without a send); activation at 10, 1k and 100k entries (with and without a snapshot); receive with 0, 100 and 10k deferred messages; a cross-node send round trip on loopback QUIC
+- [ ] 0.2a Size and cold-start measurements for `@vertep/web` and the Python wheel (2026-11-19: `scripts/measure-sizes.sh` reads built artifacts and `bench-gate.py collect --sizes` records them; still to wire into the `wasm` and `python` CI jobs, where the artifacts are built)
+- [x] 0.3 Record the baseline on `main` (before any change below) in `benches/baseline.json` with commit, machine and durability mode; it doubles as the last-release results the gate compares against
+- [x] 0.4 Budget tests through `CountingStorage`, marked `#[ignore]` until the phase that makes each one pass: a turn commits once, activation reads only after the snapshot, a duplicate is dropped without a full read
+- [x] 0.5 Regression gate job in CI against the last release's recorded results, failing over a stated threshold (the `bench-gate` job runs the suite at the last release tag and at the change on one runner; passes with a note until a release contains the suite)
+- [x] 0.5a Results page under `site/` with machine and commit; later phases add their before and after numbers to it
+- [x] 0.6 Annotate: `@tg: implements:: [[openspec:production-readiness#Benchmark Suite]]` on the harness, the size measurements and the gate, and `verifies::` for `#Results are recorded` and `#A regression fails CI`; `@tg: implements:: [[openspec:runtime-performance#Hot Path Benchmarks]]` and `[[openspec:runtime-performance#Operation Budgets]]` on the harness and the wrapper; `@tg: implements:: [[openspec:runtime-performance#Benchmark Regression Gate]]` on the gate script; `@tg: verifies::` on each budget test for its scenario
 
 ## 1. Correctness under load (D2, D10 in part)
 

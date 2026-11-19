@@ -1,6 +1,7 @@
 ---
 type: View
 status: draft
+openspec: [runtime-performance]
 ---
 # Performance
 
@@ -162,3 +163,30 @@ flowchart LR
 ```
 
 The freeze of [[decisions#New milestones wait for production readiness]] ended when M13 was archived on 2026-11-17, and M13's benchmark suite moved into phase 0. Open before code starts: whether phase 1 makes `Immediate` the default before group commit pays for it in phase 4.
+
+## Phase 0 baseline
+
+The baseline recorded on 2026-11-19 at v0.1.14 confirms the review's findings with numbers: the budgets fail by large factors, and activation cost grows with history even with a snapshot.
+
+- describes:: [[decisions#Performance is measured by counted operations and benchmarks]]
+- describes:: [[components#vertep-bench]]
+
+Counted through `CountingStorage` (`crates/vertep-runtime/tests/budgets.rs`, ignored until phase 2): a turn with one send makes 5 commits against a budget of 1; activating an actor with 1,000 entries and a snapshot at 990 reads all 1,000 entries (16,001 quads) against a budget of 10; a duplicate after deactivation does the same.
+
+Timed by criterion on an Apple M2 Max, tiramemsu at `synchronous = NORMAL` (`benches/baseline.json`, shown on `site/docs/benchmarks.html`):
+
+| Case | Mean |
+|---|---|
+| turn, memory, no send / one send | 93 µs / 148 µs |
+| turn, tiramemsu, no send / one send | 3.4 ms / 7.1 ms |
+| activation, 100,000 entries, no snapshot / snapshot 10 from head | 13.7 s / 1.3 s |
+| activation, 10 entries | 10 ms (a fixed cost, before any replay) |
+| receive with 10,000 deferred ahead (memory or store mailbox) | 91 µs |
+| journal append, tiramemsu / memory | 1.4 ms / 39 µs |
+| replay of 1,000 entries, tiramemsu / memory | 23 ms / 1.8 ms |
+| core macrostep, small / medium / large chart | 0.9 / 2.6 / 17.5 µs |
+| scripted decider round trip | 15 µs |
+| cross-node send round trip, loopback QUIC | 89 µs |
+
+The core step is three orders of magnitude cheaper than a durable turn, so the store, not the interpreter, is the place to work: phases 2 and 4 target the 5 commits and the full-journal read. The 10 ms floor of activation is not in the plan yet and needs a profile.
+

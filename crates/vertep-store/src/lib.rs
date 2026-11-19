@@ -14,7 +14,8 @@
 //! ([`MemoryStore`]), the projector that copies journals into an external graph store
 //! ([`Projector`]), the RDF 1.1 reification fallback for annotations ([`reification`]), the
 //! SPARQL text helpers ([`sparql`]) and, behind the `testkit` feature, the shared backend test
-//! kit every backend must pass.
+//! kit every backend must pass and the counting wrapper that operation budgets are checked with
+//! (`counting`).
 //!
 //! @tg: implements:: [[decisions#Two storage traits with tiramemsu as default]] {confidence: partial}
 //! @tg: implements:: [[decisions#Fencing epochs on journal appends]] {confidence: partial}
@@ -28,6 +29,8 @@ pub mod reification;
 pub mod sparql;
 pub mod vocab;
 
+#[cfg(feature = "testkit")]
+pub mod counting;
 #[cfg(feature = "testkit")]
 pub mod testkit;
 
