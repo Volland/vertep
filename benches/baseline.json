@@ -1,0 +1,167 @@
+{
+  "accepted": {},
+  "figures": {
+    "cases": {
+      "activation/no_snapshot/10": {
+        "ci_high_ns": 10227821.4,
+        "ci_low_ns": 9942084.4,
+        "mean_ns": 10073922.0
+      },
+      "activation/no_snapshot/1000": {
+        "ci_high_ns": 144823664.6,
+        "ci_low_ns": 142914922.2,
+        "mean_ns": 143838357.6
+      },
+      "activation/no_snapshot/100000": {
+        "ci_high_ns": 13822129700.0,
+        "ci_low_ns": 13534647109.2,
+        "mean_ns": 13670289312.4
+      },
+      "activation/snapshot/10": {
+        "ci_high_ns": 11141463.1,
+        "ci_low_ns": 9718212.3,
+        "mean_ns": 10219369.9
+      },
+      "activation/snapshot/1000": {
+        "ci_high_ns": 31549761.6,
+        "ci_low_ns": 30530368.3,
+        "mean_ns": 31016113.5
+      },
+      "activation/snapshot/100000": {
+        "ci_high_ns": 1309030658.6,
+        "ci_low_ns": 1285241412.4,
+        "mean_ns": 1296592095.8
+      },
+      "cluster/send_round_trip/loopback": {
+        "ci_high_ns": 89906.7,
+        "ci_low_ns": 87336.8,
+        "elements": 1,
+        "mean_ns": 88491.0
+      },
+      "decider/round_trip/scripted": {
+        "ci_high_ns": 14778.4,
+        "ci_low_ns": 14393.1,
+        "elements": 1,
+        "mean_ns": 14563.4
+      },
+      "journal/append/memory": {
+        "ci_high_ns": 39106.9,
+        "ci_low_ns": 38048.5,
+        "mean_ns": 38573.8
+      },
+      "journal/append/tiramemsu": {
+        "ci_high_ns": 1510599.4,
+        "ci_low_ns": 1331138.0,
+        "elements": 1,
+        "mean_ns": 1415587.1
+      },
+      "journal/replay_1000/memory": {
+        "ci_high_ns": 1835851.5,
+        "ci_low_ns": 1804324.6,
+        "elements": 1000,
+        "mean_ns": 1819802.6
+      },
+      "journal/replay_1000/tiramemsu": {
+        "ci_high_ns": 24214746.7,
+        "ci_low_ns": 22535804.1,
+        "elements": 1000,
+        "mean_ns": 23147727.9
+      },
+      "receive/memory/0": {
+        "ci_high_ns": 103.2,
+        "ci_low_ns": 102.3,
+        "mean_ns": 102.7
+      },
+      "receive/memory/100": {
+        "ci_high_ns": 1030.5,
+        "ci_low_ns": 1021.5,
+        "mean_ns": 1025.9
+      },
+      "receive/memory/10000": {
+        "ci_high_ns": 91318.8,
+        "ci_low_ns": 90510.6,
+        "mean_ns": 90900.4
+      },
+      "receive/store/0": {
+        "ci_high_ns": 104.3,
+        "ci_low_ns": 103.0,
+        "mean_ns": 103.6
+      },
+      "receive/store/100": {
+        "ci_high_ns": 1036.9,
+        "ci_low_ns": 1024.3,
+        "mean_ns": 1030.2
+      },
+      "receive/store/10000": {
+        "ci_high_ns": 92225.3,
+        "ci_low_ns": 90347.3,
+        "mean_ns": 91122.1
+      },
+      "step/macrostep/large": {
+        "ci_high_ns": 17692.3,
+        "ci_low_ns": 17308.0,
+        "elements": 1,
+        "mean_ns": 17479.8
+      },
+      "step/macrostep/medium": {
+        "ci_high_ns": 2580.1,
+        "ci_low_ns": 2542.8,
+        "elements": 1,
+        "mean_ns": 2558.2
+      },
+      "step/macrostep/small": {
+        "ci_high_ns": 920.2,
+        "ci_low_ns": 900.0,
+        "elements": 1,
+        "mean_ns": 908.8
+      },
+      "turns/memory/no_send": {
+        "ci_high_ns": 94175.2,
+        "ci_low_ns": 91341.7,
+        "elements": 1,
+        "mean_ns": 92754.4
+      },
+      "turns/memory/send": {
+        "ci_high_ns": 149566.2,
+        "ci_low_ns": 146583.0,
+        "elements": 1,
+        "mean_ns": 148063.6
+      },
+      "turns/tiramemsu/no_send": {
+        "ci_high_ns": 3646429.5,
+        "ci_low_ns": 3255595.6,
+        "elements": 1,
+        "mean_ns": 3430588.5
+      },
+      "turns/tiramemsu/send": {
+        "ci_high_ns": 7763020.8,
+        "ci_low_ns": 6570943.9,
+        "elements": 1,
+        "mean_ns": 7112793.7
+      }
+    },
+    "commit": "c1d4488cc802149f78b65c589dbbdb6d03b42e2a",
+    "date": "2026-11-19T16:13:04Z",
+    "describe": "v0.1.14-dirty",
+    "durability": {
+      "memory": "volatile",
+      "tiramemsu": "normal"
+    },
+    "machine": {
+      "arch": "arm64",
+      "cores": 12,
+      "cpu": "Apple M2 Max",
+      "os": "Darwin 27.0.0",
+      "runner": "local"
+    },
+    "quick": false
+  },
+  "history": [],
+  "reason": "M18 phase 0: first baseline, before any M18 change; tiramemsu at synchronous=NORMAL",
+  "thresholds": {
+    "activation/": 0.3,
+    "cluster/": 0.5,
+    "default": 0.25,
+    "receive/": 0.35
+  }
+}

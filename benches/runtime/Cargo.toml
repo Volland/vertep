@@ -1,0 +1,56 @@
+[package]
+name = "vertep-bench"
+description = "Benchmarks of Vertep's hot paths, the suite the regression gate compares against benches/baseline.json"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+# Run the suite with `cargo bench -p vertep-bench`; `scripts/bench-gate.py` collects the
+# results with the commit, the machine and the durability mode, and compares them with the
+# baseline (benches/baseline.json). VERTEP_BENCH_QUICK=1 skips the 100k-entry activation case.
+
+# The fixtures are a library without benchmarks of their own; without this, `cargo bench`
+# passes criterion's options to the library's test harness, which rejects them.
+[lib]
+bench = false
+
+[dependencies]
+vertep-core = { workspace = true, features = ["std", "serde"] }
+vertep-runtime = { workspace = true, features = ["tiramemsu", "testkit"] }
+vertep-store = { workspace = true, features = ["testkit"] }
+vertep-tiramemsu = { workspace = true }
+vertep-scxml = { workspace = true }
+vertep-dm-ecma = { workspace = true }
+tempfile = "3"
+
+[dev-dependencies]
+# decider.rs: the agent host and its decider contract.
+vertep-agent = { workspace = true }
+# cluster.rs: the QUIC cluster transport over loopback.
+vertep-cluster = { workspace = true, features = ["quic"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "net", "time"] }
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+oxrdf.workspace = true
+
+[[bench]]
+name = "runtime"
+harness = false
+
+[[bench]]
+name = "step"
+harness = false
+
+[[bench]]
+name = "decider"
+harness = false
+
+[[bench]]
+name = "cluster"
+harness = false
+
+[lints]
+workspace = true

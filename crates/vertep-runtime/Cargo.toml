@@ -23,6 +23,9 @@ tier-reason = "Journal protocol property tests with the Lean model as oracle; ex
 default = []
 # `Storage` for the tiramemsu backend.
 tiramemsu = ["dep:vertep-tiramemsu"]
+# `counting::CountingStorage`: any storage behind the store kit's counting wrapper, for
+# operation-budget tests and benchmarks.
+testkit = ["vertep-store/testkit"]
 # The server end of the WebSocket Event I/O Processor (`websocket::server`, on tokio and
 # tokio-tungstenite). The frames and the link state are always built: the browser shell uses them.
 websocket = ["dep:tokio-tungstenite", "tokio/net", "tokio/macros"]
@@ -42,7 +45,7 @@ futures = { workspace = true }
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["handshake"], optional = true }
 
 [dev-dependencies]
-vertep-runtime = { path = ".", features = ["tiramemsu"] }
+vertep-runtime = { path = ".", features = ["tiramemsu", "testkit"] }
 vertep-dm-ecma = { workspace = true }
 vertep-yaml = { workspace = true }
 vertep-dm-cel = { workspace = true }

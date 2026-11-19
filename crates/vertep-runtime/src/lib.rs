@@ -35,6 +35,8 @@
 pub mod actor;
 pub mod address;
 pub mod chart;
+#[cfg(feature = "testkit")]
+pub mod counting;
 pub mod journal;
 pub mod json;
 pub mod machine;

@@ -112,7 +112,8 @@
           <li><strong>Built in the open, quickly.</strong> The specification is complete for what is built; real-world use is what is missing. That is the reason to try it on a small case and tell us what breaks.</li>
           <li><strong>Strong:</strong> the SCXML core, the journal and replay, the deciders, the Lean model. Every crate and package declares a <a href="docs/tiers.html">stability tier</a> with the evidence behind it.</li>
           <li><strong>Younger:</strong> clusters (<span data-claim="built" data-ref="openspec:journal-shipping#Ordered Shipping">with journal shipping between nodes</span>), federation, durable objects, wallets, agent protocols, rule deciders and decision records (explanations, bundles, signed agent journals, redaction). They are built and specified, with fewer users and open items, which the roadmap lists.</li>
-          <li data-claim="missing" data-ref="openspec:production-readiness#Benchmark Suite; bindings/python/python/vertep#export_bundle; bindings/js/packages/web/src#exportBundle"><strong>Not yet there:</strong> published benchmarks, which come with the runtime-performance milestone (M18), and explanations and bundles produced from JavaScript or Python, which host no agents (both verify a bundle offline).</li>
+          <li data-claim="built" data-ref="openspec:production-readiness#Benchmark Suite"><strong>Measured, not yet tuned:</strong> the hot paths have <a href="docs/benchmarks.html">recorded benchmarks</a> and a regression gate. The runtime-performance milestone (M18) is working towards the budgets they set, such as one commit per turn.</li>
+          <li data-claim="missing" data-ref="bindings/python/python/vertep#export_bundle; bindings/js/packages/web/src#exportBundle"><strong>Not yet there:</strong> explanations and bundles produced from JavaScript or Python, which host no agents (both verify a bundle offline).</li>
         </ul>
       </div>
     </div>

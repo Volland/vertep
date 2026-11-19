@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Benchmarks — Vertep docs</title>
+<meta name="description" content="Recorded benchmark results of Vertep's hot paths: turns, activation, mailbox receive, journal append and replay, the core step, the decider round trip and the cluster round trip, with machine, commit and durability mode.">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="../assets/css/vertep.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.svg" alt="" width="46" height="46"><span class="wordmark">Vertep</span></a>
+    <nav class="topnav" aria-label="Main">
+      <a href="../why.html">Why</a>
+      <a href="../regulated.html">Regulated</a>
+      <a href="index.html" aria-current="page">Docs</a>
+      <a href="../examples/index.html">Examples</a>
+      <a href="../articles/index.html">Articles</a>
+      <a href="../book.html">Book</a>
+      <a href="../vertepnyk.html">Vertepnyk</a>
+      <a href="../about.html">About</a>
+    </nav>
+  </div>
+</header>
+
+<div class="docs-layout">
+  <aside class="sidebar" aria-label="Documentation">
+    <h4>Begin</h4>
+    <ul>
+      <li><a href="index.html">Getting started</a></li>
+      <li><a href="concepts.html">Concepts</a></li>
+    </ul>
+    <h4>Charts</h4>
+    <ul>
+      <li><a href="charts.html">Writing charts</a></li>
+      <li><a href="types.html">Datamodels and types</a></li>
+    </ul>
+    <h4>Running</h4>
+    <ul>
+      <li><a href="runtime.html">The actor runtime</a></li>
+      <li><a href="agents.html">Agents and deciders</a></li>
+      <li><a href="distribution.html">Cluster and federation</a></li>
+      <li><a href="durable-objects.html">Durable objects</a></li>
+      <li><a href="wallet.html">Agent wallets</a></li>
+      <li><a href="protocols.html">Agent protocols</a></li>
+      <li><a href="browser.html">Browser and JavaScript</a></li>
+      <li><a href="python.html">Python</a></li>
+      <li><a href="rules.html">Rules</a></li>
+      <li><a href="rules-writing.html">Writing rules</a></li>
+      <li><a href="rules-operating.html">Operating rules</a></li>
+      <li><a href="rules-verification.html">Checking rules</a></li>
+      <li><a href="rules-authoring.html">Rules written by agents</a></li>
+    </ul>
+    <h4>Reference</h4>
+    <ul>
+      <li><a href="rdf.html">RDF and versions</a></li>
+      <li><a href="verification.html">Verification</a></li>
+      <li><a href="cli.html">The vt command</a></li>
+      <li><a href="tiers.html">Stability tiers</a></li>
+      <li><a href="benchmarks.html" aria-current="page">Benchmarks</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="content">
+    <p class="breadcrumb"><a href="index.html">Docs</a> · Reference</p>
+    <h1>Benchmarks</h1>
+    <p class="lede">The recorded results of the benchmark suite in <code>benches/runtime</code>, with the commit, the machine and the store's durability mode. They are the baseline the regression gate compares against. Later M18 phases add their before and after figures here.</p>
+
+    <h2 id="run">Running the suite</h2>
+    <pre><code>cargo bench -p vertep-bench
+python3 scripts/bench-gate.py collect --out results.json</code></pre>
+    <p><code>VERTEP_BENCH_QUICK=1</code> skips the 100,000-entry activation case. The CI job <code>bench-gate</code> runs the suite at the last release tag and at the change, on one runner, and fails when a case is slower than its threshold (25% unless <code>benches/baseline.json</code> says otherwise). A baseline moves only with a recorded reason: <code>scripts/bench-gate.py record --results results.json --reason "..."</code>, then <code>scripts/bench-gate.py page</code> rewrites this page.</p>
+
+    <h2 id="budgets">Budgets that count, not time</h2>
+    <p>Wall-clock figures depend on the machine. The budgets the runtime promises are counts of store calls instead, checked by the tests in <code>crates/vertep-runtime/tests/budgets.rs</code> through <code>CountingStorage</code>: a turn commits once, activation reads only the entries after the latest snapshot, and a duplicate message is dropped without reading the journal from the start. The runtime does not meet them yet, so those tests are ignored until M18 phase 2. Today a turn with one send makes five commits, and activation reads the whole journal even when a snapshot is ten entries from the head.</p>
+
+    <h2 id="results">Recorded results</h2>
+    <!-- bench:begin -->
+    <p class="bench-meta">Commit <code>c1d4488cc802</code> (v0.1.14-dirty), recorded 2026-11-19T16:13:04Z on Apple M2 Max, 12 cores, Darwin 27.0.0. Tiramemsu durability: <code>normal</code>. Reason for this baseline: M18 phase 0: first baseline, before any M18 change; tiramemsu at synchronous=NORMAL</p>
+    <h3 id="bench-activation">activation</h3>
+    <table class="bench">
+      <thead><tr><th>Case</th><th>Mean</th><th>95% interval</th><th>Per second</th></tr></thead>
+      <tbody>
+        <tr><td><code>activation/no_snapshot/10</code></td><td>10.1 ms</td><td>9.94 ms – 10.2 ms</td><td>99</td></tr>
+        <tr><td><code>activation/no_snapshot/1000</code></td><td>144 ms</td><td>143 ms – 145 ms</td><td>7</td></tr>
+        <tr><td><code>activation/no_snapshot/100000</code></td><td>13.7 s</td><td>13.5 s – 13.8 s</td><td>0</td></tr>
+        <tr><td><code>activation/snapshot/10</code></td><td>10.2 ms</td><td>9.72 ms – 11.1 ms</td><td>98</td></tr>
+        <tr><td><code>activation/snapshot/1000</code></td><td>31 ms</td><td>30.5 ms – 31.5 ms</td><td>32</td></tr>
+        <tr><td><code>activation/snapshot/100000</code></td><td>1.3 s</td><td>1.29 s – 1.31 s</td><td>1</td></tr>
+      </tbody>
+    </table>
+    <h3 id="bench-cluster">cluster</h3>
+    <table class="bench">
+      <thead><tr><th>Case</th><th>Mean</th><th>95% interval</th><th>Per second</th></tr></thead>
+      <tbody>
+        <tr><td><code>cluster/send_round_trip/loopback</code></td><td>88.5 µs</td><td>87.3 µs – 89.9 µs</td><td>11,301</td></tr>
+      </tbody>
+    </table>
+    <h3 id="bench-decider">decider</h3>
+    <table class="bench">
+      <thead><tr><th>Case</th><th>Mean</th><th>95% interval</th><th>Per second</th></tr></thead>
+      <tbody>
+        <tr><td><code>decider/round_trip/scripted</code></td><td>14.6 µs</td><td>14.4 µs – 14.8 µs</td><td>68,665</td></tr>
+      </tbody>
+    </table>
+    <h3 id="bench-journal">journal</h3>
+    <table class="bench">
+      <thead><tr><th>Case</th><th>Mean</th><th>95% interval</th><th>Per second</th></tr></thead>
+      <tbody>
+        <tr><td><code>journal/append/memory</code></td><td>38.6 µs</td><td>38 µs – 39.1 µs</td><td>25,924</td></tr>
+        <tr><td><code>journal/append/tiramemsu</code></td><td>1.42 ms</td><td>1.33 ms – 1.51 ms</td><td>706</td></tr>
+        <tr><td><code>journal/replay_1000/memory</code></td><td>1.82 ms</td><td>1.8 ms – 1.84 ms</td><td>549,510</td></tr>
+        <tr><td><code>journal/replay_1000/tiramemsu</code></td><td>23.1 ms</td><td>22.5 ms – 24.2 ms</td><td>43,201</td></tr>
+      </tbody>
+    </table>
+    <h3 id="bench-receive">receive</h3>
+    <table class="bench">
+      <thead><tr><th>Case</th><th>Mean</th><th>95% interval</th><th>Per second</th></tr></thead>
+      <tbody>
+        <tr><td><code>receive/memory/0</code></td><td>103 ns</td><td>102 ns – 103 ns</td><td>9,737,098</td></tr>
+        <tr><td><code>receive/memory/100</code></td><td>1.03 µs</td><td>1.02 µs – 1.03 µs</td><td>974,754</td></tr>
+        <tr><td><code>receive/memory/10000</code></td><td>90.9 µs</td><td>90.5 µs – 91.3 µs</td><td>11,001</td></tr>
+        <tr><td><code>receive/store/0</code></td><td>104 ns</td><td>103 ns – 104 ns</td><td>9,652,510</td></tr>
+        <tr><td><code>receive/store/100</code></td><td>1.03 µs</td><td>1.02 µs – 1.04 µs</td><td>970,685</td></tr>
+        <tr><td><code>receive/store/10000</code></td><td>91.1 µs</td><td>90.3 µs – 92.2 µs</td><td>10,974</td></tr>
+      </tbody>
+    </table>
+    <h3 id="bench-step">step</h3>
+    <table class="bench">
+      <thead><tr><th>Case</th><th>Mean</th><th>95% interval</th><th>Per second</th></tr></thead>
+      <tbody>
+        <tr><td><code>step/macrostep/large</code></td><td>17.5 µs</td><td>17.3 µs – 17.7 µs</td><td>57,209</td></tr>
+        <tr><td><code>step/macrostep/medium</code></td><td>2.56 µs</td><td>2.54 µs – 2.58 µs</td><td>390,900</td></tr>
+        <tr><td><code>step/macrostep/small</code></td><td>909 ns</td><td>900 ns – 920 ns</td><td>1,100,352</td></tr>
+      </tbody>
+    </table>
+    <h3 id="bench-turns">turns</h3>
+    <table class="bench">
+      <thead><tr><th>Case</th><th>Mean</th><th>95% interval</th><th>Per second</th></tr></thead>
+      <tbody>
+        <tr><td><code>turns/memory/no_send</code></td><td>92.8 µs</td><td>91.3 µs – 94.2 µs</td><td>10,781</td></tr>
+        <tr><td><code>turns/memory/send</code></td><td>148 µs</td><td>147 µs – 150 µs</td><td>6,754</td></tr>
+        <tr><td><code>turns/tiramemsu/no_send</code></td><td>3.43 ms</td><td>3.26 ms – 3.65 ms</td><td>291</td></tr>
+        <tr><td><code>turns/tiramemsu/send</code></td><td>7.11 ms</td><td>6.57 ms – 7.76 ms</td><td>141</td></tr>
+      </tbody>
+    </table>
+    <!-- bench:end -->
+
+    <div class="ornament" aria-hidden="true"><img class="star-glyph" src="../assets/img/star.svg" alt=""></div>
+
+    <nav class="pager" aria-label="Pages">
+      <a href="tiers.html">← Stability tiers</a>
+      <a href="index.html">Getting started →</a>
+    </nav>
+  </main>
+</div>
+
+<footer class="colophon">
+  <div class="colophon-inner">
+    <div class="mark"><img src="../assets/img/logo.svg" alt="" width="40" height="40">Vertep</div>
+    <small>Named for the travelling puppet theatre of Ukraine. Licensed MIT or Apache-2.0.</small>
+    <nav class="topnav" aria-label="Footer"><a href="../why.html" style="color:inherit">Why</a><a href="../regulated.html" style="color:inherit">Regulated</a><a href="index.html" style="color:inherit">Docs</a><a href="../examples/index.html" style="color:inherit">Examples</a><a href="../articles/index.html" style="color:inherit">Articles</a><a href="../book.html" style="color:inherit">Book</a><a href="../vertepnyk.html" style="color:inherit">Vertepnyk</a><a href="https://github.com/Volland/vertep" style="color:inherit">GitHub</a><a href="../about.html" style="color:inherit">About</a><a href="https://lean4knowledge.com/" style="color:inherit">Lean 4 Knowledge</a><a href="https://pavlyshyn.me/" style="color:inherit">pavlyshyn.me</a><a href="../impressum.html" style="color:inherit">Impressum</a><a href="../datenschutz.html" style="color:inherit">Datenschutz</a><a href="../agb.html" style="color:inherit">AGB</a></nav>
+  </div>
+</footer>
+</body>
+</html>

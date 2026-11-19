@@ -29,6 +29,7 @@ members = [
     "crates/vertep-wallet",
     "crates/vertep-kolyada",
     "examples",
+    "benches/runtime",
 ]
 
 [workspace.package]
