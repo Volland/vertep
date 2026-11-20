@@ -315,6 +315,8 @@ a.card .more { font-family: var(--font-head); color: var(--orange-text); }
 .colophon a { color: var(--orange); }
 .colophon .mark { display: flex; align-items: center; gap: .8rem; font-family: var(--font-display); font-size: 1.4rem; letter-spacing: .08em; }
 .colophon .mark img { width: 40px; height: 40px; }
+.colophon .colophon-contact { flex-basis: 100%; margin: 0; font-size: 1rem; color: var(--paper-3); overflow-wrap: anywhere; }
+:root[data-theme="dark"] .colophon .colophon-contact { color: var(--ink-2); }
 .colophon small { font-family: var(--font-head-ital); font-style: italic; font-size: 1rem; color: var(--paper-3); }
 :root[data-theme="dark"] .colophon small { color: var(--ink-2); }
 

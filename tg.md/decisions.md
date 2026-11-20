@@ -1180,6 +1180,15 @@ The website in `site/` is hand-written HTML with one stylesheet and SVG marks: n
 
 The look is woodcut gravure in three inks, black, white and orange, with paper and ink swapped in dark mode; the tokens and components are in `site/assets/css/vertep.css`. Code on the pages is taken from files in the repository, and command output is pasted from real runs, so a page that disagrees with the code is a bug in the page. The example pages are written by `site/tools/sync-examples.py` from the sources and recorded outputs that `cargo test -p vertep-examples` checks; the pages are committed, so viewing the site still needs no build. The workflow `.github/workflows/pages.yml` deploys `site/` unchanged to GitHub Pages at https://volland.github.io/vertep/ on every push that touches it; package READMEs and crate metadata (`homepage`) link there, and load the logo from it.
 
+## The site explains Vertep in business terms before mechanism
+
+`site/use-cases.html` explains Vertep without jargon: a new-employee analogy, eight cases as without / with Vertep / worth, who in a company cares, and when it is not needed.
+
+- motivated_by:: [[decisions#Explanation is the process record, not a story about it]] {weight: primary, since: "2026-11-19"}
+- motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: secondary, since: "2026-11-19"}
+
+Reader feedback (2026-11-19) asked for simpler examples with business impact and the problems solved; the landing, Why and Regulated pages lead with mechanism (SCXML, journal, Lean). Every case maps to a shipped capability: decide-state candidates, guards, human deciders, durable timers, decision budgets, replay without a model, chart versions by hash and fork-under-another-version. The impact is stated qualitatively, with no invented numbers. The main and footer navigation of every page, including those written by `site/tools/sync-examples.py`, link it after Why.
+
 ## Legal pages mirror the author's own site
 
 The site carries a German Impressum, Datenschutzerklärung and AGB, plus an About page, all taken from pavlyshyn.me, and links to lean4knowledge.com and pavlyshyn.me from every footer.
@@ -1196,6 +1205,15 @@ The site has a page for the author's book, The Goat Does Not Choose the Play, wi
 - motivated_by:: [[decisions#Legal pages mirror the author's own site]] {weight: secondary}
 
 The cover is a copy kept in `site/assets/img/`, so the page loads no third-party resource and the Datenschutz stays true; the only outward link is the Leanpub address. The page states what the book says about itself and gives no price, which Leanpub sets. `site/tools/sync-examples.py` writes the navigation of the example pages and carries the same link.
+
+## The project has its own contact channels
+
+Vertep is reached at `hello@vertep.org` and followed as `@vertep.org` on Bluesky; the author's Mastodon account, `@vpavlyshyn@fosstodon.org`, is listed beside them. Every footer, the About page and the README carry all three. Decided 2026-11-20.
+
+- motivated_by:: [[decisions#Legal pages mirror the author's own site]] {weight: secondary, since: "2026-11-20"}
+- motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: secondary}
+
+The footer line is a plain paragraph of links styled by `.colophon-contact`, so no widget or third-party script loads and the Datenschutz stays true. The Mastodon link carries `rel="me"`, so Fosstodon can verify the site once it is listed on the profile. The Impressum and Datenschutz name `hello@vertep.org` as the contact address. `site/tools/sync-examples.py` writes the same line into the example pages. The Bluesky avatar and banner are drawn from the Vertep seal and kept in `site/assets/img/social/`.
 
 ## Site code is highlighted at build time
 

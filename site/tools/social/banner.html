@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Bluesky banner for @vertep.org, 3000 x 1000 (3:1). Rendered by render.sh.
+     The bottom-left corner stays quiet: Bluesky lays the avatar over it. -->
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../../assets/css/fonts.css">
+<style>
+html,body{margin:0;width:3000px;height:1000px;overflow:hidden}
+body{background:#fbf6ec;color:#17120f;
+  background-image:repeating-linear-gradient(-45deg,rgba(23,18,15,.13) 0 3px,transparent 3px 18px)}
+.frame{position:absolute;inset:0;border-top:22px solid #17120f;border-bottom:22px solid #17120f}
+.frame::before,.frame::after{content:"";position:absolute;left:0;right:0;height:6px;background:#17120f}
+.frame::before{top:16px}.frame::after{bottom:16px}
+.text{position:absolute;left:520px;top:170px;width:1560px}
+.kicker{font-family:"IM Fell English SC",Georgia,serif;font-size:66px;color:#b2440c;margin:0 0 10px;letter-spacing:.02em}
+h1{font-family:"Ruslan Display",Georgia,serif;font-weight:400;font-size:250px;line-height:1;margin:0;letter-spacing:.06em;
+  text-shadow:10px 10px 0 #e8641c}
+.rule{height:8px;background:#17120f;margin:44px 0 36px;width:1180px;box-shadow:0 18px 0 -4px #fbf6ec,0 20px 0 -4px #17120f}
+.lede{font-family:"IM Fell English",Georgia,serif;font-style:italic;font-size:64px;line-height:1.25;margin:0;color:#2b221d;max-width:1500px}
+.art{position:absolute;left:2120px;top:110px;width:780px;height:780px}
+.art .rays{position:absolute;inset:-6%;background:repeating-conic-gradient(from 0deg,#e8641c 0 4deg,transparent 4deg 12deg);
+  -webkit-mask:radial-gradient(circle,#000 0 46%,transparent 70%);opacity:.9}
+.art .disc{position:absolute;inset:14%;border-radius:50%;background:#fbf6ec;border:9px solid #17120f;box-shadow:0 0 0 20px #fbf6ec,0 0 0 27px #17120f}
+.art img{position:absolute;inset:17% 18% 14% 16%;width:66%;height:69%}
+.stars{position:absolute;left:150px;top:150px;display:flex;flex-direction:column;gap:46px}
+.stars img{width:210px;height:210px}
+</style></head><body>
+<div class="frame"></div>
+<div class="stars"><img src="../../assets/img/star.svg" alt=""></div>
+<div class="text">
+  <p class="kicker">Explainable agents for decisions that matter</p>
+  <h1>Vertep</h1>
+  <div class="rule"></div>
+  <p class="lede">Statecharts as durable actors. Every step written down before it happens, so any decision replays and explains itself.</p>
+</div>
+<div class="art"><div class="rays"></div><div class="disc"></div><img src="../../assets/img/goat.svg" alt=""></div>
+</body></html>
