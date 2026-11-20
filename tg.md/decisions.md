@@ -1206,6 +1206,15 @@ The site has a page for the author's book, The Goat Does Not Choose the Play, wi
 
 The cover is a copy kept in `site/assets/img/`, so the page loads no third-party resource and the Datenschutz stays true; the only outward link is the Leanpub address. The page states what the book says about itself and gives no price, which Leanpub sets. `site/tools/sync-examples.py` writes the navigation of the example pages and carries the same link.
 
+## The project has its own contact channels
+
+Vertep is reached at `hello@vertep.org` and followed as `@vertep.org` on Bluesky; the author's Mastodon account, `@vpavlyshyn@fosstodon.org`, is listed beside them. Every footer, the About page and the README carry all three. Decided 2026-11-20.
+
+- motivated_by:: [[decisions#Legal pages mirror the author's own site]] {weight: secondary, since: "2026-11-20"}
+- motivated_by:: [[decisions#Documentation site is plain static HTML]] {weight: secondary}
+
+The footer line is a plain paragraph of links styled by `.colophon-contact`, so no widget or third-party script loads and the Datenschutz stays true. The Mastodon link carries `rel="me"`, so Fosstodon can verify the site once it is listed on the profile. The Impressum and Datenschutz name `hello@vertep.org` as the contact address. `site/tools/sync-examples.py` writes the same line into the example pages. The Bluesky avatar and banner are drawn from the Vertep seal and kept in `site/assets/img/social/`.
+
 ## Site code is highlighted at build time
 
 Rust, XML (SCXML) and YAML blocks on the site are highlighted by `site/tools/highlight.py`, which writes plain `<span class="k">` markup into the committed pages, so the pages still need no script.
