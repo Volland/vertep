@@ -657,3 +657,93 @@ async fn pairs_beyond_the_stream_cap_share_streams_in_order() {
         }
     }
 }
+
+// @tg: verifies:: [[openspec:cluster-transport#Stream Budget Within The Peer Limit#More pairs than the limit]] {level: integration}
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn more_pairs_than_the_limit() {
+    const PAIRS: usize = 1_000;
+    const PER_PAIR: usize = 3;
+    let cluster = ClusterId::new("test").unwrap();
+    let ca = ClusterCa::generate(&cluster).unwrap();
+    let mailboxes = Arc::new(Mailboxes::new(PER_PAIR));
+    let b = transport(
+        ca.issue(&node("n2")).unwrap(),
+        Arc::new(PeerSet::new([node("n1")])),
+        mailboxes.clone(),
+        Arc::new(MemoryDeadLetters::default()),
+        TransportConfig::default(),
+    );
+    let a = Arc::new(transport(
+        ca.issue(&node("n1")).unwrap(),
+        Arc::new(PeerSet::new([node("n2")])),
+        Arc::new(Mailboxes::new(1)),
+        Arc::new(MemoryDeadLetters::default()),
+        TransportConfig::default(),
+    ));
+    let addr = b.local_addr().unwrap();
+    let mut outlets: Vec<_> = (0..PAIRS)
+        .map(|p| mailboxes.outlet(&format!("urn:t{p}")))
+        .collect();
+    let sends: Vec<_> = (0..PAIRS)
+        .map(|p| {
+            let a = a.clone();
+            tokio::spawn(async move {
+                for i in 0..PER_PAIR {
+                    let f = frame(
+                        &format!("{p}-{i}"),
+                        &format!("urn:x{p}"),
+                        &format!("urn:t{p}"),
+                    );
+                    let reply = a.send(&node("n2"), addr, &f).await.unwrap();
+                    assert!(matches!(reply, Reply::Ack { .. }), "{reply:?}");
+                }
+            })
+        })
+        .collect();
+    tokio::time::timeout(Duration::from_secs(60), async {
+        for s in sends {
+            s.await.unwrap();
+        }
+    })
+    .await
+    .expect("every pair delivered without waiting for a stream that cannot open");
+    for (p, o) in outlets.iter_mut().enumerate() {
+        for i in 0..PER_PAIR {
+            assert_eq!(
+                within(o.recv()).await.unwrap().1.id,
+                format!("{p}-{i}"),
+                "pair {p} in order"
+            );
+        }
+    }
+}
+
+// @tg: verifies:: [[openspec:cluster-transport#Stream Budget Within The Peer Limit#Slow peer does not stall others]] {level: integration}
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn slow_peer_does_not_stall_others() {
+    let p = Arc::new(pair());
+    let mut y = p.mailboxes.outlet("urn:y");
+    // a UDP socket that never answers: the handshake with it hangs
+    let silent = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    let silent_addr = silent.local_addr().unwrap();
+    let hung = {
+        let p = p.clone();
+        tokio::spawn(async move {
+            let _ =
+                p.a.send(&node("p"), silent_addr, &frame("lost", "urn:x", "urn:z"))
+                    .await;
+        })
+    };
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let reply = tokio::time::timeout(
+        Duration::from_secs(3),
+        p.a.send(&node("n2"), p.b_addr, &frame("m1", "urn:x", "urn:y")),
+    )
+    .await
+    .expect("a hanging handshake with another peer does not delay this send")
+    .unwrap();
+    assert_eq!(reply, Reply::Ack { id: "m1".into() });
+    assert_eq!(within(y.recv()).await.unwrap().1.id, "m1");
+    hung.abort();
+    drop(silent);
+}

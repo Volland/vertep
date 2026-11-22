@@ -8,8 +8,13 @@
 //!   so a foreign certificate and a removed member are both refused during the handshake,
 //!   before any frame is read.
 //! - **Ordering.** Frames of one `(sender, target)` pair travel on one stream, one at a time,
-//!   so they arrive in order; other pairs use other streams and never wait for it. Past
-//!   `max_pair_streams` streams per peer, pairs share streams by hash, still in order per pair.
+//!   so they arrive in order; other pairs use other streams and never wait for it. Past the
+//!   pair-stream cap per peer, pairs share streams by hash, still in order per pair.
+//! - **Stream budget.** The QUIC limit on concurrent streams is set explicitly
+//!   ([`TransportConfig::stream_limit`]), and the pair-stream cap stays below it with a reserve
+//!   ([`TransportConfig::pair_stream_cap`]), so no send waits for a stream the peer will never
+//!   allow. Each peer has its own state; connecting to one peer or opening a stream to it never
+//!   holds a lock that sends to other peers need.
 //! - **Backpressure.** The receiver reads the next frame of a stream only after the handler
 //!   accepted the previous one (stored it in the mailbox), so a full mailbox slows exactly the
 //!   streams that feed it.
@@ -334,6 +339,29 @@ pub struct TransportConfig {
     pub max_pair_streams: usize,
     /// How many accepted message identifiers the receiver remembers for deduplication.
     pub dedup_capacity: usize,
+    /// QUIC's limit on concurrent bidirectional streams a peer may open to this node (quinn's
+    /// `max_concurrent_bidi_streams`). Cluster members share one configuration, so it is also
+    /// the limit this node meets when it opens streams to a peer.
+    pub stream_limit: u32,
+}
+
+/// Streams below [`TransportConfig::stream_limit`] that pair streams leave free.
+pub const STREAM_RESERVE: usize = 16;
+
+impl TransportConfig {
+    /// The most pair streams opened to one peer: `max_pair_streams`, clamped to the stream
+    /// limit less [`STREAM_RESERVE`], and at least one.
+    // @tg: implements:: [[openspec:cluster-transport#Stream Budget Within The Peer Limit]]
+    pub fn pair_stream_cap(&self) -> usize {
+        let limit = (self.stream_limit as usize).saturating_sub(STREAM_RESERVE);
+        self.max_pair_streams.min(limit).max(1)
+    }
+
+    fn quic(&self) -> Arc<quinn::TransportConfig> {
+        let mut t = quinn::TransportConfig::default();
+        t.max_concurrent_bidi_streams(quinn::VarInt::from_u32(self.stream_limit));
+        Arc::new(t)
+    }
 }
 
 impl Default for TransportConfig {
@@ -342,6 +370,7 @@ impl Default for TransportConfig {
             max_frame: DEFAULT_MAX_FRAME,
             max_pair_streams: 1024,
             dedup_capacity: 65_536,
+            stream_limit: 256,
         }
     }
 }
@@ -365,12 +394,40 @@ impl fmt::Debug for Receiving {
 }
 
 type PairStream = Arc<tokio::sync::Mutex<(quinn::SendStream, quinn::RecvStream)>>;
+/// The stream of one `(sender, target)` pair, opened once by its first send.
+type PairSlot = Arc<tokio::sync::OnceCell<PairStream>>;
+
+/// One peer: its connection and its streams, locked apart from every other peer.
+// @tg: implements:: [[openspec:cluster-transport#Stream Budget Within The Peer Limit]]
+struct PeerState {
+    /// Held while connecting to this peer only, so one attempt runs at a time.
+    conn: tokio::sync::Mutex<Option<quinn::Connection>>,
+    /// Never held across an await.
+    streams: Mutex<Streams>,
+    /// Bumped whenever a stream open finishes, for sends waiting to share one.
+    opened: tokio::sync::watch::Sender<()>,
+}
 
 #[derive(Default)]
-struct PeerConn {
-    conn: Option<quinn::Connection>,
-    pairs: HashMap<(String, String), PairStream>,
-    streams: Vec<PairStream>,
+struct Streams {
+    pairs: HashMap<(String, String), PairSlot>,
+    open: Vec<PairStream>,
+    /// Streams being opened now, counted against the cap.
+    opening: usize,
+}
+
+impl PeerState {
+    fn new() -> Self {
+        PeerState {
+            conn: tokio::sync::Mutex::new(None),
+            streams: Mutex::new(Streams::default()),
+            opened: tokio::sync::watch::Sender::new(()),
+        }
+    }
+}
+
+fn locked<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// A node's QUIC endpoint: accepts members' connections and sends frames to peers.
@@ -384,7 +441,7 @@ pub struct ClusterTransport {
     identity: NodeIdentity,
     client: quinn::ClientConfig,
     config: TransportConfig,
-    peers: tokio::sync::Mutex<HashMap<NodeId, PeerConn>>,
+    peers: Mutex<HashMap<NodeId, Arc<PeerState>>>,
     accept: tokio::task::JoinHandle<()>,
 }
 
@@ -421,6 +478,7 @@ fn client_config(identity: &NodeIdentity) -> Result<quinn::ClientConfig, Transpo
 fn server_config(
     identity: &NodeIdentity,
     policy: Arc<dyn PeerPolicy>,
+    config: &TransportConfig,
 ) -> Result<quinn::ServerConfig, TransportError> {
     let inner = WebPkiClientVerifier::builder_with_provider(roots(identity)?, provider())
         .build()
@@ -438,7 +496,9 @@ fn server_config(
         .map_err(tls)?;
     s.alpn_protocols = vec![ALPN.to_vec()];
     let q = QuicServerConfig::try_from(s).map_err(tls)?;
-    Ok(quinn::ServerConfig::with_crypto(Arc::new(q)))
+    let mut server = quinn::ServerConfig::with_crypto(Arc::new(q));
+    server.transport_config(config.quic());
+    Ok(server)
 }
 
 async fn read_len(recv: &mut quinn::RecvStream) -> Result<Option<usize>, String> {
@@ -596,8 +656,9 @@ impl ClusterTransport {
         receiving: Receiving,
         config: TransportConfig,
     ) -> Result<Self, TransportError> {
-        let server = server_config(&identity, policy.clone())?;
-        let client = client_config(&identity)?;
+        let server = server_config(&identity, policy.clone(), &config)?;
+        let mut client = client_config(&identity)?;
+        client.transport_config(config.quic());
         let endpoint =
             quinn::Endpoint::server(server, addr).map_err(|e| TransportError::Io(e.to_string()))?;
         let inbox = Arc::new(Inbox {
@@ -622,7 +683,7 @@ impl ClusterTransport {
             identity,
             client,
             config,
-            peers: tokio::sync::Mutex::new(HashMap::new()),
+            peers: Mutex::new(HashMap::new()),
             accept,
         })
     }
@@ -643,53 +704,120 @@ impl ClusterTransport {
         &self.identity.node
     }
 
+    /// The state of `peer`, created on first use.
+    fn peer(&self, peer: &NodeId) -> Arc<PeerState> {
+        locked(&self.peers)
+            .entry(peer.clone())
+            .or_insert_with(|| Arc::new(PeerState::new()))
+            .clone()
+    }
+
+    /// The open connection to `peer`, connecting if there is none; only sends to this peer
+    /// wait for the handshake.
+    async fn connection(
+        &self,
+        ps: &PeerState,
+        peer: &NodeId,
+        addr: SocketAddr,
+    ) -> Result<quinn::Connection, TransportError> {
+        let mut conn = ps.conn.lock().await;
+        if let Some(c) = conn.as_ref() {
+            if c.close_reason().is_none() {
+                return Ok(c.clone());
+            }
+            // the connection closed: its streams are gone with it
+            *locked(&ps.streams) = Streams::default();
+            *conn = None;
+        }
+        let name = node_name(&self.identity.cluster, peer);
+        let c = self
+            .endpoint
+            .connect_with(self.client.clone(), addr, &name)
+            .map_err(|e| TransportError::Connect(e.to_string()))?
+            .await
+            .map_err(|e| TransportError::Connect(e.to_string()))?;
+        *conn = Some(c.clone());
+        Ok(c)
+    }
+
     async fn stream(
         &self,
         peer: &NodeId,
         addr: SocketAddr,
         pair: (String, String),
     ) -> Result<PairStream, TransportError> {
-        let mut peers = self.peers.lock().await;
-        let pc = peers.entry(peer.clone()).or_default();
-        if pc.conn.as_ref().is_some_and(|c| c.close_reason().is_some()) {
-            *pc = PeerConn::default();
-        }
-        if let Some(s) = pc.pairs.get(&pair) {
-            return Ok(s.clone());
-        }
-        let conn = match &pc.conn {
-            Some(c) => c.clone(),
-            None => {
-                let name = node_name(&self.identity.cluster, peer);
-                let c = self
-                    .endpoint
-                    .connect_with(self.client.clone(), addr, &name)
-                    .map_err(|e| TransportError::Connect(e.to_string()))?
-                    .await
-                    .map_err(|e| TransportError::Connect(e.to_string()))?;
-                pc.conn = Some(c.clone());
-                c
-            }
-        };
-        let stream = if pc.streams.len() < self.config.max_pair_streams.max(1) {
-            let (send, recv) = conn
-                .open_bi()
-                .await
-                .map_err(|e| TransportError::Connect(e.to_string()))?;
-            let s = Arc::new(tokio::sync::Mutex::new((send, recv)));
-            pc.streams.push(s.clone());
-            s
-        } else {
-            let h = crate::meta::HashVersion::Fnv1a64
-                .hash64(format!("{}\n{}", pair.0, pair.1).as_bytes());
-            pc.streams[(h % pc.streams.len() as u64) as usize].clone()
-        };
-        pc.pairs.insert(pair, stream.clone());
-        Ok(stream)
+        let ps = self.peer(peer);
+        let conn = self.connection(&ps, peer, addr).await?;
+        let slot = locked(&ps.streams)
+            .pairs
+            .entry(pair.clone())
+            .or_default()
+            .clone();
+        let stream = slot
+            .get_or_try_init(|| self.pair_stream(&ps, &conn, &pair))
+            .await?;
+        Ok(stream.clone())
     }
 
-    async fn drop_peer(&self, peer: &NodeId) {
-        self.peers.lock().await.remove(peer);
+    /// A stream for `pair`: a new one while the peer is below the cap, otherwise one of the
+    /// open streams chosen by the pair's hash. A send that finds every slot still opening
+    /// waits for the first to open instead of asking the peer for one more.
+    async fn pair_stream(
+        &self,
+        ps: &PeerState,
+        conn: &quinn::Connection,
+        pair: &(String, String),
+    ) -> Result<PairStream, TransportError> {
+        enum Next {
+            Open,
+            Share(PairStream),
+            Wait,
+        }
+        let cap = self.config.pair_stream_cap();
+        loop {
+            let mut opened = ps.opened.subscribe();
+            let next = {
+                let mut st = locked(&ps.streams);
+                if st.open.len() + st.opening < cap {
+                    st.opening += 1;
+                    Next::Open
+                } else if st.open.is_empty() {
+                    Next::Wait
+                } else {
+                    let h = crate::meta::HashVersion::Fnv1a64
+                        .hash64(format!("{}\n{}", pair.0, pair.1).as_bytes());
+                    Next::Share(st.open[(h % st.open.len() as u64) as usize].clone())
+                }
+            };
+            match next {
+                Next::Share(s) => return Ok(s),
+                Next::Wait => {
+                    if opened.changed().await.is_err() {
+                        return Err(TransportError::Connect("the peer is gone".into()));
+                    }
+                }
+                Next::Open => {
+                    let result = conn.open_bi().await;
+                    let out = {
+                        let mut st = locked(&ps.streams);
+                        st.opening -= 1;
+                        result
+                            .map(|(send, recv)| {
+                                let s = Arc::new(tokio::sync::Mutex::new((send, recv)));
+                                st.open.push(s.clone());
+                                s
+                            })
+                            .map_err(|e| TransportError::Connect(e.to_string()))
+                    };
+                    ps.opened.send_replace(());
+                    return out;
+                }
+            }
+        }
+    }
+
+    fn drop_peer(&self, peer: &NodeId) {
+        locked(&self.peers).remove(peer);
     }
 
     /// Sends `frame` to `peer` at `addr` on the stream of its `(sender, target)` pair and
@@ -729,7 +857,7 @@ impl ClusterTransport {
         match result {
             Ok(payload) => Ok(Reply::decode(&payload)?),
             Err(e) => {
-                self.drop_peer(peer).await;
+                self.drop_peer(peer);
                 Err(TransportError::Stream(e))
             }
         }

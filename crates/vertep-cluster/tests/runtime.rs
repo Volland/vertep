@@ -898,3 +898,59 @@ async fn draining_a_shard_deactivates_only_its_actors() {
         "another shard's actor keeps running"
     );
 }
+
+// @tg: verifies:: [[openspec:cluster-transport#Ordering Per Sender And Receiver#Retry keeps the order]] {level: integration}
+#[tokio::test(flavor = "current_thread")]
+async fn retry_keeps_the_order() {
+    let mut c = Cluster::with_config(
+        2,
+        8,
+        ClusterConfig {
+            retry_backoff: Duration::from_millis(200),
+            ..ClusterConfig::default()
+        },
+    );
+    c.register(
+        "sink",
+        &scxml(
+            "null",
+            "s",
+            r#"<state id="s"><transition event="e1"/><transition event="e2"/></state>"#,
+        ),
+    );
+    let y = c.actor_on("sink", 1, "y");
+    c.register(
+        "source",
+        &scxml(
+            "null",
+            "s",
+            &format!(
+                r#"<state id="s"><transition event="one"><send event="e1" target="{y}"/></transition>
+                   <transition event="two"><send event="e2" target="{y}"/></transition></state>"#
+            ),
+        ),
+    );
+    let x = c.actor_on("source", 0, "x");
+    let (n0, n1) = (c.members[0].id.clone(), c.members[1].id.clone());
+    // e1 fails once: the wire between the nodes is cut when it is first sent
+    c.wire.set_cut(&n0, &n1, true);
+    c.members[0].node.send(&x, ev("one")).unwrap();
+    assert!(
+        c.until(T, |c| inputs(&c.members[0].node, &x).len() == 1)
+            .await
+    );
+    c.run_for(Duration::from_millis(50)).await;
+    c.wire.set_cut(&n0, &n1, false);
+    // e2 is handed off while e1 waits for its retry
+    c.members[0].node.send(&x, ev("two")).unwrap();
+    assert!(
+        c.until(T, |c| inputs(&c.members[1].node, &y).len() == 2)
+            .await,
+        "both arrive"
+    );
+    let names: Vec<String> = inputs(&c.members[1].node, &y)
+        .iter()
+        .map(|e| e.name.to_string())
+        .collect();
+    assert_eq!(names, ["e1", "e2"], "the retried e1 still precedes e2");
+}

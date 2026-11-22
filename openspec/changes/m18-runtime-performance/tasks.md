@@ -13,16 +13,16 @@ Each phase lands as its own pull request with green CI. Phase 0 comes first, so 
 
 ## 1. Correctness under load (D2, D10 in part)
 
-- [ ] 1.1 `vertep-cluster` transport: set quinn's `max_concurrent_bidi_streams` explicitly (default 256) and clamp `max_pair_streams` below it, leaving a reserve
-- [ ] 1.2 Replace the transport-wide `peers` mutex with a map of `Arc<PeerState>`, each with its own lock and a `OnceCell` connection; no lock is held across `connect` or `open_bi`
-- [ ] 1.3 One sender task per pair stream with a FIFO queue, exponential back-off and per-message deadline; remove the task per message (`runtime.rs` retry loop)
-- [ ] 1.4 Test: 1,000 pairs to one peer with a limit of 256 deliver everything, each pair in order (`Stream Budget Within The Peer Limit#More pairs than the limit`)
-- [ ] 1.5 Test: a hanging handshake to peer P does not delay sends to peer Q (`#Slow peer does not stall others`)
-- [ ] 1.6 Test: retried e1 still precedes e2 (`Ordering Per Sender And Receiver#Retry keeps the order`)
-- [ ] 1.7 `vertep-tiramemsu`: open journal shards with `Durability::Immediate` by default; add `JournalCapabilities::durable_commit`; `NodeConfig::durability` with `Relaxed` opt-in and a startup log line naming the risk
-- [ ] 1.8 Test: default open declares durable commits; relaxed open declares not durable (`Durable Commit` scenarios)
-- [ ] 1.9 Crash test with the testkit crash points: an entry whose sends were dispatched is present after restart (`Transactional Outbox#No send outlives its entry`)
-- [ ] 1.10 Annotate: `implements::` on the stream budget, the per-peer state and the pair sender for `cluster-transport#Stream Budget Within The Peer Limit` and `#Ordering Per Sender And Receiver`; `implements::` on the shard open for `storage#Durable Commit` and on dispatch for `event-journal#Transactional Outbox`; `verifies::` above each test from 1.4 to 1.9
+- [x] 1.1 `vertep-cluster` transport: set quinn's `max_concurrent_bidi_streams` explicitly (default 256) and clamp `max_pair_streams` below it, leaving a reserve
+- [x] 1.2 Replace the transport-wide `peers` mutex with a map of `Arc<PeerState>`, each with its own lock and a `OnceCell` connection; no lock is held across `connect` or `open_bi`
+- [x] 1.3 One sender task per pair stream with a FIFO queue, exponential back-off and per-message deadline; remove the task per message (`runtime.rs` retry loop)
+- [x] 1.4 Test: 1,000 pairs to one peer with a limit of 256 deliver everything, each pair in order (`Stream Budget Within The Peer Limit#More pairs than the limit`)
+- [x] 1.5 Test: a hanging handshake to peer P does not delay sends to peer Q (`#Slow peer does not stall others`)
+- [x] 1.6 Test: retried e1 still precedes e2 (`Ordering Per Sender And Receiver#Retry keeps the order`)
+- [x] 1.7 `vertep-tiramemsu`: open journal shards with `Durability::Immediate` by default (as `ShardDurability::Immediate`; `CommitDurability` is the runtime's enum); add `JournalCapabilities::durable_commit`; `NodeConfig::durability` with `Relaxed` opt-in and a startup log line naming the risk
+- [x] 1.8 Test: default open declares durable commits; relaxed open declares not durable (`Durable Commit` scenarios)
+- [x] 1.9 Crash test with the testkit crash points: an entry whose sends were dispatched is present after restart (`Transactional Outbox#No send outlives its entry`)
+- [x] 1.10 Annotate: `implements::` on the stream budget, the per-peer state and the pair sender for `cluster-transport#Stream Budget Within The Peer Limit` and `#Ordering Per Sender And Receiver`; `implements::` on the shard open for `storage#Durable Commit` and on dispatch for `event-journal#Transactional Outbox`; `verifies::` above each test from 1.4 to 1.9
 
 ## 2. One commit per turn, unversioned bookkeeping, reads from the snapshot (D3, D4, D7)
 

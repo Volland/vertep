@@ -347,12 +347,17 @@ pub struct JournalCapabilities {
     pub fencing: bool,
     /// The store commits a [`StateDelta`] in the same transaction as the entries.
     pub state_in_append: bool,
+    /// A returned append is durable against an operating-system crash (synced before
+    /// `append` returns). A volatile store, or a file store opened in a relaxed mode, declares
+    /// `false`: an OS crash can then lose the newest entries after their sends went out.
+    pub durable_commit: bool,
 }
 
 /// A journal store: per actor address, a linearizable, all-or-nothing append at an expected
 /// position, and reads from a position.
 // @tg: implements:: [[openspec:storage#Journal Store Contract]]
 // @tg: implements:: [[openspec:storage#Append Fencing Token]]
+// @tg: implements:: [[openspec:storage#Durable Commit]] {confidence: partial, note: "declared through JournalCapabilities::durable_commit"}
 pub trait JournalStore: Send + Sync {
     /// What the store supports beyond compare-and-set.
     fn capabilities(&self) -> JournalCapabilities;

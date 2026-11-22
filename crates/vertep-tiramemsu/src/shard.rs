@@ -7,8 +7,8 @@ use std::sync::{Mutex, OnceLock};
 use oxrdf::vocab::rdf;
 use oxrdf::{GraphName, NamedNode, NamedOrBlankNode, Quad, Term, Triple};
 use tiramemsu::{
-    AssertOpts, Db, Eid, Error, ObjectId, OpenOptions, SparqlOptions, SparqlResult, TimeRef, Tx,
-    TxOptions, Valid, Value, View,
+    AssertOpts, Db, Durability, Eid, Error, ObjectId, OpenOptions, SparqlOptions, SparqlResult,
+    TimeRef, Tx, TxOptions, Valid, Value, View,
 };
 use vertep_store::sparql::{clear_graph, delete_data, insert_data};
 use vertep_store::{
@@ -112,7 +112,35 @@ impl Drop for FileClaim {
 pub struct TiramemsuShard {
     db: Db,
     path: PathBuf,
+    durable_commit: bool,
     _claim: FileClaim,
+}
+
+/// When a shard's commits become durable, chosen when it is opened.
+///
+/// [`ShardDurability::Immediate`] is the default: each commit is synced (SQLite
+/// `synchronous = FULL`) before `append` returns, so the runtime dispatches a turn's sends only
+/// after its entry survives an operating-system crash. [`ShardDurability::Relaxed`] is an
+/// explicit opt-in (`synchronous = NORMAL` in WAL mode): faster, but an OS crash or power loss
+/// can roll back the newest commits after their sends were delivered. A relaxed shard declares
+/// `durable_commit = false` in its capabilities.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum ShardDurability {
+    /// Synced before each append returns (the default).
+    #[default]
+    Immediate,
+    /// Durable only after a later checkpoint; the newest commits may be lost to an OS crash.
+    Relaxed,
+}
+
+impl ShardDurability {
+    /// The tiramemsu durability this mode opens with.
+    pub fn tiramemsu(self) -> Durability {
+        match self {
+            ShardDurability::Immediate => Durability::Immediate,
+            ShardDurability::Relaxed => Durability::Normal,
+        }
+    }
 }
 
 impl std::fmt::Debug for TiramemsuShard {
@@ -123,10 +151,14 @@ impl std::fmt::Debug for TiramemsuShard {
     }
 }
 
-/// The journal store capabilities of a tiramemsu shard: fencing and state in the append.
+/// The journal store capabilities of a tiramemsu shard opened with the default durability:
+/// fencing, state in the append and durable commits. A shard opened relaxed (or from a `Db`
+/// the caller opened) declares `durable_commit = false`; read [`TiramemsuShard::capabilities`]
+/// rather than this constant when the open options vary.
 pub const CAPABILITIES: JournalCapabilities = JournalCapabilities {
     fencing: true,
     state_in_append: true,
+    durable_commit: true,
 };
 
 /// The graph store capabilities of tiramemsu: RDF 1.2 (annotations resolve to statement ids;
@@ -232,28 +264,55 @@ fn tx_members(
 }
 
 impl TiramemsuShard {
-    /// Opens (or creates) the shard file at `path` with tiramemsu's default options.
+    /// Opens (or creates) the shard file at `path` with tiramemsu's default options and
+    /// [`ShardDurability::Immediate`]: every commit is synced before `append` returns.
     ///
     /// # Errors
     ///
     /// [`StoreError::Unavailable`] when the file is already open in this process, and the
     /// errors of `Db::open`.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, StoreError> {
-        Self::open_with(path, OpenOptions::default())
+        Self::open_durability(path, ShardDurability::Immediate)
     }
 
-    /// Opens (or creates) the shard file at `path` with `options`.
+    /// Opens (or creates) the shard file at `path` with tiramemsu's default options and the
+    /// given durability; [`ShardDurability::Relaxed`] is the explicit opt-in to faster commits
+    /// that an OS crash can lose.
     ///
     /// # Errors
     ///
     /// As [`TiramemsuShard::open`].
+    pub fn open_durability(
+        path: impl AsRef<Path>,
+        durability: ShardDurability,
+    ) -> Result<Self, StoreError> {
+        Self::open_with(
+            path,
+            OpenOptions {
+                durability: durability.tiramemsu(),
+                ..OpenOptions::default()
+            },
+        )
+    }
+
+    /// Opens (or creates) the shard file at `path` with `options`, as given: the shard declares
+    /// durable commits only when `options.durability` is `Durability::Immediate`. Note that
+    /// `OpenOptions::default()` is tiramemsu's `Normal`, which is not durable against an OS
+    /// crash; [`TiramemsuShard::open`] chooses `Immediate`.
+    ///
+    /// # Errors
+    ///
+    /// As [`TiramemsuShard::open`].
+    // @tg: implements:: [[openspec:storage#Durable Commit]]
     pub fn open_with(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self, StoreError> {
         let path = path.as_ref().to_path_buf();
+        let durable_commit = options.durability == Durability::Immediate;
         let claim = FileClaim::take(&path)?;
         let db = Db::open(&path, options).map_err(store_error)?;
         let shard = TiramemsuShard {
             db,
             path,
+            durable_commit,
             _claim: claim,
         };
         shard.declare_schema()?;
@@ -263,6 +322,9 @@ impl TiramemsuShard {
     /// A shard on a `Db` the caller opened, for example with `Db::open_with_host` on the
     /// WebAssembly host. `path` names the file as that host knows it; it is claimed as given,
     /// without touching a file system.
+    ///
+    /// The `Db` does not say how it syncs, so the shard declares `durable_commit = false`;
+    /// [`TiramemsuShard::from_db_durable`] declares what the caller chose.
     ///
     /// # Errors
     ///
@@ -274,10 +336,32 @@ impl TiramemsuShard {
         let shard = TiramemsuShard {
             db,
             path,
+            durable_commit: false,
             _claim: claim,
         };
         shard.declare_schema()?;
         Ok(shard)
+    }
+
+    /// As [`TiramemsuShard::from_db`], declaring durable commits when the caller opened `db`
+    /// with `Durability::Immediate` on a host that syncs.
+    ///
+    /// # Errors
+    ///
+    /// As [`TiramemsuShard::from_db`].
+    pub fn from_db_durable(
+        db: Db,
+        path: impl Into<PathBuf>,
+        durable_commit: bool,
+    ) -> Result<Self, StoreError> {
+        let mut shard = Self::from_db(db, path)?;
+        shard.durable_commit = durable_commit;
+        Ok(shard)
+    }
+
+    /// True when a returned append is synced against an operating-system crash.
+    pub fn durable_commit(&self) -> bool {
+        self.durable_commit
     }
 
     /// Declares `vt:head` and `vt:fencingEpoch` cardinality one, once per file.
@@ -528,8 +612,12 @@ impl TiramemsuShard {
 }
 
 impl JournalStore for TiramemsuShard {
+    // @tg: implements:: [[openspec:storage#Durable Commit]]
     fn capabilities(&self) -> JournalCapabilities {
-        CAPABILITIES
+        JournalCapabilities {
+            durable_commit: self.durable_commit,
+            ..CAPABILITIES
+        }
     }
 
     fn append(

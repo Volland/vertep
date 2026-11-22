@@ -62,6 +62,8 @@ impl MemoryStore {
             journal_caps: JournalCapabilities {
                 fencing: true,
                 state_in_append: true,
+                // memory is lost with the process: nothing survives a crash
+                durable_commit: false,
             },
             rdf: RdfCapability::Rdf12,
         }
