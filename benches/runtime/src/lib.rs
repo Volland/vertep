@@ -20,9 +20,8 @@ pub const T0: i64 = 1_794_355_200_000;
 
 /// The durability mode the tiramemsu cases run with, recorded with every result.
 ///
-/// The backend opens shards with tiramemsu's default, `synchronous = NORMAL`, until M18
-/// phase 1 makes immediate durability the default.
-pub const TIRAMEMSU_DURABILITY: &str = "normal";
+/// `TiramemsuShard::open` syncs each commit (`ShardDurability::Immediate`) since M18 phase 1.
+pub const TIRAMEMSU_DURABILITY: &str = "immediate";
 
 /// A counter: one transition, one assignment.
 pub const COUNTER: &str = r#"<datamodel><data id="n" expr="0"/></datamodel>

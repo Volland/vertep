@@ -292,7 +292,7 @@ The default backend: one tiramemsu file per shard implements both `JournalStore`
 - realizes:: [[decisions#Two storage traits with tiramemsu as default]] {confidence: partial}
 - scheduled_in:: [[roadmap#M2 Actor runtime]]
 
-Implemented 2026-11-11 on tiramemsu 0.12: one append is one `Db::transact`; entries are named graphs, current state is `GRAPH <actor>` derived from entries, `view_as_of` gives time travel. Measured about 400 appends/s per shard and 25,000 replayed entries/s.
+Implemented 2026-11-11 on tiramemsu 0.12: one append is one `Db::transact`; entries are named graphs, current state is `GRAPH <actor>` derived from entries, `view_as_of` gives time travel. Measured about 400 appends/s per shard and 25,000 replayed entries/s. Since M18 phase 1 (2026-11-22) shards open with `ShardDurability::Immediate` by default and declare `durable_commit`; `ShardDurability::Relaxed` is the opt-in.
 
 ## vertep-oxigraph
 

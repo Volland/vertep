@@ -190,3 +190,14 @@ Timed by criterion on an Apple M2 Max, tiramemsu at `synchronous = NORMAL` (`ben
 
 The core step is three orders of magnitude cheaper than a durable turn, so the store, not the interpreter, is the place to work: phases 2 and 4 target the 5 commits and the full-journal read. The 10 ms floor of activation is not in the plan yet and needs a profile.
 
+
+## Phase 1: correctness under load
+
+Phase 1 (2026-11-22) fixed the three correctness findings: the stream stall, the reordering retry, and sends that could outlive an entry lost to an OS crash.
+
+- describes:: [[decisions#Cluster streams stay within the peer's stream budget]]
+- describes:: [[decisions#Effects follow a durable commit]]
+
+The transport sets quinn's stream limit (`TransportConfig::stream_limit`, 256) and caps pair streams 16 below it; each peer has its own state, and a send that finds every slot still opening waits for one instead of asking the peer for another. Before the fix, 1,000 pairs to one peer hung past 60 s and a hanging handshake with one peer stalled every other; both tests now pass in well under a second (`crates/vertep-cluster/tests/transport.rs`). Each `(node, sender, target)` pair has one sender task with a FIFO queue and exponential back-off (up to 32 times `retry_backoff`), so a retried e1 no longer arrives after e2, as it did before (`retry_keeps_the_order`).
+
+Shards open with immediate durability by default. On the M2 Max the cost was within noise (tiramemsu append 1.51 ms against 1.42 ms, a turn 3.27 ms against 3.43 ms), but macOS `fsync` does not flush the drive cache, so the CI runners on Linux are where the sync's real cost shows; group commit in phase 4 is what pays for it.

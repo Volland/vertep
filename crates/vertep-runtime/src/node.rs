@@ -64,6 +64,8 @@ pub enum CrashPoint {
     BeforeAppend,
     /// After the entry is appended, before the message is acknowledged and sends dispatched.
     AfterAppend,
+    /// After the entry is appended and its sends dispatched, before anything else runs.
+    AfterDispatch,
 }
 
 /// Node settings.
@@ -80,7 +82,33 @@ pub struct NodeConfig {
     pub failure_backoff_ms: i64,
     /// Simulated crash point (tests).
     pub crash_at: Option<CrashPoint>,
+    /// The durability the application asks of its journal store; see [`CommitDurability`].
+    pub durability: CommitDurability,
 }
+
+/// Whether a node's sends wait for appends that survive an operating-system crash.
+///
+/// The node always dispatches a turn's sends after its append returns (the transactional
+/// outbox); whether that append survives an OS crash is the store's to declare, in
+/// `JournalCapabilities::durable_commit`. Open the store to match: the tiramemsu backend is
+/// durable by default and relaxed only on request (`ShardDurability::Relaxed`).
+///
+/// - [`CommitDurability::Durable`] (the default) is the safe choice and logs nothing. A store
+///   that does not declare durable commits, such as the in-memory store, is allowed (tests and
+///   ephemeral nodes use it); [`Node::durable_commits`] reports it.
+/// - [`CommitDurability::Relaxed`] is the explicit opt-in to faster commits. The node writes
+///   one line to stderr when it is built, naming the risk.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum CommitDurability {
+    /// Appends are expected to be synced before they return (the default).
+    #[default]
+    Durable,
+    /// The application accepts that an OS crash can lose the newest entries.
+    Relaxed,
+}
+
+/// The startup line of a node configured with [`CommitDurability::Relaxed`].
+pub const RELAXED_DURABILITY_WARNING: &str = "vertep: relaxed commit durability: an operating-system crash can lose the newest entries after their sends were delivered";
 
 impl Default for NodeConfig {
     fn default() -> Self {
@@ -90,6 +118,7 @@ impl Default for NodeConfig {
             fencing: None,
             failure_backoff_ms: 1_000,
             crash_at: None,
+            durability: CommitDurability::Durable,
         }
     }
 }
@@ -829,6 +858,9 @@ impl NodeBuilder {
     /// recovers what a previous process left: pending timers, undispatched sends and stored
     /// mailbox messages.
     pub fn build(self) -> Node {
+        if self.config.durability == CommitDurability::Relaxed {
+            eprintln!("{RELAXED_DURABILITY_WARNING}");
+        }
         let nonce = {
             use std::hash::{BuildHasher, Hasher};
             let mut h = std::collections::hash_map::RandomState::new().build_hasher();
@@ -1022,6 +1054,18 @@ impl Node {
     /// The storage.
     pub fn storage(&self) -> &Arc<dyn Storage> {
         &self.shared.storage
+    }
+
+    /// True when the journal store declares that a returned append survives an
+    /// operating-system crash, so no dispatched send can outlive its entry.
+    // @tg: implements:: [[openspec:storage#Durable Commit]] {confidence: partial, note: "the runtime's report of the store's declaration"}
+    pub fn durable_commits(&self) -> bool {
+        self.shared.storage.journal().capabilities().durable_commit
+    }
+
+    /// The durability the node was configured with.
+    pub fn durability(&self) -> CommitDurability {
+        self.config.durability
     }
 
     /// The node's clock reading.
@@ -1854,6 +1898,9 @@ impl Node {
             &env,
             now,
         );
+        if self.config.crash_at == Some(CrashPoint::AfterDispatch) {
+            self.crash();
+        }
         true
     }
 

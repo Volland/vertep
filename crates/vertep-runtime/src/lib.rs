@@ -62,8 +62,8 @@ pub use mailbox::{
     MatchSpec, MemoryMailboxes, RouteSpec, RoutedMailboxes, StoreMailboxes,
 };
 pub use node::{
-    ActivationError, ActorState, AskError, CrashPoint, DeadLetter, DeliveryError, MigrateError,
-    Node, NodeBuilder, NodeConfig, NodeHandle, NodeStats, RemoveError,
+    ActivationError, ActorState, AskError, CommitDurability, CrashPoint, DeadLetter, DeliveryError,
+    MigrateError, Node, NodeBuilder, NodeConfig, NodeHandle, NodeStats, RemoveError,
 };
 pub use placement::{Placement, Route};
 pub use shell::{Clock, Shell, Sleep, Spawn, VirtualClock};

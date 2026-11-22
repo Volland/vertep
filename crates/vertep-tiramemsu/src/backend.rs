@@ -8,7 +8,7 @@ use vertep_store::{
     StoreError,
 };
 
-use crate::shard::{CAPABILITIES, TiramemsuShard};
+use crate::shard::{CAPABILITIES, ShardDurability, TiramemsuShard};
 
 /// The shard of an actor: the FNV-1a 64-bit hash of the UTF-8 bytes of its address IRI,
 /// modulo the shard count. The function is fixed: changing it moves actors between files.
@@ -42,7 +42,8 @@ pub struct TiramemsuBackend {
 }
 
 impl TiramemsuBackend {
-    /// Opens (or creates) `shard_count` shard files in `dir`.
+    /// Opens (or creates) `shard_count` shard files in `dir`, each with
+    /// [`ShardDurability::Immediate`].
     ///
     /// # Errors
     ///
@@ -50,6 +51,21 @@ impl TiramemsuBackend {
     /// of another shard count (actors would be looked up in the wrong files); the errors of
     /// [`TiramemsuShard::open`].
     pub fn open(dir: impl AsRef<Path>, shard_count: usize) -> Result<Self, StoreError> {
+        Self::open_durability(dir, shard_count, ShardDurability::Immediate)
+    }
+
+    /// Opens (or creates) `shard_count` shard files in `dir` with the given durability;
+    /// [`ShardDurability::Relaxed`] is the explicit opt-in, declared as not durable.
+    ///
+    /// # Errors
+    ///
+    /// As [`TiramemsuBackend::open`].
+    // @tg: implements:: [[openspec:storage#Durable Commit]]
+    pub fn open_durability(
+        dir: impl AsRef<Path>,
+        shard_count: usize,
+        durability: ShardDurability,
+    ) -> Result<Self, StoreError> {
         if shard_count == 0 {
             return Err(StoreError::invalid("a backend has at least one shard"));
         }
@@ -68,7 +84,12 @@ impl TiramemsuBackend {
             }
         }
         let shards = (0..shard_count)
-            .map(|i| TiramemsuShard::open(dir.join(shard_file_name(i, shard_count))))
+            .map(|i| {
+                TiramemsuShard::open_durability(
+                    dir.join(shard_file_name(i, shard_count)),
+                    durability,
+                )
+            })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(TiramemsuBackend { dir, shards })
     }
@@ -101,7 +122,10 @@ impl TiramemsuBackend {
 
 impl JournalStore for TiramemsuBackend {
     fn capabilities(&self) -> JournalCapabilities {
-        CAPABILITIES
+        JournalCapabilities {
+            durable_commit: self.shards.iter().all(TiramemsuShard::durable_commit),
+            ..CAPABILITIES
+        }
     }
 
     fn append(

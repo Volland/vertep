@@ -17,7 +17,7 @@ mod shard;
 
 pub use backend::{TiramemsuBackend, shard_file_name, shard_of};
 pub use convert::violations;
-pub use shard::{CAPABILITIES, TiramemsuShard, TiramemsuView, graph_capabilities};
+pub use shard::{CAPABILITIES, ShardDurability, TiramemsuShard, TiramemsuView, graph_capabilities};
 
 /// The tiramemsu crate this backend is built on.
 pub use tiramemsu;

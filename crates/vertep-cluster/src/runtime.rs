@@ -19,7 +19,7 @@
 //!   forwarded to the owner with a redirect for the sender.
 
 use core::fmt;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -73,8 +73,25 @@ pub struct ClusterConfig {
     pub dedup_capacity: usize,
     /// How long an outbound message is retried before the sender gets a delivery error.
     pub delivery_deadline: Duration,
-    /// The pause between retries.
+    /// The first pause between retries; each further retry of the same frame waits twice as
+    /// long, up to [`MAX_BACKOFF_FACTOR`] times this.
     pub retry_backoff: Duration,
+}
+
+/// The longest retry pause, as a multiple of [`ClusterConfig::retry_backoff`].
+pub const MAX_BACKOFF_FACTOR: u32 = 32;
+
+/// How long a pair's sender task waits for another frame before it ends.
+const PAIR_IDLE: Duration = Duration::from_secs(30);
+
+/// A pair's sender task: `(destination node, sender, target)`.
+type PairKey = (NodeId, String, String);
+
+/// A frame queued on its pair, with the envelope it carries and when it was handed off.
+struct Outgoing {
+    env: Envelope,
+    frame: Frame,
+    since: tokio::time::Instant,
 }
 
 impl Default for ClusterConfig {
@@ -123,6 +140,8 @@ pub struct ClusterNode {
     outbound: OnceLock<Arc<dyn Storage>>,
     /// The outbound queue of each destination node, once opened.
     queues: Mutex<BTreeMap<NodeId, Arc<StoreMailbox>>>,
+    /// The FIFO queue of each pair's sender task, while it runs.
+    pairs: Mutex<HashMap<PairKey, tokio::sync::mpsc::UnboundedSender<Outgoing>>>,
     view_version: Mutex<u64>,
     /// Set once the node stopped: it sends and retries nothing more.
     stopped: AtomicBool,
@@ -168,6 +187,7 @@ impl ClusterNode {
             workers: Mutex::new(Workers::default()),
             outbound: OnceLock::new(),
             queues: Mutex::new(BTreeMap::new()),
+            pairs: Mutex::new(HashMap::new()),
             view_version: Mutex::new(0),
             stopped: AtomicBool::new(false),
             me: me.clone(),
@@ -487,76 +507,113 @@ impl ClusterNode {
         self.retry_remote(node, env, frame)
     }
 
-    /// Retries `frame` (carrying `env`) to `node` until it is settled or this node stops.
+    /// Queues `frame` (carrying `env`) on the sender task of its `(node, sender, target)` pair,
+    /// starting the task if none runs. The task sends one frame at a time and retries it until
+    /// it is settled before the next, so a retry never lets a later frame of the pair overtake.
+    // @tg: implements:: [[openspec:cluster-transport#Ordering Per Sender And Receiver]]
     fn retry_remote(&self, node: NodeId, env: Envelope, frame: Frame) -> Result<(), String> {
         let Some(wire) = self.wire.get().cloned() else {
             return Err("no cluster wire".into());
         };
         let rt = tokio::runtime::Handle::try_current().map_err(|e| e.to_string())?;
-        let (me, local) = (self.me.clone(), self.local().clone());
-        // a node that is gone (stopped, crashed) retries nothing
+        let key: PairKey = (node, frame.sender.clone(), frame.target.clone());
+        let mut item = Outgoing {
+            env,
+            frame,
+            since: tokio::time::Instant::now(),
+        };
+        let mut pairs = lock(&self.pairs);
+        if let Some(tx) = pairs.get(&key) {
+            match tx.send(item) {
+                Ok(()) => return Ok(()),
+                // the task ended without removing its queue (its node stopped): start anew
+                Err(tokio::sync::mpsc::error::SendError(back)) => item = back,
+            }
+        }
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let _ = tx.send(item);
+        pairs.insert(key.clone(), tx);
+        drop(pairs);
+        rt.spawn(pair_sender(
+            self.me.clone(),
+            wire,
+            self.local().clone(),
+            key,
+            rx,
+        ));
+        Ok(())
+    }
+
+    /// Sends `item` to `node` until it is settled, its deadline passes or this node stops;
+    /// false when the node is gone.
+    async fn deliver(
+        me: &Weak<ClusterNode>,
+        wire: &Arc<dyn Wire>,
+        local: &NodeId,
+        node: &NodeId,
+        item: Outgoing,
+    ) -> bool {
         let alive =
             |me: &Weak<ClusterNode>| me.upgrade().filter(|m| !m.stopped.load(Ordering::SeqCst));
-        rt.spawn(async move {
-            let start = tokio::time::Instant::now();
-            loop {
-                if alive(&me).is_none() {
-                    return;
+        let Outgoing { env, frame, since } = item;
+        let mut backoff = match alive(me) {
+            Some(m) => m.config.retry_backoff,
+            None => return false,
+        };
+        loop {
+            let reply = wire.send(local, node, frame.clone()).await;
+            let Some(me) = alive(me) else {
+                return false;
+            };
+            let last = match reply {
+                Ok(Reply::Ack { .. }) => {
+                    me.settled(node, &frame.id);
+                    return true;
                 }
-                let reply = wire.send(&local, &node, frame.clone()).await;
-                let Some(me) = alive(&me) else {
-                    return;
-                };
-                let last = match reply {
-                    Ok(Reply::Ack { .. }) => {
-                        me.settled(&node, &frame.id);
-                        return;
-                    }
-                    Ok(Reply::Forwarded { redirect, .. }) => {
-                        lock(&me.routing).apply_redirect(&redirect);
-                        me.settled(&node, &frame.id);
-                        return;
-                    }
-                    // the receiver recorded it as a dead letter: the sender is stale
-                    Ok(Reply::Rejected {
-                        kind: RejectKind::Fenced,
-                        ..
-                    }) => {
-                        me.settled(&node, &frame.id);
-                        return;
-                    }
-                    Ok(Reply::Rejected {
-                        kind: RejectKind::Unavailable,
-                        message,
-                        ..
-                    }) => message,
-                    Ok(Reply::Rejected { message, .. }) => {
-                        me.report(&env, &message);
-                        me.settled(&node, &frame.id);
-                        return;
-                    }
-                    // a data answer is for a request frame (journal shipping), never a message
-                    Ok(Reply::Data { .. }) => {
-                        me.report(&env, "the receiver answered a message with data");
-                        me.settled(&node, &frame.id);
-                        return;
-                    }
-                    Err(e) => e,
-                };
-                if start.elapsed() + me.config.retry_backoff > me.config.delivery_deadline {
-                    me.report(
-                        &env,
-                        &format!("not acknowledged before the deadline: {last}"),
-                    );
-                    me.settled(&node, &frame.id);
-                    return;
+                Ok(Reply::Forwarded { redirect, .. }) => {
+                    lock(&me.routing).apply_redirect(&redirect);
+                    me.settled(node, &frame.id);
+                    return true;
                 }
-                let backoff = me.config.retry_backoff;
-                drop(me);
-                tokio::time::sleep(backoff).await;
+                // the receiver recorded it as a dead letter: the sender is stale
+                Ok(Reply::Rejected {
+                    kind: RejectKind::Fenced,
+                    ..
+                }) => {
+                    me.settled(node, &frame.id);
+                    return true;
+                }
+                Ok(Reply::Rejected {
+                    kind: RejectKind::Unavailable,
+                    message,
+                    ..
+                }) => message,
+                Ok(Reply::Rejected { message, .. }) => {
+                    me.report(&env, &message);
+                    me.settled(node, &frame.id);
+                    return true;
+                }
+                // a data answer is for a request frame (journal shipping), never a message
+                Ok(Reply::Data { .. }) => {
+                    me.report(&env, "the receiver answered a message with data");
+                    me.settled(node, &frame.id);
+                    return true;
+                }
+                Err(e) => e,
+            };
+            if since.elapsed() + backoff > me.config.delivery_deadline {
+                me.report(
+                    &env,
+                    &format!("not acknowledged before the deadline: {last}"),
+                );
+                me.settled(node, &frame.id);
+                return true;
             }
-        });
-        Ok(())
+            let cap = me.config.retry_backoff * MAX_BACKOFF_FACTOR;
+            drop(me);
+            tokio::time::sleep(backoff).await;
+            backoff = (backoff * 2).min(cap);
+        }
     }
 
     /// Counts a reply or error that answers a worker request, freeing its activation.
@@ -1334,4 +1391,35 @@ fn unhex(text: &str) -> Option<Vec<u8>> {
         .step_by(2)
         .map(|i| u8::from_str_radix(text.get(i..i + 2)?, 16).ok())
         .collect()
+}
+
+/// The sender task of one pair: takes its frames in order and delivers each before the next;
+/// ends when its node stops or after [`PAIR_IDLE`] without a frame.
+// @tg: implements:: [[openspec:cluster-transport#Ordering Per Sender And Receiver]]
+async fn pair_sender(
+    me: Weak<ClusterNode>,
+    wire: Arc<dyn Wire>,
+    local: NodeId,
+    key: PairKey,
+    mut rx: tokio::sync::mpsc::UnboundedReceiver<Outgoing>,
+) {
+    loop {
+        let item = match tokio::time::timeout(PAIR_IDLE, rx.recv()).await {
+            Ok(Some(item)) => item,
+            Ok(None) => return,
+            Err(_idle) => {
+                let Some(node) = me.upgrade() else { return };
+                let mut pairs = lock(&node.pairs);
+                // enqueueing holds the same lock, so nothing can slip in after this check
+                if rx.is_empty() {
+                    pairs.remove(&key);
+                    return;
+                }
+                continue;
+            }
+        };
+        if !ClusterNode::deliver(&me, &wire, &local, &key.0, item).await {
+            return;
+        }
+    }
 }

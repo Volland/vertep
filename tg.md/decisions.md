@@ -1979,7 +1979,9 @@ Rejected: tuning without a baseline, and budgets in wall-clock time only, which 
 
 ## Effects follow a durable commit
 
-Journal shards open with `Durability::Immediate` by default, so a turn's sends go out only after its entry is synced; `Relaxed` is an opt-in a store declares through `JournalCapabilities::durable_commit`. Proposed 2026-11-16 (M18 D2).
+Journal shards open with `ShardDurability::Immediate` by default, so a turn's sends go out only after its entry is synced; `Relaxed` is an opt-in declared through `JournalCapabilities::durable_commit` (M18 D2).
+
+Proposed 2026-11-16, accepted 2026-11-22 when phase 1 landed. `NodeConfig::durability = Relaxed` writes the risk to stderr when the node is built, and `Node::durable_commits` reports what the store declares.
 
 - motivated_by:: [[decisions#Event-sourced actors]] {weight: primary, since: "2026-11-16"}
 - motivated_by:: [[constraints#SQLite NORMAL synchronous can lose the newest commits]] {weight: primary}
@@ -2051,7 +2053,9 @@ In the cluster, `virtuals` holds only active actors, idle pair streams are evict
 
 ## Cluster streams stay within the peer's stream budget
 
-The QUIC transport sets its stream limit and keeps pair streams below it, locks per peer with no lock held across connect or `open_bi`, and sends each pair through one ordered task with a window of frames. Proposed 2026-11-16 (M18 D10).
+The QUIC transport sets its stream limit and keeps pair streams below it, locks per peer with no lock held across connect or `open_bi`, and sends each pair through one ordered task with a window of frames (M18 D10).
+
+Proposed 2026-11-16. The stream budget (`TransportConfig::stream_limit`, default 256, pair streams capped 16 below it), the per-peer state and the ordered pair task with exponential back-off were accepted 2026-11-22 with phase 1; the window of frames waits for phase 5.
 
 - motivated_by:: [[constraints#QUIC limits streams per connection]] {weight: primary, since: "2026-11-16"}
 - motivated_by:: [[decisions#QUIC with mutual TLS and a stream per actor pair]] {weight: primary, note: "kept: pairs share streams past the cap"}
